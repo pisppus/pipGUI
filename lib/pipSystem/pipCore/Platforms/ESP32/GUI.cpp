@@ -1,7 +1,5 @@
 #include <pipCore/Platforms/ESP32/GUI.h>
 
-#include <OpenFontRender.h>
-
 #include <esp_heap_caps.h>
 
 namespace pipcore
@@ -60,11 +58,6 @@ namespace pipcore
         const uint32_t dutyMax = (1U << _backlightResolution) - 1U;
         const uint32_t duty = (dutyMax * (uint32_t)percent + 50U) / 100U;
         ledcWrite(_backlightChannel, dutyMax - duty);
-    }
-
-    void Esp32GuiPlatform::configureOpenFontRender()
-    {
-        OpenFontRender::setSerial(Serial);
     }
 
     void *Esp32GuiPlatform::guiAlloc(size_t bytes, GuiAllocCaps caps)

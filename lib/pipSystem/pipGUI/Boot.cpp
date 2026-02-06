@@ -98,12 +98,6 @@ namespace pipgui
             float zoomEase = bezierEase01(tn, 0.30f, 0.80f);
             float fadeEase = bezierEase01(tn, 0.20f, 0.90f);
 
-            if (!_flags.ttfLoaded || _logoTitleTTFSize == 0)
-            {
-                draw(_bootFgColor);
-                break;
-            }
-
             bool useSprite = _flags.spriteEnabled;
             bool prevRender = _flags.renderToSprite;
             lgfx::LGFX_Sprite *prevActive = _activeSprite;
@@ -125,20 +119,18 @@ namespace pipgui
             uint8_t alpha = (uint8_t)(fadeEase * 255.0f + 0.5f);
             uint16_t fgBlend = detail::blend565(_bootBgColor, _bootFgColor, alpha);
 
-            _ttf.setDrawer(*target);
-            _ttf.setFontColor(fgBlend, _bootBgColor);
-
-            uint16_t baseTitlePx = _logoTitleTTFSize;
-            uint16_t baseSubPx = _logoSubtitleTTFSize ? _logoSubtitleTTFSize : (uint16_t)((baseTitlePx * 3U) / 4U);
+            uint16_t baseTitlePx = _logoTitleSizePx ? _logoTitleSizePx : _textStyleH1Px;
+            uint16_t baseSubPx = _logoSubtitleSizePx ? _logoSubtitleSizePx : (uint16_t)((baseTitlePx * 3U) / 4U);
 
             float scale = 0.50f + 0.50f * zoomEase;
 
             uint16_t titlePx = (uint16_t)max(4, (int)(baseTitlePx * scale + 0.5f));
             uint16_t subPx = (uint16_t)max(4, (int)(baseSubPx * scale + 0.5f));
 
-            _ttf.setFontSize(titlePx);
-            int16_t titleW = (int16_t)_ttf.getTextWidth("%s", _bootTitle.c_str());
-            int16_t titleH = (int16_t)_ttf.getTextHeight("%s", _bootTitle.c_str());
+            int16_t titleW = 0;
+            int16_t titleH = 0;
+            setPSDFFontSize(titlePx);
+            psdfMeasureText(_bootTitle, titleW, titleH);
 
             bool hasSub = _bootSubtitle.length() > 0;
             int16_t subW = 0;
@@ -150,25 +142,22 @@ namespace pipgui
 
             if (hasSub)
             {
-                _ttf.setFontSize(subPx);
-                subW = (int16_t)_ttf.getTextWidth("%s", _bootSubtitle.c_str());
-                subH = (int16_t)_ttf.getTextHeight("%s", _bootSubtitle.c_str());
+                setPSDFFontSize(subPx);
+                psdfMeasureText(_bootSubtitle, subW, subH);
             }
 
             int16_t totalH = hasSub ? (titleH + spacing + subH) : titleH;
             int16_t topY = (_bootY != -1) ? _bootY : (int16_t)((_screenHeight - totalH) / 2);
             int16_t cx = (_bootX != -1) ? _bootX : (int16_t)(_screenWidth / 2);
 
-            _ttf.setFontSize(titlePx);
-            _ttf.drawString(_bootTitle.c_str(), cx - titleW / 2, topY,
-                            fgBlend, _bootBgColor, Layout::Horizontal);
+            setPSDFFontSize(titlePx);
+            psdfDrawTextInternal(_bootTitle, cx, topY, fgBlend, _bootBgColor, AlignCenter);
 
             if (hasSub)
             {
                 int16_t subY = topY + titleH + spacing;
-                _ttf.setFontSize(subPx);
-                _ttf.drawString(_bootSubtitle.c_str(), cx - subW / 2, subY,
-                                fgBlend, _bootBgColor, Layout::Horizontal);
+                setPSDFFontSize(subPx);
+                psdfDrawTextInternal(_bootSubtitle, cx, subY, fgBlend, _bootBgColor, AlignCenter);
             }
 
             if (useSprite)
@@ -185,50 +174,20 @@ namespace pipgui
         {
             auto t = getDrawTarget();
 
-            int16_t th, sh = 0, sp = 4;
+            int16_t th = 0, sh = 0, sp = 4;
             bool sub = _bootSubtitle.length() > 0;
-            if (_flags.ttfLoaded && _logoTitleTTFSize > 0)
-            {
-                _ttf.setDrawer(*t);
-                uint16_t titlePx = _logoTitleTTFSize;
-                uint16_t subPx = _logoSubtitleTTFSize ? _logoSubtitleTTFSize : (uint16_t)((titlePx * 3U) / 4U);
 
-                _ttf.setFontSize(titlePx);
-                th = (int16_t)_ttf.getTextHeight("%s", _bootTitle.c_str());
+            uint16_t titlePx = _logoTitleSizePx ? _logoTitleSizePx : _textStyleH1Px;
+            uint16_t subPx = _logoSubtitleSizePx ? _logoSubtitleSizePx : (uint16_t)((titlePx * 3U) / 4U);
 
-                if (sub)
-                {
-                    _ttf.setFontSize(subPx);
-                    sh = (int16_t)_ttf.getTextHeight("%s", _bootSubtitle.c_str());
-                }
-            }
-            else
+            int16_t tmpW = 0;
+            setPSDFFontSize(titlePx);
+            psdfMeasureText(_bootTitle, tmpW, th);
+
+            if (sub)
             {
-                if (_logoTitleFont)
-                {
-                    t->loadFont(_logoTitleFont);
-                    th = t->fontHeight();
-                    t->unloadFont();
-                }
-                else
-                {
-                    t->setTextFont(4);
-                    th = t->fontHeight();
-                }
-                if (sub)
-                {
-                    if (_logoSubtitleFont)
-                    {
-                        t->loadFont(_logoSubtitleFont);
-                        sh = t->fontHeight();
-                        t->unloadFont();
-                    }
-                    else
-                    {
-                        t->setTextFont(2);
-                        sh = t->fontHeight();
-                    }
-                }
+                setPSDFFontSize(subPx);
+                psdfMeasureText(_bootSubtitle, tmpW, sh);
             }
 
             int16_t totH = sub ? (th + sp + sh) : th;

@@ -10,8 +10,8 @@ namespace pipgui
                                float animProgress,
                                bool animate,
                                int8_t animDirection,
-                               uint16_t activeColor,
-                               uint16_t inactiveColor,
+                               uint32_t activeColor,
+                               uint32_t inactiveColor,
                                uint8_t dotRadius,
                                uint8_t spacing,
                                uint8_t activeWidth)
@@ -62,7 +62,7 @@ namespace pipgui
         _flags.renderToSprite = 1;
         _activeSprite = &_sprite;
 
-        _sprite.fillRect((int16_t)(rx - pad), (int16_t)(ry - pad), rw, rh, _bgColor);
+        fillRect((int16_t)(rx - pad), (int16_t)(ry - pad), rw, rh, _bgColor);
         drawScrollDots(left, top, count, activeIndex, prevIndex, animProgress, animate, animDirection,
                        activeColor, inactiveColor, dotRadius, spacing, activeWidth);
 
@@ -80,8 +80,8 @@ namespace pipgui
                             float animProgress,
                             bool animate,
                             int8_t animDirection,
-                            uint16_t activeColor,
-                            uint16_t inactiveColor,
+                            uint32_t activeColor,
+                            uint32_t inactiveColor,
                             uint8_t dotRadius,
                             uint8_t spacing,
                             uint8_t activeWidth)
@@ -131,19 +131,17 @@ namespace pipgui
         int16_t baseY = top + h / 2;
         int16_t baseX0 = left + (int16_t)activeWidth / 2;
 
-        t->fillRect(left, top, totalW, h, _bgColor);
+        fillRect(left, top, totalW, h, _bgColor);
 
         for (uint8_t i = 0; i < count; i++)
         {
-            t->fillSmoothCircle((int16_t)(baseX0 + (int16_t)i * (int16_t)spacing),
-                                baseY,
-                                (int16_t)dotRadius,
-                                inactiveColor);
+            int16_t cx = (int16_t)(baseX0 + (int16_t)i * (int16_t)spacing);
+            fillCircleFrc(cx, baseY, (int16_t)dotRadius, inactiveColor);
         }
 
         if (count == 1)
         {
-            t->fillSmoothCircle(baseX0, baseY, (int16_t)dotRadius, activeColor);
+            fillCircleFrc(baseX0, baseY, (int16_t)dotRadius, activeColor);
             return;
         }
 
@@ -193,26 +191,19 @@ namespace pipgui
             int16_t lx = (int16_t)roundf(drawnLeftX);
             int16_t rx = (int16_t)roundf(drawnRightX);
 
-            t->fillSmoothCircle(lx, baseY, (int16_t)dotRadius, activeColor);
-            t->fillSmoothCircle(rx, baseY, (int16_t)dotRadius, activeColor);
+            fillCircleFrc(lx, baseY, (int16_t)dotRadius, activeColor);
+            fillCircleFrc(rx, baseY, (int16_t)dotRadius, activeColor);
 
             if (fabsf(drawnRightX - drawnLeftX) > (float)dotRadius * 0.5f)
             {
-                t->fillSmoothRoundRect(lx,
-                                      (int16_t)(baseY - (int16_t)dotRadius),
-                                      (int16_t)(rx - lx),
-                                      h,
-                                      0,
-                                      activeColor);
+                fillRect(lx, (int16_t)(baseY - (int16_t)dotRadius), (int16_t)(rx - lx), h, activeColor);
             }
         }
         else
         {
             int16_t cx = baseX0 + (int16_t)activeIndex * (int16_t)spacing;
-            t->fillSmoothCircle(cx,
-                                baseY,
-                                (int16_t)dotRadius,
-                                activeColor);
+            fillCircleFrc(cx, baseY, (int16_t)dotRadius, activeColor);
         }
     }
+}
 }

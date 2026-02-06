@@ -9,6 +9,25 @@
 
 namespace pipgui
 {
+    static inline uint16_t to565(uint32_t c)
+    {
+        uint8_t r = (uint8_t)((c >> 16) & 0xFF);
+        uint8_t g = (uint8_t)((c >> 8) & 0xFF);
+        uint8_t b = (uint8_t)(c & 0xFF);
+        return (uint16_t)((((uint16_t)(r >> 3)) << 11) | (((uint16_t)(g >> 2)) << 5) | ((uint16_t)(b >> 3)));
+    }
+
+    static inline uint32_t from565(uint16_t c)
+    {
+        uint8_t r5 = (uint8_t)((c >> 11) & 0x1F);
+        uint8_t g6 = (uint8_t)((c >> 5) & 0x3F);
+        uint8_t b5 = (uint8_t)(c & 0x1F);
+        uint8_t r8 = (uint8_t)((r5 * 255U) / 31U);
+        uint8_t g8 = (uint8_t)((g6 * 255U) / 63U);
+        uint8_t b8 = (uint8_t)((b5 * 255U) / 31U);
+        return (uint32_t)((r8 << 16) | (g8 << 8) | b8);
+    }
+
     static void clearListMenuCache(ListMenuState &m, pipcore::GuiPlatform *plat)
     {
         if (m.cacheNormal)
@@ -167,8 +186,8 @@ namespace pipgui
 
         if (m.style.cardColor == 0 && m.style.cardActiveColor == 0)
         {
-            uint16_t base = _bgColor ? _bgColor : 0x0000;
-            m.style.cardColor = pipgui::detail::lighten565(base, 4);
+            uint16_t base = _bgColor ? (uint16_t)_bgColor : 0x0000;
+            m.style.cardColor = to565(pipgui::detail::lighten888(from565(base), 4));
             m.style.cardActiveColor = rgb(0, 130, 220);
             m.style.radius = 10;
             m.style.spacing = 10;
@@ -379,7 +398,6 @@ namespace pipgui
             cardH = m.style.cardHeight;
         else
             cardH = cardMode ? 50 : 34;
-
         if (m.style.cardHeight <= 0 && cardH * 2 + m.style.spacing > usableH)
             cardH = usableH / 3;
 
@@ -475,50 +493,11 @@ namespace pipgui
 
         pipcore::GuiPlatform *plat = platform();
 
-        bool useCache = (cardMode || plainMode) && _flags.ttfLoaded && (bgColor == _bgColor);
+        bool useCache = (cardMode || plainMode) && (bgColor == (uint16_t)_bgColor);
+
         if (!useCache && m.cacheValid)
         {
             clearListMenuCache(m, plat);
-        }
-
-        if (useCache)
-        {
-            if (!m.cacheValid || m.cacheW != cardW || m.cacheH != cardH)
-            {
-                clearListMenuCache(m, plat);
-                m.cacheW = cardW;
-                m.cacheH = cardH;
-                m.cacheValid = true;
-            }
-        }
-
-        if (plainMode && useCache && m.cacheValid)
-        {
-            int32_t base = (int32_t)floorf(m.scrollPos);
-            int32_t keepMin = base - 2;
-            int32_t keepMax = base + (int32_t)visibleCount + 2;
-            if (keepMin < 0)
-                keepMin = 0;
-            if (keepMax < 0)
-                keepMax = 0;
-            if (keepMax >= (int32_t)m.itemCount)
-                keepMax = (int32_t)m.itemCount - 1;
-
-            for (uint8_t j = 0; j < m.itemCount; ++j)
-            {
-                if ((int32_t)j >= keepMin && (int32_t)j <= keepMax)
-                    continue;
-                if (m.cacheNormal && m.cacheNormal[j])
-                {
-                    detail::guiFree(plat, m.cacheNormal[j]);
-                    m.cacheNormal[j] = nullptr;
-                }
-                if (m.cacheActive && m.cacheActive[j])
-                {
-                    detail::guiFree(plat, m.cacheActive[j]);
-                    m.cacheActive[j] = nullptr;
-                }
-            }
         }
 
         auto renderItemToCache = [&](uint8_t index, bool activeState, uint16_t bg, uint16_t border, uint16_t txtCol, uint16_t subCol) -> uint16_t *
@@ -535,10 +514,10 @@ namespace pipgui
             if (m.cacheW <= 0 || m.cacheH <= 0)
                 return nullptr;
             size_t pixels = (size_t)m.cacheW * (size_t)m.cacheH;
-            assert(pixels <= (std::numeric_limits<size_t>::max() / sizeof(uint16_t)));
             if (pixels == 0 || pixels > (std::numeric_limits<size_t>::max() / sizeof(uint16_t)))
                 return nullptr;
             size_t bytes = pixels * sizeof(uint16_t);
+
             slot = (uint16_t *)detail::guiAlloc(plat, bytes, pipcore::GuiAllocCaps::PreferExternal);
             if (!slot)
                 return nullptr;
@@ -569,66 +548,69 @@ namespace pipgui
 
             int16_t txLocal = 10;
 
-            if (_flags.ttfLoaded)
+            uint16_t titlePx = m.style.titleFontPx;
+            uint16_t subPx = m.style.subtitleFontPx;
+            uint16_t gapPx = m.style.lineGapPx;
+
+            if (titlePx == 0)
+                titlePx = hasSub ? 18 : 20;
+            if (hasSub)
             {
-                _ttf.setDrawer(spr);
-
-                uint16_t titlePx = m.style.titleFontPx;
-                uint16_t subPx = m.style.subtitleFontPx;
-                uint16_t gapPx = m.style.lineGapPx;
-
-                if (titlePx == 0)
-                    titlePx = hasSub ? 18 : 20;
-                if (hasSub)
-                {
-                    if (subPx == 0)
-                        subPx = (uint16_t)((titlePx * 7U) / 10U);
-                    if (gapPx == 0)
-                        gapPx = (uint16_t)(titlePx / 3U);
-                    if (gapPx > 0)
-                        gapPx = (uint16_t)(gapPx + 4);
-                }
-                else
-                {
-                    subPx = 0;
-                    gapPx = 0;
-                }
-
-                int16_t titleH = 0;
-                int16_t subH = 0;
-
-                _ttf.setFontSize(titlePx);
-                titleH = (int16_t)_ttf.getTextHeight("%s", title.c_str());
-
-                if (hasSub && subPx > 0)
-                {
-                    _ttf.setFontSize(subPx);
-                    subH = (int16_t)_ttf.getTextHeight("%s", sub.c_str());
-                }
-
-                int16_t totalH = titleH;
-                if (hasSub && subH > 0)
-                    totalH += gapPx + subH;
-
-                int16_t baseY = (int16_t)((m.cacheH - totalH) / 2);
-                baseY -= 4;
-                if (baseY < 2)
-                    baseY = 2;
-
-                int16_t tyTitleLocal = baseY;
-                int16_t tySubLocal = baseY + titleH + (hasSub ? gapPx : 0);
-
-                _ttf.setFontSize(titlePx);
-                _ttf.setFontColor(txtCol, bg);
-                _ttf.drawString(title.c_str(), txLocal, tyTitleLocal, txtCol, bg, Layout::Horizontal);
-
-                if (hasSub && subPx > 0)
-                {
-                    _ttf.setFontSize(subPx);
-                    _ttf.setFontColor(subCol, bg);
-                    _ttf.drawString(sub.c_str(), txLocal, tySubLocal, subCol, bg, Layout::Horizontal);
-                }
+                if (subPx == 0)
+                    subPx = (uint16_t)((titlePx * 7U) / 10U);
+                if (gapPx == 0)
+                    gapPx = (uint16_t)(titlePx / 3U);
+                if (gapPx > 0)
+                    gapPx = (uint16_t)(gapPx + 4);
             }
+            else
+            {
+                subPx = 0;
+                gapPx = 0;
+            }
+
+            int16_t titleW = 0;
+            int16_t titleH = 0;
+            int16_t subW = 0;
+            int16_t subH = 0;
+
+            setPSDFFontSize(titlePx);
+            psdfMeasureText(title, titleW, titleH);
+
+            if (hasSub && subPx > 0)
+            {
+                setPSDFFontSize(subPx);
+                psdfMeasureText(sub, subW, subH);
+            }
+
+            int16_t totalH = titleH;
+            if (hasSub && subH > 0)
+                totalH += gapPx + subH;
+
+            int16_t baseY = (int16_t)((m.cacheH - totalH) / 2);
+            baseY -= 4;
+            if (baseY < 2)
+                baseY = 2;
+
+            int16_t tyTitleLocal = baseY;
+            int16_t tySubLocal = baseY + titleH + (hasSub ? gapPx : 0);
+
+            bool prevRender = _flags.renderToSprite;
+            lgfx::LGFX_Sprite *prevActive = _activeSprite;
+            _flags.renderToSprite = 1;
+            _activeSprite = &spr;
+
+            setPSDFFontSize(titlePx);
+            psdfDrawTextInternal(title, txLocal, tyTitleLocal, txtCol, bg, AlignLeft);
+
+            if (hasSub && subPx > 0)
+            {
+                setPSDFFontSize(subPx);
+                psdfDrawTextInternal(sub, txLocal, tySubLocal, subCol, bg, AlignLeft);
+            }
+
+            _flags.renderToSprite = prevRender;
+            _activeSprite = prevActive;
 
             memcpy(slot, (uint16_t *)spr.getBuffer(), pixels * sizeof(uint16_t));
             spr.deleteSprite();
@@ -693,18 +675,26 @@ namespace pipgui
             if (titlePx == 0)
                 titlePx = 18;
 
-            _ttf.setDrawer(spr);
-            _ttf.setFontSize(titlePx);
+            int16_t titleW = 0;
+            int16_t titleH = 0;
+            setPSDFFontSize(titlePx);
+            psdfMeasureText(title, titleW, titleH);
 
-            int16_t titleH = (int16_t)_ttf.getTextHeight("%s", title.c_str());
             int16_t baseY = (int16_t)((m.cacheH - titleH) / 2);
             baseY -= 4;
             if (baseY < 2)
                 baseY = 2;
 
-            _ttf.setFontSize(titlePx);
-            _ttf.setFontColor(txtCol, bg);
-            _ttf.drawString(title.c_str(), txLocal, baseY, txtCol, bg, Layout::Horizontal);
+            bool prevRender = _flags.renderToSprite;
+            lgfx::LGFX_Sprite *prevActive = _activeSprite;
+            _flags.renderToSprite = 1;
+            _activeSprite = &spr;
+
+            setPSDFFontSize(titlePx);
+            psdfDrawTextInternal(title, txLocal, baseY, txtCol, bg, AlignLeft);
+
+            _flags.renderToSprite = prevRender;
+            _activeSprite = prevActive;
 
             memcpy(slot, (uint16_t *)spr.getBuffer(), pixels * sizeof(uint16_t));
             spr.deleteSprite();
@@ -734,9 +724,10 @@ namespace pipgui
             bool active = (i == m.selectedIndex);
 
             uint16_t bg = active ? m.style.cardActiveColor : (cardMode ? m.style.cardColor : bgColor);
-            uint16_t border = pipgui::detail::lighten565(bg, 4);
-            uint16_t txtCol = pipgui::detail::autoTextColorForBg(bg);
-            uint16_t subCol = pipgui::detail::lighten565((txtCol == 0xFFFF ? 0xC618 : 0x8410), 0);
+            uint32_t bg888 = from565(bg);
+            uint16_t border = to565(pipgui::detail::lighten888(bg888, 4));
+            uint16_t txtCol = to565(pipgui::detail::autoTextColorForBg(bg888));
+            uint16_t subCol = to565(pipgui::detail::lighten888((txtCol == 0xFFFF ? from565(0xC618) : from565(0x8410)), 0));
 
             if (!cardMode)
             {
@@ -745,12 +736,14 @@ namespace pipgui
                 if (plainMode && useCache)
                 {
                     uint16_t bg2 = active ? m.style.cardActiveColor : bgColor;
-                    uint16_t border2 = pipgui::detail::lighten565(bg2, 4);
-                    uint16_t txt2 = pipgui::detail::autoTextColorForBg(bg2);
+                    uint32_t bg2_888 = from565(bg2);
+                    uint16_t border2 = to565(pipgui::detail::lighten888(bg2_888, 4));
+                    uint16_t txt2 = to565(pipgui::detail::autoTextColorForBg(bg2_888));
                     uint16_t *buf = renderPlainItemToCache(i, active, bg2, border2, txt2);
                     if (buf)
                     {
                         t->pushImage(cx, yy, cardW, cardH, buf);
+
                         continue;
                     }
                 }
@@ -763,38 +756,21 @@ namespace pipgui
 
                 int16_t tx = cx + 12;
 
-                if (_flags.ttfLoaded)
-                {
-                    _ttf.setDrawer(*t);
+                uint16_t titlePx = m.style.titleFontPx;
+                if (titlePx == 0)
+                    titlePx = 18;
 
-                    uint16_t titlePx = m.style.titleFontPx;
-                    if (titlePx == 0)
-                        titlePx = 18;
+                int16_t titleW = 0;
+                int16_t titleH = 0;
+                setPSDFFontSize(titlePx);
+                psdfMeasureText(title, titleW, titleH);
+                int16_t baseY = yy + (int16_t)((cardH - titleH) / 2);
+                baseY -= 4;
+                if (baseY < yy + 2)
+                    baseY = (int16_t)(yy + 2);
 
-                    _ttf.setFontSize(titlePx);
-                    int16_t titleH = (int16_t)_ttf.getTextHeight("%s", title.c_str());
-                    int16_t baseY = yy + (int16_t)((cardH - titleH) / 2);
-                    baseY -= 4;
-                    if (baseY < yy + 2)
-                        baseY = (int16_t)(yy + 2);
-
-                    _ttf.setFontSize(titlePx);
-                    _ttf.setFontColor(txtCol, bg);
-                    _ttf.drawString(title.c_str(), tx, baseY, txtCol, bg, Layout::Horizontal);
-                }
-                else
-                {
-                    t->setTextColor(txtCol, bg);
-
-                    t->setTextFont(2);
-                    int16_t titleH = t->fontHeight();
-                    int16_t baseY = yy + (int16_t)((cardH - titleH) / 2);
-                    baseY -= 4;
-                    if (baseY < yy + 2)
-                        baseY = (int16_t)(yy + 2);
-
-                    t->drawString(title, tx, baseY);
-                }
+                setPSDFFontSize(titlePx);
+                psdfDrawTextInternal(title, tx, baseY, txtCol, bg, AlignLeft);
 
                 continue;
             }
@@ -805,6 +781,7 @@ namespace pipgui
                 if (buf)
                 {
                     t->pushImage(cx, yy, cardW, cardH, buf);
+
                     continue;
                 }
             }
@@ -817,102 +794,60 @@ namespace pipgui
             const String &sub = m.items[i].subtitle;
             bool hasSub = sub.length() > 0;
 
-            if (_flags.ttfLoaded)
+            uint16_t titlePx = m.style.titleFontPx;
+            uint16_t subPx = m.style.subtitleFontPx;
+            uint16_t gapPx = m.style.lineGapPx;
+
+            if (titlePx == 0)
+                titlePx = hasSub ? 18 : 20;
+            if (hasSub)
             {
-                _ttf.setDrawer(*t);
-
-                uint16_t titlePx = m.style.titleFontPx;
-                uint16_t subPx = m.style.subtitleFontPx;
-                uint16_t gapPx = m.style.lineGapPx;
-
-                if (titlePx == 0)
-                    titlePx = hasSub ? 18 : 20;
-                if (hasSub)
-                {
-                    if (subPx == 0)
-                        subPx = (uint16_t)((titlePx * 7U) / 10U);
-                    if (gapPx == 0)
-                        gapPx = (uint16_t)(titlePx / 3U);
-                    if (gapPx > 0)
-                        gapPx = (uint16_t)(gapPx + 3);
-                }
-                else
-                {
-                    subPx = 0;
-                    gapPx = 0;
-                }
-
-                int16_t titleH = 0;
-                int16_t subH = 0;
-
-                _ttf.setFontSize(titlePx);
-                titleH = (int16_t)_ttf.getTextHeight("%s", title.c_str());
-
-                if (hasSub && subPx > 0)
-                {
-                    _ttf.setFontSize(subPx);
-                    subH = (int16_t)_ttf.getTextHeight("%s", sub.c_str());
-                }
-
-                int16_t totalH = titleH;
-                if (hasSub && subH > 0)
-                    totalH += gapPx + subH;
-
-                int16_t baseY = yy + (int16_t)((cardH - totalH) / 2);
-                baseY -= 4;
-                if (baseY < yy + 2)
-                    baseY = (int16_t)(yy + 2);
-
-                int16_t tyTitle = baseY;
-                int16_t tySub = baseY + titleH + (hasSub ? gapPx : 0);
-
-                _ttf.setFontSize(titlePx);
-                _ttf.setFontColor(txtCol, bg);
-                _ttf.drawString(title.c_str(), tx, tyTitle, txtCol, bg, Layout::Horizontal);
-
-                if (hasSub && subPx > 0)
-                {
-                    _ttf.setFontSize(subPx);
-                    _ttf.setFontColor(subCol, bg);
-                    _ttf.drawString(sub.c_str(), tx, tySub, subCol, bg, Layout::Horizontal);
-                }
+                if (subPx == 0)
+                    subPx = (uint16_t)((titlePx * 7U) / 10U);
+                if (gapPx == 0)
+                    gapPx = (uint16_t)(titlePx / 3U);
+                if (gapPx > 0)
+                    gapPx = (uint16_t)(gapPx + 3);
             }
             else
             {
-                t->setTextColor(txtCol, bg);
+                subPx = 0;
+                gapPx = 0;
+            }
 
-                t->setTextFont(2);
-                int16_t titleH = t->fontHeight();
-                int16_t subH = 0;
+            int16_t titleW = 0;
+            int16_t titleH = 0;
+            int16_t subW = 0;
+            int16_t subH = 0;
 
-                if (hasSub)
-                {
-                    t->setTextFont(1);
-                    subH = t->fontHeight();
-                    t->setTextFont(2);
-                }
+            setPSDFFontSize(titlePx);
+            psdfMeasureText(title, titleW, titleH);
 
-                int16_t gap = hasSub ? 5 : 0;
+            if (hasSub && subPx > 0)
+            {
+                setPSDFFontSize(subPx);
+                psdfMeasureText(sub, subW, subH);
+            }
 
-                int16_t totalH = titleH + (hasSub ? (gap + subH) : 0);
+            int16_t totalH = titleH;
+            if (hasSub && subH > 0)
+                totalH += gapPx + subH;
 
-                int16_t baseY = yy + (int16_t)((cardH - totalH) / 2);
-                baseY -= 4;
-                if (baseY < yy + 2)
-                    baseY = (int16_t)(yy + 2);
+            int16_t baseY = yy + (int16_t)((cardH - totalH) / 2);
+            baseY -= 4;
+            if (baseY < yy + 2)
+                baseY = (int16_t)(yy + 2);
 
-                int16_t tyTitle = baseY;
-                int16_t tySub = baseY + titleH + (hasSub ? gap : 0);
+            int16_t tyTitle = baseY;
+            int16_t tySub = baseY + titleH + (hasSub ? gapPx : 0);
 
-                t->setTextFont(2);
-                t->drawString(title, tx, tyTitle);
+            setPSDFFontSize(titlePx);
+            psdfDrawTextInternal(title, tx, tyTitle, txtCol, bg, AlignLeft);
 
-                if (hasSub)
-                {
-                    t->setTextFont(1);
-                    t->setTextColor(subCol, bg);
-                    t->drawString(sub, tx, tySub);
-                }
+            if (hasSub && subPx > 0)
+            {
+                setPSDFFontSize(subPx);
+                psdfDrawTextInternal(sub, tx, tySub, subCol, bg, AlignLeft);
             }
         }
 

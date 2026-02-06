@@ -30,25 +30,26 @@ namespace pipgui
         int16_t innerW = w;
         int16_t innerH = h;
 
-        if (_flags.ttfLoaded)
         {
-            _ttf.setDrawer(t);
-
             uint16_t msgPx = (uint16_t)max<int16_t>(16, _screenHeight / 18);
             uint16_t codePx = msgPx;
             int16_t gap = 10;
 
-            _ttf.setFontSize(msgPx);
-            int16_t mw = (int16_t)_ttf.getTextWidth("%s", title.c_str());
-            int16_t mh = (int16_t)_ttf.getTextHeight("%s", "Ag");
+            int16_t mw = 0;
+            int16_t mh = 0;
+            int16_t tmpW = 0;
+            setPSDFFontSize(msgPx);
+            psdfMeasureText(title, mw, mh);
+            psdfMeasureText(String("Ag"), tmpW, mh);
+
             int16_t mx = innerX + (innerW - mw) / 2;
             if (mx < innerX)
                 mx = innerX;
-            _ttf.setFontColor(dim, bg);
-            _ttf.drawString(title.c_str(), mx, innerY, dim, bg, Layout::Horizontal);
+
+            psdfDrawTextInternal(title, mx, innerY, dim, bg, AlignLeft);
 
             int16_t cy = innerY + mh + gap;
-            _ttf.setFontSize(codePx);
+            setPSDFFontSize(codePx);
 
             if (detail.startsWith("Code:"))
             {
@@ -57,26 +58,28 @@ namespace pipgui
                 code.trim();
                 code = String(" ") + code;
 
-                int16_t lw = (int16_t)_ttf.getTextWidth("%s", label.c_str());
-                int16_t cw = (int16_t)_ttf.getTextWidth("%s", code.c_str());
+                int16_t lw = 0;
+                int16_t cw = 0;
+                int16_t lh = 0;
+                int16_t ch = 0;
+                psdfMeasureText(label, lw, lh);
+                psdfMeasureText(code, cw, ch);
+
                 int16_t total = lw + cw;
                 int16_t sx = innerX + (innerW - total) / 2;
                 if (sx < innerX)
                     sx = innerX;
 
-                _ttf.setFontColor(dim, bg);
-                _ttf.drawString(label.c_str(), sx, cy, dim, bg, Layout::Horizontal);
-
-                _ttf.setFontColor(accent, bg);
-                _ttf.drawString(code.c_str(), sx + lw, cy, accent, bg, Layout::Horizontal);
+                psdfDrawTextInternal(label, sx, cy, dim, bg, AlignLeft);
+                psdfDrawTextInternal(code, sx + lw, cy, accent, bg, AlignLeft);
             }
             else
             {
-                int16_t dw = (int16_t)_ttf.getTextWidth("%s", detail.c_str());
+                int16_t dw = 0;
+                int16_t dh = 0;
+                psdfMeasureText(detail, dw, dh);
                 int16_t vw = innerW;
                 int16_t vx = innerX;
-
-                _ttf.setFontColor(dim, bg);
 
                 if (dw > vw)
                 {
@@ -84,57 +87,17 @@ namespace pipgui
                     int effX = scrollX % tsw;
                     if (effX > 0)
                         effX -= tsw;
-                    _ttf.drawString(detail.c_str(), vx + effX + 10, cy, dim, bg, Layout::Horizontal);
+                    psdfDrawTextInternal(detail, (int16_t)(vx + effX + 10), cy, dim, bg, AlignLeft);
                     if (vx + effX + dw + 10 < vx + vw)
-                        _ttf.drawString(detail.c_str(), vx + effX + dw + 20, cy, dim, bg, Layout::Horizontal);
+                        psdfDrawTextInternal(detail, (int16_t)(vx + effX + dw + 20), cy, dim, bg, AlignLeft);
                 }
                 else
                 {
                     int16_t dx = innerX + (innerW - dw) / 2;
                     if (dx < innerX)
                         dx = innerX;
-                    _ttf.drawString(detail.c_str(), dx, cy, dim, bg, Layout::Horizontal);
+                    psdfDrawTextInternal(detail, dx, cy, dim, bg, AlignLeft);
                 }
-            }
-        }
-        else
-        {
-            t.setTextFont(2);
-            t.setTextColor(dim, bg);
-
-            int16_t mw = t.textWidth(title);
-            int16_t mh = t.fontHeight();
-            int16_t mx = innerX + (innerW - mw) / 2;
-            if (mx < innerX)
-                mx = innerX;
-            t.drawString(title, mx, innerY);
-
-            int16_t cy = innerY + mh + 8;
-
-            if (detail.startsWith("Code:"))
-            {
-                String label = "Code:";
-                String code = detail.substring(5);
-                if (code.startsWith(" "))
-                    code = code.substring(1);
-                int16_t lw = t.textWidth(label);
-                int16_t cw = t.textWidth(code);
-                int16_t sx = innerX + (innerW - (lw + cw)) / 2;
-                if (sx < innerX)
-                    sx = innerX;
-                t.setTextColor(dim, bg);
-                t.drawString(label, sx, cy);
-                t.setTextColor(accent, bg);
-                t.drawString(code, sx + lw, cy);
-            }
-            else
-            {
-                t.setTextColor(dim, bg);
-                int dw = t.textWidth(detail);
-                int dx = innerX + (innerW - dw) / 2;
-                if (dx < innerX)
-                    dx = innerX;
-                t.drawString(detail, dx, cy);
             }
         }
     }
@@ -256,31 +219,25 @@ namespace pipgui
         if (iconY < (int16_t)(contentTop + (int16_t)iconSize / 2 + 6))
             iconY = (int16_t)(contentTop + (int16_t)iconSize / 2 + 6);
 
-        drawEmojiIconTTF(String(errorEmoji), _screenWidth / 2, iconY, iconSize, iconColor, 0);
-
-        if (_flags.ttfLoaded)
         {
-            _ttf.setDrawer(*t);
+            int16_t ew = 0;
+            int16_t eh = 0;
+
+            setPSDFFontSize(iconSize);
+            psdfMeasureText(String(errorEmoji), ew, eh);
+            psdfDrawTextInternal(String(errorEmoji), (int16_t)(_screenWidth / 2), (int16_t)(iconY - eh / 2), iconColor, 0, AlignCenter);
+
             uint16_t px = (uint16_t)max<int16_t>(18, _screenHeight / 12);
+            int16_t hw = 0;
+            int16_t hh = 0;
+            setPSDFFontSize(px);
+            psdfMeasureText(String(header), hw, hh);
 
-            _ttf.setFontSize(px);
-
-            uint32_t tw = _ttf.getTextWidth("%s", header);
-            uint32_t th = _ttf.getTextHeight("%s", header);
-            int16_t tx = (int16_t)(_screenWidth / 2 - (int16_t)tw / 2);
             int16_t ty = iconY + (int16_t)(iconSize / 2 + 10);
             if (ty < (int16_t)(contentTop + 2))
                 ty = (int16_t)(contentTop + 2);
-            _ttf.setFontColor(0xFFFF, 0);
-            _ttf.drawString(header, tx, ty, 0xFFFF, 0, Layout::Horizontal);
-        }
-        else
-        {
-            t->setTextFont(4);
-            t->setTextColor(0xFFFF);
-            t->setTextDatum(MC_DATUM);
-            t->drawString(header, _screenWidth / 2, (int16_t)(iconY + iconSize / 2 + 10));
-            t->setTextDatum(TL_DATUM);
+
+            psdfDrawTextInternal(String(header), (int16_t)(_screenWidth / 2), ty, 0xFFFF, 0, AlignCenter);
         }
 
         int16_t messageTop = (int16_t)(iconY + (int16_t)iconSize / 2 + 32);

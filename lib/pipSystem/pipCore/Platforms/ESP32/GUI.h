@@ -26,8 +26,6 @@ namespace pipcore
 
         void setBacklightPercent(uint8_t percent) override;
 
-        void configureOpenFontRender() override;
-
         void *guiAlloc(size_t bytes, GuiAllocCaps caps = GuiAllocCaps::Default) override;
         void guiFree(void *ptr) override;
 

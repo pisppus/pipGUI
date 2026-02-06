@@ -37,7 +37,6 @@ namespace pipcore
         virtual uint8_t loadMaxBrightnessPercent() { return 100; }
         virtual void storeMaxBrightnessPercent(uint8_t) {}
         virtual void setBacklightPercent(uint8_t) {}
-        virtual void configureOpenFontRender() {}
 
         virtual void *guiAlloc(size_t bytes, GuiAllocCaps caps = GuiAllocCaps::Default)
         {

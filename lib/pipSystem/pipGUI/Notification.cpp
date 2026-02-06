@@ -1,34 +1,7 @@
 #include <pipGUI/core/api/pipGUI.h>
 
-#include <pipGUI/fonts/WixMadeforDisplay-Bold.h>
-#include <pipGUI/fonts/WixMadeforDisplay-SemiBold.h>
-
 namespace pipgui
 {
-
-    static OpenFontRender g_notifTitleFont;
-    static OpenFontRender g_notifBodyFont;
-    static bool g_notifFontsInited = false;
-
-    static void ensureNotificationFonts()
-    {
-        if (g_notifFontsInited)
-            return;
-
-        pipcore::GuiPlatform *p = pipgui::GUI::sharedPlatform();
-        if (p)
-            p->configureOpenFontRender();
-
-        FT_Error e1 = g_notifTitleFont.loadFont(gBuiltinWixBoldTTF, sizeof(gBuiltinWixBoldTTF), 0);
-        FT_Error e2 = g_notifBodyFont.loadFont(gBuiltinWixSemiBoldTTF, sizeof(gBuiltinWixSemiBoldTTF), 0);
-
-        if (!e1 && !e2)
-        {
-            g_notifTitleFont.setBackgroundFillMethod(BgFillMethod::None);
-            g_notifBodyFont.setBackgroundFillMethod(BgFillMethod::None);
-            g_notifFontsInited = true;
-        }
-    }
 
     static float easeOutCubic(float t)
     {
@@ -116,6 +89,7 @@ namespace pipgui
     {
         if (!_flags.notifActive)
             return;
+
         uint32_t now = nowMs(), elapsed = now - _notifStartMs;
         uint32_t dur = _notifAnimDurationMs ? _notifAnimDurationMs : 1;
         if (elapsed > dur)
@@ -163,24 +137,18 @@ namespace pipgui
                 }
             }
 
-            uint16_t cardColor = 0xFFFF;  
-            uint16_t titleColor = 0x0000; 
-            uint16_t msgColor = 0x7BEF;   
+            uint16_t cardColor = 0xFFFF;
+            uint16_t titleColor = 0x0000;
+            uint16_t msgColor = 0x7BEF;
 
             uint16_t btnColor;
 
             if (_notifType == Error)
-            {
                 btnColor = 0xF80A;
-            }
             else if (_notifType == NotificationTypeWarning)
-            {
                 btnColor = 0xFD24;
-            }
             else
-            {
                 btnColor = 0xE75C;
-            }
 
             int16_t finalW = 138;
             int16_t finalH = 92;
@@ -213,6 +181,7 @@ namespace pipgui
                 cTop = 0;
                 cH = (int16_t)_screenHeight;
             }
+
             float contentHf = (float)cH;
             if (contentHf < cardHf)
                 contentHf = cardHf;
@@ -234,13 +203,58 @@ namespace pipgui
                                         cardRadius > 2 ? (cardRadius - 2) : cardRadius,
                                         cardColor);
 
+            uint16_t titleSz = (uint16_t)max(9, (int)(19 * scale));
+            uint16_t msgSz = (uint16_t)max(7, (int)(13 * scale));
+
+            int16_t tW = 0;
+            int16_t tH = 0;
+            int16_t mW = 0;
+            int16_t mH = 0;
+
+            setPSDFFontSize(titleSz);
+            psdfMeasureText(_notifTitle, tW, tH);
+
+            setPSDFFontSize(msgSz);
+            psdfMeasureText(_notifMessage, mW, mH);
+
+            int16_t gap = (int16_t)(11 * scale);
+            int16_t blockH = tH + gap + mH;
+            int16_t startY = cardCenterY - blockH / 2 - (int16_t)(20 * scale);
+
+            bool prevRenderText = _flags.renderToSprite;
+            lgfx::LGFX_Sprite *prevActiveText = _activeSprite;
+            _flags.renderToSprite = 1;
+            _activeSprite = &_sprite;
+
+            setPSDFFontSize(titleSz);
+            psdfDrawTextInternal(_notifTitle,
+                                cardX + (cardW - tW) / 2,
+                                startY,
+                                titleColor,
+                                cardColor,
+                                AlignLeft);
+
+            setPSDFFontSize(msgSz);
+            psdfDrawTextInternal(_notifMessage,
+                                cardX + (cardW - mW) / 2,
+                                startY + tH + gap,
+                                msgColor,
+                                cardColor,
+                                AlignLeft);
+
+            _flags.renderToSprite = prevRenderText;
+            _activeSprite = prevActiveText;
+
             int16_t btnBaseW = 123;
             int16_t btnBaseH = 22;
-
             int16_t marginBot = 8;
 
             int16_t btnW = (int16_t)(btnBaseW * scale + 0.5f);
             int16_t btnH = (int16_t)(btnBaseH * scale + 0.5f);
+            if (btnW < 18)
+                btnW = 18;
+            if (btnH < 10)
+                btnH = 10;
 
             int16_t btnX = cardX + (cardW - btnW) / 2;
             int16_t btnY = cardY + cardH - btnH - (int16_t)(marginBot * scale + 0.5f);
@@ -248,64 +262,6 @@ namespace pipgui
             int16_t btnRadius = (int16_t)(7.0f * scale + 0.5f);
             if (btnRadius < 3)
                 btnRadius = 3;
-
-            ensureNotificationFonts();
-
-            if (g_notifFontsInited)
-            {
-                uint16_t titleSz = (uint16_t)max(9, (int)(19 * scale));
-                uint16_t msgSz = (uint16_t)max(7, (int)(13 * scale));
-
-                g_notifTitleFont.setDrawer(_sprite);
-                g_notifBodyFont.setDrawer(_sprite);
-
-                g_notifTitleFont.setFontSize(titleSz);
-                g_notifBodyFont.setFontSize(msgSz);
-
-                int16_t tH = (int16_t)g_notifTitleFont.getTextHeight("A");
-                int16_t tW = (int16_t)g_notifTitleFont.getTextWidth("%s", _notifTitle.c_str());
-
-                int16_t mH = (int16_t)g_notifBodyFont.getTextHeight("A");
-                int16_t mW = (int16_t)g_notifBodyFont.getTextWidth("%s", _notifMessage.c_str());
-
-                int16_t gap = (int16_t)(11 * scale);
-                int16_t blockH = tH + gap + mH;
-                int16_t startY = cardCenterY - blockH / 2 - (int16_t)(20 * scale);
-
-                g_notifTitleFont.setFontColor(titleColor, cardColor);
-                g_notifTitleFont.drawString(_notifTitle.c_str(),
-                                            cardX + (cardW - tW) / 2,
-                                            startY,
-                                            titleColor,
-                                            cardColor,
-                                            Layout::Horizontal);
-
-                g_notifBodyFont.setFontColor(msgColor, cardColor);
-                g_notifBodyFont.drawString(_notifMessage.c_str(),
-                                           cardX + (cardW - mW) / 2,
-                                           startY + tH + gap,
-                                           msgColor,
-                                           cardColor,
-                                           Layout::Horizontal);
-            }
-            else
-            {
-                _sprite.setTextFont(2);
-                _sprite.setTextColor(titleColor, cardColor);
-                int16_t th = _sprite.fontHeight();
-                _sprite.setTextColor(msgColor, cardColor);
-                int16_t mh = _sprite.fontHeight();
-
-                int16_t gap = 5;
-                int16_t blockH = th + gap + mh;
-                int16_t sy = cardCenterY - blockH / 2 - (int16_t)(20 * scale);
-
-                _sprite.setTextFont(2);
-                _sprite.drawString(_notifTitle, cardX + (cardW - _sprite.textWidth(_notifTitle)) / 2, sy);
-
-                _sprite.setTextFont(1);
-                _sprite.drawString(_notifMessage, cardX + (cardW - _sprite.textWidth(_notifMessage)) / 2, sy + th + gap);
-            }
 
             String label = _notifButtonText;
             if (_flags.notifDelayed && now < _notifUnlockMs)

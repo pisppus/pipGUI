@@ -1,29 +1,7 @@
 #include <pipGUI/core/api/pipGUI.h>
 
-#include <pipGUI/fonts/WixMadeforDisplay-SemiBold.h>
-
 namespace pipgui
 {
-
-    static OpenFontRender g_buttonFont;
-    static bool g_buttonFontInited = false;
-
-    static void ensureButtonFont()
-    {
-        if (g_buttonFontInited)
-            return;
-
-        pipcore::GuiPlatform *p = pipgui::GUI::sharedPlatform();
-        if (p)
-            p->configureOpenFontRender();
-
-        FT_Error e = g_buttonFont.loadFont(gBuiltinWixSemiBoldTTF, sizeof(gBuiltinWixSemiBoldTTF), 0);
-        if (!e)
-        {
-            g_buttonFont.setBackgroundFillMethod(BgFillMethod::None);
-            g_buttonFontInited = true;
-        }
-    }
 
     static float easeOutCubicBtn(float t)
     {
@@ -140,7 +118,7 @@ namespace pipgui
     void GUI::drawButton(const String &label,
                          const uint16_t *iconBitmap, uint8_t iconW, uint8_t iconH,
                          int16_t x, int16_t y, int16_t w, int16_t h,
-                         uint16_t baseColor,
+                         uint32_t baseColor,
                          uint8_t radius,
                          const ButtonVisualState &state)
     {
@@ -173,14 +151,14 @@ namespace pipgui
         if (br < 1)
             br = 1;
 
-        uint16_t mainColor = baseColor;
-        uint16_t autoPressedBg = lerpColor565Btn(mainColor, 0x0000, 0.22f);
-        uint16_t autoDisabledBg = lerpColor565Btn(mainColor, 0x8410, 0.6f);
+        uint32_t mainColor = baseColor;
+        uint32_t autoPressedBg = detail::blend888(mainColor, 0x000000, 56);
+        uint32_t autoDisabledBg = detail::blend888(mainColor, 0x7F7F7F, 160);
 
-        uint16_t activeBg = (state.pressLevel > 0 ? autoPressedBg : mainColor);
-        uint16_t disabledBg = autoDisabledBg;
+        uint32_t activeBg = (state.pressLevel > 0 ? autoPressedBg : mainColor);
+        uint32_t disabledBg = autoDisabledBg;
 
-        uint16_t bg;
+        uint32_t bg;
 
         if (state.fadeLevel == 0)
         {
@@ -194,20 +172,17 @@ namespace pipgui
         {
             float k = (float)state.fadeLevel / 255.0f;
             float eased = easeOutCubicBtn(k);
-            bg = lerpColor565Btn(disabledBg, activeBg, eased);
+            uint8_t a = (uint8_t)(eased * 255.0f + 0.5f);
+            bg = detail::blend888(disabledBg, activeBg, a);
         }
 
-        t->fillSmoothRoundRect(bx, by, bw, bh, br, bg);
+        fillRoundRectFrc(bx, by, bw, bh, (uint8_t)br, bg);
 
-        uint8_t r5 = (bg >> 11) & 0x1F;
-        uint8_t g6 = (bg >> 5) & 0x3F;
-        uint8_t b5 = bg & 0x1F;
+        uint8_t br8 = (uint8_t)((bg >> 16) & 0xFF);
+        uint8_t bg8 = (uint8_t)((bg >> 8) & 0xFF);
+        uint8_t bb8 = (uint8_t)(bg & 0xFF);
 
-        uint16_t r8 = (uint16_t)((r5 * 255U) / 31U);
-        uint16_t g8 = (uint16_t)((g6 * 255U) / 63U);
-        uint16_t b8 = (uint16_t)((b5 * 255U) / 31U);
-
-        uint16_t lum = (uint16_t)((r8 * 30U + g8 * 59U + b8 * 11U) / 100U);
+        uint16_t lum = (uint16_t)((br8 * 30U + bg8 * 59U + bb8 * 11U) / 100U);
         uint16_t fgActive = (lum > 140U) ? 0x0000 : 0xFFFF;
 
         bool disabledVis = !state.enabled || (state.fadeLevel < 40);
@@ -234,130 +209,88 @@ namespace pipgui
             }
         }
 
-        ensureButtonFont();
-
         bool hasIcon = (iconBitmap && iconW > 0 && iconH > 0);
 
-        if (g_buttonFontInited)
+        int16_t paddingX = 6;
+        int16_t paddingY = 2;
+        int16_t maxW = (bw - paddingX * 2) > 4 ? (int16_t)(bw - paddingX * 2) : 4;
+        int16_t maxH = (bh - paddingY * 2) > 4 ? (int16_t)(bh - paddingY * 2) : 4;
+
+        int16_t textMaxW = maxW;
+        int16_t iconGap = hasIcon ? 4 : 0;
+        if (hasIcon)
         {
-            g_buttonFont.setDrawer(*t);
-            g_buttonFont.setFontColor(fg, bg);
-
-            int16_t paddingX = 6;
-            int16_t paddingY = 2;
-            int16_t maxW = (bw - paddingX * 2) > 4 ? (int16_t)(bw - paddingX * 2) : 4;
-            int16_t maxH = (bh - paddingY * 2) > 4 ? (int16_t)(bh - paddingY * 2) : 4;
-
-            int16_t textMaxW = maxW;
-            int16_t iconGap = hasIcon ? 4 : 0;
-            if (hasIcon)
-            {
-                textMaxW = maxW - iconW - iconGap;
-                if (textMaxW < 4)
-                    textMaxW = 4;
-            }
-
-            uint16_t px = (bh * 0.55f) > 8 ? (uint16_t)(bh * 0.55f) : 8;
-            uint16_t maxPx = (bh * 0.8f) > 8 ? (uint16_t)(bh * 0.8f) : 8;
-
-            if (px > maxPx)
-                px = maxPx;
-
-            g_buttonFont.setFontSize(px);
-            uint32_t tw = g_buttonFont.getTextWidth("%s", labelToDraw.c_str());
-            uint32_t th = g_buttonFont.getTextHeight("%s", labelToDraw.c_str());
-
-            if (tw > (uint32_t)textMaxW || th > (uint32_t)maxH)
-            {
-                float scaleX = (float)textMaxW / (float)tw;
-                float scaleY = (float)maxH / (float)th;
-                float scale = (scaleX < scaleY) ? scaleX : scaleY;
-
-                if (scale < 1.0f)
-                {
-                    uint16_t newPx = (px * scale) > 7 ? (uint16_t)(px * scale) : 7;
-
-                    g_buttonFont.setFontSize(newPx);
-                    tw = g_buttonFont.getTextWidth("%s", labelToDraw.c_str());
-                    th = g_buttonFont.getTextHeight("%s", labelToDraw.c_str());
-                }
-            }
-
-            int16_t contentW = (int16_t)tw;
-            int16_t iconGap2 = hasIcon ? iconGap : 0;
-            if (hasIcon)
-                contentW += iconW + iconGap2;
-
-            int16_t contentX = bx + (bw - contentW) / 2;
-
-            int16_t tx = contentX;
-            int16_t iconX = contentX;
-            if (hasIcon)
-            {
-                iconX = contentX;
-                tx = iconX + iconW + iconGap2;
-            }
-
-            int16_t ty = by + (bh - (int16_t)th) / 2;
-            if (ty - 3 >= by)
-                ty -= 3;
-
-            if (hasIcon)
-            {
-                int16_t iconY = by + (bh - iconH) / 2;
-                if (iconY < by)
-                    iconY = by;
-                t->pushImage(iconX, iconY, iconW, iconH, iconBitmap);
-            }
-
-            g_buttonFont.drawString(labelToDraw.c_str(), tx, ty, fg, bg, Layout::Horizontal);
+            textMaxW = maxW - iconW - iconGap;
+            if (textMaxW < 4)
+                textMaxW = 4;
         }
-        else
+
+        uint16_t px = (bh * 0.55f) > 8 ? (uint16_t)(bh * 0.55f) : 8;
+        uint16_t maxPx = (bh * 0.8f) > 8 ? (uint16_t)(bh * 0.8f) : 8;
+
+        if (px > maxPx)
+            px = maxPx;
+
+        int16_t tw = 0;
+        int16_t th = 0;
+
+        setPSDFFontSize(px);
+        psdfMeasureText(labelToDraw, tw, th);
+
+        if (tw > textMaxW || th > maxH)
         {
-            t->setTextFont(2);
-            t->setTextColor(fg, bg);
+            float scaleX = (tw > 0) ? ((float)textMaxW / (float)tw) : 1.0f;
+            float scaleY = (th > 0) ? ((float)maxH / (float)th) : 1.0f;
+            float scale = (scaleX < scaleY) ? scaleX : scaleY;
 
-            int16_t tw = t->textWidth(labelToDraw);
-
-            int16_t th = t->fontHeight();
-
-            int16_t contentW = tw;
-            int16_t iconGap = hasIcon ? 4 : 0;
-            if (hasIcon)
+            if (scale < 1.0f)
             {
-                contentW += iconW + iconGap;
+                uint16_t newPx = (px * scale) > 7 ? (uint16_t)(px * scale) : 7;
+                setPSDFFontSize(newPx);
+                psdfMeasureText(labelToDraw, tw, th);
+                px = newPx;
             }
-
-            int16_t contentX = bx + (bw - contentW) / 2;
-
-            int16_t tx = contentX;
-            int16_t iconX = contentX;
-            if (hasIcon)
-            {
-                iconX = contentX;
-                tx = iconX + iconW + iconGap;
-            }
-
-            int16_t ty0 = by + (bh - th) / 2;
-            int16_t ty = ty0 > by ? ty0 : by;
-            if (ty - 3 >= by)
-                ty -= 3;
-
-            if (hasIcon)
-            {
-                int16_t iconY = by + (bh - iconH) / 2;
-                if (iconY < by)
-                    iconY = by;
-                t->pushImage(iconX, iconY, iconW, iconH, iconBitmap);
-            }
-
-            t->drawString(labelToDraw, tx, ty);
         }
+
+        int16_t contentW = tw;
+        int16_t iconGap2 = hasIcon ? iconGap : 0;
+        if (hasIcon)
+            contentW = (int16_t)(iconW + iconGap2 + tw);
+
+        int16_t contentX = bx + (bw - contentW) / 2;
+
+        int16_t tx = contentX;
+        int16_t iconX = contentX;
+        if (hasIcon)
+        {
+            iconX = contentX;
+            tx = iconX + iconW + iconGap2;
+        }
+
+        int16_t ty = by + (bh - th) / 2;
+        if (ty - 3 >= by)
+            ty -= 3;
+
+        if (hasIcon)
+        {
+            int16_t ix = iconX;
+            int16_t iy = by + (bh - iconH) / 2;
+            blitImage565Frc(ix, iy, iconBitmap, iconW, iconH);
+        }
+
+        setPSDFFontSize(px);
+        uint16_t bg565 = rgb888To565Frc((uint8_t)((bg >> 16) & 0xFF),
+                                        (uint8_t)((bg >> 8) & 0xFF),
+                                        (uint8_t)(bg & 0xFF),
+                                        tx,
+                                        ty,
+                                        FrcProfile::Off);
+        psdfDrawTextInternal(labelToDraw, tx, ty, fg, bg565, AlignLeft);
     }
 
     void GUI::drawButton(const String &label,
                          int16_t x, int16_t y, int16_t w, int16_t h,
-                         uint16_t baseColor,
+                         uint32_t baseColor,
                          uint8_t radius,
                          const ButtonVisualState &state)
     {
@@ -367,7 +300,7 @@ namespace pipgui
     void GUI::updateButton(const String &label,
                            const uint16_t *iconBitmap, uint8_t iconW, uint8_t iconH,
                            int16_t x, int16_t y, int16_t w, int16_t h,
-                           uint16_t baseColor,
+                           uint32_t baseColor,
                            uint8_t radius,
                            const ButtonVisualState &state)
     {
@@ -399,7 +332,11 @@ namespace pipgui
         _flags.renderToSprite = 1;
         _activeSprite = &_sprite;
 
-        _sprite.fillRect((int16_t)(rx - pad), (int16_t)(ry - pad), (int16_t)(w + pad * 2), (int16_t)(h + pad * 2), _bgColor);
+        fillRect((int16_t)(rx - pad),
+                 (int16_t)(ry - pad),
+                 (int16_t)(w + pad * 2),
+                 (int16_t)(h + pad * 2),
+                 _bgColor);
         drawButton(label, iconBitmap, iconW, iconH, x, y, w, h, baseColor, radius, state);
 
         _flags.renderToSprite = prevRender;
@@ -411,7 +348,7 @@ namespace pipgui
 
     void GUI::updateButton(const String &label,
                            int16_t x, int16_t y, int16_t w, int16_t h,
-                           uint16_t baseColor,
+                           uint32_t baseColor,
                            uint8_t radius,
                            const ButtonVisualState &state)
     {

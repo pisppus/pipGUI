@@ -65,8 +65,8 @@ namespace pipgui
         }
         if (m.style.cardColor == 0 && m.style.cardActiveColor == 0)
         {
-            uint16_t base = _bgColor ? _bgColor : 0x0000;
-            m.style.cardColor = pipgui::detail::lighten565(base, 4);
+            uint32_t base = _bgColor ? _bgColor : 0x000000;
+            m.style.cardColor = pipgui::detail::lighten888(base, 4);
             m.style.cardActiveColor = rgb(0, 130, 220);
             m.style.radius = 10;
             m.style.spacing = 8;
@@ -527,6 +527,8 @@ namespace pipgui
 
         LovyanGFX *t = getDrawTarget();
 
+        auto to565 = [](uint32_t c) -> uint16_t { uint8_t r = (uint8_t)((c >> 16) & 0xFF); uint8_t g = (uint8_t)((c >> 8) & 0xFF); uint8_t b = (uint8_t)(c & 0xFF); return (uint16_t)((((uint16_t)(r >> 3)) << 11) | (((uint16_t)(g >> 2)) << 5) | ((uint16_t)(b >> 3))); };
+
         int16_t left = 0, right = _screenWidth, top = 0, bottom = _screenHeight;
         if (_flags.statusBarEnabled && _statusBarHeight > 0)
         {
@@ -545,7 +547,7 @@ namespace pipgui
         int16_t usableW = right - left;
         int16_t usableH = bottom - top;
 
-        t->fillRect(left, top, usableW, bottom - top, _bgColor);
+        t->fillRect(left, top, usableW, bottom - top, to565(_bgColor));
 
         uint8_t cols = 1;
         uint8_t rows = 1;
@@ -666,16 +668,122 @@ namespace pipgui
             if (tileH < 20)
                 tileH = 20;
 
-            uint16_t bg = (i == m.selectedIndex) ? m.style.cardActiveColor : m.style.cardColor;
+            uint32_t bg = (i == m.selectedIndex) ? m.style.cardActiveColor : m.style.cardColor;
             if (bg == 0)
                 bg = _bgColor;
 
-            t->fillSmoothRoundRect(x, y, tileW, tileH, r, bg);
-            uint16_t border = pipgui::detail::lighten565(bg, 4);
-            t->drawRoundRect(x, y, tileW, tileH, r, border);
+            auto to565 = [](uint32_t c) -> uint16_t { uint8_t r = (uint8_t)((c >> 16) & 0xFF); uint8_t g = (uint8_t)((c >> 8) & 0xFF); uint8_t b = (uint8_t)(c & 0xFF); return (uint16_t)((((uint16_t)(r >> 3)) << 11) | (((uint16_t)(g >> 2)) << 5) | ((uint16_t)(b >> 3))); };
 
-            uint16_t txtCol = pipgui::detail::autoTextColorForBg(bg);
-            uint16_t subCol = pipgui::detail::lighten565(txtCol == 0xFFFF ? 0xC618 : 0x8410, 0);
+            if (_frcProfile == FrcProfile::Off)
+            {
+                t->fillSmoothRoundRect(x, y, tileW, tileH, r, to565(bg));
+                uint32_t border = pipgui::detail::lighten888(bg, 4);
+                t->drawRoundRect(x, y, tileW, tileH, r, to565(border));
+            }
+            else
+            {
+                // tile-based FRC fill for rounded rect
+                Color888 cc{(uint8_t)((bg >> 16) & 0xFF), (uint8_t)((bg >> 8) & 0xFF), (uint8_t)(bg & 0xFF)};
+                uint16_t tileBuf[16 * 16];
+                for (int16_t ty = 0; ty < 16; ++ty)
+                    for (int16_t tx = 0; tx < 16; ++tx)
+                        tileBuf[(uint16_t)ty * 16U + (uint16_t)tx] = detail::quantize565(cc, tx, ty, _frcSeed, _frcProfile);
+
+                int16_t xx0 = x;
+                int16_t yy0 = y;
+                int16_t ww = tileW;
+                int16_t hh = tileH;
+                int16_t rr = (int16_t)(r >= 1 ? r - 1 : 0);
+                int32_t rSq = (int32_t)rr * (int32_t)rr;
+
+                auto pointInRounded = [&](int16_t px, int16_t py) -> bool {
+                    int16_t lx = (int16_t)(px - xx0);
+                    int16_t ly = (int16_t)(py - yy0);
+                    if (lx < 0 || ly < 0 || lx >= ww || ly >= hh)
+                        return false;
+                    if (lx >= r && lx < ww - r)
+                        return true;
+                    if (ly >= r && ly < hh - r)
+                        return true;
+                    // corners
+                    if (lx < r && ly < r)
+                    {
+                        int32_t dx = (int32_t)(rr - lx);
+                        int32_t dy = (int32_t)(rr - ly);
+                        return dx * dx + dy * dy <= rSq;
+                    }
+                    else if (lx >= ww - r && ly < r)
+                    {
+                        int32_t dx = (int32_t)(lx - (ww - r));
+                        int32_t dy = (int32_t)(rr - ly);
+                        return dx * dx + dy * dy <= rSq;
+                    }
+                    else if (lx < r && ly >= hh - r)
+                    {
+                        int32_t dx = (int32_t)(rr - lx);
+                        int32_t dy = (int32_t)(ly - (hh - r));
+                        return dx * dx + dy * dy <= rSq;
+                    }
+                    else if (lx >= ww - r && ly >= hh - r)
+                    {
+                        int32_t dx = (int32_t)(lx - (ww - r));
+                        int32_t dy = (int32_t)(ly - (hh - r));
+                        return dx * dx + dy * dy <= rSq;
+                    }
+                    return true;
+                };
+
+                // fill
+                for (int16_t py = y; py < y + tileH; ++py)
+                {
+                    if (py < 0 || py >= _screenHeight) continue;
+                    for (int16_t px = x; px < x + tileW; ++px)
+                    {
+                        if (px < 0 || px >= _screenWidth) continue;
+                        if (!pointInRounded(px, py))
+                            continue;
+                        uint16_t out = tileBuf[((uint16_t)py & 15U) * 16U + ((uint16_t)px & 15U)];
+                        t->drawPixel(px, py, out);
+                    }
+                }
+
+                // border (1px) using quantized border color
+                uint32_t borderColor = pipgui::detail::lighten888(bg, 4);
+                Color888 bc{(uint8_t)((borderColor >> 16) & 0xFF), (uint8_t)((borderColor >> 8) & 0xFF), (uint8_t)(borderColor & 0xFF)};
+                for (int16_t py = y; py < y + tileH; ++py)
+                {
+                    if (py < 0 || py >= _screenHeight) continue;
+                    for (int16_t px = x; px < x + tileW; ++px)
+                    {
+                        if (px < 0 || px >= _screenWidth) continue;
+                        if (!pointInRounded(px, py))
+                            continue;
+                        // check if any neighbor is outside -> border pixel
+                        bool borderPixel = false;
+                        const int dxs[4] = {1, -1, 0, 0};
+                        const int dys[4] = {0, 0, 1, -1};
+                        for (int di = 0; di < 4; ++di)
+                        {
+                            int nx = px + dxs[di];
+                            int ny = py + dys[di];
+                            if (nx < x || ny < y || nx >= x + tileW || ny >= y + tileH || !pointInRounded(nx, ny))
+                            {
+                                borderPixel = true;
+                                break;
+                            }
+                        }
+                        if (borderPixel)
+                        {
+                            uint16_t outb = detail::quantize565(bc, px, py, _frcSeed, _frcProfile);
+                            t->drawPixel(px, py, outb);
+                        }
+                    }
+                }
+            }
+
+            uint32_t txtCol = pipgui::detail::autoTextColorForBg(bg);
+            auto from565 = [](uint16_t c) -> uint32_t { uint8_t r5 = (c >> 11) & 0x1F; uint8_t g6 = (c >> 5) & 0x3F; uint8_t b5 = c & 0x1F; uint8_t r8 = (uint8_t)((r5 * 255U) / 31U); uint8_t g8 = (uint8_t)((g6 * 255U) / 63U); uint8_t b8 = (uint8_t)((b5 * 255U) / 31U); return (uint32_t)((r8 << 16) | (g8 << 8) | b8); };
+            uint32_t subCol = pipgui::detail::lighten888((txtCol == 0xFFFFFF ? from565(0xC618) : from565(0x8410)), 0);
 
             const TileMenuState::Item &it = m.items[i];
             const String &title = it.title;
@@ -695,10 +803,7 @@ namespace pipgui
             uint16_t subPx = m.style.subtitleFontPx;
             uint16_t gapPx = m.style.lineGapPx;
 
-            if (_flags.ttfLoaded)
             {
-                _ttf.setDrawer(*t);
-
                 if (titlePx == 0)
                     titlePx = hasSub ? 18 : 20;
                 if (hasSub)
@@ -714,15 +819,13 @@ namespace pipgui
                     gapPx = 0;
                 }
 
-                _ttf.setFontSize(titlePx);
-                titleH = (int16_t)_ttf.getTextHeight("%s", title.c_str());
-                titleW = (int16_t)_ttf.getTextWidth("%s", title.c_str());
+                setPSDFFontSize(titlePx);
+                psdfMeasureText(title, titleW, titleH);
 
                 if (hasSub && subPx > 0)
                 {
-                    _ttf.setFontSize(subPx);
-                    subH = (int16_t)_ttf.getTextHeight("%s", sub.c_str());
-                    subW = (int16_t)_ttf.getTextWidth("%s", sub.c_str());
+                    setPSDFFontSize(subPx);
+                    psdfMeasureText(sub, subW, subH);
                 }
 
                 totalTextH = titleH;
@@ -732,24 +835,6 @@ namespace pipgui
                 maxTextW = titleW;
                 if (hasSub && subW > 0 && subW > maxTextW)
                     maxTextW = subW;
-            }
-            else
-            {
-                t->setTextColor(txtCol, bg);
-                t->setTextFont(2);
-                titleH = t->fontHeight();
-                titleW = t->textWidth(title);
-
-                if (hasSub)
-                {
-                    t->setTextFont(1);
-                    subH = t->fontHeight();
-                    subW = t->textWidth(sub);
-                }
-
-                const int16_t gapBmp = hasSub ? 2 : 0;
-                totalTextH = titleH + (hasSub ? gapBmp + subH : 0);
-                maxTextW = hasSub ? (titleW > subW ? titleW : subW) : titleW;
             }
 
             int16_t iconW = hasIcon ? it.iconW : 0;
@@ -775,7 +860,6 @@ namespace pipgui
                 t->pushImage(iconX, iconY, iconW, iconH, it.iconBitmap);
             }
 
-            if (_flags.ttfLoaded)
             {
                 int16_t tyTitle = textTopY;
                 int16_t tySub = textTopY + titleH + (hasSub ? gapPx : 0);
@@ -783,32 +867,13 @@ namespace pipgui
                 int16_t titleX = centerX - titleW / 2;
                 int16_t subX = centerX - subW / 2;
 
-                _ttf.setFontSize(titlePx);
-                _ttf.setFontColor(txtCol, bg);
-                _ttf.drawString(title.c_str(), titleX, tyTitle, txtCol, bg, Layout::Horizontal);
+                setPSDFFontSize(titlePx);
+                psdfDrawTextInternal(title, titleX, tyTitle, to565(txtCol), to565(bg), AlignLeft);
 
                 if (hasSub && subPx > 0)
                 {
-                    _ttf.setFontSize(subPx);
-                    _ttf.setFontColor(subCol, bg);
-                    _ttf.drawString(sub.c_str(), subX, tySub, subCol, bg, Layout::Horizontal);
-                }
-            }
-            else
-            {
-                t->setTextColor(txtCol, bg);
-                t->setTextFont(2);
-                int16_t tyTitle = textTopY;
-                int16_t titleX = centerX - titleW / 2;
-                t->drawString(title, titleX, tyTitle);
-
-                if (hasSub)
-                {
-                    t->setTextFont(1);
-                    t->setTextColor(subCol, bg);
-                    int16_t tySub = tyTitle + titleH + 2;
-                    int16_t subX = centerX - subW / 2;
-                    t->drawString(sub, subX, tySub);
+                    setPSDFFontSize(subPx);
+                    psdfDrawTextInternal(sub, subX, tySub, to565(subCol), to565(bg), AlignLeft);
                 }
             }
         }

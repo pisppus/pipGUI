@@ -272,6 +272,19 @@ namespace pipgui
         tickRecovery(now);
         tickDebugDirtyOverlay(now);
 
+        // Update FRC seed for temporal dithering (if enabled)
+        if (_frcProfile != FrcProfile::Off && _frcTemporalPeriodMs)
+        {
+            if ((now - _frcLastUpdateMs) >= _frcTemporalPeriodMs)
+            {
+                _frcLastUpdateMs = now;
+                // simple LCG to vary seed pseudo-randomly
+                _frcSeed = (uint32_t)((uint64_t)_frcSeed * 1664525U + 1013904223U);
+                // request redraw so temporal change is visible
+                _flags.needRedraw = 1;
+            }
+        }
+
         if (_flags.bootActive)
         {
             renderBootFrame(now);
@@ -289,8 +302,6 @@ namespace pipgui
             renderScreenTransition(now);
             if (_flags.notifActive)
                 renderNotificationOverlay();
-
-            tickDebugDirtyOverlay(now);
             return;
         }
 
@@ -306,8 +317,6 @@ namespace pipgui
                 renderStatusBar(true);
             }
             renderNotificationOverlay();
-
-            tickDebugDirtyOverlay(now);
             return;
         }
 
@@ -337,8 +346,6 @@ namespace pipgui
                     if (_tft)
                         _sprite.pushSprite(_tft, 0, 0);
                     _dirtyCount = 0;
-
-                    tickDebugDirtyOverlay(now);
                 }
                 else
                 {
@@ -354,20 +361,13 @@ namespace pipgui
         }
 
         if (_flags.notifActive && !_flags.spriteEnabled)
-        {
             renderNotificationOverlay();
-            tickDebugDirtyOverlay(now);
-        }
     }
 
     void GUI::loopWithInput(Button &next, Button &prev)
     {
         next.update();
         prev.update();
-
-        setNotificationButtonDown(prev.isDown());
-        setErrorButtonDown(prev.isDown());
-
         loop();
     }
 }

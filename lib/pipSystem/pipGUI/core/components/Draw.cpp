@@ -11,11 +11,159 @@ namespace pipgui
     uint16_t GUI::screenWidth() const { return _screenWidth; }
     uint16_t GUI::screenHeight() const { return _screenHeight; }
 
-    uint16_t GUI::rgb(uint8_t r, uint8_t g, uint8_t b) const
+    uint32_t GUI::rgb(uint8_t r, uint8_t g, uint8_t b) const
     {
-        if (_tft)
-            return _tft->color565(r, g, b);
-        return (uint16_t)(((uint16_t)(r & 0xF8) << 8) | ((uint16_t)(g & 0xFC) << 3) | ((uint16_t)(b & 0xF8) >> 3));
+        return ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b;
+    }
+
+    uint16_t GUI::color888To565(int16_t x, int16_t y, uint32_t color888) const
+    {
+        Color888 c{
+            (uint8_t)((color888 >> 16) & 0xFF),
+            (uint8_t)((color888 >> 8) & 0xFF),
+            (uint8_t)(color888 & 0xFF),
+        };
+        return detail::quantize565(c, x, y, _frcSeed, _frcProfile);
+    }
+
+    void GUI::fillCircleFrc(int16_t cx, int16_t cy, int16_t r, uint32_t color888)
+    {
+        if (r <= 0)
+            return;
+
+        auto t = getDrawTarget();
+        if (!t)
+            return;
+
+        int16_t x0 = (int16_t)(cx - r);
+        int16_t y0 = (int16_t)(cy - r);
+        int16_t x1 = (int16_t)(cx + r);
+        int16_t y1 = (int16_t)(cy + r);
+
+        int32_t rr = (int32_t)r * (int32_t)r;
+        for (int16_t y = y0; y <= y1; ++y)
+        {
+            int32_t dy = (int32_t)y - (int32_t)cy;
+            int32_t dy2 = dy * dy;
+            for (int16_t x = x0; x <= x1; ++x)
+            {
+                int32_t dx = (int32_t)x - (int32_t)cx;
+                if (dx * dx + dy2 <= rr)
+                    t->drawPixel(x, y, color888To565(x, y, color888));
+            }
+        }
+    }
+
+    void GUI::fillRoundRectFrc(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radius, uint32_t color888)
+    {
+        if (w <= 0 || h <= 0)
+            return;
+
+        auto t = getDrawTarget();
+        if (!t)
+            return;
+
+        int16_t r = (int16_t)radius;
+        int16_t maxR = (w < h ? w : h) / 2;
+        if (r > maxR)
+            r = maxR;
+        if (r < 0)
+            r = 0;
+
+        int16_t x0 = x;
+        int16_t y0 = y;
+        int16_t x1 = (int16_t)(x + w - 1);
+        int16_t y1 = (int16_t)(y + h - 1);
+
+        int16_t cxL = (int16_t)(x0 + r);
+        int16_t cxR = (int16_t)(x1 - r);
+        int16_t cyT = (int16_t)(y0 + r);
+        int16_t cyB = (int16_t)(y1 - r);
+
+        int32_t rr = (int32_t)r * (int32_t)r;
+
+        for (int16_t py = y0; py <= y1; ++py)
+        {
+            for (int16_t px = x0; px <= x1; ++px)
+            {
+                bool inside = false;
+
+                if (r == 0)
+                {
+                    inside = true;
+                }
+                else if (px >= cxL && px <= cxR)
+                {
+                    inside = true;
+                }
+                else if (py >= cyT && py <= cyB)
+                {
+                    inside = true;
+                }
+                else
+                {
+                    int16_t ccx = (px < cxL) ? cxL : cxR;
+                    int16_t ccy = (py < cyT) ? cyT : cyB;
+                    int32_t dx = (int32_t)px - (int32_t)ccx;
+                    int32_t dy = (int32_t)py - (int32_t)ccy;
+                    inside = (dx * dx + dy * dy) <= rr;
+                }
+
+                if (inside)
+                    t->drawPixel(px, py, color888To565(px, py, color888));
+            }
+        }
+    }
+
+    void GUI::drawRoundRectFrc(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radius, uint32_t color888)
+    {
+        if (w <= 0 || h <= 0)
+            return;
+
+        if (w <= 2 || h <= 2)
+        {
+            fillRect(x, y, w, h, color888);
+            return;
+        }
+
+        fillRoundRectFrc(x, y, w, h, radius, color888);
+        fillRoundRectFrc(x + 1, y + 1, w - 2, h - 2, radius > 0 ? (uint8_t)(radius - 1) : 0, _bgColor);
+    }
+
+    void GUI::blitImage565Frc(int16_t x, int16_t y, const uint16_t *bitmap565, int16_t w, int16_t h)
+    {
+        if (!bitmap565 || w <= 0 || h <= 0)
+            return;
+
+        auto t = getDrawTarget();
+        if (!t)
+            return;
+
+        const int16_t x0 = x;
+        const int16_t y0 = y;
+
+        for (int16_t yy = 0; yy < h; ++yy)
+        {
+            const int16_t py = (int16_t)(y0 + yy);
+            const uint16_t *row = bitmap565 + (int32_t)yy * (int32_t)w;
+
+            for (int16_t xx = 0; xx < w; ++xx)
+            {
+                const int16_t px = (int16_t)(x0 + xx);
+                const uint16_t c565 = row[xx];
+
+                const uint8_t r5 = (uint8_t)((c565 >> 11) & 0x1F);
+                const uint8_t g6 = (uint8_t)((c565 >> 5) & 0x3F);
+                const uint8_t b5 = (uint8_t)(c565 & 0x1F);
+
+                const uint8_t r8 = (uint8_t)((r5 * 255U) / 31U);
+                const uint8_t g8 = (uint8_t)((g6 * 255U) / 63U);
+                const uint8_t b8 = (uint8_t)((b5 * 255U) / 31U);
+
+                const uint32_t c888 = ((uint32_t)r8 << 16) | ((uint32_t)g8 << 8) | (uint32_t)b8;
+                t->drawPixel(px, py, color888To565(px, py, c888));
+            }
+        }
     }
 
     uint16_t GUI::rgb888To565Frc(uint8_t r, uint8_t g, uint8_t b, int16_t x, int16_t y, FrcProfile profile) const
@@ -31,7 +179,32 @@ namespace pipgui
         if (!_flags.spriteEnabled)
         {
             if (_tft)
-                _tft->fillScreen(_bgColor);
+            {
+                if (profile == FrcProfile::Off)
+                {
+                    uint16_t c565 = (uint16_t)((((uint16_t)(r >> 3)) << 11) | (((uint16_t)(g >> 2)) << 5) | ((uint16_t)(b >> 3)));
+                    _tft->fillScreen(c565);
+                }
+                else
+                {
+                    uint16_t tile[16 * 16];
+                    Color888 c{r, g, b};
+                    for (int16_t ty = 0; ty < 16; ++ty)
+                    {
+                        for (int16_t tx = 0; tx < 16; ++tx)
+                            tile[(uint16_t)ty * 16U + (uint16_t)tx] = detail::quantize565(c, tx, ty, _frcSeed, profile);
+                    }
+
+                    for (int16_t yy = 0; yy < (int16_t)_screenHeight; ++yy)
+                    {
+                        const uint16_t *tileRow = &tile[((uint16_t)yy & 15U) * 16U];
+                        for (int16_t xx = 0; xx < (int16_t)_screenWidth; ++xx)
+                        {
+                            _tft->drawPixel(xx, yy, tileRow[(uint16_t)xx & 15U]);
+                        }
+                    }
+                }
+            }
             return;
         }
 
@@ -95,7 +268,27 @@ namespace pipgui
         if (!_flags.spriteEnabled)
         {
             if (_tft)
-                _tft->fillRect(x, y, w, h, rgb(r, g, b));
+            {
+                if (profile == FrcProfile::Off)
+                {
+                    uint16_t c565 = (uint16_t)((((uint16_t)(r >> 3)) << 11) | (((uint16_t)(g >> 2)) << 5) | ((uint16_t)(b >> 3)));
+                    _tft->fillRect(x, y, w, h, c565);
+                }
+                else
+                {
+                    Color888 c{r, g, b};
+                    for (int16_t yy = 0; yy < h; ++yy)
+                    {
+                        int16_t py = (int16_t)(y + yy);
+                        for (int16_t xx = 0; xx < w; ++xx)
+                        {
+                            int16_t px = (int16_t)(x + xx);
+                            uint16_t c565 = detail::quantize565(c, px, py, _frcSeed, profile);
+                            _tft->drawPixel(px, py, c565);
+                        }
+                    }
+                }
+            }
             return;
         }
 
@@ -195,14 +388,12 @@ namespace pipgui
         return _tft;
     }
 
-    void GUI::clear(uint16_t color)
+    void GUI::clear(uint32_t color)
     {
-        _bgColor = color;
-        lgfx::LGFX_Sprite *spr = _activeSprite;
-        if (_flags.renderToSprite && _flags.spriteEnabled && spr)
-            spr->fillSprite(color);
-        else if (_tft)
-            _tft->fillScreen(color);
+        uint8_t r = (uint8_t)((color >> 16) & 0xFF);
+        uint8_t g = (uint8_t)((color >> 8) & 0xFF);
+        uint8_t b = (uint8_t)(color & 0xFF);
+        clear888(r, g, b, _frcProfile);
     }
 
     int16_t GUI::AutoX(int32_t contentWidth) const
@@ -227,29 +418,12 @@ namespace pipgui
         return top + (availH - (int16_t)contentHeight) / 2;
     }
 
-    void GUI::fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color)
+    void GUI::fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t color)
     {
-        if (x == -1)
-            x = AutoX(w);
-        if (y == -1)
-            y = AutoY(h);
-
-        if (_flags.spriteEnabled && _tft && !_flags.renderToSprite)
-        {
-            bool prevRender = _flags.renderToSprite;
-            lgfx::LGFX_Sprite *prevActive = _activeSprite;
-
-            _flags.renderToSprite = 1;
-            _activeSprite = &_sprite;
-            getDrawTarget()->fillRect(x, y, w, h, color);
-            _flags.renderToSprite = prevRender;
-            _activeSprite = prevActive;
-
-            invalidateRect(x, y, w, h);
-            return;
-        }
-
-        getDrawTarget()->fillRect(x, y, w, h, color);
+        uint8_t r = (uint8_t)((color >> 16) & 0xFF);
+        uint8_t g = (uint8_t)((color >> 8) & 0xFF);
+        uint8_t b = (uint8_t)(color & 0xFF);
+        fillRect888(x, y, w, h, r, g, b, _frcProfile);
     }
 
     void GUI::drawCenteredTitle(const String &title, const String &subtitle, uint16_t fg, uint16_t bg)
@@ -258,46 +432,47 @@ namespace pipgui
 
         t->fillScreen(bg);
 
-        if (!_flags.ttfLoaded)
-            return;
+        uint16_t titlePx = _logoTitleSizePx ? _logoTitleSizePx : _textStyleH1Px;
+        uint16_t subPx = _logoSubtitleSizePx ? _logoSubtitleSizePx : (uint16_t)((titlePx * 3U) / 4U);
 
-        _ttf.setDrawer(*t);
-        _ttf.setFontColor(fg, bg);
-
-        uint16_t titlePx = _logoTitleTTFSize ? _logoTitleTTFSize : _textStyleH1Px;
-        uint16_t subPx = _logoSubtitleTTFSize ? _logoSubtitleTTFSize : (uint16_t)((titlePx * 3U) / 4U);
-
-        _ttf.setFontSize(titlePx);
-        int16_t titleW = (int16_t)_ttf.getTextWidth("%s", title.c_str());
-        int16_t titleH = (int16_t)_ttf.getTextHeight("%s", title.c_str());
+        int16_t titleW = 0;
+        int16_t titleH = 0;
+        setPSDFFontSize(titlePx);
+        psdfMeasureText(title, titleW, titleH);
 
         bool hasSub = subtitle.length() > 0;
-        int16_t subW = 0, subH = 0;
+        int16_t subW = 0;
+        int16_t subH = 0;
         if (hasSub)
         {
-            _ttf.setFontSize(subPx);
-            subW = (int16_t)_ttf.getTextWidth("%s", subtitle.c_str());
-            subH = (int16_t)_ttf.getTextHeight("%s", subtitle.c_str());
+            setPSDFFontSize(subPx);
+            psdfMeasureText(subtitle, subW, subH);
         }
 
         int16_t spacing = 4;
-        int16_t totalH = hasSub ? (titleH + spacing + subH) : titleH;
-        int16_t topY = (_bootY != -1) ? _bootY : (_screenHeight - totalH) / 2;
-        int16_t cx = (_bootX != -1) ? _bootX : _screenWidth / 2;
 
-        _ttf.setFontSize(titlePx);
-        _ttf.drawString(title.c_str(), cx - titleW / 2, topY, fg, bg, Layout::Horizontal);
+        int16_t totalH = titleH;
+        if (hasSub)
+            totalH = (int16_t)(titleH + spacing + subH);
+
+        int16_t topY = (_bootY != -1) ? _bootY : (_screenHeight - totalH) / 2;
+        int16_t cx = (_bootX != -1) ? _bootX : (int16_t)(_screenWidth / 2);
+
+        setPSDFFontSize(titlePx);
+        psdfDrawTextInternal(title, cx, topY, fg, bg, AlignCenter);
 
         if (hasSub)
         {
-            int16_t subY = topY + titleH + spacing;
-            _ttf.setFontSize(subPx);
-            _ttf.drawString(subtitle.c_str(), cx - subW / 2, subY, fg, bg, Layout::Horizontal);
+            int16_t subY = (int16_t)(topY + titleH + spacing);
+            setPSDFFontSize(subPx);
+            psdfDrawTextInternal(subtitle, cx, subY, fg, bg, AlignCenter);
         }
     }
 
     void GUI::invalidateRect(int16_t x, int16_t y, int16_t w, int16_t h)
     {
+        if (!_tft || !_flags.spriteEnabled)
+            return;
         if (w <= 0 || h <= 0)
             return;
 

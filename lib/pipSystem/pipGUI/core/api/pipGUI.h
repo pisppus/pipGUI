@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <utility>
 #include <pipCore/Platforms/GUIPlatform.h>
-#include <OpenFontRender.h>
 #include <pipCore/Button.h>
 #include <pipGUI/core/components/FRC.h>
 #include "UiLayout.h"
@@ -98,15 +97,6 @@ namespace pipgui
         AlignLeft,
         AlignCenter,
         AlignRight
-    };
-
-    enum BuiltinTTF : uint8_t
-    {
-        KronaOne,
-        WixRegular,
-        WixMedium,
-        WixSemiBold,
-        WixBold
     };
 
     enum TextStyle : uint8_t
@@ -224,6 +214,27 @@ namespace pipgui
             }
         };
 
+        static inline uint32_t blend888(uint32_t bg, uint32_t fg, uint8_t alpha)
+        {
+            if (alpha == 0)
+                return bg;
+            if (alpha >= 255)
+                return fg;
+
+            uint32_t invAlpha = 255 - alpha;
+            uint8_t br = (uint8_t)((bg >> 16) & 0xFF);
+            uint8_t bgc = (uint8_t)((bg >> 8) & 0xFF);
+            uint8_t bb = (uint8_t)(bg & 0xFF);
+            uint8_t fr = (uint8_t)((fg >> 16) & 0xFF);
+            uint8_t fgc = (uint8_t)((fg >> 8) & 0xFF);
+            uint8_t fb = (uint8_t)(fg & 0xFF);
+
+            uint8_t r = (uint8_t)((br * invAlpha + fr * alpha) >> 8);
+            uint8_t g = (uint8_t)((bgc * invAlpha + fgc * alpha) >> 8);
+            uint8_t b = (uint8_t)((bb * invAlpha + fb * alpha) >> 8);
+            return (uint32_t)((r << 16) | (g << 8) | b);
+        }
+
         static inline uint16_t blend565(uint16_t bg, uint16_t fg, uint8_t alpha)
         {
             if (alpha == 0)
@@ -235,7 +246,7 @@ namespace pipgui
             uint16_t r = (((bg >> 11) & 0x1F) * invAlpha + ((fg >> 11) & 0x1F) * alpha) >> 8;
             uint16_t g = (((bg >> 5) & 0x3F) * invAlpha + ((fg >> 5) & 0x3F) * alpha) >> 8;
             uint16_t b = ((bg & 0x1F) * invAlpha + (fg & 0x1F) * alpha) >> 8;
-            return (r << 11) | (g << 5) | b;
+            return (uint16_t)((r << 11) | (g << 5) | b);
         }
 
         struct NoneToken
@@ -326,8 +337,8 @@ namespace pipgui
         int16_t innerW;
         int16_t innerH;
 
-        uint16_t bgColor;
-        uint16_t gridColor;
+        uint32_t bgColor;
+        uint32_t gridColor;
 
         uint8_t gridCellsX;
         uint8_t gridCellsY;
@@ -387,8 +398,8 @@ namespace pipgui
 
     struct ListMenuStyle
     {
-        uint16_t cardColor;
-        uint16_t cardActiveColor;
+        uint32_t cardColor;
+        uint32_t cardActiveColor;
         uint8_t radius;
         uint8_t spacing;
         int16_t cardWidth;
@@ -401,8 +412,8 @@ namespace pipgui
 
     struct TileMenuStyle
     {
-        uint16_t cardColor;
-        uint16_t cardActiveColor;
+        uint32_t cardColor;
+        uint32_t cardActiveColor;
         uint8_t radius;
         uint8_t spacing;
         uint8_t columns;

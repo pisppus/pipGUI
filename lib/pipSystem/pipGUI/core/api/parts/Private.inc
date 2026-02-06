@@ -9,6 +9,9 @@
         int16_t AutoX(int32_t contentWidth) const;
         int16_t AutoY(int32_t contentHeight) const;
 
+        bool psdfMeasureText(const String &text, int16_t &outW, int16_t &outH) const;
+        void psdfDrawTextInternal(const String &text, int16_t x, int16_t y, uint16_t fg565, uint16_t bg565, TextAlign align);
+
         void drawCenteredTitle(const String &title,
                                const String &subtitle,
                                uint16_t fg,
@@ -34,6 +37,12 @@
         void invalidateRect(int16_t x, int16_t y, int16_t w, int16_t h);
         void flushDirty();
         void tickDebugDirtyOverlay(uint32_t now);
+
+        uint16_t color888To565(int16_t x, int16_t y, uint32_t color888) const;
+        void fillCircleFrc(int16_t cx, int16_t cy, int16_t r, uint32_t color888);
+        void fillRoundRectFrc(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radius, uint32_t color888);
+        void drawRoundRectFrc(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radius, uint32_t color888);
+        void blitImage565Frc(int16_t x, int16_t y, const uint16_t *bitmap565, int16_t w, int16_t h);
 
         uint32_t nowMs() const;
         void ensureScreenStorage(uint8_t id);
@@ -93,9 +102,10 @@
         uint8_t _debugOverlayDrawnState = 0;
         uint32_t _debugLastFlushMs = 0;
 
-        uint16_t _screenWidth = 0, _screenHeight = 0, _bgColor = 0;
+        uint16_t _screenWidth = 0, _screenHeight = 0;
+        uint32_t _bgColor = 0;
 
-        FrcProfile _frcProfile = FrcProfile::Off;
+        FrcProfile _frcProfile = FrcProfile::BlueNoiseGamma22;
         uint32_t _frcSeed = 0x6D2B79F5U;
         uint32_t _frcLastUpdateMs = 0;
         uint16_t _frcTemporalPeriodMs = 66;
@@ -120,7 +130,8 @@
             unsigned screenTransition : 1;
             unsigned screenSpritesEnabled : 1;
             unsigned bootActive : 1;
-            unsigned ttfLoaded : 1;
+            unsigned psdfLoaded : 1;
+            unsigned psdfEnabled : 1;
             unsigned errorTransition : 1;
             unsigned errorActive : 1;
             unsigned errorFlashState : 1;
@@ -142,20 +153,20 @@
         BootAnimation _bootAnim = None;
         String _bootTitle;
         String _bootSubtitle;
-        uint16_t _bootFgColor = 0, _bootBgColor = 0;
+        uint32_t _bootFgColor = 0, _bootBgColor = 0;
         uint32_t _bootStartMs = 0, _bootDurationMs = 0;
         int16_t _bootX = 0, _bootY = 0;
 
-        const uint8_t *_logoTitleFont = nullptr;
-        const uint8_t *_logoSubtitleFont = nullptr;
-        uint16_t _logoTitleTTFSize = 0, _logoSubtitleTTFSize = 0;
+        uint16_t _logoTitleSizePx = 0;
+        uint16_t _logoSubtitleSizePx = 0;
 
         uint16_t _textStyleH1Px = 24;
         uint16_t _textStyleH2Px = 18;
         uint16_t _textStyleBodyPx = 14;
         uint16_t _textStyleCaptionPx = 12;
 
-        OpenFontRender _ttf;
+        uint16_t _psdfSizePx = 0;
+        float _psdfWeightBias = 0.10f;
 
         struct ErrorEntry
         {

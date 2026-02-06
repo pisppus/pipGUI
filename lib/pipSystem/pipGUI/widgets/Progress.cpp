@@ -100,8 +100,8 @@ namespace pipgui
     void GUI::drawProgressBar(int16_t x, int16_t y,
                               int16_t w, int16_t h,
                               uint8_t value,
-                              uint16_t baseColor,
-                              uint16_t fillColor,
+                              uint32_t baseColor,
+                              uint32_t fillColor,
                               uint8_t radius,
                               ProgressAnim anim)
     {
@@ -254,11 +254,13 @@ namespace pipgui
 
         if (anim == Stripes)
         {
-            uint16_t stripeColor = pipgui::detail::lighten565(fillColor, 20);
+            uint32_t stripeColor = pipgui::detail::lighten888(fillColor, 20);
             int16_t stripeW = 8;
             int16_t gapW = 8;
             int16_t period = stripeW + gapW;
             int16_t phase = (int16_t)((now / 35U) % (uint32_t)period);
+
+            auto to565 = [](uint32_t c) -> uint16_t { uint8_t r = (uint8_t)((c >> 16) & 0xFF); uint8_t g = (uint8_t)((c >> 8) & 0xFF); uint8_t b = (uint8_t)(c & 0xFF); return (uint16_t)((((uint16_t)(r >> 3)) << 11) | (((uint16_t)(g >> 2)) << 5) | ((uint16_t)(b >> 3))); };
 
             t->startWrite();
             for (int16_t px = innerX; px < innerX + fillW; ++px)
@@ -269,7 +271,16 @@ namespace pipgui
                     int16_t offset = getCornerOffset(px);
                     int16_t lineH = innerH - (offset * 2);
                     if (lineH > 0)
-                        t->writeFastVLine(px, innerY + offset, lineH, stripeColor);
+                    {
+                        if (_frcProfile == FrcProfile::Off)
+                            t->writeFastVLine(px, innerY + offset, lineH, to565(stripeColor));
+                        else
+                        {
+                            Color888 sc{(uint8_t)((stripeColor >> 16) & 0xFF), (uint8_t)((stripeColor >> 8) & 0xFF), (uint8_t)(stripeColor & 0xFF)};
+                            for (int16_t py = innerY + offset; py < innerY + offset + lineH; ++py)
+                                t->drawPixel(px, py, detail::quantize565(sc, px, py, _frcSeed, _frcProfile));
+                        }
+                    }
                 }
             }
             t->endWrite();
@@ -323,11 +334,11 @@ namespace pipgui
     void GUI::drawProgressBar(int16_t x, int16_t y,
                               int16_t w, int16_t h,
                               uint8_t value,
-                              uint16_t color,
+                              uint32_t color,
                               uint8_t radius,
                               ProgressAnim anim)
     {
-        uint16_t base = pipgui::detail::lighten565(color, 10);
+        uint32_t base = pipgui::detail::lighten888(color, 10);
         drawProgressBar(x, y, w, h, value, base, color, radius, anim);
     }
 
@@ -335,8 +346,8 @@ namespace pipgui
                                       int16_t r,
                                       uint8_t thickness,
                                       uint8_t value,
-                                      uint16_t baseColor,
-                                      uint16_t fillColor,
+                                      uint32_t baseColor,
+                                      uint32_t fillColor,
                                       ProgressAnim anim)
     {
         if (r <= 0)
@@ -436,17 +447,18 @@ namespace pipgui
 
         if (anim == Stripes)
         {
-            uint16_t stripeColor = pipgui::detail::lighten565(fillColor, 20);
+            uint32_t stripeColor = pipgui::detail::lighten888(fillColor, 20);
             int16_t stripeW = 12;
             int16_t gapW = 12;
             int16_t period = stripeW + gapW;
             int16_t phase = (int16_t)((now / 35U) % (uint32_t)period);
 
+            auto to565 = [](uint32_t c) -> uint16_t { uint8_t r = (uint8_t)((c >> 16) & 0xFF); uint8_t g = (uint8_t)((c >> 8) & 0xFF); uint8_t b = (uint8_t)(c & 0xFF); return (uint16_t)((((uint16_t)(r >> 3)) << 11) | (((uint16_t)(g >> 2)) << 5) | ((uint16_t)(b >> 3))); };
             drawRingArcStroke(t, cx, cy, r, thickness, 0.0f, fillSpan, [&](float a) -> uint16_t
                               {
                                   int32_t ai = (int32_t)(a + 0.5f);
                                   int16_t local = (int16_t)((ai + period - phase) % period);
-                                  return (local < stripeW) ? stripeColor : fillColor;
+                                  return (local < stripeW) ? to565(stripeColor) : to565(fillColor);
                               });
         }
         else if (anim == Shimmer)
@@ -481,18 +493,18 @@ namespace pipgui
                                       int16_t r,
                                       uint8_t thickness,
                                       uint8_t value,
-                                      uint16_t color,
+                                      uint32_t color,
                                       ProgressAnim anim)
     {
-        uint16_t base = pipgui::detail::lighten565(color, 10);
+        uint32_t base = pipgui::detail::lighten888(color, 10);
         drawCircularProgressBar(x, y, r, thickness, value, base, color, anim);
     }
 
     void GUI::updateProgressBar(int16_t x, int16_t y,
                                int16_t w, int16_t h,
                                uint8_t value,
-                               uint16_t baseColor,
-                               uint16_t fillColor,
+                               uint32_t baseColor,
+                               uint32_t fillColor,
                                uint8_t radius,
                                ProgressAnim anim)
     {
@@ -535,11 +547,11 @@ namespace pipgui
     void GUI::updateProgressBar(int16_t x, int16_t y,
                                int16_t w, int16_t h,
                                uint8_t value,
-                               uint16_t color,
+                               uint32_t color,
                                uint8_t radius,
                                ProgressAnim anim)
     {
-        uint16_t base = pipgui::detail::lighten565(color, 10);
+        uint32_t base = pipgui::detail::lighten888(color, 10);
         updateProgressBar(x, y, w, h, value, base, color, radius, anim);
     }
 
@@ -547,8 +559,8 @@ namespace pipgui
                                int16_t x, int16_t y,
                                int16_t w, int16_t h,
                                uint8_t value,
-                               uint16_t baseColor,
-                               uint16_t fillColor,
+                               uint32_t baseColor,
+                               uint32_t fillColor,
                                uint8_t radius,
                                ProgressAnim anim)
     {
@@ -590,7 +602,8 @@ namespace pipgui
             _flags.renderToSprite = 1;
             _activeSprite = &_sprite;
 
-            _sprite.fillRect((int16_t)(rx - pad), (int16_t)(ry - pad), (int16_t)(w + pad * 2), (int16_t)(h + pad * 2), _bgColor);
+            auto to565 = [](uint32_t c) -> uint16_t { uint8_t r = (uint8_t)((c >> 16) & 0xFF); uint8_t g = (uint8_t)((c >> 8) & 0xFF); uint8_t b = (uint8_t)(c & 0xFF); return (uint16_t)((((uint16_t)(r >> 3)) << 11) | (((uint16_t)(g >> 2)) << 5) | ((uint16_t)(b >> 3))); };
+            _sprite.fillRect((int16_t)(rx - pad), (int16_t)(ry - pad), (int16_t)(w + pad * 2), (int16_t)(h + pad * 2), to565(_bgColor));
             drawProgressBar(x, y, w, h, value, baseColor, fillColor, radius, anim);
             _flags.renderToSprite = prevRender;
             _activeSprite = prevActive;
@@ -661,17 +674,20 @@ namespace pipgui
                                         int16_t r,
                                         uint8_t thickness,
                                         uint8_t value,
-                                        uint16_t baseColor,
-                                        uint16_t fillColor,
+                                        uint32_t baseColor,
+                                        uint32_t fillColor,
                                         ProgressAnim anim)
     {
+        uint16_t base565 = (uint16_t)baseColor;
+        uint16_t fill565 = (uint16_t)fillColor;
+
         if (!_flags.spriteEnabled || !_tft)
         {
             bool prevRender = _flags.renderToSprite;
             lgfx::LGFX_Sprite *prevActive = _activeSprite;
 
             _flags.renderToSprite = 0;
-            drawCircularProgressBar(x, y, r, thickness, value, baseColor, fillColor, anim);
+            drawCircularProgressBar(x, y, r, thickness, value, base565, fill565, anim);
             _flags.renderToSprite = prevRender;
             _activeSprite = prevActive;
             return;
@@ -693,7 +709,7 @@ namespace pipgui
         int16_t pad = 2;
         int16_t rr = (int16_t)(r + pad);
         _sprite.fillRect((int16_t)(cx - rr), (int16_t)(cy - rr), (int16_t)(rr * 2 + 1), (int16_t)(rr * 2 + 1), _bgColor);
-        drawCircularProgressBar(x, y, r, thickness, value, baseColor, fillColor, anim);
+        drawCircularProgressBar(x, y, r, thickness, value, base565, fill565, anim);
         _flags.renderToSprite = prevRender;
         _activeSprite = prevActive;
 
@@ -705,10 +721,10 @@ namespace pipgui
                                         int16_t r,
                                         uint8_t thickness,
                                         uint8_t value,
-                                        uint16_t color,
+                                        uint32_t color,
                                         ProgressAnim anim)
     {
-        uint16_t base = pipgui::detail::lighten565(color, 10);
+        uint32_t base = pipgui::detail::lighten888(color, 10);
         updateCircularProgressBar(x, y, r, thickness, value, base, color, anim);
     }
 }

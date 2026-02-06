@@ -110,10 +110,12 @@ namespace pipgui
 
     void GUI::drawToggleSwitch(int16_t x, int16_t y, int16_t w, int16_t h,
                                ToggleSwitchState &state,
-                               uint16_t activeColor,
+                               uint32_t activeColor,
                                int32_t inactiveColor,
                                int32_t knobColor)
     {
+        auto to565 = [](uint32_t c) -> uint16_t { uint8_t r = (uint8_t)((c >> 16) & 0xFF); uint8_t g = (uint8_t)((c >> 8) & 0xFF); uint8_t b = (uint8_t)(c & 0xFF); return (uint16_t)((((uint16_t)(r >> 3)) << 11) | (((uint16_t)(g >> 2)) << 5) | ((uint16_t)(b >> 3))); };
+        uint16_t active565 = to565(activeColor);
         if (w <= 0 || h <= 0)
             return;
 
@@ -174,7 +176,7 @@ namespace pipgui
         uint16_t inactive;
         if (inactiveColor < 0)
         {
-            inactive = lerpColor565Sw(activeColor, 0x8410, 0.75f);
+            inactive = lerpColor565Sw(active565, 0x8410, 0.75f);
         }
         else
         {
@@ -184,7 +186,7 @@ namespace pipgui
         float k = (float)state.pos / 255.0f;
         float eased = easeBezierSw(k);
 
-        uint16_t bg = lerpColor565Sw(inactive, activeColor, eased);
+        uint16_t bg = lerpColor565Sw(inactive, active565, eased);
         t->fillSmoothRoundRect(x0, y0, w, h, r, bg);
 
         int16_t pad = (int16_t)max((int16_t)3, (int16_t)(h / 8));
@@ -222,10 +224,11 @@ namespace pipgui
 
     void GUI::updateToggleSwitch(int16_t x, int16_t y, int16_t w, int16_t h,
                                  ToggleSwitchState &state,
-                                 uint16_t activeColor,
+                                 uint32_t activeColor,
                                  int32_t inactiveColor,
                                  int32_t knobColor)
     {
+        auto to565 = [](uint32_t c) -> uint16_t { uint8_t r = (uint8_t)((c >> 16) & 0xFF); uint8_t g = (uint8_t)((c >> 8) & 0xFF); uint8_t b = (uint8_t)(c & 0xFF); return (uint16_t)((((uint16_t)(r >> 3)) << 11) | (((uint16_t)(g >> 2)) << 5) | ((uint16_t)(b >> 3))); };
         if (!_flags.spriteEnabled || !_tft)
         {
             bool prevRender = _flags.renderToSprite;
@@ -254,7 +257,7 @@ namespace pipgui
         _flags.renderToSprite = 1;
         _activeSprite = &_sprite;
 
-        _sprite.fillRect((int16_t)(rx - pad), (int16_t)(ry - pad), (int16_t)(w + pad * 2), (int16_t)(h + pad * 2), _bgColor);
+        _sprite.fillRect((int16_t)(rx - pad), (int16_t)(ry - pad), (int16_t)(w + pad * 2), (int16_t)(h + pad * 2), to565(_bgColor));
         drawToggleSwitch(x, y, w, h, state, activeColor, inactiveColor, knobColor);
 
         _flags.renderToSprite = prevRender;

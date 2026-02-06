@@ -192,20 +192,21 @@ namespace pipgui
         DirtyRect dirtyRight = {};
         DirtyRect dirtyBattery = {};
 
-        if (_flags.ttfLoaded)
         {
-            _ttf.setDrawer(_sprite);
             uint16_t px = (bar.h > 6) ? (uint16_t)(bar.h - 4) : (uint16_t)bar.h;
             if (px < 8)
                 px = 8;
-            _ttf.setFontSize(px);
+            setPSDFFontSize(px);
         }
 
         auto textWidth = [&](const String &s) -> int16_t
         {
-            if (!_flags.ttfLoaded || s.length() == 0)
+            if (s.length() == 0)
                 return 0;
-            return (int16_t)_ttf.getTextWidth("%s", s.c_str());
+            int16_t tw = 0;
+            int16_t th = 0;
+            psdfMeasureText(s, tw, th);
+            return tw;
         };
 
         if ((mask & StatusBarDirtyLeft) != 0)
@@ -476,14 +477,13 @@ namespace pipgui
         t->fillRect(x, y, w, h, _statusBarBg);
         int16_t textH = 0;
 
-        if (_flags.ttfLoaded)
         {
-            _ttf.setDrawer(*t);
             uint16_t px = (h > 6) ? (uint16_t)(h - 4) : (uint16_t)h;
             if (px < 8)
                 px = 8;
-            _ttf.setFontSize(px);
-            textH = (int16_t)_ttf.getTextHeight("%s", "Ag");
+            setPSDFFontSize(px);
+            int16_t tmpW = 0;
+            psdfMeasureText(String("Ag"), tmpW, textH);
             if (textH <= 0 || textH > h)
                 textH = h;
         }
@@ -494,17 +494,19 @@ namespace pipgui
 
         auto measureText = [&](const String &s) -> int16_t
         {
-            if (!_flags.ttfLoaded || !s.length())
+            if (!s.length())
                 return 0;
-            return (int16_t)_ttf.getTextWidth("%s", s.c_str());
+            int16_t tw = 0;
+            int16_t th = 0;
+            psdfMeasureText(s, tw, th);
+            return tw;
         };
 
         auto drawTextAt = [&](const String &s, int16_t tx)
         {
-            if (!_flags.ttfLoaded || !s.length())
+            if (!s.length())
                 return;
-            _ttf.setFontColor(_statusBarFg, _statusBarBg);
-            _ttf.drawString(s.c_str(), tx, baseY, _statusBarFg, _statusBarBg, Layout::Horizontal);
+            psdfDrawTextInternal(s, tx, baseY, _statusBarFg, _statusBarBg, AlignLeft);
         };
 
         int16_t leftX = x + 2;

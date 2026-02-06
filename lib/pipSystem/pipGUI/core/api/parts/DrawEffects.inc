@@ -8,12 +8,12 @@
             return *_tft;
         }
 
-        uint16_t rgb(uint8_t r, uint8_t g, uint8_t b) const;
+        uint32_t rgb(uint8_t r, uint8_t g, uint8_t b) const;
         uint16_t screenWidth() const;
         uint16_t screenHeight() const;
 
-        void clear(uint16_t color = 0x0000);
-        void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color);
+        void clear(uint32_t color = 0x000000);
+        void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t color);
 
         void drawBlurStrip(int16_t x, int16_t y,
                            int16_t w, int16_t h,
@@ -40,8 +40,8 @@
                             float animProgress = 0.0f,
                             bool animate = false,
                             int8_t animDirection = 0,
-                            uint16_t activeColor = 0xFFFF,
-                            uint16_t inactiveColor = 0x7BEF,
+                            uint32_t activeColor = 0xFFFFFF,
+                            uint32_t inactiveColor = 0x7B817B,
                             uint8_t dotRadius = 3,
                             uint8_t spacing = 14,
                             uint8_t activeWidth = 18);
@@ -53,15 +53,15 @@
                               float animProgress = 0.0f,
                               bool animate = false,
                               int8_t animDirection = 0,
-                              uint16_t activeColor = 0xFFFF,
-                              uint16_t inactiveColor = 0x7BEF,
+                              uint32_t activeColor = 0xFFFFFF,
+                              uint32_t inactiveColor = 0x7B817B,
                               uint8_t dotRadius = 3,
                               uint8_t spacing = 14,
                               uint8_t activeWidth = 18);
 
         void drawGlowCircle(int16_t x, int16_t y,
                             int16_t r,
-                            uint16_t fillColor,
+                            uint32_t fillColor,
                             int32_t bgColor = -1,
                             int32_t glowColor = -1,
                             uint8_t glowSize = 12,
@@ -71,7 +71,7 @@
 
         void updateGlowCircle(int16_t x, int16_t y,
                               int16_t r,
-                              uint16_t fillColor,
+                              uint32_t fillColor,
                               int32_t bgColor = -1,
                               int32_t glowColor = -1,
                               uint8_t glowSize = 12,
@@ -82,7 +82,7 @@
         void drawGlowRoundRect(int16_t x, int16_t y,
                                int16_t w, int16_t h,
                                uint8_t radius,
-                               uint16_t fillColor,
+                               uint32_t fillColor,
                                int32_t bgColor = -1,
                                int32_t glowColor = -1,
                                uint8_t glowSize = 12,
@@ -93,7 +93,7 @@
         void updateGlowRoundRect(int16_t x, int16_t y,
                                  int16_t w, int16_t h,
                                  uint8_t radius,
-                                 uint16_t fillColor,
+                                 uint32_t fillColor,
                                  int32_t bgColor = -1,
                                  int32_t glowColor = -1,
                                  uint8_t glowSize = 12,

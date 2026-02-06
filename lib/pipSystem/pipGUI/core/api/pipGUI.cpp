@@ -321,6 +321,11 @@ namespace pipgui
 
         if (plat)
             _brightnessMax = plat->loadMaxBrightnessPercent();
+
+        loadBuiltinPSDF();
+        enablePSDF(true);
+        if (_psdfSizePx == 0)
+            _psdfSizePx = _textStyleBodyPx;
     }
 
     void GUI::setPlatform(pipcore::GuiPlatform *platform)
@@ -368,6 +373,21 @@ namespace pipgui
     {
         _screenAnim = anim;
         _screenAnimDurationMs = durationMs;
+    }
+
+    void GUI::setFrcProfile(FrcProfile profile)
+    {
+        if (profile == FrcProfile::Off)
+            profile = FrcProfile::BlueNoise;
+        _frcProfile = profile;
+    }
+
+    void GUI::enableGamma22(bool enabled)
+    {
+        if (enabled)
+            setFrcProfile(FrcProfile::BlueNoiseGamma22);
+        else
+            setFrcProfile(FrcProfile::BlueNoise);
     }
 
 }
