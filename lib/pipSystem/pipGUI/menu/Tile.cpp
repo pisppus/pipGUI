@@ -1,5 +1,5 @@
-#include <pipGUI/core/api/pipGUI.h>
-#include <pipGUI/core/utils/Colors.h>
+#include <pipGUI/core/api/pipGUI.hpp>
+#include <pipGUI/core/utils/Colors.hpp>
 #include <math.h>
 
 namespace pipgui
@@ -304,7 +304,7 @@ namespace pipgui
 
         if (changed)
         {
-            if (_flags.spriteEnabled && _tft && !_flags.renderToSprite && _currentScreen == screenId)
+            if (_flags.spriteEnabled && _display && !_flags.renderToSprite && _currentScreen == screenId)
                 updateTileMenu(screenId, prevSelected);
             else
                 requestRedraw();
@@ -321,10 +321,10 @@ namespace pipgui
         if (!m.configured || m.itemCount == 0)
             return;
 
-        if (!_flags.spriteEnabled || !_tft)
+        if (!_flags.spriteEnabled || !_display)
         {
             bool prevRender = _flags.renderToSprite;
-            lgfx::LGFX_Sprite *prevActive = _activeSprite;
+            pipcore::Sprite *prevActive = _activeSprite;
             _flags.renderToSprite = 0;
             renderTileMenu(screenId);
             _flags.renderToSprite = prevRender;
@@ -487,7 +487,7 @@ namespace pipgui
         int16_t bhNew = (int16_t)(hNew + pad * 2);
 
         bool prevRender = _flags.renderToSprite;
-        lgfx::LGFX_Sprite *prevActive = _activeSprite;
+        pipcore::Sprite *prevActive = _activeSprite;
 
         int32_t clipX = 0, clipY = 0, clipW = 0, clipH = 0;
         _sprite.getClipRect(&clipX, &clipY, &clipW, &clipH);
@@ -525,7 +525,7 @@ namespace pipgui
         if (!m.configured || m.itemCount == 0)
             return;
 
-        LovyanGFX *t = getDrawTarget();
+        auto t = getDrawTarget();
 
         auto to565 = [](uint32_t c) -> uint16_t { uint8_t r = (uint8_t)((c >> 16) & 0xFF); uint8_t g = (uint8_t)((c >> 8) & 0xFF); uint8_t b = (uint8_t)(c & 0xFF); return (uint16_t)((((uint16_t)(r >> 3)) << 11) | (((uint16_t)(g >> 2)) << 5) | ((uint16_t)(b >> 3))); };
 
@@ -676,7 +676,7 @@ namespace pipgui
 
             if (_frcProfile == FrcProfile::Off)
             {
-                t->fillSmoothRoundRect(x, y, tileW, tileH, r, to565(bg));
+                t->fillRoundRect(x, y, tileW, tileH, r, to565(bg));
                 uint32_t border = pipgui::detail::lighten888(bg, 4);
                 t->drawRoundRect(x, y, tileW, tileH, r, to565(border));
             }

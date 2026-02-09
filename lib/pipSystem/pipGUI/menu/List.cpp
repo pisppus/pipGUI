@@ -1,5 +1,5 @@
-#include <pipGUI/core/api/pipGUI.h>
-#include <pipGUI/core/utils/Colors.h>
+#include <pipGUI/core/api/pipGUI.hpp>
+#include <pipGUI/core/utils/Colors.hpp>
 #include <math.h>
 #include <new>
 #include <utility>
@@ -89,7 +89,7 @@ namespace pipgui
             if (m.viewportSprite)
             {
                 m.viewportSprite->deleteSprite();
-                m.viewportSprite->~LGFX_Sprite();
+                m.viewportSprite->~Sprite();
                 detail::guiFree(plat, m.viewportSprite);
                 m.viewportSprite = nullptr;
             }
@@ -522,15 +522,14 @@ namespace pipgui
             if (!slot)
                 return nullptr;
 
-            if (!_tft)
+            if (!_display)
             {
                 detail::guiFree(plat, slot);
                 slot = nullptr;
                 return nullptr;
             }
 
-            lgfx::LGFX_Sprite spr(_tft);
-            spr.setColorDepth(16);
+            pipcore::Sprite spr;
             if (!spr.createSprite(m.cacheW, m.cacheH))
             {
                 detail::guiFree(plat, slot);
@@ -543,7 +542,7 @@ namespace pipgui
             bool hasSub = sub.length() > 0;
 
             spr.fillScreen(_bgColor);
-            spr.fillSmoothRoundRect(0, 0, m.cacheW, m.cacheH, r, bg);
+            spr.fillRoundRect(0, 0, m.cacheW, m.cacheH, r, bg);
             spr.drawRoundRect(0, 0, m.cacheW, m.cacheH, r, border);
 
             int16_t txLocal = 10;
@@ -596,7 +595,7 @@ namespace pipgui
             int16_t tySubLocal = baseY + titleH + (hasSub ? gapPx : 0);
 
             bool prevRender = _flags.renderToSprite;
-            lgfx::LGFX_Sprite *prevActive = _activeSprite;
+            pipcore::Sprite *prevActive = _activeSprite;
             _flags.renderToSprite = 1;
             _activeSprite = &spr;
 
@@ -640,15 +639,14 @@ namespace pipgui
             if (!slot)
                 return nullptr;
 
-            if (!_tft)
+            if (!_display)
             {
                 detail::guiFree(plat, slot);
                 slot = nullptr;
                 return nullptr;
             }
 
-            lgfx::LGFX_Sprite spr(_tft);
-            spr.setColorDepth(16);
+            pipcore::Sprite spr;
             if (!spr.createSprite(m.cacheW, m.cacheH))
             {
                 detail::guiFree(plat, slot);
@@ -661,7 +659,7 @@ namespace pipgui
             spr.fillScreen(_bgColor);
             if (activeState)
             {
-                spr.fillSmoothRoundRect(0, 0, m.cacheW, m.cacheH, r, bg);
+                spr.fillRoundRect(0, 0, m.cacheW, m.cacheH, r, bg);
                 spr.drawRoundRect(0, 0, m.cacheW, m.cacheH, r, border);
             }
             else
@@ -686,7 +684,7 @@ namespace pipgui
                 baseY = 2;
 
             bool prevRender = _flags.renderToSprite;
-            lgfx::LGFX_Sprite *prevActive = _activeSprite;
+            pipcore::Sprite *prevActive = _activeSprite;
             _flags.renderToSprite = 1;
             _activeSprite = &spr;
 
@@ -750,7 +748,7 @@ namespace pipgui
 
                 if (active)
                 {
-                    t->fillSmoothRoundRect(cx, yy, cardW, cardH, r, bg);
+                    t->fillRoundRect(cx, yy, cardW, cardH, r, bg);
                     t->drawRoundRect(cx, yy, cardW, cardH, r, border);
                 }
 
@@ -786,7 +784,7 @@ namespace pipgui
                 }
             }
 
-            t->fillSmoothRoundRect(cx, yy, cardW, cardH, r, bg);
+            t->fillRoundRect(cx, yy, cardW, cardH, r, bg);
             t->drawRoundRect(cx, yy, cardW, cardH, r, border);
 
             int16_t tx = cx + 10;
@@ -925,7 +923,7 @@ namespace pipgui
 
             uint16_t col = t->color565(v, v, v);
 
-            t->fillSmoothRoundRect(trX, thY, 3, thH, 1, col);
+            t->fillRoundRect(trX, thY, 3, thH, 1, col);
         }
     }
 
@@ -963,10 +961,10 @@ namespace pipgui
         if (w <= 0 || h <= 0)
             return false;
 
-        if (!_flags.spriteEnabled || !_tft)
+        if (!_flags.spriteEnabled || !_display)
         {
             bool prevRender = _flags.renderToSprite;
-            lgfx::LGFX_Sprite *prevActive = _activeSprite;
+            pipcore::Sprite *prevActive = _activeSprite;
 
             _flags.renderToSprite = 0;
             renderListMenu(screenId, x, y, w, h, bgColor);
@@ -979,24 +977,27 @@ namespace pipgui
 
         if (!m.viewportSprite)
         {
-            void *mem = detail::guiAlloc(plat, sizeof(lgfx::LGFX_Sprite), pipcore::GuiAllocCaps::Default);
+            void *mem = detail::guiAlloc(plat, sizeof(pipcore::Sprite), pipcore::GuiAllocCaps::Default);
             if (mem)
             {
-                m.viewportSprite = new (mem) lgfx::LGFX_Sprite(_tft);
-                m.viewportSprite->setColorDepth(16);
+                m.viewportSprite = new (mem) pipcore::Sprite();
             }
         }
 
-        lgfx::LGFX_Sprite *vp = m.viewportSprite;
+        pipcore::Sprite *vp = m.viewportSprite;
         if (vp)
         {
             if (!vp->getBuffer() || vp->width() != w || vp->height() != h)
             {
                 vp->deleteSprite();
-                vp->setColorDepth(16);
                 if (!vp->createSprite(w, h))
+                {
                     vp->deleteSprite();
-                m.viewportValid = false;
+                    vp->~Sprite();
+                    detail::guiFree(plat, vp);
+                    m.viewportSprite = nullptr;
+                    vp = nullptr;
+                }
             }
         }
 
@@ -1004,7 +1005,7 @@ namespace pipgui
 
         uint8_t prevNeedRedraw = _flags.needRedraw;
         bool prevRender = _flags.renderToSprite;
-        lgfx::LGFX_Sprite *prevActive = _activeSprite;
+        pipcore::Sprite *prevActive = _activeSprite;
 
         bool incrementalUsed = false;
         int16_t dirtyX = 0, dirtyY = 0, dirtyW = w, dirtyH = h;

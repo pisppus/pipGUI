@@ -1,4 +1,4 @@
-#include <pipGUI/core/api/pipGUI.h>
+#include <pipGUI/core/api/pipGUI.hpp>
 
 namespace pipgui
 {
@@ -122,7 +122,7 @@ namespace pipgui
                          uint8_t radius,
                          const ButtonVisualState &state)
     {
-        if (_flags.spriteEnabled && _tft && !_flags.renderToSprite)
+        if (_flags.spriteEnabled && _display && !_flags.renderToSprite)
         {
             updateButton(label, iconBitmap, iconW, iconH, x, y, w, h, baseColor, radius, state);
             return;
@@ -304,10 +304,10 @@ namespace pipgui
                            uint8_t radius,
                            const ButtonVisualState &state)
     {
-        if (!_flags.spriteEnabled || !_tft)
+        if (!_flags.spriteEnabled || !_display)
         {
             bool prevRender = _flags.renderToSprite;
-            lgfx::LGFX_Sprite *prevActive = _activeSprite;
+            pipcore::Sprite *prevActive = _activeSprite;
 
             _flags.renderToSprite = 0;
             drawButton(label, iconBitmap, iconW, iconH, x, y, w, h, baseColor, radius, state);
@@ -327,7 +327,7 @@ namespace pipgui
         int16_t pad = 2;
 
         bool prevRender = _flags.renderToSprite;
-        lgfx::LGFX_Sprite *prevActive = _activeSprite;
+        pipcore::Sprite *prevActive = _activeSprite;
 
         _flags.renderToSprite = 1;
         _activeSprite = &_sprite;

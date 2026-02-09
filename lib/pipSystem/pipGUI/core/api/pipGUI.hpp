@@ -6,10 +6,11 @@
 #include <stdlib.h>
 #include <algorithm>
 #include <utility>
-#include <pipCore/Platforms/GUIPlatform.h>
-#include <pipCore/Button.h>
-#include <pipGUI/core/components/FRC.h>
-#include "UiLayout.h"
+#include <pipCore/Platforms/GUIPlatform.hpp>
+#include <pipCore/Graphics/Sprite.hpp>
+#include <pipCore/Button.hpp>
+#include <pipGUI/core/components/FRC.hpp>
+#include "UiLayout.hpp"
 
 namespace pipgui
 {
@@ -293,8 +294,6 @@ namespace pipgui
         RecoveryActionCallback action;
     };
 
-    using PipLGFX = lgfx::LovyanGFX;
-
     struct ButtonVisualStyle
     {
         uint16_t bgColor, bgPressedColor, bgDisabledColor, textColor;
@@ -464,7 +463,7 @@ namespace pipgui
         uint16_t cacheH;
         bool cacheValid;
 
-        lgfx::LGFX_Sprite *viewportSprite;
+        pipcore::Sprite *viewportSprite;
         int16_t viewportX;
         int16_t viewportY;
         int16_t viewportW;

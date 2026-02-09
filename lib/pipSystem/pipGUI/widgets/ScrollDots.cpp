@@ -1,4 +1,4 @@
-#include <pipGUI/core/api/pipGUI.h>
+#include <pipGUI/core/api/pipGUI.hpp>
 #include <math.h>
 
 namespace pipgui
@@ -19,10 +19,10 @@ namespace pipgui
         if (count == 0)
             return;
 
-        if (!_flags.spriteEnabled || !_tft)
+        if (!_flags.spriteEnabled || !_display)
         {
             bool prevRender = _flags.renderToSprite;
-            lgfx::LGFX_Sprite *prevActive = _activeSprite;
+            pipcore::Sprite *prevActive = _activeSprite;
 
             _flags.renderToSprite = 0;
             drawScrollDots(x, y, count, activeIndex, prevIndex, animProgress, animate, animDirection,
@@ -57,7 +57,7 @@ namespace pipgui
         int16_t rh = (int16_t)(h + pad * 2);
 
         bool prevRender = _flags.renderToSprite;
-        lgfx::LGFX_Sprite *prevActive = _activeSprite;
+        pipcore::Sprite *prevActive = _activeSprite;
 
         _flags.renderToSprite = 1;
         _activeSprite = &_sprite;
@@ -89,7 +89,7 @@ namespace pipgui
         if (count == 0)
             return;
 
-        if (_flags.spriteEnabled && _tft && !_flags.renderToSprite)
+        if (_flags.spriteEnabled && _display && !_flags.renderToSprite)
         {
             updateScrollDots(x, y, count, activeIndex, prevIndex, animProgress, animate, animDirection,
                              activeColor, inactiveColor, dotRadius, spacing, activeWidth);
@@ -205,5 +205,4 @@ namespace pipgui
             fillCircleFrc(cx, baseY, (int16_t)dotRadius, activeColor);
         }
     }
-}
 }

@@ -1,4 +1,4 @@
-#include <pipGUI/core/api/pipGUI.h>
+#include <pipGUI/core/api/pipGUI.hpp>
 
 namespace pipgui
 {
@@ -11,7 +11,7 @@ namespace pipgui
         return 1.0f + 16.0f * t * t * t * t * t;
     }
 
-    void GUI::drawErrorCard(LovyanGFX &t,
+    void GUI::drawErrorCard(pipcore::Sprite &t,
                             int16_t x, int16_t y, int16_t w, int16_t h,
                             const String &title, const String &detail,
                             uint16_t accentColor,
@@ -184,7 +184,7 @@ namespace pipgui
         }
 
         bool prevRenderFrame = _flags.renderToSprite;
-        lgfx::LGFX_Sprite *prevActiveFrame = _activeSprite;
+        pipcore::Sprite *prevActiveFrame = _activeSprite;
 
         if (_flags.spriteEnabled)
         {
@@ -197,7 +197,7 @@ namespace pipgui
             _activeSprite = nullptr;
         }
 
-        LovyanGFX *t = getDrawTarget();
+        auto t = getDrawTarget();
         t->fillScreen(0);
 
         int16_t sbh = statusBarHeight();
@@ -323,7 +323,7 @@ namespace pipgui
             uint8_t radius = 10;
 
             bool prevRenderBtn = _flags.renderToSprite;
-            lgfx::LGFX_Sprite *prevActiveBtn = _activeSprite;
+            pipcore::Sprite *prevActiveBtn = _activeSprite;
 
             if (_flags.spriteEnabled)
             {
@@ -362,8 +362,8 @@ namespace pipgui
                            3, 14, 18);
         }
 
-        if (_flags.spriteEnabled && _tft)
-            _sprite.pushSprite(_tft, 0, 0);
+        if (_flags.spriteEnabled && _display)
+            _sprite.writeToDisplay(*_display, 0, 0, (int16_t)_screenWidth, (int16_t)_screenHeight);
 
         _flags.renderToSprite = prevRenderFrame;
         _activeSprite = prevActiveFrame;

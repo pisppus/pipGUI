@@ -1,9 +1,17 @@
-#include <pipGUI/core/api/pipGUI.h>
-#include <pipGUI/core/utils/Colors.h>
+#include <pipGUI/core/api/pipGUI.hpp>
+#include <pipGUI/core/utils/Colors.hpp>
 #include <math.h>
 
 namespace pipgui
 {
+    static inline uint16_t to565(uint32_t c)
+    {
+        uint8_t r = (uint8_t)((c >> 16) & 0xFF);
+        uint8_t g = (uint8_t)((c >> 8) & 0xFF);
+        uint8_t b = (uint8_t)(c & 0xFF);
+        return (uint16_t)((((uint16_t)(r >> 3)) << 11) | (((uint16_t)(g >> 2)) << 5) | ((uint16_t)(b >> 3)));
+    }
+
     static uint16_t blendWhite(uint16_t color, uint8_t intensity)
     {
         if (intensity == 0)
@@ -23,7 +31,7 @@ namespace pipgui
     }
 
     template <typename ColorFunc>
-    static void drawRingArcStroke(LovyanGFX *t,
+    static void drawRingArcStroke(pipcore::Sprite *t,
                                   int16_t cx, int16_t cy,
                                   int16_t r,
                                   uint8_t thickness,
@@ -52,20 +60,18 @@ namespace pipgui
         if (stepDeg > 6.0f)
             stepDeg = 6.0f;
 
-        t->startWrite();
         for (float a = startDeg; a <= endDeg + 0.001f; a += stepDeg)
         {
             float rad = (a - 90.0f) * 0.01745329252f;
             int16_t px = cx + (int16_t)roundf(cosf(rad) * rMid);
             int16_t py = cy + (int16_t)roundf(sinf(rad) * rMid);
             uint16_t col = colorAtAngle(a);
-            t->fillSmoothCircle(px, py, dotR, col);
+            t->fillCircle(px, py, dotR, col);
         }
-        t->endWrite();
     }
 
     template <typename ColorFunc>
-    static void drawRingArcStrokeWrapped(LovyanGFX *t,
+    static void drawRingArcStrokeWrapped(pipcore::Sprite *t,
                                          int16_t cx, int16_t cy,
                                          int16_t r,
                                          uint8_t thickness,
@@ -110,7 +116,7 @@ namespace pipgui
         if (value > 100)
             value = 100;
 
-        if (_flags.spriteEnabled && _tft && !_flags.renderToSprite)
+        if (_flags.spriteEnabled && _display && !_flags.renderToSprite)
         {
             updateProgressBar(x, y, w, h, value, baseColor, fillColor, radius, anim);
             return;
@@ -165,7 +171,7 @@ namespace pipgui
         if (r < 1)
             r = 0;
 
-        t->fillSmoothRoundRect(x, y, w, h, r, baseColor);
+        t->fillRoundRect(x, y, w, h, r, to565(baseColor));
 
         int16_t innerX = x;
         int16_t innerY = y;
@@ -201,7 +207,7 @@ namespace pipgui
             int16_t segW = segRight - segLeft;
 
             if (segW > 0)
-                t->fillSmoothRoundRect(segLeft, innerY, segW, innerH, fillR, fillColor);
+                t->fillRoundRect(segLeft, innerY, segW, innerH, fillR, to565(fillColor));
 
             return;
         }
@@ -215,7 +221,7 @@ namespace pipgui
         if (fillW > innerW)
             fillW = innerW;
 
-        t->fillSmoothRoundRect(innerX, innerY, fillW, innerH, fillR, fillColor);
+        t->fillRoundRect(innerX, innerY, fillW, innerH, fillR, to565(fillColor));
 
         if (anim == ProgressAnimNone)
             return;
@@ -262,7 +268,6 @@ namespace pipgui
 
             auto to565 = [](uint32_t c) -> uint16_t { uint8_t r = (uint8_t)((c >> 16) & 0xFF); uint8_t g = (uint8_t)((c >> 8) & 0xFF); uint8_t b = (uint8_t)(c & 0xFF); return (uint16_t)((((uint16_t)(r >> 3)) << 11) | (((uint16_t)(g >> 2)) << 5) | ((uint16_t)(b >> 3))); };
 
-            t->startWrite();
             for (int16_t px = innerX; px < innerX + fillW; ++px)
             {
                 int16_t local = (px - innerX + period - phase) % period;
@@ -273,7 +278,7 @@ namespace pipgui
                     if (lineH > 0)
                     {
                         if (_frcProfile == FrcProfile::Off)
-                            t->writeFastVLine(px, innerY + offset, lineH, to565(stripeColor));
+                            t->fillRect(px, innerY + offset, 1, lineH, to565(stripeColor));
                         else
                         {
                             Color888 sc{(uint8_t)((stripeColor >> 16) & 0xFF), (uint8_t)((stripeColor >> 8) & 0xFF), (uint8_t)(stripeColor & 0xFF)};
@@ -283,7 +288,6 @@ namespace pipgui
                     }
                 }
             }
-            t->endWrite();
         }
         else if (anim == Shimmer)
         {
@@ -307,7 +311,6 @@ namespace pipgui
 
             if (drawRight > drawLeft)
             {
-                t->startWrite();
                 for (int16_t px = drawLeft; px < drawRight; ++px)
                 {
                     int16_t dist = abs(px - shimmerCenter);
@@ -324,9 +327,8 @@ namespace pipgui
                     int16_t offset = getCornerOffset(px);
                     int16_t lineH = innerH - (offset * 2);
                     if (lineH > 0)
-                        t->writeFastVLine(px, innerY + offset, lineH, col);
+                        t->fillRect(px, innerY + offset, 1, lineH, col);
                 }
-                t->endWrite();
             }
         }
     }
@@ -357,7 +359,7 @@ namespace pipgui
         if (thickness < 1)
             thickness = 1;
 
-        if (_flags.spriteEnabled && _tft && !_flags.renderToSprite)
+        if (_flags.spriteEnabled && _display && !_flags.renderToSprite)
         {
             updateCircularProgressBar(x, y, r, thickness, value, baseColor, fillColor, anim);
             return;
@@ -508,10 +510,10 @@ namespace pipgui
                                uint8_t radius,
                                ProgressAnim anim)
     {
-        if (!_flags.spriteEnabled || !_tft)
+        if (!_flags.spriteEnabled || !_display)
         {
             bool prevRender = _flags.renderToSprite;
-            lgfx::LGFX_Sprite *prevActive = _activeSprite;
+            pipcore::Sprite *prevActive = _activeSprite;
 
             _flags.renderToSprite = 0;
             drawProgressBar(x, y, w, h, value, baseColor, fillColor, radius, anim);
@@ -530,7 +532,7 @@ namespace pipgui
         int16_t pad = 2;
 
         bool prevRender = _flags.renderToSprite;
-        lgfx::LGFX_Sprite *prevActive = _activeSprite;
+        pipcore::Sprite *prevActive = _activeSprite;
 
         _flags.renderToSprite = 1;
         _activeSprite = &_sprite;
@@ -567,10 +569,10 @@ namespace pipgui
         if (w <= 0 || h <= 0)
             return;
 
-        if (!_flags.spriteEnabled || !_tft)
+        if (!_flags.spriteEnabled || !_display)
         {
             bool prevRender = _flags.renderToSprite;
-            lgfx::LGFX_Sprite *prevActive = _activeSprite;
+            pipcore::Sprite *prevActive = _activeSprite;
 
             _flags.renderToSprite = 0;
             drawProgressBar(x, y, w, h, value, baseColor, fillColor, radius, anim);
@@ -597,7 +599,7 @@ namespace pipgui
         if (needFull)
         {
             bool prevRender = _flags.renderToSprite;
-            lgfx::LGFX_Sprite *prevActive = _activeSprite;
+            pipcore::Sprite *prevActive = _activeSprite;
 
             _flags.renderToSprite = 1;
             _activeSprite = &_sprite;
@@ -651,7 +653,7 @@ namespace pipgui
         _sprite.setClipRect(cx, (int16_t)(ry - pad), cw, (int16_t)(h + pad * 2));
 
         bool prevRender = _flags.renderToSprite;
-        lgfx::LGFX_Sprite *prevActive = _activeSprite;
+        pipcore::Sprite *prevActive = _activeSprite;
 
         _flags.renderToSprite = 1;
         _activeSprite = &_sprite;
@@ -681,10 +683,10 @@ namespace pipgui
         uint16_t base565 = (uint16_t)baseColor;
         uint16_t fill565 = (uint16_t)fillColor;
 
-        if (!_flags.spriteEnabled || !_tft)
+        if (!_flags.spriteEnabled || !_display)
         {
             bool prevRender = _flags.renderToSprite;
-            lgfx::LGFX_Sprite *prevActive = _activeSprite;
+            pipcore::Sprite *prevActive = _activeSprite;
 
             _flags.renderToSprite = 0;
             drawCircularProgressBar(x, y, r, thickness, value, base565, fill565, anim);
@@ -694,7 +696,7 @@ namespace pipgui
         }
 
         bool prevRender = _flags.renderToSprite;
-        lgfx::LGFX_Sprite *prevActive = _activeSprite;
+        pipcore::Sprite *prevActive = _activeSprite;
 
         _flags.renderToSprite = 1;
         _activeSprite = &_sprite;

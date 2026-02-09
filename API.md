@@ -127,8 +127,8 @@ ui.fillRect(
 Для ESP32 используй готовую реализацию:
 
 ```cpp
-#include <pipGUI/core/api/pipGUI.h>
-#include <pipCore/Platforms/ESP32/GUI.h>
+#include <pipGUI/core/api/pipGUI.hpp>
+#include <pipCore/Platforms/ESP32/GUI.hpp>
 
 static pipcore::Esp32GuiPlatform platform;
 static pipgui::GUI ui;

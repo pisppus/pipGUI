@@ -1,4 +1,4 @@
-#include <pipGUI/core/api/pipGUI.h>
+#include <pipGUI/core/api/pipGUI.hpp>
 
 namespace pipgui
 {
@@ -103,7 +103,7 @@ namespace pipgui
     {
         if (!_flags.statusBarEnabled || _statusBarHeight == 0)
             return;
-        if (!_tft)
+        if (!_display)
             return;
 
         auto unionRect = [](DirtyRect a, DirtyRect b) -> DirtyRect
@@ -155,7 +155,7 @@ namespace pipgui
                 return;
 
             bool prevRender = _flags.renderToSprite;
-            lgfx::LGFX_Sprite *prevActive = _activeSprite;
+            pipcore::Sprite *prevActive = _activeSprite;
 
             _flags.renderToSprite = 0;
             renderStatusBar(false);
@@ -432,7 +432,7 @@ namespace pipgui
             return;
 
         bool prevRender = _flags.renderToSprite;
-        lgfx::LGFX_Sprite *prevActive = _activeSprite;
+        pipcore::Sprite *prevActive = _activeSprite;
 
         if (useSprite && _flags.spriteEnabled)
         {
@@ -444,7 +444,9 @@ namespace pipgui
             _flags.renderToSprite = 0;
         }
 
-        LovyanGFX *t = getDrawTarget();
+        auto t = getDrawTarget();
+        if (!t)
+            return;
 
         int16_t x = 0;
         int16_t y = 0;
@@ -568,9 +570,9 @@ namespace pipgui
             uint16_t frameColor = _statusBarFg;
             uint16_t innerBg = _statusBarBg;
 
-            t->fillSmoothRoundRect(bx, by, bwCase, bh, 4, frameColor);
+            t->fillRoundRect(bx, by, bwCase, bh, 4, frameColor);
             if (bwCase > 2 && bh > 2)
-                t->fillSmoothRoundRect(bx + 1, by + 1, bwCase - 2, bh - 2, 3, innerBg);
+                t->fillRoundRect(bx + 1, by + 1, bwCase - 2, bh - 2, 3, innerBg);
 
             if (noseW > 0)
             {
@@ -579,7 +581,7 @@ namespace pipgui
                     tipH = bh / 2;
                 int16_t tipY = by + (bh - tipH) / 2;
                 int16_t tipX = bx + bwCase + 1;
-                t->fillSmoothRoundRect(tipX, tipY, noseW, tipH, 1, frameColor);
+                t->fillRoundRect(tipX, tipY, noseW, tipH, 1, frameColor);
             }
 
             if (_batteryStyle == Numeric)
@@ -600,13 +602,13 @@ namespace pipgui
                     int16_t ix = bx + 2;
                     int16_t iy = by + 2;
 
-                    t->fillSmoothRoundRect(ix, iy, innerW, innerH, 2, innerBg);
+                    t->fillRoundRect(ix, iy, innerW, innerH, 2, innerBg);
 
                     int16_t fillW = (int16_t)((innerW * _batteryLevel) / 100);
                     if (fillW > 0)
                     {
                         uint16_t col = (_batteryLevel <= 20) ? 0xF800 : t->color565(0, 214, 4);
-                        t->fillSmoothRoundRect(ix, iy, fillW, innerH, 2, col);
+                        t->fillRoundRect(ix, iy, fillW, innerH, 2, col);
                     }
                 }
             }

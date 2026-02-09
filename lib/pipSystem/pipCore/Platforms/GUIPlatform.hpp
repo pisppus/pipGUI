@@ -4,8 +4,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-#define LGFX_USE_V1
-#include <LovyanGFX.hpp>
+#include <pipCore/Platforms/GuiDisplay.hpp>
 
 namespace pipcore
 {
@@ -26,13 +25,21 @@ namespace pipcore
         uint16_t width = 0;
         uint16_t height = 0;
         uint32_t hz = 0;
+        bool bgr = false;
     };
 
     class GuiPlatform
     {
     public:
+        static void setDefaultPlatform(GuiPlatform *platform) { defaultPlatformRef() = platform; }
+        static GuiPlatform *defaultPlatform() { return defaultPlatformRef(); }
+
         virtual ~GuiPlatform() = default;
         virtual uint32_t nowMs() = 0;
+
+        virtual void ioPinModeInput(uint8_t, bool) {}
+        virtual bool ioDigitalRead(uint8_t) { return false; }
+
         virtual void configureBacklightPin(uint8_t, uint8_t = 0, uint32_t = 5000, uint8_t = 12) {}
         virtual uint8_t loadMaxBrightnessPercent() { return 100; }
         virtual void storeMaxBrightnessPercent(uint8_t) {}
@@ -59,6 +66,13 @@ namespace pipcore
             return false;
         }
 
-        virtual lgfx::LovyanGFX *guiDisplay() { return nullptr; }
+        virtual GuiDisplay *guiDisplay() { return nullptr; }
+
+    private:
+        static GuiPlatform *&defaultPlatformRef()
+        {
+            static GuiPlatform *p = nullptr;
+            return p;
+        }
     };
 }

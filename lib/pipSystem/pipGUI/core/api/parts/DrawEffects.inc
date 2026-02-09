@@ -1,11 +1,11 @@
 #if !defined(PIPGUI_GUI_PARTS)
-#error "Do not include this file directly. Include <pipGUI/core/api/pipGUI.h>"
+#error "Do not include this file directly. Include <pipGUI/core/api/pipGUI.hpp>"
 #endif
 
-        PipLGFX &tft()
+        pipcore::GuiDisplay &display()
         {
-            assert(_tft != nullptr);
-            return *_tft;
+            assert(_display != nullptr);
+            return *_display;
         }
 
         uint32_t rgb(uint8_t r, uint8_t g, uint8_t b) const;

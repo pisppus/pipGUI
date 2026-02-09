@@ -1,4 +1,4 @@
-#include <pipGUI/core/api/pipGUI.h>
+#include <pipGUI/core/api/pipGUI.hpp>
 
 namespace
 {
@@ -324,7 +324,7 @@ void GUI::renderRecoveryScreen()
     uint16_t pbg = panelBgColor(*this);
     uint8_t r = panelRadius();
 
-    t->fillSmoothRoundRect(px, py, pw, ph, r, pbg);
+    t->fillRoundRect(px, py, pw, ph, r, pbg);
     if (ph > (int16_t)r)
         t->fillRect(px, py + r, pw, ph - r, pbg);
 

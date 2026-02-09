@@ -1,4 +1,4 @@
-#include <pipGUI/core/api/pipGUI.h>
+#include <pipGUI/core/api/pipGUI.hpp>
 
 namespace pipgui
 {
@@ -35,23 +35,9 @@ namespace pipgui
         if (!t)
             return;
 
-        int16_t x0 = (int16_t)(cx - r);
-        int16_t y0 = (int16_t)(cy - r);
-        int16_t x1 = (int16_t)(cx + r);
-        int16_t y1 = (int16_t)(cy + r);
-
-        int32_t rr = (int32_t)r * (int32_t)r;
-        for (int16_t y = y0; y <= y1; ++y)
-        {
-            int32_t dy = (int32_t)y - (int32_t)cy;
-            int32_t dy2 = dy * dy;
-            for (int16_t x = x0; x <= x1; ++x)
-            {
-                int32_t dx = (int32_t)x - (int32_t)cx;
-                if (dx * dx + dy2 <= rr)
-                    t->drawPixel(x, y, color888To565(x, y, color888));
-            }
-        }
+        uint16_t c565 = color888To565(cx, cy, color888);
+        t->fillCircle(cx, cy, r, c565);
+        return;
     }
 
     void GUI::fillRoundRectFrc(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radius, uint32_t color888)
@@ -70,49 +56,8 @@ namespace pipgui
         if (r < 0)
             r = 0;
 
-        int16_t x0 = x;
-        int16_t y0 = y;
-        int16_t x1 = (int16_t)(x + w - 1);
-        int16_t y1 = (int16_t)(y + h - 1);
-
-        int16_t cxL = (int16_t)(x0 + r);
-        int16_t cxR = (int16_t)(x1 - r);
-        int16_t cyT = (int16_t)(y0 + r);
-        int16_t cyB = (int16_t)(y1 - r);
-
-        int32_t rr = (int32_t)r * (int32_t)r;
-
-        for (int16_t py = y0; py <= y1; ++py)
-        {
-            for (int16_t px = x0; px <= x1; ++px)
-            {
-                bool inside = false;
-
-                if (r == 0)
-                {
-                    inside = true;
-                }
-                else if (px >= cxL && px <= cxR)
-                {
-                    inside = true;
-                }
-                else if (py >= cyT && py <= cyB)
-                {
-                    inside = true;
-                }
-                else
-                {
-                    int16_t ccx = (px < cxL) ? cxL : cxR;
-                    int16_t ccy = (py < cyT) ? cyT : cyB;
-                    int32_t dx = (int32_t)px - (int32_t)ccx;
-                    int32_t dy = (int32_t)py - (int32_t)ccy;
-                    inside = (dx * dx + dy * dy) <= rr;
-                }
-
-                if (inside)
-                    t->drawPixel(px, py, color888To565(px, py, color888));
-            }
-        }
+        uint16_t c565 = color888To565(x, y, color888);
+        t->fillRoundRect(x, y, w, h, r, c565);
     }
 
     void GUI::drawRoundRectFrc(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radius, uint32_t color888)
@@ -177,40 +122,11 @@ namespace pipgui
         _bgColor = rgb(r, g, b);
 
         if (!_flags.spriteEnabled)
-        {
-            if (_tft)
-            {
-                if (profile == FrcProfile::Off)
-                {
-                    uint16_t c565 = (uint16_t)((((uint16_t)(r >> 3)) << 11) | (((uint16_t)(g >> 2)) << 5) | ((uint16_t)(b >> 3)));
-                    _tft->fillScreen(c565);
-                }
-                else
-                {
-                    uint16_t tile[16 * 16];
-                    Color888 c{r, g, b};
-                    for (int16_t ty = 0; ty < 16; ++ty)
-                    {
-                        for (int16_t tx = 0; tx < 16; ++tx)
-                            tile[(uint16_t)ty * 16U + (uint16_t)tx] = detail::quantize565(c, tx, ty, _frcSeed, profile);
-                    }
-
-                    for (int16_t yy = 0; yy < (int16_t)_screenHeight; ++yy)
-                    {
-                        const uint16_t *tileRow = &tile[((uint16_t)yy & 15U) * 16U];
-                        for (int16_t xx = 0; xx < (int16_t)_screenWidth; ++xx)
-                        {
-                            _tft->drawPixel(xx, yy, tileRow[(uint16_t)xx & 15U]);
-                        }
-                    }
-                }
-            }
             return;
-        }
 
-        lgfx::LGFX_Sprite *spr = (_flags.renderToSprite && _flags.spriteEnabled)
-                                     ? (_activeSprite ? _activeSprite : &_sprite)
-                                     : &_sprite;
+        pipcore::Sprite *spr = (_flags.renderToSprite && _flags.spriteEnabled)
+                                        ? (_activeSprite ? _activeSprite : &_sprite)
+                                        : &_sprite;
 
         uint16_t *buf = (uint16_t *)spr->getBuffer();
         if (!buf)
@@ -251,7 +167,7 @@ namespace pipgui
             }
         }
 
-        if (_tft && _flags.spriteEnabled && !_flags.renderToSprite)
+        if (_display && _flags.spriteEnabled && !_flags.renderToSprite)
             invalidateRect(0, 0, (int16_t)_screenWidth, (int16_t)_screenHeight);
     }
 
@@ -266,35 +182,11 @@ namespace pipgui
             return;
 
         if (!_flags.spriteEnabled)
-        {
-            if (_tft)
-            {
-                if (profile == FrcProfile::Off)
-                {
-                    uint16_t c565 = (uint16_t)((((uint16_t)(r >> 3)) << 11) | (((uint16_t)(g >> 2)) << 5) | ((uint16_t)(b >> 3)));
-                    _tft->fillRect(x, y, w, h, c565);
-                }
-                else
-                {
-                    Color888 c{r, g, b};
-                    for (int16_t yy = 0; yy < h; ++yy)
-                    {
-                        int16_t py = (int16_t)(y + yy);
-                        for (int16_t xx = 0; xx < w; ++xx)
-                        {
-                            int16_t px = (int16_t)(x + xx);
-                            uint16_t c565 = detail::quantize565(c, px, py, _frcSeed, profile);
-                            _tft->drawPixel(px, py, c565);
-                        }
-                    }
-                }
-            }
             return;
-        }
 
-        lgfx::LGFX_Sprite *spr = (_flags.renderToSprite && _flags.spriteEnabled)
-                                     ? (_activeSprite ? _activeSprite : &_sprite)
-                                     : &_sprite;
+        pipcore::Sprite *spr = (_flags.renderToSprite && _flags.spriteEnabled)
+                                        ? (_activeSprite ? _activeSprite : &_sprite)
+                                        : &_sprite;
 
         uint16_t *buf = (uint16_t *)spr->getBuffer();
         if (!buf)
@@ -377,15 +269,15 @@ namespace pipgui
             }
         }
 
-        if (_tft && _flags.spriteEnabled && !_flags.renderToSprite)
+        if (_display && _flags.spriteEnabled && !_flags.renderToSprite)
             invalidateRect(x, y, w, h);
     }
 
-    LovyanGFX *GUI::getDrawTarget()
+    pipcore::Sprite *GUI::getDrawTarget()
     {
         if (_flags.renderToSprite && _flags.spriteEnabled)
             return _activeSprite ? _activeSprite : &_sprite;
-        return _tft;
+        return &_sprite;
     }
 
     void GUI::clear(uint32_t color)
@@ -471,7 +363,7 @@ namespace pipgui
 
     void GUI::invalidateRect(int16_t x, int16_t y, int16_t w, int16_t h)
     {
-        if (!_tft || !_flags.spriteEnabled)
+        if (!_display || !_flags.spriteEnabled)
             return;
         if (w <= 0 || h <= 0)
             return;
@@ -504,6 +396,20 @@ namespace pipgui
 
         if (w <= 0 || h <= 0)
             return;
+
+        if (_debugShowDirtyRects)
+        {
+            if (_debugRectCount < (uint8_t)(sizeof(_debugRects) / sizeof(_debugRects[0])))
+            {
+                _debugRects[_debugRectCount++] = {x, y, w, h};
+            }
+            else
+            {
+                for (uint8_t i = 1; i < _debugRectCount; ++i)
+                    _debugRects[i - 1] = _debugRects[i];
+                _debugRects[_debugRectCount - 1] = {x, y, w, h};
+            }
+        }
 
         auto intersectsOrTouches = [](const DirtyRect &a, int16_t bx, int16_t by, int16_t bw, int16_t bh) -> bool
         {
@@ -566,90 +472,16 @@ namespace pipgui
     {
         if (_dirtyCount == 0)
             return;
-        if (!_tft || !_flags.spriteEnabled)
+        if (!_display || !_flags.spriteEnabled)
         {
             _dirtyCount = 0;
             return;
         }
 
-        uint32_t now = nowMs();
-
-        int32_t clipX = 0, clipY = 0, clipW = 0, clipH = 0;
-        _tft->getClipRect(&clipX, &clipY, &clipW, &clipH);
-
-        bool debugRectsSame = false;
-        if (_debugShowDirtyRects)
-        {
-            uint8_t cap = (uint8_t)(sizeof(_debugRects) / sizeof(_debugRects[0]));
-            uint8_t newCount = (_dirtyCount < cap) ? _dirtyCount : cap;
-            if (_debugRectCount == newCount)
-            {
-                debugRectsSame = true;
-                for (uint8_t i = 0; i < newCount; ++i)
-                {
-                    if (_debugRects[i].x != _dirty[i].x ||
-                        _debugRects[i].y != _dirty[i].y ||
-                        _debugRects[i].w != _dirty[i].w ||
-                        _debugRects[i].h != _dirty[i].h)
-                    {
-                        debugRectsSame = false;
-                        break;
-                    }
-                }
-            }
-        }
-
-        if (_debugShowDirtyRects && _debugRectCount > 0 && _debugOverlayDrawnState != 0 && !debugRectsSame)
-        {
-            for (uint8_t i = 0; i < _debugRectCount; ++i)
-            {
-                DirtyRect r = _debugRects[i];
-                if (r.w <= 0 || r.h <= 0)
-                    continue;
-
-                r.x = (int16_t)(r.x - 2);
-                r.y = (int16_t)(r.y - 2);
-                r.w = (int16_t)(r.w + 4);
-                r.h = (int16_t)(r.h + 4);
-
-                if (r.x < 0)
-                {
-                    r.w += r.x;
-                    r.x = 0;
-                }
-                if (r.y < 0)
-                {
-                    r.h += r.y;
-                    r.y = 0;
-                }
-                if (r.w <= 0 || r.h <= 0)
-                    continue;
-
-                if (r.x + r.w > (int16_t)_screenWidth)
-                    r.w = (int16_t)_screenWidth - r.x;
-                if (r.y + r.h > (int16_t)_screenHeight)
-                    r.h = (int16_t)_screenHeight - r.y;
-                if (r.w <= 0 || r.h <= 0)
-                    continue;
-
-                _tft->setClipRect(r.x, r.y, r.w, r.h);
-                _sprite.pushSprite(_tft, 0, 0);
-            }
-
-            _tft->setClipRect(clipX, clipY, clipW, clipH);
-        }
-
-        if (_debugShowDirtyRects)
-        {
-            uint8_t cap = (uint8_t)(sizeof(_debugRects) / sizeof(_debugRects[0]));
-            _debugRectCount = (_dirtyCount < cap) ? _dirtyCount : cap;
-            for (uint8_t i = 0; i < _debugRectCount; ++i)
-                _debugRects[i] = _dirty[i];
-
-            _debugHighlightUntilMs = now + 160;
-            _debugOverlayDrawnState = 2;
-            _debugLastFlushMs = now;
-        }
+        const int16_t sw = _sprite.width();
+        const int16_t sh = _sprite.height();
+        uint16_t *buf = (uint16_t *)_sprite.getBuffer();
+        const int32_t stride = sw;
 
         for (uint8_t i = 0; i < _dirtyCount; ++i)
         {
@@ -657,49 +489,131 @@ namespace pipgui
             if (r.w <= 0 || r.h <= 0)
                 continue;
 
-            _tft->setClipRect(r.x, r.y, r.w, r.h);
-            _sprite.pushSprite(_tft, 0, 0);
-
-            if (_debugShowDirtyRects)
+            if (_debugShowDirtyRects && buf && sw > 0 && sh > 0)
             {
-                _tft->setClipRect(clipX, clipY, clipW, clipH);
-                _tft->drawRect(r.x, r.y, r.w, r.h, _debugDirtyRectActiveColor);
-            }
-        }
+                int16_t x0 = r.x;
+                int16_t y0 = r.y;
+                int16_t w = r.w;
+                int16_t h = r.h;
 
-        _tft->setClipRect(clipX, clipY, clipW, clipH);
+                if (x0 < 0)
+                {
+                    w += x0;
+                    x0 = 0;
+                }
+                if (y0 < 0)
+                {
+                    h += y0;
+                    y0 = 0;
+                }
+                if (x0 + w > sw)
+                    w = (int16_t)(sw - x0);
+                if (y0 + h > sh)
+                    h = (int16_t)(sh - y0);
+
+                if (w > 0 && h > 0)
+                {
+                    const uint32_t perim = (uint32_t)(w * 2) + (uint32_t)((h > 2) ? ((h - 2) * 2) : 0);
+                    uint16_t *saved = (uint16_t *)detail::guiAlloc(platform(), perim * sizeof(uint16_t), pipcore::GuiAllocCaps::Default);
+                    if (saved)
+                    {
+                        uint32_t idx = 0;
+
+                        const int32_t top = (int32_t)y0 * stride + x0;
+                        for (int16_t xx = 0; xx < w; ++xx)
+                            saved[idx++] = buf[top + xx];
+
+                        if (h > 1)
+                        {
+                            const int32_t bot = (int32_t)(y0 + h - 1) * stride + x0;
+                            for (int16_t xx = 0; xx < w; ++xx)
+                                saved[idx++] = buf[bot + xx];
+                        }
+
+                        if (h > 2)
+                        {
+                            for (int16_t yy = 1; yy < h - 1; ++yy)
+                                saved[idx++] = buf[((int32_t)(y0 + yy) * stride) + x0];
+                            if (w > 1)
+                            {
+                                for (int16_t yy = 1; yy < h - 1; ++yy)
+                                    saved[idx++] = buf[((int32_t)(y0 + yy) * stride) + (x0 + w - 1)];
+                            }
+                        }
+                        else if (w > 1)
+                        {
+                            for (int16_t yy = 0; yy < h; ++yy)
+                                saved[idx++] = buf[((int32_t)(y0 + yy) * stride) + (x0 + w - 1)];
+                        }
+
+                        const uint16_t col = swap16(_debugDirtyRectActiveColor);
+
+                        for (int16_t xx = 0; xx < w; ++xx)
+                            buf[top + xx] = col;
+
+                        if (h > 1)
+                        {
+                            const int32_t bot = (int32_t)(y0 + h - 1) * stride + x0;
+                            for (int16_t xx = 0; xx < w; ++xx)
+                                buf[bot + xx] = col;
+                        }
+
+                        for (int16_t yy = 1; yy < h - 1; ++yy)
+                        {
+                            buf[((int32_t)(y0 + yy) * stride) + x0] = col;
+                            if (w > 1)
+                                buf[((int32_t)(y0 + yy) * stride) + (x0 + w - 1)] = col;
+                        }
+
+                        _sprite.writeToDisplay(*_display, x0, y0, w, h);
+
+                        idx = 0;
+                        for (int16_t xx = 0; xx < w; ++xx)
+                            buf[top + xx] = saved[idx++];
+
+                        if (h > 1)
+                        {
+                            const int32_t bot = (int32_t)(y0 + h - 1) * stride + x0;
+                            for (int16_t xx = 0; xx < w; ++xx)
+                                buf[bot + xx] = saved[idx++];
+                        }
+
+                        if (h > 2)
+                        {
+                            for (int16_t yy = 1; yy < h - 1; ++yy)
+                                buf[((int32_t)(y0 + yy) * stride) + x0] = saved[idx++];
+                            if (w > 1)
+                            {
+                                for (int16_t yy = 1; yy < h - 1; ++yy)
+                                    buf[((int32_t)(y0 + yy) * stride) + (x0 + w - 1)] = saved[idx++];
+                            }
+                        }
+                        else if (w > 1)
+                        {
+                            for (int16_t yy = 0; yy < h; ++yy)
+                                buf[((int32_t)(y0 + yy) * stride) + (x0 + w - 1)] = saved[idx++];
+                        }
+
+                        detail::guiFree(platform(), saved);
+                        continue;
+                    }
+                }
+            }
+
+            _sprite.writeToDisplay(*_display, r.x, r.y, r.w, r.h);
+        }
 
         _dirtyCount = 0;
     }
 
     void GUI::tickDebugDirtyOverlay(uint32_t now)
     {
-        if (!_debugShowDirtyRects || !_tft)
+        if (!_debugShowDirtyRects || !_display)
             return;
         if (_debugRectCount == 0)
             return;
         if (_flags.bootActive || _flags.errorActive)
             return;
-
-        uint8_t desired = (now < _debugHighlightUntilMs) ? 2 : 1;
-        if (desired == _debugOverlayDrawnState)
-            return;
-
-        int32_t clipX = 0, clipY = 0, clipW = 0, clipH = 0;
-        _tft->getClipRect(&clipX, &clipY, &clipW, &clipH);
-        _tft->setClipRect(clipX, clipY, clipW, clipH);
-
-        uint16_t color = (desired == 2) ? _debugDirtyRectActiveColor : _debugDirtyRectColor;
-        for (uint8_t i = 0; i < _debugRectCount; ++i)
-        {
-            DirtyRect r = _debugRects[i];
-            if (r.w <= 0 || r.h <= 0)
-                continue;
-            _tft->drawRect(r.x, r.y, r.w, r.h, color);
-        }
-
-        _tft->setClipRect(clipX, clipY, clipW, clipH);
-        _debugOverlayDrawnState = desired;
     }
 
 }

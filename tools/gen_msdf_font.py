@@ -117,7 +117,7 @@ def _gen_header(atlas: dict) -> str:
 def _main():
     project_dir = env["PROJECT_DIR"]
     atlas_path = os.path.join(project_dir, "lib", "pipSystem", "pipGUI", "fonts", "atlas.json")
-    out_path = os.path.join(project_dir, "lib", "pipSystem", "pipGUI", "fonts", "WixMadeForDisplay_psdf_metrics.h")
+    out_path = os.path.join(project_dir, "lib", "pipSystem", "pipGUI", "fonts", "WixMadeForDisplay_psdf_metrics.hpp")
 
     data = _read_json(atlas_path)
     content = _gen_header(data)

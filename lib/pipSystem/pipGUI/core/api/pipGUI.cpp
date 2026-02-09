@@ -1,4 +1,4 @@
-#include <pipGUI/core/api/pipGUI.h>
+#include <pipGUI/core/api/pipGUI.hpp>
 #include <math.h>
 
 namespace pipgui
@@ -121,7 +121,7 @@ namespace pipgui
             if (m->viewportSprite)
             {
                 m->viewportSprite->deleteSprite();
-                m->viewportSprite->~LGFX_Sprite();
+                m->viewportSprite->~Sprite();
                 detail::guiFree(plat, m->viewportSprite);
                 m->viewportSprite = nullptr;
             }
@@ -234,7 +234,7 @@ namespace pipgui
         }
     }
 
-    void GUI::configureDisplay(int8_t mosi, int8_t sclk, int8_t cs, int8_t dc, int8_t rst, uint16_t w, uint16_t h, uint32_t hz)
+    void GUI::configureDisplay(int8_t mosi, int8_t sclk, int8_t cs, int8_t dc, int8_t rst, uint16_t w, uint16_t h, uint32_t hz, bool bgr)
     {
         _displayCfg.mosi = mosi;
         _displayCfg.sclk = sclk;
@@ -245,10 +245,10 @@ namespace pipgui
         _displayCfg.width = w;
         _displayCfg.height = h;
         _displayCfg.hz = hz;
+        _displayCfg.bgr = bgr;
         _displayCfgConfigured = true;
-
-        if (platform())
-            platform()->guiConfigureDisplay(_displayCfg);
+        if (pipcore::GuiPlatform *plat = platform())
+            plat->guiConfigureDisplay(_displayCfg);
     }
 
     void GUI::begin(uint8_t rotation, uint16_t bgColor)
@@ -256,6 +256,10 @@ namespace pipgui
         pipcore::GuiPlatform *plat = platform();
         if (!plat)
             return;
+
+#if defined(PIPGUI_DEBUG_DIRTY_RECTS) && (PIPGUI_DEBUG_DIRTY_RECTS)
+        _debugShowDirtyRects = true;
+#endif
 
         if (_displayCfgConfigured)
         {
@@ -266,43 +270,33 @@ namespace pipgui
         if (!plat->guiBeginDisplay(rotation))
             return;
 
-        _tft = plat->guiDisplay();
-        if (!_tft)
+        _display = plat->guiDisplay();
+        if (!_display)
             return;
 
-        _screenWidth = _tft->width();
-        _screenHeight = _tft->height();
+        _screenWidth = _display->width();
+        _screenHeight = _display->height();
         _bgColor = bgColor;
 
-        _tft->fillScreen(_bgColor);
-        _tft->setTextWrap(false);
-        _tft->setTextColor(0xFFFF, _bgColor);
+        _display->fillScreen565(_bgColor);
 
-        using SpriteT = lgfx::LGFX_Sprite;
-        auto resetSprite = [&](SpriteT &s)
-        {
-            s.~SpriteT();
-            new (&s) SpriteT(_tft);
-            s.setColorDepth(16);
-        };
+        _sprite.deleteSprite();
+        _screenFromSprite.deleteSprite();
+        _screenToSprite.deleteSprite();
 
-        resetSprite(_sprite);
-        resetSprite(_screenFromSprite);
-        resetSprite(_screenToSprite);
-
-        _flags.spriteEnabled = _sprite.createSprite(_screenWidth, _screenHeight) != nullptr;
+        _flags.spriteEnabled = _sprite.createSprite((int16_t)_screenWidth, (int16_t)_screenHeight);
         _activeSprite = _flags.spriteEnabled ? &_sprite : nullptr;
 
-        bool fromOk = _screenFromSprite.createSprite(_screenWidth, _screenHeight);
-        bool toOk = fromOk && _screenToSprite.createSprite(_screenWidth, _screenHeight);
+        bool fromOk = _screenFromSprite.createSprite((int16_t)_screenWidth, (int16_t)_screenHeight);
+        bool toOk = fromOk && _screenToSprite.createSprite((int16_t)_screenWidth, (int16_t)_screenHeight);
 
         if (!(fromOk && toOk))
         {
             _screenFromSprite.deleteSprite();
             _screenToSprite.deleteSprite();
 
-            int16_t halfW = _screenWidth / 2;
-            int16_t halfH = _screenHeight / 2;
+            int16_t halfW = (int16_t)(_screenWidth / 2);
+            int16_t halfH = (int16_t)(_screenHeight / 2);
 
             if (halfW > 0 && halfH > 0 && _flags.spriteEnabled)
             {
@@ -333,6 +327,8 @@ namespace pipgui
         _platform = platform;
         if (platform)
             g_sharedPlatform = platform;
+
+        pipcore::GuiPlatform::setDefaultPlatform(platform);
     }
 
     pipcore::GuiPlatform *GUI::platform() const
@@ -377,8 +373,6 @@ namespace pipgui
 
     void GUI::setFrcProfile(FrcProfile profile)
     {
-        if (profile == FrcProfile::Off)
-            profile = FrcProfile::BlueNoise;
         _frcProfile = profile;
     }
 

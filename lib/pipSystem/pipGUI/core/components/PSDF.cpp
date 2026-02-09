@@ -1,8 +1,8 @@
 #include <math.h>
-#include <pipGUI/core/api/pipGUI.h>
-#include <pipGUI/fonts/WixMadeForDisplay/WixMadeForDisplay.h>
+#include <pipGUI/core/api/pipGUI.hpp>
+#include <pipGUI/fonts/WixMadeForDisplay/WixMadeForDisplay.hpp>
 
-#include <pipGUI/fonts/WixMadeForDisplay/metrics.h>
+#include <pipGUI/fonts/WixMadeForDisplay/metrics.hpp>
 
 namespace pipgui
 {
@@ -270,7 +270,7 @@ namespace pipgui
 
         if (_flags.spriteEnabled && (_flags.renderToSprite && (_activeSprite ? _activeSprite->getBuffer() : _sprite.getBuffer())))
         {
-            lgfx::LGFX_Sprite *spr = _activeSprite ? _activeSprite : &_sprite;
+            pipcore::Sprite *spr = _activeSprite ? _activeSprite : &_sprite;
             uint16_t *buf = (uint16_t *)spr->getBuffer();
             if (!buf)
                 return;
@@ -282,10 +282,10 @@ namespace pipgui
 
             auto swap16 = [](uint16_t v) -> uint16_t
             { return (uint16_t)((v >> 8) | (v << 8)); };
-
+            
             auto read565 = [&](int32_t idx) -> uint16_t
             { return swap16(buf[idx]); };
-
+            
             auto write565 = [&](int32_t idx, uint16_t c) -> void
             { buf[idx] = swap16(c); };
 
@@ -398,7 +398,7 @@ namespace pipgui
             return;
         }
 
-        LovyanGFX *t = getDrawTarget();
+        auto t = getDrawTarget();
         if (!t)
             return;
 
@@ -494,7 +494,7 @@ namespace pipgui
 
     void GUI::drawPSDFText(const String &text, int16_t x, int16_t y, uint32_t color, uint32_t bgColor, TextAlign align)
     {
-        if (_flags.spriteEnabled && _tft && !_flags.renderToSprite)
+        if (_flags.spriteEnabled && _display && !_flags.renderToSprite)
         {
             updatePSDFText(text, x, y, color, bgColor, align);
             return;
@@ -615,7 +615,7 @@ namespace pipgui
         int16_t bh = (int16_t)((iy1 - iy0) + pad * 2);
 
         bool prevRender = _flags.renderToSprite;
-        lgfx::LGFX_Sprite *prevActive = _activeSprite;
+        pipcore::Sprite *prevActive = _activeSprite;
 
         _flags.renderToSprite = 1;
         _activeSprite = &_sprite;

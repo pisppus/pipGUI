@@ -1,4 +1,4 @@
-#include <pipGUI/core/api/pipGUI.h>
+#include <pipGUI/core/api/pipGUI.hpp>
 #include <math.h>
 #include <algorithm>
 #include <cstdint>
@@ -9,12 +9,13 @@ namespace pipgui
     {
         float fastEase(float t) { return (t < 0.5f) ? 2 * t * t : 2 * (t - 0.5f) * (0.5f - (t - 0.5f)) + 0.5f; }
 
-        void drawScaledSprite(lgfx::LGFX_Sprite &dest, lgfx::LGFX_Sprite &src, int w, int h, int x, int y)
+        void drawScaledSprite(pipcore::Sprite &dest, pipcore::Sprite &src, int w, int h, int x, int y)
         {
             if (w <= 0 || h <= 0)
                 return;
             uint16_t *srcBuf = (uint16_t *)src.getBuffer();
             uint16_t *dstBuf = (uint16_t *)dest.getBuffer();
+
             if (!srcBuf || !dstBuf)
                 return;
 
@@ -148,7 +149,7 @@ namespace pipgui
 
     void GUI::prepareScreenTransition(ScreenCallback fromCb, ScreenCallback toCb)
     {
-        lgfx::LGFX_Sprite *prevActive = _activeSprite;
+        pipcore::Sprite *prevActive = _activeSprite;
         bool prevRender = _flags.renderToSprite;
 
         _activeSprite = &_sprite;
@@ -178,7 +179,7 @@ namespace pipgui
 
     bool GUI::ensureScreenTransitionSprites()
     {
-        if (!_flags.spriteEnabled || !_tft)
+        if (!_flags.spriteEnabled || !_display)
             return false;
 
         if (_screenFromSprite.getBuffer() && _screenToSprite.getBuffer())
@@ -253,8 +254,8 @@ namespace pipgui
         int slideY = round(p * _screenHeight);
         int destY = (dir == -1) ? (_screenHeight - slideY) : (slideY - _screenHeight);
         _screenToSprite.pushSprite(&_sprite, 0, destY);
-        if (_tft)
-            _sprite.pushSprite(_tft, 0, 0);
+        if (_display)
+            _sprite.writeToDisplay(*_display, 0, 0, (int16_t)_screenWidth, (int16_t)_screenHeight);
 
         if (el >= dur)
         {
@@ -325,7 +326,7 @@ namespace pipgui
             _flags.needRedraw = 0;
             if (_flags.spriteEnabled)
             {
-                if (_tft)
+                if (_display)
                 {
                     ListMenuState *lm = getListMenu(_currentScreen);
                     if (lm && lm->configured && lm->itemCount > 0)
@@ -343,8 +344,8 @@ namespace pipgui
                     _flags.renderToSprite = 0;
 
                     renderStatusBar(true);
-                    if (_tft)
-                        _sprite.pushSprite(_tft, 0, 0);
+                    if (_display)
+                        _sprite.writeToDisplay(*_display, 0, 0, (int16_t)_screenWidth, (int16_t)_screenHeight);
                     _dirtyCount = 0;
                 }
                 else

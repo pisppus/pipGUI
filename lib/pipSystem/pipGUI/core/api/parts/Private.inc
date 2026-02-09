@@ -1,11 +1,11 @@
 #if !defined(PIPGUI_GUI_PARTS)
-#error "Do not include this file directly. Include <pipGUI/core/api/pipGUI.h>"
+#error "Do not include this file directly. Include <pipGUI/core/api/pipGUI.hpp>"
 #endif
 
         void configureListMenu(uint8_t screenId, uint8_t parentScreen, const ListMenuItemDef *items, uint8_t itemCount);
         void configureTileMenu(uint8_t screenId, uint8_t parentScreen, const TileMenuItemDef *items, uint8_t itemCount);
 
-        LovyanGFX *getDrawTarget();
+        pipcore::Sprite *getDrawTarget();
         int16_t AutoX(int32_t contentWidth) const;
         int16_t AutoY(int32_t contentHeight) const;
 
@@ -16,7 +16,7 @@
                                const String &subtitle,
                                uint16_t fg,
                                uint16_t bg);
-        void drawErrorCard(LovyanGFX &t,
+        void drawErrorCard(pipcore::Sprite &t,
                            int16_t x,
                            int16_t y,
                            int16_t w,
@@ -79,11 +79,11 @@
         BacklightCallback _backlightCb = nullptr;
         uint8_t _brightnessMax = 100;
 
-        PipLGFX *_tft = nullptr;
-        lgfx::LGFX_Sprite _sprite;
-        lgfx::LGFX_Sprite _screenFromSprite;
-        lgfx::LGFX_Sprite _screenToSprite;
-        lgfx::LGFX_Sprite *_activeSprite = nullptr;
+        pipcore::GuiDisplay *_display = nullptr;
+        pipcore::Sprite _sprite;
+        pipcore::Sprite _screenFromSprite;
+        pipcore::Sprite _screenToSprite;
+        pipcore::Sprite *_activeSprite = nullptr;
 
         struct DirtyRect
         {
@@ -105,7 +105,7 @@
         uint16_t _screenWidth = 0, _screenHeight = 0;
         uint32_t _bgColor = 0;
 
-        FrcProfile _frcProfile = FrcProfile::BlueNoiseGamma22;
+        FrcProfile _frcProfile = FrcProfile::Off;
         uint32_t _frcSeed = 0x6D2B79F5U;
         uint32_t _frcLastUpdateMs = 0;
         uint16_t _frcTemporalPeriodMs = 66;

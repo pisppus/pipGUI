@@ -1,4 +1,4 @@
-#include <pipGUI/core/api/pipGUI.h>
+#include <pipGUI/core/api/pipGUI.hpp>
 
 namespace pipgui
 {
@@ -198,8 +198,8 @@ namespace pipgui
 
             uint16_t cardBorderColor = lerpColor565(cardColor, 0x0000, 0.12f);
 
-            _sprite.fillSmoothRoundRect(cardX, cardY, cardW, cardH, cardRadius, cardBorderColor);
-            _sprite.fillSmoothRoundRect(cardX + 1, cardY + 1, cardW - 2, cardH - 2,
+            _sprite.fillRoundRect(cardX, cardY, cardW, cardH, cardRadius, cardBorderColor);
+            _sprite.fillRoundRect(cardX + 1, cardY + 1, cardW - 2, cardH - 2,
                                         cardRadius > 2 ? (cardRadius - 2) : cardRadius,
                                         cardColor);
 
@@ -222,7 +222,7 @@ namespace pipgui
             int16_t startY = cardCenterY - blockH / 2 - (int16_t)(20 * scale);
 
             bool prevRenderText = _flags.renderToSprite;
-            lgfx::LGFX_Sprite *prevActiveText = _activeSprite;
+            pipcore::Sprite *prevActiveText = _activeSprite;
             _flags.renderToSprite = 1;
             _activeSprite = &_sprite;
 
@@ -268,11 +268,20 @@ namespace pipgui
             {
                 label += " (";
                 label += String((_notifUnlockMs - now + 999) / 1000);
-                label += ")";
+                if (!_flags.spriteEnabled || !_display)
+                {
+                    bool prevRenderText = _flags.renderToSprite;
+                    pipcore::Sprite *prevActiveText = _activeSprite;
+                    _flags.renderToSprite = 0;
+                    renderNotificationOverlay();
+                    _flags.renderToSprite = prevRenderText;
+                    _activeSprite = prevActiveText;
+                    return;
+                }
             }
 
             bool prevRender = _flags.renderToSprite;
-            lgfx::LGFX_Sprite *prevActive = _activeSprite;
+            pipcore::Sprite *prevActive = _activeSprite;
             _flags.renderToSprite = 1;
             _activeSprite = &_sprite;
 
@@ -288,13 +297,13 @@ namespace pipgui
             _flags.renderToSprite = prevRender;
             _activeSprite = prevActive;
 
-            if (_tft && _flags.spriteEnabled)
-                _sprite.pushSprite(_tft, 0, 0);
+            if (_display && _flags.spriteEnabled)
+                _sprite.writeToDisplay(*_display, 0, 0, (int16_t)_screenWidth, (int16_t)_screenHeight);
         }
         else
         {
-            if (_tft)
-                _tft->fillScreen(0);
+            if (_display)
+                _display->fillScreen565(0);
         }
     }
 }

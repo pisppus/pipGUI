@@ -1,4 +1,4 @@
-#include <pipGUI/core/api/pipGUI.h>
+#include <pipGUI/core/api/pipGUI.hpp>
 #include <math.h>
 
 namespace pipgui
@@ -17,7 +17,7 @@ void GUI::drawGlowCircle(int16_t x, int16_t y,
     if (r <= 0)
         return;
 
-    if (_flags.spriteEnabled && _tft && !_flags.renderToSprite)
+    if (_flags.spriteEnabled && _display && !_flags.renderToSprite)
     {
         updateGlowCircle(x, y, r, fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
         return;
@@ -53,7 +53,7 @@ void GUI::drawGlowCircle(int16_t x, int16_t y,
         if (_frcProfile == FrcProfile::Off)
         {
             uint16_t c565 = to565(fillColor);
-            target->fillSmoothCircle(x, y, r, c565);
+            target->fillCircle(x, y, r, c565);
         }
         else
         {
@@ -84,7 +84,7 @@ void GUI::drawGlowCircle(int16_t x, int16_t y,
         {
             uint16_t col = to565_from888(bc);
             if (useSmoothGlow)
-                target->fillSmoothCircle(x, y, r + off, col);
+                target->fillCircle(x, y, r + off, col);
             else
                 target->fillCircle(x, y, r + off, col);
         }
@@ -99,7 +99,7 @@ void GUI::drawGlowCircle(int16_t x, int16_t y,
     if (_frcProfile == FrcProfile::Off)
     {
         uint16_t c565 = (uint16_t)((((uint16_t)( (uint8_t)((fillColor >> 16) & 0xFF) >> 3)) << 11) | (((uint16_t)( (uint8_t)((fillColor >> 8) & 0xFF) >> 2)) << 5) | ((uint16_t)((uint8_t)(fillColor & 0xFF) >> 3)));
-        target->fillSmoothCircle(x, y, r, c565);
+        target->fillCircle(x, y, r, c565);
     }
     else
     {
@@ -120,10 +120,10 @@ void GUI::updateGlowCircle(int16_t x, int16_t y,
                            GlowAnim anim,
                            uint16_t pulsePeriodMs)
 {
-    if (!_flags.spriteEnabled || !_tft)
+    if (!_flags.spriteEnabled || !_display)
     {
         bool prevRender = _flags.renderToSprite;
-        lgfx::LGFX_Sprite *prevActive = _activeSprite;
+        pipcore::Sprite *prevActive = _activeSprite;
         _flags.renderToSprite = 0;
         drawGlowCircle(x, y, r, fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
         _flags.renderToSprite = prevRender;
@@ -151,7 +151,7 @@ void GUI::updateGlowCircle(int16_t x, int16_t y,
     uint32_t bg = (bgColor >= 0) ? static_cast<uint32_t>(bgColor) : _bgColor;
 
     bool prevRender = _flags.renderToSprite;
-    lgfx::LGFX_Sprite *prevActive = _activeSprite;
+    pipcore::Sprite *prevActive = _activeSprite;
 
     _flags.renderToSprite = 1;
     _activeSprite = &_sprite;
@@ -191,7 +191,7 @@ void GUI::drawGlowRoundRect(int16_t x, int16_t y,
     if (w <= 0 || h <= 0)
         return;
 
-    if (_flags.spriteEnabled && _tft && !_flags.renderToSprite)
+    if (_flags.spriteEnabled && _display && !_flags.renderToSprite)
     {
         updateGlowRoundRect(x, y, w, h, radius, fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
         return;
@@ -221,7 +221,7 @@ void GUI::drawGlowRoundRect(int16_t x, int16_t y,
 
     if (glowSize == 0 || strength < 2)
     {
-        target->fillSmoothRoundRect(x, y, w, h, radius, to565(fillColor));
+        target->fillRoundRect(x, y, w, h, radius, to565(fillColor));
         return;
     }
 
@@ -243,9 +243,9 @@ void GUI::drawGlowRoundRect(int16_t x, int16_t y,
         int16_t hh = h + off * 2;
         int16_t rr = radius + off;
         rr = (ww < hh ? ww : hh) / 2 < rr ? (ww < hh ? ww : hh) / 2 : rr;
-        target->fillSmoothRoundRect(xx, yy, ww, hh, (uint8_t)rr, to565(col));
+        target->fillRoundRect(xx, yy, ww, hh, (uint8_t)rr, to565(col));
     }
-    target->fillSmoothRoundRect(x, y, w, h, radius, to565(fillColor));
+    target->fillRoundRect(x, y, w, h, radius, to565(fillColor));
 }
 
 void GUI::updateGlowRoundRect(int16_t x, int16_t y,
@@ -259,10 +259,10 @@ void GUI::updateGlowRoundRect(int16_t x, int16_t y,
                               GlowAnim anim,
                               uint16_t pulsePeriodMs)
 {
-    if (!_flags.spriteEnabled || !_tft)
+    if (!_flags.spriteEnabled || !_display)
     {
         bool prevRender = _flags.renderToSprite;
-        lgfx::LGFX_Sprite *prevActive = _activeSprite;
+        pipcore::Sprite *prevActive = _activeSprite;
         _flags.renderToSprite = 0;
         drawGlowRoundRect(x, y, w, h, radius, fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
         _flags.renderToSprite = prevRender;
@@ -286,7 +286,7 @@ void GUI::updateGlowRoundRect(int16_t x, int16_t y,
     uint32_t bg = (bgColor >= 0) ? static_cast<uint32_t>(bgColor) : _bgColor;
 
     bool prevRender = _flags.renderToSprite;
-    lgfx::LGFX_Sprite *prevActive = _activeSprite;
+    pipcore::Sprite *prevActive = _activeSprite;
 
     _flags.renderToSprite = 1;
     _activeSprite = &_sprite;
@@ -402,15 +402,15 @@ bool GUI::ensureBlurWorkBuffers(uint32_t smallLen, int16_t sw, int16_t sh) noexc
            _blurRowR && _blurRowG && _blurRowB &&
            _blurColR && _blurColG && _blurColB;
 }
-
-void GUI::drawBlurStrip(int16_t x, int16_t y,
-                        int16_t w, int16_t h,
-                        uint8_t radius,
-                        BlurDirection dir,
-                        bool gradient,
-                        uint8_t materialStrength,
-                        uint8_t noiseAmount,
-                        int32_t materialColor)
+ 
+ void GUI::drawBlurStrip(int16_t x, int16_t y,
+                         int16_t w, int16_t h,
+                         uint8_t radius,
+                         BlurDirection dir,
+                         bool gradient,
+                         uint8_t materialStrength,
+                         uint8_t noiseAmount,
+                         int32_t materialColor)
 {
     (void)noiseAmount;
 
@@ -438,12 +438,15 @@ void GUI::drawBlurStrip(int16_t x, int16_t y,
 
     if (!(_flags.renderToSprite && _flags.spriteEnabled))
     {
-        if (_flags.spriteEnabled && _tft && !_flags.renderToSprite)
+        if (_flags.spriteEnabled && _display && !_flags.renderToSprite)
+        {
             updateBlurStrip(x, y, w, h, radius, dir, gradient, materialStrength, noiseAmount, materialColor);
-        return;
+            return;
+        }
+
     }
 
-    lgfx::LGFX_Sprite *spr = _activeSprite ? _activeSprite : &_sprite;
+    pipcore::Sprite *spr = _activeSprite ? _activeSprite : &_sprite;
     uint16_t *screenBuf = (uint16_t *)spr->getBuffer();
     if (!screenBuf)
         return;
@@ -707,10 +710,10 @@ void GUI::updateBlurStrip(int16_t x, int16_t y,
                           uint8_t noiseAmount,
                           int32_t materialColor)
 {
-    if (!_flags.spriteEnabled || !_tft)
+    if (!_flags.spriteEnabled || !_display)
     {
         bool prevRender = _flags.renderToSprite;
-        lgfx::LGFX_Sprite *prevActive = _activeSprite;
+        pipcore::Sprite *prevActive = _activeSprite;
         _flags.renderToSprite = 0;
         drawBlurStrip(x, y, w, h, radius, dir, gradient, materialStrength, noiseAmount, materialColor);
         _flags.renderToSprite = prevRender;
@@ -719,7 +722,7 @@ void GUI::updateBlurStrip(int16_t x, int16_t y,
     }
 
     bool prevRender = _flags.renderToSprite;
-    lgfx::LGFX_Sprite *prevActive = _activeSprite;
+    pipcore::Sprite *prevActive = _activeSprite;
 
     _flags.renderToSprite = 1;
     _activeSprite = &_sprite;

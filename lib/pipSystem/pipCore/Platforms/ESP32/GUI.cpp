@@ -1,9 +1,19 @@
-#include <pipCore/Platforms/ESP32/GUI.h>
+#include <pipCore/Platforms/ESP32/GUI.hpp>
 
 #include <esp_heap_caps.h>
 
 namespace pipcore
 {
+    void Esp32GuiPlatform::ioPinModeInput(uint8_t pin, bool pullup)
+    {
+        pinMode(pin, pullup ? INPUT_PULLUP : INPUT);
+    }
+
+    bool Esp32GuiPlatform::ioDigitalRead(uint8_t pin)
+    {
+        return digitalRead(pin) != 0;
+    }
+
     void Esp32GuiPlatform::configureBacklightPin(uint8_t pin, uint8_t channel, uint32_t freqHz, uint8_t resolutionBits)
     {
         const uint8_t resolvedBits = resolutionBits > 16 ? 12 : resolutionBits;
@@ -87,7 +97,7 @@ namespace pipcore
             return false;
 
         _display.configure(cfg.mosi, cfg.sclk, cfg.cs, cfg.dc, cfg.rst,
-                           cfg.width, cfg.height, cfg.hz, cfg.miso);
+                           cfg.width, cfg.height, cfg.hz, cfg.miso, cfg.bgr);
         _displayConfigured = true;
         return true;
     }
@@ -97,12 +107,10 @@ namespace pipcore
         if (!_displayConfigured)
             return false;
 
-        _display.init();
-        _display.setRotation(rotation);
-        return true;
+        return _display.begin(rotation);
     }
 
-    lgfx::LovyanGFX *Esp32GuiPlatform::guiDisplay()
+    GuiDisplay *Esp32GuiPlatform::guiDisplay()
     {
         if (!_displayConfigured)
             return nullptr;

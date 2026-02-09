@@ -1,5 +1,5 @@
 #if !defined(PIPGUI_GUI_PARTS)
-#error "Do not include this file directly. Include <pipGUI/core/api/pipGUI.h>"
+#error "Do not include this file directly. Include <pipGUI/core/api/pipGUI.hpp>"
 #endif
 
         void configureDisplay(int8_t mosi,
@@ -9,7 +9,8 @@
                               int8_t rst,
                               uint16_t w,
                               uint16_t h,
-                              uint32_t hz = 80000000);
+                              uint32_t hz = 80000000,
+                              bool bgr = false);
         void begin(uint8_t rotation = 0,
                    uint16_t bgColor = 0x0000);
 

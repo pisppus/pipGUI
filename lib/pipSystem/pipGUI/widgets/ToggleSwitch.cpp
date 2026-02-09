@@ -1,4 +1,4 @@
-#include <pipGUI/core/api/pipGUI.h>
+#include <pipGUI/core/api/pipGUI.hpp>
 
 namespace pipgui
 {
@@ -119,7 +119,7 @@ namespace pipgui
         if (w <= 0 || h <= 0)
             return;
 
-        if (_flags.spriteEnabled && _tft && !_flags.renderToSprite)
+        if (_flags.spriteEnabled && _display && !_flags.renderToSprite)
         {
             updateToggleSwitch(x, y, w, h, state, activeColor, inactiveColor, knobColor);
             return;
@@ -187,7 +187,7 @@ namespace pipgui
         float eased = easeBezierSw(k);
 
         uint16_t bg = lerpColor565Sw(inactive, active565, eased);
-        t->fillSmoothRoundRect(x0, y0, w, h, r, bg);
+        t->fillRoundRect(x0, y0, w, h, r, bg);
 
         int16_t pad = (int16_t)max((int16_t)3, (int16_t)(h / 8));
         int16_t knobR = (h / 2) - pad;
@@ -213,13 +213,13 @@ namespace pipgui
         }
 
         uint16_t border = lerpColor565Sw(knob, bg, 0.55f);
-        t->fillSmoothCircle(cx, cy, knobR, border);
+        t->fillCircle(cx, cy, knobR, border);
         int16_t innerR = knobR - 2;
         if (innerR < 1)
             innerR = knobR - 1;
         if (innerR < 1)
             innerR = 1;
-        t->fillSmoothCircle(cx, cy, innerR, knob);
+        t->fillCircle(cx, cy, innerR, knob);
     }
 
     void GUI::updateToggleSwitch(int16_t x, int16_t y, int16_t w, int16_t h,
@@ -228,11 +228,10 @@ namespace pipgui
                                  int32_t inactiveColor,
                                  int32_t knobColor)
     {
-        auto to565 = [](uint32_t c) -> uint16_t { uint8_t r = (uint8_t)((c >> 16) & 0xFF); uint8_t g = (uint8_t)((c >> 8) & 0xFF); uint8_t b = (uint8_t)(c & 0xFF); return (uint16_t)((((uint16_t)(r >> 3)) << 11) | (((uint16_t)(g >> 2)) << 5) | ((uint16_t)(b >> 3))); };
-        if (!_flags.spriteEnabled || !_tft)
+        if (!_flags.spriteEnabled || !_display)
         {
             bool prevRender = _flags.renderToSprite;
-            lgfx::LGFX_Sprite *prevActive = _activeSprite;
+            pipcore::Sprite *prevActive = _activeSprite;
 
             _flags.renderToSprite = 0;
             drawToggleSwitch(x, y, w, h, state, activeColor, inactiveColor, knobColor);
@@ -249,15 +248,15 @@ namespace pipgui
         if (ry == center)
             ry = AutoY(h);
 
-        int16_t pad = 4;
+        int16_t pad = 2;
 
         bool prevRender = _flags.renderToSprite;
-        lgfx::LGFX_Sprite *prevActive = _activeSprite;
+        pipcore::Sprite *prevActive = _activeSprite;
 
         _flags.renderToSprite = 1;
         _activeSprite = &_sprite;
 
-        _sprite.fillRect((int16_t)(rx - pad), (int16_t)(ry - pad), (int16_t)(w + pad * 2), (int16_t)(h + pad * 2), to565(_bgColor));
+        fillRect((int16_t)(rx - pad), (int16_t)(ry - pad), (int16_t)(w + pad * 2), (int16_t)(h + pad * 2), _bgColor);
         drawToggleSwitch(x, y, w, h, state, activeColor, inactiveColor, knobColor);
 
         _flags.renderToSprite = prevRender;

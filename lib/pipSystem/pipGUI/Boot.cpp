@@ -1,4 +1,4 @@
-#include <pipGUI/core/api/pipGUI.h>
+#include <pipGUI/core/api/pipGUI.hpp>
 #include <math.h>
 
 namespace pipgui
@@ -51,7 +51,7 @@ namespace pipgui
             if (_flags.spriteEnabled)
             {
                 bool prevRender = _flags.renderToSprite;
-                lgfx::LGFX_Sprite *prevActive = _activeSprite;
+                pipcore::Sprite *prevActive = _activeSprite;
 
                 _activeSprite = &_sprite;
                 _flags.renderToSprite = 1;
@@ -59,8 +59,8 @@ namespace pipgui
 
                 _flags.renderToSprite = prevRender;
                 _activeSprite = prevActive;
-                if (_tft && _flags.spriteEnabled)
-                    _sprite.pushSprite(_tft, 0, 0);
+                if (_display && _flags.spriteEnabled)
+                    _sprite.writeToDisplay(*_display, 0, 0, (int16_t)_screenWidth, (int16_t)_screenHeight);
             }
             else
             {
@@ -100,21 +100,15 @@ namespace pipgui
 
             bool useSprite = _flags.spriteEnabled;
             bool prevRender = _flags.renderToSprite;
-            lgfx::LGFX_Sprite *prevActive = _activeSprite;
-            LovyanGFX *target = nullptr;
+            pipcore::Sprite *prevActive = _activeSprite;
 
             if (useSprite)
             {
                 _activeSprite = &_sprite;
                 _flags.renderToSprite = 1;
-                target = _activeSprite;
-            }
-            else
-            {
-                target = _tft;
             }
 
-            target->fillScreen(_bootBgColor);
+            _sprite.fillScreen(_bootBgColor);
 
             uint8_t alpha = (uint8_t)(fadeEase * 255.0f + 0.5f);
             uint16_t fgBlend = detail::blend565(_bootBgColor, _bootFgColor, alpha);
@@ -164,8 +158,8 @@ namespace pipgui
             {
                 _flags.renderToSprite = prevRender;
                 _activeSprite = prevActive;
-                if (_tft && _flags.spriteEnabled)
-                    _sprite.pushSprite(_tft, 0, 0);
+                if (_display && _flags.spriteEnabled)
+                    _sprite.writeToDisplay(*_display, 0, 0, (int16_t)_screenWidth, (int16_t)_screenHeight);
             }
             break;
         }
