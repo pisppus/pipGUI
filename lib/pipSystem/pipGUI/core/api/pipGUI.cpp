@@ -373,15 +373,9 @@ namespace pipgui
 
     void GUI::setFrcProfile(FrcProfile profile)
     {
+        if (profile == FrcProfile::Off)
+            profile = FrcProfile::BlueNoise;
         _frcProfile = profile;
-    }
-
-    void GUI::enableGamma22(bool enabled)
-    {
-        if (enabled)
-            setFrcProfile(FrcProfile::BlueNoiseGamma22);
-        else
-            setFrcProfile(FrcProfile::BlueNoise);
     }
 
 }

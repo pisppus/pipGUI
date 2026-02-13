@@ -15,6 +15,14 @@
         void clear(uint32_t color = 0x000000);
         void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t color);
 
+        void fillRectAlpha(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t color, uint8_t alpha);
+
+        void fillRectGradientVertical(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t topColor, uint32_t bottomColor);
+        void fillRectGradientHorizontal(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t leftColor, uint32_t rightColor);
+        void fillRectGradient4(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t c00, uint32_t c10, uint32_t c01, uint32_t c11);
+        void fillRectGradientDiagonal(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t tlColor, uint32_t brColor);
+        void fillRectGradientRadial(int16_t x, int16_t y, int16_t w, int16_t h, int16_t cx, int16_t cy, int16_t radius, uint32_t innerColor, uint32_t outerColor);
+
         void drawBlurStrip(int16_t x, int16_t y,
                            int16_t w, int16_t h,
                            uint8_t radius,

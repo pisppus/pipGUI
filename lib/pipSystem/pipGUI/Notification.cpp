@@ -27,6 +27,17 @@ namespace pipgui
         return (uint16_t)((r << 11) | (g << 5) | b);
     }
 
+    static inline uint32_t expand565(uint16_t c)
+    {
+        uint8_t r5 = (uint8_t)((c >> 11) & 0x1F);
+        uint8_t g6 = (uint8_t)((c >> 5) & 0x3F);
+        uint8_t b5 = (uint8_t)(c & 0x1F);
+        uint8_t r8 = (uint8_t)((r5 * 255U) / 31U);
+        uint8_t g8 = (uint8_t)((g6 * 255U) / 63U);
+        uint8_t b8 = (uint8_t)((b5 * 255U) / 31U);
+        return (uint32_t)((r8 << 16) | (g8 << 8) | b8);
+    }
+
     void GUI::showNotification(const String &t, const String &m, const String &btn, uint16_t delay, NotificationType type)
     {
         _notifTitle = t;
@@ -137,18 +148,18 @@ namespace pipgui
                 }
             }
 
-            uint16_t cardColor = 0xFFFF;
-            uint16_t titleColor = 0x0000;
-            uint16_t msgColor = 0x7BEF;
+            uint32_t cardColor = 0xFFFFFF;
+            uint32_t titleColor = 0x000000;
+            uint32_t msgColor = 0x808080;
 
-            uint16_t btnColor;
+            uint32_t btnColor;
 
             if (_notifType == Error)
-                btnColor = 0xF80A;
+                btnColor = 0xFF0000;
             else if (_notifType == NotificationTypeWarning)
-                btnColor = 0xFD24;
+                btnColor = 0xFF8C00;
             else
-                btnColor = 0xE75C;
+                btnColor = 0x00D604;
 
             int16_t finalW = 138;
             int16_t finalH = 92;
@@ -196,12 +207,12 @@ namespace pipgui
             if (cardRadius < 4)
                 cardRadius = 4;
 
-            uint16_t cardBorderColor = lerpColor565(cardColor, 0x0000, 0.12f);
+            uint32_t cardBorderColor = detail::blend888(cardColor, 0x000000, 31);
 
-            _sprite.fillRoundRect(cardX, cardY, cardW, cardH, cardRadius, cardBorderColor);
-            _sprite.fillRoundRect(cardX + 1, cardY + 1, cardW - 2, cardH - 2,
-                                        cardRadius > 2 ? (cardRadius - 2) : cardRadius,
-                                        cardColor);
+            fillRoundRectFrc(cardX, cardY, cardW, cardH, (uint8_t)cardRadius, cardBorderColor);
+            fillRoundRectFrc(cardX + 1, cardY + 1, cardW - 2, cardH - 2,
+                             (uint8_t)(cardRadius > 2 ? (cardRadius - 2) : cardRadius),
+                             cardColor);
 
             uint16_t titleSz = (uint16_t)max(9, (int)(19 * scale));
             uint16_t msgSz = (uint16_t)max(7, (int)(13 * scale));
@@ -226,20 +237,28 @@ namespace pipgui
             _flags.renderToSprite = 1;
             _activeSprite = &_sprite;
 
+            uint16_t bg565Title = color888To565((int16_t)(cardX + (cardW - tW) / 2), startY, cardColor);
+            uint16_t fg565Title = color888To565((int16_t)(cardX + (cardW - tW) / 2), startY, titleColor);
+
             setPSDFFontSize(titleSz);
             psdfDrawTextInternal(_notifTitle,
                                 cardX + (cardW - tW) / 2,
                                 startY,
-                                titleColor,
-                                cardColor,
+                                fg565Title,
+                                bg565Title,
                                 AlignLeft);
 
             setPSDFFontSize(msgSz);
+
+            int16_t msgX = (int16_t)(cardX + (cardW - mW) / 2);
+            int16_t msgY = (int16_t)(startY + tH + gap);
+            uint16_t bg565Msg = color888To565(msgX, msgY, cardColor);
+            uint16_t fg565Msg = color888To565(msgX, msgY, msgColor);
             psdfDrawTextInternal(_notifMessage,
-                                cardX + (cardW - mW) / 2,
-                                startY + tH + gap,
-                                msgColor,
-                                cardColor,
+                                msgX,
+                                msgY,
+                                fg565Msg,
+                                bg565Msg,
                                 AlignLeft);
 
             _flags.renderToSprite = prevRenderText;
@@ -302,8 +321,7 @@ namespace pipgui
         }
         else
         {
-            if (_display)
-                _display->fillScreen565(0);
+            clear(0x000000);
         }
     }
 }

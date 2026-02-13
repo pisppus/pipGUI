@@ -1,0 +1,2 @@
+6f708fb72914e09244b186297c402ace84a014fc578435ce5144c7c7cd475fc9
+{"charset": "C:\\Users\\Pisppus\\Documents\\PlatformIO\\Projects\\pipGUI\\tools\\fonts\\PSDF\\KronaOne\\charset.txt", "font": "C:\\Users\\Pisppus\\Documents\\PlatformIO\\Projects\\pipGUI\\tools\\fonts\\TTF\\krona-one.ttf", "potr": "1", "pxrange": "8", "size": "48", "type": "psdf"}

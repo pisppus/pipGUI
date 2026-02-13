@@ -155,22 +155,22 @@ namespace pipgui
         _activeSprite = &_sprite;
         _flags.renderToSprite = 1;
 
-        _sprite.fillScreen(_bgColor);
+        clear(_bgColor);
         if (fromCb)
             fromCb(*this);
 
         int16_t fw = _screenFromSprite.width();
         int16_t fh = _screenFromSprite.height();
-        _screenFromSprite.fillScreen(_bgColor);
+        _screenFromSprite.fillScreen(color888To565(0, 0, _bgColor));
         drawScaledSprite(_screenFromSprite, _sprite, fw, fh, 0, 0);
 
-        _sprite.fillScreen(_bgColor);
+        clear(_bgColor);
         if (toCb)
             toCb(*this);
 
         int16_t tw = _screenToSprite.width();
         int16_t th = _screenToSprite.height();
-        _screenToSprite.fillScreen(_bgColor);
+        _screenToSprite.fillScreen(color888To565(0, 0, _bgColor));
         drawScaledSprite(_screenToSprite, _sprite, tw, th, 0, 0);
 
         _activeSprite = prevActive;
@@ -243,7 +243,15 @@ namespace pipgui
             el = dur;
         float p = fastEase((float)el / dur);
 
-        _sprite.fillScreen(_bgColor);
+        {
+            pipcore::Sprite *prevActive = _activeSprite;
+            bool prevRender = _flags.renderToSprite;
+            _activeSprite = &_sprite;
+            _flags.renderToSprite = 1;
+            clear(_bgColor);
+            _activeSprite = prevActive;
+            _flags.renderToSprite = prevRender;
+        }
         int dir = (_screenTransDir > 0) ? -1 : 1;
         float scale = 1.0f - p * 0.15f;
         int w = round(_screenWidth * scale), h = round(_screenHeight * scale);
@@ -274,14 +282,12 @@ namespace pipgui
         tickDebugDirtyOverlay(now);
 
         // Update FRC seed for temporal dithering (if enabled)
-        if (_frcProfile != FrcProfile::Off && _frcTemporalPeriodMs)
+        if (_frcTemporalPeriodMs)
         {
             if ((now - _frcLastUpdateMs) >= _frcTemporalPeriodMs)
             {
                 _frcLastUpdateMs = now;
-                // simple LCG to vary seed pseudo-randomly
                 _frcSeed = (uint32_t)((uint64_t)_frcSeed * 1664525U + 1013904223U);
-                // request redraw so temporal change is visible
                 _flags.needRedraw = 1;
             }
         }
@@ -311,7 +317,7 @@ namespace pipgui
             if (_currentScreen < _screenCapacity && _screens && _screens[_currentScreen])
             {
                 _flags.renderToSprite = 1;
-                _sprite.fillScreen(_bgColor);
+                clear(_bgColor);
                 _screens[_currentScreen](*this);
 
                 _flags.renderToSprite = 0;
@@ -339,7 +345,7 @@ namespace pipgui
                     }
 
                     _flags.renderToSprite = 1;
-                    _sprite.fillScreen(_bgColor);
+                    clear(_bgColor);
                     _screens[_currentScreen](*this);
                     _flags.renderToSprite = 0;
 

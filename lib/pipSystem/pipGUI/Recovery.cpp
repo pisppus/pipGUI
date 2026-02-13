@@ -2,12 +2,12 @@
 
 namespace
 {
-    static inline uint16_t panelBgColor(const pipgui::GUI &ui)
+    static inline uint32_t panelBgColor(const pipgui::GUI &ui)
     {
         return ui.rgb(48, 48, 48);
     }
 
-    static inline uint16_t highlightColor(const pipgui::GUI &ui)
+    static inline uint32_t highlightColor(const pipgui::GUI &ui)
     {
         return ui.rgb(0, 130, 220);
     }
@@ -231,13 +231,13 @@ void GUI::tickRecovery(uint32_t now)
             _recoverySavedBatteryStyle = _batteryStyle;
 
             _statusBarPos = Top;
-            _bgColor = 0x0000;
+            _bgColor = 0x000000;
 
             uint8_t h = _statusBarHeight;
             if (h == 0)
                 h = 20;
 
-            configureStatusBar(true, 0x0000, h, Top);
+            configureStatusBar(true, 0x000000, h, Top);
             setStatusBarText("Recovery", "", "");
 
             if (_batteryLevel >= 0)
@@ -292,7 +292,7 @@ void GUI::renderRecoveryScreen()
     if (!t)
         return;
 
-    t->fillRect(0, 0, _screenWidth, _screenHeight, _bgColor);
+    clear(_bgColor);
 
     int16_t left = 0, right = _screenWidth, top = 0, bottom = _screenHeight;
     if (_flags.statusBarEnabled && _statusBarHeight > 0)
@@ -321,12 +321,10 @@ void GUI::renderRecoveryScreen()
     if (pw <= 0 || ph <= 0)
         return;
 
-    uint16_t pbg = panelBgColor(*this);
+    uint32_t pbg = panelBgColor(*this);
     uint8_t r = panelRadius();
 
-    t->fillRoundRect(px, py, pw, ph, r, pbg);
-    if (ph > (int16_t)r)
-        t->fillRect(px, py + r, pw, ph - r, pbg);
+    fillRoundRectFrc(px, py, pw, ph, r, pbg);
 
     int16_t mx = 6;
     int16_t my = 6;

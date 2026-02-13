@@ -1,4 +1,5 @@
 #include <pipGUI/core/api/pipGUI.hpp>
+#include <pipGUI/icons/metrics.hpp>
 
 namespace pipgui
 {
@@ -14,16 +15,16 @@ namespace pipgui
     void GUI::drawErrorCard(pipcore::Sprite &t,
                             int16_t x, int16_t y, int16_t w, int16_t h,
                             const String &title, const String &detail,
-                            uint16_t accentColor,
+                            uint32_t accentColor,
                             uint8_t opacity,
                             int scrollX)
     {
         if (w <= 0 || h <= 0)
             return;
 
-        uint16_t bg = 0;
-        uint16_t dim = 0x7BEF;
-        uint16_t accent = accentColor;
+        uint32_t bg = 0;
+        uint32_t dim = 0xC0C0C0;
+        uint32_t accent = accentColor;
 
         int16_t innerX = x;
         int16_t innerY = y;
@@ -178,7 +179,7 @@ namespace pipgui
         {
             if (!_flags.errorFlashState)
             {
-                clear(0xF800);
+                clear(0xFF0000);
             }
             return;
         }
@@ -198,19 +199,20 @@ namespace pipgui
         }
 
         auto t = getDrawTarget();
-        t->fillScreen(0);
+        clear(0x000000);
 
         int16_t sbh = statusBarHeight();
         renderStatusBar(_flags.spriteEnabled);
 
-        uint16_t accentColor = (_errorType == Warning) ? t->color565(255, 98, 0) : t->color565(255, 0, 72);
-        uint16_t iconColor = accentColor;
+        uint32_t accent888 = (_errorType == Warning) ? rgb(255, 98, 0) : rgb(255, 0, 72);
+        uint32_t accentColor = accent888;
+        uint32_t iconColor = accentColor;
         uint16_t iconSize = (uint16_t)max<int16_t>(32, _screenHeight / 6);
-        uint16_t dotsActiveColor = t->color565(235, 235, 235);
-        uint16_t dotsInactiveColor = t->color565(60, 60, 60);
+        uint32_t dotsActiveColor = rgb(235, 235, 235);
+        uint32_t dotsInactiveColor = rgb(60, 60, 60);
 
-        const char *errorEmoji = "E";
         const char *header = (_errorType == Warning) ? "WARNING" : "ERROR";
+        uint16_t iconId = (_errorType == Warning) ? warning_layer0 : error_layer0;
 
         int16_t contentTop = sbh;
         int16_t contentH = (int16_t)(_screenHeight - contentTop);
@@ -220,12 +222,9 @@ namespace pipgui
             iconY = (int16_t)(contentTop + (int16_t)iconSize / 2 + 6);
 
         {
-            int16_t ew = 0;
-            int16_t eh = 0;
-
-            setPSDFFontSize(iconSize);
-            psdfMeasureText(String(errorEmoji), ew, eh);
-            psdfDrawTextInternal(String(errorEmoji), (int16_t)(_screenWidth / 2), (int16_t)(iconY - eh / 2), iconColor, 0, AlignCenter);
+            int16_t ix = (int16_t)(_screenWidth / 2) - (int16_t)(iconSize / 2);
+            int16_t iy = iconY - (int16_t)(iconSize / 2);
+            drawIcon(iconId, ix, iy, iconSize, iconColor, 0);
 
             uint16_t px = (uint16_t)max<int16_t>(18, _screenHeight / 12);
             int16_t hw = 0;
@@ -237,7 +236,8 @@ namespace pipgui
             if (ty < (int16_t)(contentTop + 2))
                 ty = (int16_t)(contentTop + 2);
 
-            psdfDrawTextInternal(String(header), (int16_t)(_screenWidth / 2), ty, 0xFFFF, 0, AlignCenter);
+            uint16_t headerFg = color888To565((int16_t)(_screenWidth / 2), ty, 0xFFFFFF);
+            psdfDrawTextInternal(String(header), (int16_t)(_screenWidth / 2), ty, headerFg, 0, AlignCenter);
         }
 
         int16_t messageTop = (int16_t)(iconY + (int16_t)iconSize / 2 + 32);
@@ -319,7 +319,7 @@ namespace pipgui
             int16_t btnX = (_screenWidth - btnW) / 2;
             btnY = (int16_t)(_screenHeight - btnH - 18);
 
-            uint16_t btnColor = accentColor;
+            uint32_t btnColor = accentColor;
             uint8_t radius = 10;
 
             bool prevRenderBtn = _flags.renderToSprite;

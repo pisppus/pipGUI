@@ -1,14 +1,6 @@
 #include <pipGUI/core/api/pipGUI.hpp>
 namespace pipgui
 {
-    static inline uint16_t to565(uint32_t c)
-    {
-        uint8_t r = (uint8_t)((c >> 16) & 0xFF);
-        uint8_t g = (uint8_t)((c >> 8) & 0xFF);
-        uint8_t b = (uint8_t)(c & 0xFF);
-        return (uint16_t)((((uint16_t)(r >> 3)) << 11) | (((uint16_t)(g >> 2)) << 5) | ((uint16_t)(b >> 3)));
-    }
-
     static pipcore::GuiPlatform *graphPlatform()
     {
         return pipgui::GUI::sharedPlatform();
@@ -273,11 +265,11 @@ namespace pipgui
 
         uint8_t r = (radius < 1) ? 1 : radius;
 
-        t->fillRoundRect(x, y, w, h, r, to565(gridColor));
+        fillRoundRectFrc(x, y, w, h, r, gridColor);
         if (w > 4 && h > 4)
         {
             int16_t rInner = (r > 2) ? (r - 2) : (r > 0 ? r - 1 : 0);
-            t->fillRoundRect(x + 2, y + 2, w - 4, h - 4, rInner, to565(bgColor));
+            fillRoundRectFrc(x + 2, y + 2, w - 4, h - 4, (uint8_t)rInner, bgColor);
         }
 
         int16_t innerX = x + 2;
@@ -326,12 +318,14 @@ namespace pipgui
         for (int16_t i = 1; i < cellsX; ++i)
         {
             int16_t gx = innerX + (int16_t)((int32_t)innerW * i / cellsX);
-            t->drawLine(gx, innerY, gx, innerY + innerH - 1, to565(gridColor));
+            for (int16_t yy = innerY; yy < innerY + innerH; ++yy)
+                t->drawPixel(gx, yy, color888To565(gx, yy, gridColor));
         }
         for (int16_t j = 1; j < cellsY; ++j)
         {
             int16_t gy = innerY + (int16_t)((int32_t)innerH * j / cellsY);
-            t->drawLine(innerX, gy, innerX + innerW - 1, gy, to565(gridColor));
+            for (int16_t xx = innerX; xx < innerX + innerW; ++xx)
+                t->drawPixel(xx, gy, color888To565(xx, gy, gridColor));
         }
     }
 
@@ -575,35 +569,15 @@ namespace pipgui
             uint8_t r = (area.radius < 1) ? 1 : area.radius;
             int16_t rInner = (r > 2) ? (r - 2) : (r > 0 ? r - 1 : 0);
 
-            if (_frcProfile == FrcProfile::Off)
-            {
-                t->fillRoundRect(area.x + 2, area.y + 2, area.w - 4, area.h - 4, rInner, to565(area.bgColor));
-            }
-            else
-            {
-                uint16_t tile[16 * 16];
-                uint32_t v = area.bgColor;
-                Color888 c{(uint8_t)((v >> 16) & 0xFF), (uint8_t)((v >> 8) & 0xFF), (uint8_t)(v & 0xFF)};
-                for (int16_t ty = 0; ty < 16; ++ty)
-                    for (int16_t tx = 0; tx < 16; ++tx)
-                        tile[(uint16_t)ty * 16U + (uint16_t)tx] = detail::quantize565(c, tx, ty, _frcSeed, _frcProfile);
-
-                for (int16_t yy = area.innerY; yy < area.innerY + area.innerH; ++yy)
-                {
-                    const uint16_t *tileRow = &tile[((uint16_t)yy & 15U) * 16U];
-                    for (int16_t xx = area.innerX; xx < area.innerX + area.innerW; ++xx)
-                    {
-                        t->drawPixel(xx, yy, tileRow[(uint16_t)xx & 15U]);
-                    }
-                }
-            }
+            fillRoundRectFrc(area.x + 2, area.y + 2, area.w - 4, area.h - 4, (uint8_t)rInner, area.bgColor);
 
             if (area.gridCellsX >= 2)
             {
                 for (uint16_t i = 1; i < area.gridCellsX; ++i)
                 {
                     int16_t gx = area.innerX + (int16_t)((int32_t)area.innerW * i / area.gridCellsX);
-                    t->drawLine(gx, area.innerY, gx, area.innerY + area.innerH - 1, to565(area.gridColor));
+                    for (int16_t yy = area.innerY; yy < area.innerY + area.innerH; ++yy)
+                        t->drawPixel(gx, yy, color888To565(gx, yy, area.gridColor));
                 }
             }
             if (area.gridCellsY >= 2)
@@ -611,7 +585,8 @@ namespace pipgui
                 for (uint16_t j = 1; j < area.gridCellsY; ++j)
                 {
                     int16_t gy = area.innerY + (int16_t)((int32_t)area.innerH * j / area.gridCellsY);
-                    t->drawLine(area.innerX, gy, area.innerX + area.innerW - 1, gy, to565(area.gridColor));
+                    for (int16_t xx = area.innerX; xx < area.innerX + area.innerW; ++xx)
+                        t->drawPixel(xx, gy, color888To565(xx, gy, area.gridColor));
                 }
             }
         }
@@ -635,28 +610,7 @@ namespace pipgui
 
             if (stripW > 0)
             {
-                if (_frcProfile == FrcProfile::Off)
-                {
-                    t->fillRect(stripX, area.innerY, stripW, area.innerH, to565(area.bgColor));
-                }
-                else
-                {
-                    uint16_t tile[16 * 16];
-                    uint32_t v = area.bgColor;
-                    Color888 c{(uint8_t)((v >> 16) & 0xFF), (uint8_t)((v >> 8) & 0xFF), (uint8_t)(v & 0xFF)};
-                    for (int16_t ty = 0; ty < 16; ++ty)
-                        for (int16_t tx = 0; tx < 16; ++tx)
-                            tile[(uint16_t)ty * 16U + (uint16_t)tx] = detail::quantize565(c, tx, ty, _frcSeed, _frcProfile);
-
-                    for (int16_t yy = area.innerY; yy < area.innerY + area.innerH; ++yy)
-                    {
-                        const uint16_t *tileRow = &tile[((uint16_t)yy & 15U) * 16U];
-                        for (int16_t xx = stripX; xx < stripX + stripW; ++xx)
-                        {
-                            t->drawPixel(xx, yy, tileRow[(uint16_t)xx & 15U]);
-                        }
-                    }
-                }
+                fillRect(stripX, area.innerY, stripW, area.innerH, area.bgColor);
 
                 if (area.gridCellsX >= 2)
                 {
@@ -664,7 +618,8 @@ namespace pipgui
                     {
                         int16_t gx = area.innerX + (int16_t)((int32_t)area.innerW * i / area.gridCellsX);
                         if (gx >= stripX && gx < (int16_t)(stripX + stripW))
-                            t->drawLine(gx, area.innerY, gx, area.innerY + area.innerH - 1, to565(area.gridColor));
+                            for (int16_t yy = area.innerY; yy < area.innerY + area.innerH; ++yy)
+                                t->drawPixel(gx, yy, color888To565(gx, yy, area.gridColor));
                     }
                 }
                 if (area.gridCellsY >= 2)
@@ -672,7 +627,8 @@ namespace pipgui
                     for (uint16_t j = 1; j < area.gridCellsY; ++j)
                     {
                         int16_t gy = area.innerY + (int16_t)((int32_t)area.innerH * j / area.gridCellsY);
-                        t->drawLine(stripX, gy, (int16_t)(stripX + stripW - 1), gy, to565(area.gridColor));
+                        for (int16_t xx = stripX; xx < stripX + stripW; ++xx)
+                            t->drawPixel(xx, gy, color888To565(xx, gy, area.gridColor));
                     }
                 }
             }

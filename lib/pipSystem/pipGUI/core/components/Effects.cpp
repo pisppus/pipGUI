@@ -45,23 +45,11 @@ void GUI::drawGlowCircle(int16_t x, int16_t y,
     }
 
     auto target = getDrawTarget();
-    auto to565 = [](uint32_t c) -> uint16_t { uint8_t r = (uint8_t)((c >> 16) & 0xFF); uint8_t g = (uint8_t)((c >> 8) & 0xFF); uint8_t b = (uint8_t)(c & 0xFF); return (uint16_t)((((uint16_t)(r >> 3)) << 11) | (((uint16_t)(g >> 2)) << 5) | ((uint16_t)(b >> 3))); };
-    auto to565_from888 = [](Color888 c) -> uint16_t { return (uint16_t)((((uint16_t)(c.r >> 3)) << 11) | (((uint16_t)(c.g >> 2)) << 5) | ((uint16_t)(c.b >> 3))); };
+    auto to565 = [&](int16_t px, int16_t py, uint32_t c) -> uint16_t { return color888To565(px, py, c); };
 
     if (glowSize == 0 || strength < 2)
     {
-        if (_frcProfile == FrcProfile::Off)
-        {
-            uint16_t c565 = to565(fillColor);
-            target->fillCircle(x, y, r, c565);
-        }
-        else
-        {
-            Color888 c{(uint8_t)((fillColor >> 16) & 0xFF), (uint8_t)((fillColor >> 8) & 0xFF), (uint8_t)(fillColor & 0xFF)};
-            for (int16_t yy = y - r; yy <= y + r; ++yy)
-                for (int16_t xx = x - r; xx <= x + r; ++xx)
-                    target->drawPixel(xx, yy, detail::quantize565(c, xx, yy, _frcSeed, _frcProfile));
-        }
+        fillCircleFrc(x, y, r, fillColor);
         return;
     }
 
@@ -79,35 +67,9 @@ void GUI::drawGlowCircle(int16_t x, int16_t y,
         if (alpha < 2)
             continue;
         uint32_t blended = detail::blend888(bg, glow, alpha);
-        Color888 bc{(uint8_t)((blended >> 16) & 0xFF), (uint8_t)((blended >> 8) & 0xFF), (uint8_t)(blended & 0xFF)};
-        if (_frcProfile == FrcProfile::Off)
-        {
-            uint16_t col = to565_from888(bc);
-            if (useSmoothGlow)
-                target->fillCircle(x, y, r + off, col);
-            else
-                target->fillCircle(x, y, r + off, col);
-        }
-        else
-        {
-            int16_t rr = r + off;
-            for (int16_t yy = y - rr; yy <= y + rr; ++yy)
-                for (int16_t xx = x - rr; xx <= x + rr; ++xx)
-                    target->drawPixel(xx, yy, detail::quantize565(bc, xx, yy, _frcSeed, _frcProfile));
-        }
+        fillCircleFrc(x, y, (int16_t)(r + off), blended);
     }
-    if (_frcProfile == FrcProfile::Off)
-    {
-        uint16_t c565 = (uint16_t)((((uint16_t)( (uint8_t)((fillColor >> 16) & 0xFF) >> 3)) << 11) | (((uint16_t)( (uint8_t)((fillColor >> 8) & 0xFF) >> 2)) << 5) | ((uint16_t)((uint8_t)(fillColor & 0xFF) >> 3)));
-        target->fillCircle(x, y, r, c565);
-    }
-    else
-    {
-        Color888 c{(uint8_t)((fillColor >> 16) & 0xFF), (uint8_t)((fillColor >> 8) & 0xFF), (uint8_t)(fillColor & 0xFF)};
-        for (int16_t yy = y - r; yy <= y + r; ++yy)
-            for (int16_t xx = x - r; xx <= x + r; ++xx)
-                target->drawPixel(xx, yy, detail::quantize565(c, xx, yy, _frcSeed, _frcProfile));
-    }
+    fillCircleFrc(x, y, r, fillColor);
 }
 
 void GUI::updateGlowCircle(int16_t x, int16_t y,
@@ -156,18 +118,7 @@ void GUI::updateGlowCircle(int16_t x, int16_t y,
     _flags.renderToSprite = 1;
     _activeSprite = &_sprite;
 
-    auto to565 = [](uint32_t c) -> uint16_t { uint8_t r = (uint8_t)((c >> 16) & 0xFF); uint8_t g = (uint8_t)((c >> 8) & 0xFF); uint8_t b = (uint8_t)(c & 0xFF); return (uint16_t)((((uint16_t)(r >> 3)) << 11) | (((uint16_t)(g >> 2)) << 5) | ((uint16_t)(b >> 3))); };
-    if (_frcProfile == FrcProfile::Off)
-    {
-        _sprite.fillRect(bx, by, bw, bh, to565(bg));
-    }
-    else
-    {
-        Color888 c{(uint8_t)((bg >> 16) & 0xFF), (uint8_t)((bg >> 8) & 0xFF), (uint8_t)(bg & 0xFF)};
-        for (int16_t yy = by; yy < by + bh; ++yy)
-            for (int16_t xx = bx; xx < bx + bw; ++xx)
-                _sprite.drawPixel(xx, yy, detail::quantize565(c, xx, yy, _frcSeed, _frcProfile));
-    }
+    fillRect(bx, by, bw, bh, bg);
 
     drawGlowCircle(x, y, r, fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
     _flags.renderToSprite = prevRender;
@@ -217,11 +168,9 @@ void GUI::drawGlowRoundRect(int16_t x, int16_t y,
 
     auto target = getDrawTarget();
 
-    auto to565 = [](uint32_t c) -> uint16_t { uint8_t r = (uint8_t)((c >> 16) & 0xFF); uint8_t g = (uint8_t)((c >> 8) & 0xFF); uint8_t b = (uint8_t)(c & 0xFF); return (uint16_t)((((uint16_t)(r >> 3)) << 11) | (((uint16_t)(g >> 2)) << 5) | ((uint16_t)(b >> 3))); };
-
     if (glowSize == 0 || strength < 2)
     {
-        target->fillRoundRect(x, y, w, h, radius, to565(fillColor));
+        fillRoundRectFrc(x, y, w, h, radius, fillColor);
         return;
     }
 
@@ -243,9 +192,9 @@ void GUI::drawGlowRoundRect(int16_t x, int16_t y,
         int16_t hh = h + off * 2;
         int16_t rr = radius + off;
         rr = (ww < hh ? ww : hh) / 2 < rr ? (ww < hh ? ww : hh) / 2 : rr;
-        target->fillRoundRect(xx, yy, ww, hh, (uint8_t)rr, to565(col));
+        fillRoundRectFrc(xx, yy, ww, hh, (uint8_t)rr, col);
     }
-    target->fillRoundRect(x, y, w, h, radius, to565(fillColor));
+    fillRoundRectFrc(x, y, w, h, radius, fillColor);
 }
 
 void GUI::updateGlowRoundRect(int16_t x, int16_t y,
@@ -291,18 +240,7 @@ void GUI::updateGlowRoundRect(int16_t x, int16_t y,
     _flags.renderToSprite = 1;
     _activeSprite = &_sprite;
 
-    auto to565 = [](uint32_t c) -> uint16_t { uint8_t r = (uint8_t)((c >> 16) & 0xFF); uint8_t g = (uint8_t)((c >> 8) & 0xFF); uint8_t b = (uint8_t)(c & 0xFF); return (uint16_t)((((uint16_t)(r >> 3)) << 11) | (((uint16_t)(g >> 2)) << 5) | ((uint16_t)(b >> 3))); };
-    if (_frcProfile == FrcProfile::Off)
-    {
-        _sprite.fillRect(bx, by, bw, bh, to565(bg));
-    }
-    else
-    {
-        Color888 c{(uint8_t)((bg >> 16) & 0xFF), (uint8_t)((bg >> 8) & 0xFF), (uint8_t)(bg & 0xFF)};
-        for (int16_t yy = by; yy < by + bh; ++yy)
-            for (int16_t xx = bx; xx < bx + bw; ++xx)
-                _sprite.drawPixel(xx, yy, detail::quantize565(c, xx, yy, _frcSeed, _frcProfile));
-    }
+    fillRect(bx, by, bw, bh, bg);
 
     drawGlowRoundRect(x, y, w, h, radius, fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
     _flags.renderToSprite = prevRender;
@@ -671,7 +609,6 @@ bool GUI::ensureBlurWorkBuffers(uint32_t smallLen, int16_t sw, int16_t sh) noexc
             uint16_t cBlur = smallIn[(uint32_t)sy * (uint32_t)sw + (uint32_t)sx];
 
             auto expand565 = [](uint16_t c) -> uint32_t { uint8_t r5 = (c >> 11) & 0x1F; uint8_t g6 = (c >> 5) & 0x3F; uint8_t b5 = c & 0x1F; uint8_t r8 = (uint8_t)((r5 * 255U) / 31U); uint8_t g8 = (uint8_t)((g6 * 255U) / 63U); uint8_t b8 = (uint8_t)((b5 * 255U) / 31U); return (uint32_t)((r8 << 16) | (g8 << 8) | b8); };
-            auto to565 = [](uint32_t c) -> uint16_t { uint8_t r = (uint8_t)((c >> 16) & 0xFF); uint8_t g = (uint8_t)((c >> 8) & 0xFF); uint8_t b = (uint8_t)(c & 0xFF); return (uint16_t)((((uint16_t)(r >> 3)) << 11) | (((uint16_t)(g >> 2)) << 5) | ((uint16_t)(b >> 3))); };
 
             uint32_t orig888 = expand565(cOrig);
             uint32_t blur888 = expand565(cBlur);
@@ -687,14 +624,11 @@ bool GUI::ensureBlurWorkBuffers(uint32_t smallLen, int16_t sw, int16_t sh) noexc
                 mixed888 = detail::blend888(mixed888, mat888, mat);
             }
 
-            uint16_t out565;
-            if (_frcProfile == FrcProfile::Off)
-                out565 = to565(mixed888);
-            else
-            {
-                Color888 cc{(uint8_t)((mixed888 >> 16) & 0xFF), (uint8_t)((mixed888 >> 8) & 0xFF), (uint8_t)(mixed888 & 0xFF)};
-                out565 = detail::quantize565(cc, (int16_t)ix + x, (int16_t)iy + y, _frcSeed, _frcProfile);
-            }
+            Color888 cc{(uint8_t)((mixed888 >> 16) & 0xFF), (uint8_t)((mixed888 >> 8) & 0xFF), (uint8_t)(mixed888 & 0xFF)};
+            FrcProfile p = _frcProfile;
+            if (cc.isBlack() || cc.isWhite())
+                p = FrcProfile::Off;
+            uint16_t out565 = detail::quantize565(cc, (int16_t)ix + x, (int16_t)iy + y, _frcSeed, p);
 
             write565(screenOffset + ix, out565);
         }

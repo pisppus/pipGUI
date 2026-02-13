@@ -51,6 +51,7 @@ namespace pipcore
     private:
         bool clipTest(int16_t x, int16_t y) const;
         void clipNormalize();
+        inline void fillRow(uint16_t *dst, int16_t w, uint16_t v);
 
         static inline int16_t clampi16(int16_t v, int16_t lo, int16_t hi)
         {

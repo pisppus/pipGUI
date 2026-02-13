@@ -1,9 +1,10 @@
 #include <pipGUI/core/api/pipGUI.hpp>
+#include <pipGUI/icons/metrics.hpp>
 
 namespace pipgui
 {
 
-    void GUI::configureStatusBar(bool enabled, uint16_t bgColor, uint8_t height, StatusBarPosition pos)
+    void GUI::configureStatusBar(bool enabled, uint32_t bgColor, uint8_t height, StatusBarPosition pos)
     {
         _flags.statusBarEnabled = enabled;
 
@@ -46,12 +47,12 @@ namespace pipgui
             _statusBarHeight = hLocal;
         }
 
-        uint8_t r = (bgColor >> 11) & 0x1F;
-        uint8_t g = (bgColor >> 5) & 0x3F;
-        uint8_t b = bgColor & 0x1F;
-        uint16_t y = (uint16_t)r * 30U + (uint16_t)g * 59U + (uint16_t)b * 11U;
-        uint16_t maxY = (30U * 31U + 59U * 63U + 11U * 31U);
-        _statusBarFg = (y > (maxY / 2U)) ? 0x0000 : 0xFFFF;
+        uint8_t r = (uint8_t)((bgColor >> 16) & 0xFF);
+        uint8_t g = (uint8_t)((bgColor >> 8) & 0xFF);
+        uint8_t b = (uint8_t)(bgColor & 0xFF);
+        uint32_t y = (uint32_t)r * 30U + (uint32_t)g * 59U + (uint32_t)b * 11U;
+        uint32_t maxY = (30U * 255U + 59U * 255U + 11U * 255U);
+        _statusBarFg = (y > (maxY / 2U)) ? 0x000000 : 0xFFFFFF;
     }
 
     void GUI::setStatusBarText(const String &left, const String &center, const String &right)
@@ -448,6 +449,20 @@ namespace pipgui
         if (!t)
             return;
 
+        auto expand565 = [](uint16_t c) -> uint32_t
+        {
+            uint8_t r5 = (uint8_t)((c >> 11) & 0x1F);
+            uint8_t g6 = (uint8_t)((c >> 5) & 0x3F);
+            uint8_t b5 = (uint8_t)(c & 0x1F);
+            uint8_t r8 = (uint8_t)((r5 * 255U) / 31U);
+            uint8_t g8 = (uint8_t)((g6 * 255U) / 63U);
+            uint8_t b8 = (uint8_t)((b5 * 255U) / 31U);
+            return (uint32_t)((r8 << 16) | (g8 << 8) | b8);
+        };
+
+        uint32_t bg888 = expand565(_statusBarBg);
+        uint32_t fg888 = expand565(_statusBarFg);
+
         int16_t x = 0;
         int16_t y = 0;
         int16_t w = (int16_t)_screenWidth;
@@ -476,7 +491,7 @@ namespace pipgui
             return;
         }
 
-        t->fillRect(x, y, w, h, _statusBarBg);
+        fillRect(x, y, w, h, bg888);
         int16_t textH = 0;
 
         {
@@ -508,7 +523,9 @@ namespace pipgui
         {
             if (!s.length())
                 return;
-            psdfDrawTextInternal(s, tx, baseY, _statusBarFg, _statusBarBg, AlignLeft);
+            uint16_t fg565 = color888To565(tx, baseY, fg888);
+            uint16_t bg565 = color888To565(tx, baseY, bg888);
+            psdfDrawTextInternal(s, tx, baseY, fg565, bg565, AlignLeft);
         };
 
         int16_t leftX = x + 2;
@@ -522,7 +539,7 @@ namespace pipgui
             int16_t iy = y + (h - ic.h) / 2;
             if (iy < y)
                 iy = y;
-            t->pushImage(leftX, iy, ic.w, ic.h, ic.bitmap);
+            blitImage565Frc(leftX, iy, ic.bitmap, ic.w, ic.h);
             leftX += ic.w + 2;
         }
 
@@ -538,7 +555,7 @@ namespace pipgui
 
         if (_batteryStyle != Hidden && _batteryLevel >= 0)
         {
-            int16_t bwTotal = 30;
+            int16_t bwTotal = 27;
             if (bwTotal + 2 > w)
                 bwTotal = (w > 4) ? (w - 2) : w;
 
@@ -552,66 +569,26 @@ namespace pipgui
                     bh = h;
             }
 
-            int16_t noseW = 2;
-            int16_t bwCase = bwTotal - noseW;
-            if (bwCase < 10)
-            {
-                bwCase = bwTotal;
-                noseW = 0;
-            }
+            int16_t iconSize = bwTotal;
+            if (iconSize < 8)
+                iconSize = 8;
 
-            int16_t bx = rightCursor - bwTotal;
+            int16_t bx = rightCursor - iconSize;
             if (bx < x + 2)
                 bx = x + 2;
-            int16_t by = y + (h - bh) / 2;
+            int16_t by = y + (h - iconSize) / 2;
             if (by < y)
                 by = y;
 
-            uint16_t frameColor = _statusBarFg;
-            uint16_t innerBg = _statusBarBg;
+            uint32_t frameColor = _statusBarFg;
+            uint32_t fillCol = (_batteryLevel <= 20) ? 0xFF0000 : 0x00D604;
 
-            t->fillRoundRect(bx, by, bwCase, bh, 4, frameColor);
-            if (bwCase > 2 && bh > 2)
-                t->fillRoundRect(bx + 1, by + 1, bwCase - 2, bh - 2, 3, innerBg);
+            drawIcon(pipgui::battery_layer2, bx, by, (uint16_t)iconSize, fillCol, bg888);
+            int16_t cutX = (int16_t)(bx + (int32_t)iconSize * _batteryLevel / 100);
+            fillRect(cutX, by, (int16_t)(bx + iconSize - cutX), (int16_t)iconSize, bg888);
 
-            if (noseW > 0)
-            {
-                int16_t tipH = bh - 4;
-                if (tipH < 4)
-                    tipH = bh / 2;
-                int16_t tipY = by + (bh - tipH) / 2;
-                int16_t tipX = bx + bwCase + 1;
-                t->fillRoundRect(tipX, tipY, noseW, tipH, 1, frameColor);
-            }
-
-            if (_batteryStyle == Numeric)
-            {
-                String txt = String(_batteryLevel);
-                int16_t tw = measureText(txt);
-                int16_t tx = bx + (bwCase - tw) / 2;
-                if (tx < bx + 1)
-                    tx = bx + 1;
-                drawTextAt(txt, tx);
-            }
-            else
-            {
-                int16_t innerW = bwCase - 4;
-                int16_t innerH = bh - 4;
-                if (innerW > 0 && innerH > 0)
-                {
-                    int16_t ix = bx + 2;
-                    int16_t iy = by + 2;
-
-                    t->fillRoundRect(ix, iy, innerW, innerH, 2, innerBg);
-
-                    int16_t fillW = (int16_t)((innerW * _batteryLevel) / 100);
-                    if (fillW > 0)
-                    {
-                        uint16_t col = (_batteryLevel <= 20) ? 0xF800 : t->color565(0, 214, 4);
-                        t->fillRoundRect(ix, iy, fillW, innerH, 2, col);
-                    }
-                }
-            }
+            drawIcon(pipgui::battery_layer0, bx, by, (uint16_t)iconSize, frameColor, bg888);
+            drawIcon(pipgui::battery_layer1, bx, by, (uint16_t)iconSize, frameColor, bg888);
 
             rightCursor = bx - 4;
         }
@@ -627,7 +604,7 @@ namespace pipgui
             int16_t iy = y + (h - ic.h) / 2;
             if (iy < y)
                 iy = y;
-            t->pushImage(ixr, iy, ic.w, ic.h, ic.bitmap);
+            blitImage565Frc(ixr, iy, ic.bitmap, ic.w, ic.h);
             rightCursor = ixr - 2;
         }
 
@@ -671,7 +648,7 @@ namespace pipgui
                     int16_t iy = y + (h - ic.h) / 2;
                     if (iy < y)
                         iy = y;
-                    t->pushImage(curX, iy, ic.w, ic.h, ic.bitmap);
+                    blitImage565Frc(curX, iy, ic.bitmap, ic.w, ic.h);
                     curX += ic.w + 2;
                 }
 

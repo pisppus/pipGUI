@@ -4,43 +4,33 @@
 
 namespace pipgui
 {
-    static inline uint16_t to565(uint32_t c)
-    {
-        uint8_t r = (uint8_t)((c >> 16) & 0xFF);
-        uint8_t g = (uint8_t)((c >> 8) & 0xFF);
-        uint8_t b = (uint8_t)(c & 0xFF);
-        return (uint16_t)((((uint16_t)(r >> 3)) << 11) | (((uint16_t)(g >> 2)) << 5) | ((uint16_t)(b >> 3)));
-    }
-
-    static uint16_t blendWhite(uint16_t color, uint8_t intensity)
+    static uint32_t blendWhite(uint32_t color, uint8_t intensity)
     {
         if (intensity == 0)
             return color;
         if (intensity >= 255)
-            return 0xFFFF;
+            return 0xFFFFFF;
 
-        uint8_t r = (color >> 11) & 0x1F;
-        uint8_t g = (color >> 5) & 0x3F;
-        uint8_t b = color & 0x1F;
+        uint8_t r = (uint8_t)((color >> 16) & 0xFF);
+        uint8_t g = (uint8_t)((color >> 8) & 0xFF);
+        uint8_t b = (uint8_t)(color & 0xFF);
 
-        r += ((31 - r) * intensity) >> 8;
-        g += ((63 - g) * intensity) >> 8;
-        b += ((31 - b) * intensity) >> 8;
+        r = (uint8_t)(r + (((uint16_t)(255 - r) * intensity) >> 8));
+        g = (uint8_t)(g + (((uint16_t)(255 - g) * intensity) >> 8));
+        b = (uint8_t)(b + (((uint16_t)(255 - b) * intensity) >> 8));
 
-        return (uint16_t)((r << 11) | (g << 5) | b);
+        return (uint32_t)((r << 16) | (g << 8) | b);
     }
 
     template <typename ColorFunc>
-    static void drawRingArcStroke(pipcore::Sprite *t,
-                                  int16_t cx, int16_t cy,
-                                  int16_t r,
-                                  uint8_t thickness,
-                                  float startDeg,
-                                  float endDeg,
-                                  ColorFunc colorAtAngle)
+    static void drawRingArcStrokeArc(GUI &g,
+                                     int16_t cx, int16_t cy,
+                                     int16_t r,
+                                     uint8_t thickness,
+                                     float startDeg,
+                                     float endDeg,
+                                     ColorFunc colorAtAngle)
     {
-        if (!t)
-            return;
         if (r <= 0)
             return;
         if (thickness < 1)
@@ -48,36 +38,88 @@ namespace pipgui
         if (startDeg > endDeg)
             return;
 
-        int16_t dotR = (thickness >= 2) ? (int16_t)(thickness / 2) : 1;
-        float rMid = (float)r - (float)dotR;
-        if (rMid < 1.0f)
-            rMid = 1.0f;
+        const int16_t outerR = r;
+        int16_t innerR = (int16_t)(r - (int16_t)thickness + 1);
+        if (innerR < 1)
+            innerR = 1;
 
-        float maxStepRad = ((float)dotR * 0.85f) / rMid;
+        float segStep = 1.5f;
+        float radStep = segStep * 0.01745329252f;
+        float rr = (float)((outerR + innerR) / 2);
+        if (rr < 1.0f)
+            rr = 1.0f;
+
+        float maxStepRad = radStep;
+        if (thickness > 2)
+            maxStepRad = std::min(0.10f, (float)thickness * 0.015f);
+
         float stepDeg = maxStepRad * 57.2957795f;
         if (stepDeg < 1.0f)
             stepDeg = 1.0f;
         if (stepDeg > 6.0f)
             stepDeg = 6.0f;
 
-        for (float a = startDeg; a <= endDeg + 0.001f; a += stepDeg)
+        for (float a = startDeg; a < endDeg - 0.0001f; a += stepDeg)
         {
-            float rad = (a - 90.0f) * 0.01745329252f;
-            int16_t px = cx + (int16_t)roundf(cosf(rad) * rMid);
-            int16_t py = cy + (int16_t)roundf(sinf(rad) * rMid);
-            uint16_t col = colorAtAngle(a);
-            t->fillCircle(px, py, dotR, col);
+            float a0 = a;
+            float a1 = a + stepDeg;
+            if (a1 > endDeg)
+                a1 = endDeg;
+
+            float mid = (a0 + a1) * 0.5f;
+            uint32_t col = colorAtAngle(mid);
+
+            const float g0 = 90.0f - a0;
+            const float g1 = 90.0f - a1;
+
+            for (int16_t rrInt = innerR; rrInt <= outerR; ++rrInt)
+                g.drawArc(cx, cy, rrInt, g0, g1, col);
         }
     }
 
     template <typename ColorFunc>
-    static void drawRingArcStrokeWrapped(pipcore::Sprite *t,
-                                         int16_t cx, int16_t cy,
-                                         int16_t r,
-                                         uint8_t thickness,
-                                         float startDeg,
-                                         float endDeg,
-                                         ColorFunc colorAtAngle)
+    static void drawRingArcCaps(GUI &g,
+                                int16_t cx, int16_t cy,
+                                int16_t r,
+                                uint8_t thickness,
+                                float startDeg,
+                                float endDeg,
+                                ColorFunc colorAtAngle)
+    {
+        if (r <= 0)
+            return;
+        if (thickness < 1)
+            thickness = 1;
+        if (startDeg > endDeg)
+            return;
+
+        const int16_t capR = (thickness >= 3) ? (int16_t)(thickness / 2) : 1;
+        float rMid = (float)r - (float)capR;
+        if (rMid < 1.0f)
+            rMid = 1.0f;
+
+        auto drawCapAt = [&](float deg)
+        {
+            float rad = (90.0f - deg) * 0.01745329252f;
+            int16_t px = (int16_t)lroundf((float)cx + cosf(rad) * rMid);
+            int16_t py = (int16_t)lroundf((float)cy + sinf(rad) * rMid);
+            uint32_t col = colorAtAngle(deg);
+            g.fillCircle(px, py, capR, col);
+        };
+
+        drawCapAt(startDeg);
+        if (endDeg != startDeg)
+            drawCapAt(endDeg);
+    }
+
+    template <typename ColorFunc>
+    static void drawRingArcStrokeArcWrapped(GUI &g,
+                                            int16_t cx, int16_t cy,
+                                            int16_t r,
+                                            uint8_t thickness,
+                                            float startDeg,
+                                            float endDeg,
+                                            ColorFunc colorAtAngle)
     {
         if (startDeg > endDeg)
             return;
@@ -94,12 +136,12 @@ namespace pipgui
 
         if (startDeg <= endDeg)
         {
-            drawRingArcStroke(t, cx, cy, r, thickness, startDeg, endDeg, colorAtAngle);
+            drawRingArcStrokeArc(g, cx, cy, r, thickness, startDeg, endDeg, colorAtAngle);
         }
         else
         {
-            drawRingArcStroke(t, cx, cy, r, thickness, startDeg, 360.0f, colorAtAngle);
-            drawRingArcStroke(t, cx, cy, r, thickness, 0.0f, endDeg, colorAtAngle);
+            drawRingArcStrokeArc(g, cx, cy, r, thickness, startDeg, 360.0f, colorAtAngle);
+            drawRingArcStrokeArc(g, cx, cy, r, thickness, 0.0f, endDeg, colorAtAngle);
         }
     }
 
@@ -171,7 +213,7 @@ namespace pipgui
         if (r < 1)
             r = 0;
 
-        t->fillRoundRect(x, y, w, h, r, to565(baseColor));
+        fillRoundRectFrc(x, y, w, h, r, baseColor);
 
         int16_t innerX = x;
         int16_t innerY = y;
@@ -207,7 +249,7 @@ namespace pipgui
             int16_t segW = segRight - segLeft;
 
             if (segW > 0)
-                t->fillRoundRect(segLeft, innerY, segW, innerH, fillR, to565(fillColor));
+                fillRoundRectFrc(segLeft, innerY, segW, innerH, (uint8_t)fillR, fillColor);
 
             return;
         }
@@ -221,7 +263,7 @@ namespace pipgui
         if (fillW > innerW)
             fillW = innerW;
 
-        t->fillRoundRect(innerX, innerY, fillW, innerH, fillR, to565(fillColor));
+        fillRoundRectFrc(innerX, innerY, fillW, innerH, (uint8_t)fillR, fillColor);
 
         if (anim == ProgressAnimNone)
             return;
@@ -266,8 +308,6 @@ namespace pipgui
             int16_t period = stripeW + gapW;
             int16_t phase = (int16_t)((now / 35U) % (uint32_t)period);
 
-            auto to565 = [](uint32_t c) -> uint16_t { uint8_t r = (uint8_t)((c >> 16) & 0xFF); uint8_t g = (uint8_t)((c >> 8) & 0xFF); uint8_t b = (uint8_t)(c & 0xFF); return (uint16_t)((((uint16_t)(r >> 3)) << 11) | (((uint16_t)(g >> 2)) << 5) | ((uint16_t)(b >> 3))); };
-
             for (int16_t px = innerX; px < innerX + fillW; ++px)
             {
                 int16_t local = (px - innerX + period - phase) % period;
@@ -276,16 +316,7 @@ namespace pipgui
                     int16_t offset = getCornerOffset(px);
                     int16_t lineH = innerH - (offset * 2);
                     if (lineH > 0)
-                    {
-                        if (_frcProfile == FrcProfile::Off)
-                            t->fillRect(px, innerY + offset, 1, lineH, to565(stripeColor));
-                        else
-                        {
-                            Color888 sc{(uint8_t)((stripeColor >> 16) & 0xFF), (uint8_t)((stripeColor >> 8) & 0xFF), (uint8_t)(stripeColor & 0xFF)};
-                            for (int16_t py = innerY + offset; py < innerY + offset + lineH; ++py)
-                                t->drawPixel(px, py, detail::quantize565(sc, px, py, _frcSeed, _frcProfile));
-                        }
-                    }
+                        fillRect(px, innerY + offset, 1, lineH, stripeColor);
                 }
             }
         }
@@ -322,12 +353,12 @@ namespace pipgui
 
                     if (intensity < 2)
                         continue;
-                    uint16_t col = blendWhite(fillColor, intensity);
+                    uint32_t col = blendWhite(fillColor, intensity);
 
                     int16_t offset = getCornerOffset(px);
                     int16_t lineH = innerH - (offset * 2);
                     if (lineH > 0)
-                        t->fillRect(px, innerY + offset, 1, lineH, col);
+                        fillRect(px, innerY + offset, 1, lineH, col);
                 }
             }
         }
@@ -364,10 +395,6 @@ namespace pipgui
             updateCircularProgressBar(x, y, r, thickness, value, baseColor, fillColor, anim);
             return;
         }
-
-        auto t = getDrawTarget();
-        if (!t)
-            return;
 
         int16_t cx = x;
         int16_t cy = y;
@@ -409,8 +436,9 @@ namespace pipgui
             }
             cy = top + availH / 2;
         }
-        drawRingArcStroke(t, cx, cy, r, thickness, 0.0f, 360.0f, [&](float) -> uint16_t
-                          { return baseColor; });
+
+        drawRingArcStrokeArc(*this, cx, cy, r, thickness, 0.0f, 360.0f, [&](float) -> uint32_t
+                             { return baseColor; });
 
         if (anim == Indeterminate)
         {
@@ -424,8 +452,10 @@ namespace pipgui
             float startDeg = pos - segDeg * 0.5f;
             float endDeg = pos + segDeg * 0.5f;
 
-            drawRingArcStrokeWrapped(t, cx, cy, r, thickness, startDeg, endDeg, [&](float) -> uint16_t
-                                     { return fillColor; });
+            drawRingArcStrokeArcWrapped(*this, cx, cy, r, thickness, startDeg, endDeg, [&](float) -> uint32_t
+                                        { return fillColor; });
+            drawRingArcCaps(*this, cx, cy, r, thickness, startDeg, endDeg, [&](float) -> uint32_t
+                            { return fillColor; });
             return;
         }
 
@@ -440,8 +470,11 @@ namespace pipgui
 
         if (anim == ProgressAnimNone)
         {
-            drawRingArcStroke(t, cx, cy, r, thickness, 0.0f, fillSpan, [&](float) -> uint16_t
-                              { return fillColor; });
+            drawRingArcStrokeArc(*this, cx, cy, r, thickness, 0.0f, fillSpan, [&](float) -> uint32_t
+                                 { return fillColor; });
+
+            drawRingArcCaps(*this, cx, cy, r, thickness, 0.0f, fillSpan, [&](float) -> uint32_t
+                            { return fillColor; });
             return;
         }
 
@@ -455,13 +488,19 @@ namespace pipgui
             int16_t period = stripeW + gapW;
             int16_t phase = (int16_t)((now / 35U) % (uint32_t)period);
 
-            auto to565 = [](uint32_t c) -> uint16_t { uint8_t r = (uint8_t)((c >> 16) & 0xFF); uint8_t g = (uint8_t)((c >> 8) & 0xFF); uint8_t b = (uint8_t)(c & 0xFF); return (uint16_t)((((uint16_t)(r >> 3)) << 11) | (((uint16_t)(g >> 2)) << 5) | ((uint16_t)(b >> 3))); };
-            drawRingArcStroke(t, cx, cy, r, thickness, 0.0f, fillSpan, [&](float a) -> uint16_t
-                              {
-                                  int32_t ai = (int32_t)(a + 0.5f);
-                                  int16_t local = (int16_t)((ai + period - phase) % period);
-                                  return (local < stripeW) ? to565(stripeColor) : to565(fillColor);
-                              });
+            drawRingArcStrokeArc(*this, cx, cy, r, thickness, 0.0f, fillSpan, [&](float a) -> uint32_t
+                                 {
+                                     int32_t ai = (int32_t)(a + 0.5f);
+                                     int16_t local = (int16_t)((ai + period - phase) % period);
+                                     return (local < stripeW) ? stripeColor : fillColor;
+                                 });
+
+            drawRingArcCaps(*this, cx, cy, r, thickness, 0.0f, fillSpan, [&](float a) -> uint32_t
+                            {
+                                int32_t ai = (int32_t)(a + 0.5f);
+                                int16_t local = (int16_t)((ai + period - phase) % period);
+                                return (local < stripeW) ? stripeColor : fillColor;
+                            });
         }
         else if (anim == Shimmer)
         {
@@ -476,18 +515,31 @@ namespace pipgui
             float shimmerCenter = shimmerLeft + bandW / 2.0f;
             float halfBand = bandW / 2.0f;
 
-            drawRingArcStroke(t, cx, cy, r, thickness, 0.0f, fillSpan, [&](float a) -> uint16_t
-                              {
-                                  float dist = fabsf(a - shimmerCenter);
-                                  float norm = dist / halfBand;
-                                  if (norm > 1.0f)
-                                      norm = 1.0f;
-                                  float curve = 1.0f - (norm * norm);
-                                  uint8_t intensity = (uint8_t)(110.0f * curve);
-                                  if (intensity < 2)
-                                      return fillColor;
-                                  return blendWhite(fillColor, intensity);
-                              });
+            drawRingArcStrokeArc(*this, cx, cy, r, thickness, 0.0f, fillSpan, [&](float a) -> uint32_t
+                                 {
+                                     float dist = fabsf(a - shimmerCenter);
+                                     float norm = dist / halfBand;
+                                     if (norm > 1.0f)
+                                         norm = 1.0f;
+                                     float curve = 1.0f - (norm * norm);
+                                     uint8_t intensity = (uint8_t)(110.0f * curve);
+                                     if (intensity < 2)
+                                         return fillColor;
+                                     return blendWhite(fillColor, intensity);
+                                 });
+
+            drawRingArcCaps(*this, cx, cy, r, thickness, 0.0f, fillSpan, [&](float a) -> uint32_t
+                            {
+                                float dist = fabsf(a - shimmerCenter);
+                                float norm = dist / halfBand;
+                                if (norm > 1.0f)
+                                    norm = 1.0f;
+                                float curve = 1.0f - (norm * norm);
+                                uint8_t intensity = (uint8_t)(110.0f * curve);
+                                if (intensity < 2)
+                                    return fillColor;
+                                return blendWhite(fillColor, intensity);
+                            });
         }
     }
 
@@ -537,7 +589,7 @@ namespace pipgui
         _flags.renderToSprite = 1;
         _activeSprite = &_sprite;
 
-        _sprite.fillRect((int16_t)(rx - pad), (int16_t)(ry - pad), (int16_t)(w + pad * 2), (int16_t)(h + pad * 2), _bgColor);
+        fillRect((int16_t)(rx - pad), (int16_t)(ry - pad), (int16_t)(w + pad * 2), (int16_t)(h + pad * 2), _bgColor);
         drawProgressBar(x, y, w, h, value, baseColor, fillColor, radius, anim);
         _flags.renderToSprite = prevRender;
         _activeSprite = prevActive;
@@ -604,8 +656,7 @@ namespace pipgui
             _flags.renderToSprite = 1;
             _activeSprite = &_sprite;
 
-            auto to565 = [](uint32_t c) -> uint16_t { uint8_t r = (uint8_t)((c >> 16) & 0xFF); uint8_t g = (uint8_t)((c >> 8) & 0xFF); uint8_t b = (uint8_t)(c & 0xFF); return (uint16_t)((((uint16_t)(r >> 3)) << 11) | (((uint16_t)(g >> 2)) << 5) | ((uint16_t)(b >> 3))); };
-            _sprite.fillRect((int16_t)(rx - pad), (int16_t)(ry - pad), (int16_t)(w + pad * 2), (int16_t)(h + pad * 2), to565(_bgColor));
+            fillRect((int16_t)(rx - pad), (int16_t)(ry - pad), (int16_t)(w + pad * 2), (int16_t)(h + pad * 2), _bgColor);
             drawProgressBar(x, y, w, h, value, baseColor, fillColor, radius, anim);
             _flags.renderToSprite = prevRender;
             _activeSprite = prevActive;
@@ -658,7 +709,7 @@ namespace pipgui
         _flags.renderToSprite = 1;
         _activeSprite = &_sprite;
 
-        _sprite.fillRect(cx, (int16_t)(ry - pad), cw, (int16_t)(h + pad * 2), _bgColor);
+        fillRect(cx, (int16_t)(ry - pad), cw, (int16_t)(h + pad * 2), _bgColor);
         drawProgressBar(x, y, w, h, value, baseColor, fillColor, radius, anim);
         _flags.renderToSprite = prevRender;
         _activeSprite = prevActive;
@@ -680,16 +731,13 @@ namespace pipgui
                                         uint32_t fillColor,
                                         ProgressAnim anim)
     {
-        uint16_t base565 = (uint16_t)baseColor;
-        uint16_t fill565 = (uint16_t)fillColor;
-
         if (!_flags.spriteEnabled || !_display)
         {
             bool prevRender = _flags.renderToSprite;
             pipcore::Sprite *prevActive = _activeSprite;
 
             _flags.renderToSprite = 0;
-            drawCircularProgressBar(x, y, r, thickness, value, base565, fill565, anim);
+            drawCircularProgressBar(x, y, r, thickness, value, baseColor, fillColor, anim);
             _flags.renderToSprite = prevRender;
             _activeSprite = prevActive;
             return;
@@ -710,8 +758,8 @@ namespace pipgui
 
         int16_t pad = 2;
         int16_t rr = (int16_t)(r + pad);
-        _sprite.fillRect((int16_t)(cx - rr), (int16_t)(cy - rr), (int16_t)(rr * 2 + 1), (int16_t)(rr * 2 + 1), _bgColor);
-        drawCircularProgressBar(x, y, r, thickness, value, base565, fill565, anim);
+        fillRect((int16_t)(cx - rr), (int16_t)(cy - rr), (int16_t)(rr * 2 + 1), (int16_t)(rr * 2 + 1), _bgColor);
+        drawCircularProgressBar(x, y, r, thickness, value, baseColor, fillColor, anim);
         _flags.renderToSprite = prevRender;
         _activeSprite = prevActive;
 

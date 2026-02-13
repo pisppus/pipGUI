@@ -188,7 +188,7 @@ namespace pipgui
         {
             uint16_t base = _bgColor ? (uint16_t)_bgColor : 0x0000;
             m.style.cardColor = to565(pipgui::detail::lighten888(from565(base), 4));
-            m.style.cardActiveColor = rgb(0, 130, 220);
+            m.style.cardActiveColor = to565(rgb(0, 130, 220));
             m.style.radius = 10;
             m.style.spacing = 10;
         }
@@ -206,8 +206,8 @@ namespace pipgui
     }
 
     void GUI::setListMenuStyle(uint8_t screenId,
-                               uint16_t cardColor,
-                               uint16_t cardActiveColor,
+                               uint32_t cardColor,
+                               uint32_t cardActiveColor,
                                uint8_t spacing,
                                uint8_t radius,
                                int16_t cardWidth,
@@ -223,8 +223,8 @@ namespace pipgui
 
         clearListMenuCache(m, platform());
 
-        m.style.cardColor = cardColor;
-        m.style.cardActiveColor = cardActiveColor;
+        m.style.cardColor = to565(cardColor);
+        m.style.cardActiveColor = to565(cardActiveColor);
         m.style.spacing = spacing;
         m.style.radius = radius;
         m.style.cardWidth = cardWidth;
@@ -354,7 +354,7 @@ namespace pipgui
         renderListMenu(screenId, left, top, w, h, _bgColor);
     }
 
-    void GUI::renderListMenu(uint8_t screenId, int16_t x, int16_t y, int16_t w, int16_t h, uint16_t bgColor)
+    void GUI::renderListMenu(uint8_t screenId, int16_t x, int16_t y, int16_t w, int16_t h, uint32_t bgColor)
     {
         ListMenuState *pm = getListMenu(screenId);
         if (!pm)
@@ -429,7 +429,7 @@ namespace pipgui
         int32_t bgW = bgR - bgL;
         int32_t bgH = bgB - bgT;
         if (bgW > 0 && bgH > 0)
-            t->fillRect((int16_t)bgL, (int16_t)bgT, (int16_t)bgW, (int16_t)bgH, bgColor);
+            t->fillRect((int16_t)bgL, (int16_t)bgT, (int16_t)bgW, (int16_t)bgH, (uint16_t)bgColor);
 
         int16_t visibleHeight = bottom - contentTop;
         if (visibleHeight < cardH)
@@ -542,8 +542,7 @@ namespace pipgui
             bool hasSub = sub.length() > 0;
 
             spr.fillScreen(_bgColor);
-            spr.fillRoundRect(0, 0, m.cacheW, m.cacheH, r, bg);
-            spr.drawRoundRect(0, 0, m.cacheW, m.cacheH, r, border);
+            fillRoundRectFrc(0, 0, m.cacheW, m.cacheH, r, from565(bg));
 
             int16_t txLocal = 10;
 
@@ -659,12 +658,11 @@ namespace pipgui
             spr.fillScreen(_bgColor);
             if (activeState)
             {
-                spr.fillRoundRect(0, 0, m.cacheW, m.cacheH, r, bg);
-                spr.drawRoundRect(0, 0, m.cacheW, m.cacheH, r, border);
+                fillRoundRectFrc(0, 0, m.cacheW, m.cacheH, r, from565(bg));
             }
             else
             {
-                spr.fillRect(0, 0, m.cacheW, m.cacheH, bg);
+                fillRect(0, 0, m.cacheW, m.cacheH, from565(bg));
             }
 
             int16_t txLocal = 12;
@@ -748,8 +746,7 @@ namespace pipgui
 
                 if (active)
                 {
-                    t->fillRoundRect(cx, yy, cardW, cardH, r, bg);
-                    t->drawRoundRect(cx, yy, cardW, cardH, r, border);
+                    fillRoundRectFrc(cx, yy, cardW, cardH, r, from565(bg));
                 }
 
                 int16_t tx = cx + 12;
@@ -784,8 +781,7 @@ namespace pipgui
                 }
             }
 
-            t->fillRoundRect(cx, yy, cardW, cardH, r, bg);
-            t->drawRoundRect(cx, yy, cardW, cardH, r, border);
+            fillRoundRectFrc(cx, yy, cardW, cardH, r, from565(bg));
 
             int16_t tx = cx + 10;
             const String &title = m.items[i].title;
@@ -950,7 +946,7 @@ namespace pipgui
         return updateListMenu(screenId, left, top, w, h, _bgColor);
     }
 
-    bool GUI::updateListMenu(uint8_t screenId, int16_t x, int16_t y, int16_t w, int16_t h, uint16_t bgColor)
+    bool GUI::updateListMenu(uint8_t screenId, int16_t x, int16_t y, int16_t w, int16_t h, uint32_t bgColor)
     {
         ListMenuState *pm = getListMenu(screenId);
         if (!pm)

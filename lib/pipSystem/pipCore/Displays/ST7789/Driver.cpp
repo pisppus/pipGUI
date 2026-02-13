@@ -339,6 +339,9 @@ namespace pipcore
             break;
         }
 
+        if (_rotation == 3)
+            madctl = (uint8_t)(madctl ^ 0x80);
+
         writeCmd(CmdMADCTL);
         writeData(&madctl, 1);
     }

@@ -14,8 +14,8 @@
 
         void drawCenteredTitle(const String &title,
                                const String &subtitle,
-                               uint16_t fg,
-                               uint16_t bg);
+                               uint32_t fg,
+                               uint32_t bg);
         void drawErrorCard(pipcore::Sprite &t,
                            int16_t x,
                            int16_t y,
@@ -23,7 +23,7 @@
                            int16_t h,
                            const String &title,
                            const String &detail,
-                           uint16_t accentColor,
+                           uint32_t accentColor,
                            uint8_t opacity,
                            int scrollX);
 
@@ -85,6 +85,12 @@
         pipcore::Sprite _screenToSprite;
         pipcore::Sprite *_activeSprite = nullptr;
 
+        bool _clipEnabled = false;
+        int16_t _clipX = 0;
+        int16_t _clipY = 0;
+        int16_t _clipW = 0;
+        int16_t _clipH = 0;
+
         struct DirtyRect
         {
             int16_t x, y, w, h;
@@ -105,10 +111,10 @@
         uint16_t _screenWidth = 0, _screenHeight = 0;
         uint32_t _bgColor = 0;
 
-        FrcProfile _frcProfile = FrcProfile::Off;
+        FrcProfile _frcProfile = FrcProfile::BlueNoise;
         uint32_t _frcSeed = 0x6D2B79F5U;
         uint32_t _frcLastUpdateMs = 0;
-        uint16_t _frcTemporalPeriodMs = 66;
+        uint16_t _frcTemporalPeriodMs = 0;
 
         pipcore::GuiDisplayConfig _displayCfg;
         bool _displayCfgConfigured = false;
@@ -167,6 +173,7 @@
 
         uint16_t _psdfSizePx = 0;
         float _psdfWeightBias = 0.10f;
+        FontId _psdfFontId = WixMadeForDisplay;
 
         struct ErrorEntry
         {
@@ -201,8 +208,8 @@
 
         StatusBarPosition _statusBarPos = Top;
         uint8_t _statusBarHeight = 0;
-        uint16_t _statusBarBg = 0x0000;
-        uint16_t _statusBarFg = 0xFFFF;
+        uint32_t _statusBarBg = 0x000000;
+        uint32_t _statusBarFg = 0xFFFFFF;
         String _statusTextLeft;
         String _statusTextCenter;
         String _statusTextRight;
@@ -276,11 +283,11 @@
         uint8_t _recoveryItemCapacity = 0;
         RecoveryEntry *_recoveryItems = nullptr;
 
-        uint16_t _recoverySavedBgColor = 0;
+        uint32_t _recoverySavedBgColor = 0;
         StatusBarPosition _recoverySavedStatusBarPos = Top;
         uint8_t _recoverySavedStatusBarHeight = 0;
-        uint16_t _recoverySavedStatusBarBg = 0x0000;
-        uint16_t _recoverySavedStatusBarFg = 0xFFFF;
+        uint32_t _recoverySavedStatusBarBg = 0x000000;
+        uint32_t _recoverySavedStatusBarFg = 0xFFFFFF;
         String _recoverySavedStatusLeft;
         String _recoverySavedStatusCenter;
         String _recoverySavedStatusRight;

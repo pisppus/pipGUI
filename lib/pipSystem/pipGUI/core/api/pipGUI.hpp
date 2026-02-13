@@ -100,6 +100,12 @@ namespace pipgui
         AlignRight
     };
 
+    enum FontId : uint8_t
+    {
+        WixMadeForDisplay,
+        KronaOne
+    };
+
     enum TextStyle : uint8_t
     {
         H1,
@@ -471,7 +477,7 @@ namespace pipgui
         int16_t viewportCardW;
         int16_t viewportCardH;
         int16_t viewportItemSpanPx;
-        uint16_t viewportBgColor;
+        uint32_t viewportBgColor;
         float viewportScrollPos;
         int32_t viewportScrollPx;
         uint8_t viewportSelectedIndex;

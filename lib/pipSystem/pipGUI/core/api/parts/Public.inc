@@ -25,6 +25,30 @@
                              float speed = 1.0f);
         void updateGraphLine(uint8_t lineIndex, int16_t value, uint32_t color, int16_t valueMin, int16_t valueMax);
 
+        void drawLine(int16_t x0, int16_t y0,
+                      int16_t x1, int16_t y1,
+                      uint32_t color);
+
+        void drawCircle(int16_t cx, int16_t cy, int16_t r, uint32_t color);
+        void fillCircle(int16_t cx, int16_t cy, int16_t r, uint32_t color);
+
+        void drawArc(int16_t cx, int16_t cy, int16_t r, float startDeg, float endDeg, uint32_t color);
+
+        void drawEllipse(int16_t cx, int16_t cy, int16_t rx, int16_t ry, uint32_t color);
+        void fillEllipse(int16_t cx, int16_t cy, int16_t rx, int16_t ry, uint32_t color);
+
+        void drawTriangle(int16_t x0, int16_t y0,
+                          int16_t x1, int16_t y1,
+                          int16_t x2, int16_t y2,
+                          uint32_t color);
+        void fillTriangle(int16_t x0, int16_t y0,
+                          int16_t x1, int16_t y1,
+                          int16_t x2, int16_t y2,
+                          uint32_t color);
+
+        void drawSquircle(int16_t cx, int16_t cy, int16_t r, uint32_t color);
+        void fillSquircle(int16_t cx, int16_t cy, int16_t r, uint32_t color);
+
         void drawProgressBar(int16_t x,
                              int16_t y,
                              int16_t w,
@@ -153,6 +177,9 @@
                                 uint32_t activeColor,
                                 int32_t inactiveColor = -1,
                                 int32_t knobColor = -1);
+
+        void setClipWindow(int16_t x, int16_t y, int16_t w, int16_t h);
+        void resetClipWindow();
         void configureTextStyles(uint16_t h1Px = 24, uint16_t h2Px = 18, uint16_t bodyPx = 14, uint16_t captionPx = 12);
         void setTextStyle(TextStyle style);
 
@@ -164,6 +191,7 @@
         uint16_t psdfFontSize() const;
         void setPSDFWeightBias(float bias);
         float psdfWeightBias() const;
+        void setPSDFFont(FontId fontId);
         void drawPSDFText(const String &text,
                           int16_t x,
                           int16_t y,
@@ -176,6 +204,19 @@
                             uint32_t color,
                             uint32_t bgColor,
                             TextAlign align = Left);
+
+        void drawIcon(uint16_t iconId,
+                      int16_t x,
+                      int16_t y,
+                      uint16_t sizePx,
+                      uint32_t color,
+                      uint32_t bgColor);
+        void updateIcon(uint16_t iconId,
+                        int16_t x,
+                        int16_t y,
+                        uint16_t sizePx,
+                        uint32_t color,
+                        uint32_t bgColor);
 
         void setScreenAnimation(ScreenAnim anim, uint32_t durationMs);
 
@@ -190,8 +231,8 @@
         void showLogo(const String &t,
                       const String &s,
                       BootAnimation a = None,
-                      uint16_t fg = 0xFFFF,
-                      uint16_t bg = 0x0000,
+                      uint32_t fg = 0xFFFFFF,
+                      uint32_t bg = 0x000000,
                       uint32_t dur = 0,
                       int16_t x = -1,
                       int16_t y = -1);
@@ -231,8 +272,8 @@
         }
 
         void setListMenuStyle(uint8_t screenId,
-                              uint16_t cardColor,
-                              uint16_t cardActiveColor,
+                              uint32_t cardColor,
+                              uint32_t cardActiveColor,
                               uint8_t spacing = 8,
                               uint8_t radius = 8,
                               int16_t cardWidth = 0,
@@ -248,7 +289,7 @@
                             int16_t y,
                             int16_t w,
                             int16_t h,
-                            uint16_t bgColor);
+                            uint32_t bgColor);
 
         bool updateListMenu(uint8_t screenId);
         bool updateListMenu(uint8_t screenId,
@@ -256,7 +297,7 @@
                             int16_t y,
                             int16_t w,
                             int16_t h,
-                            uint16_t bgColor);
+                            uint32_t bgColor);
 
         void configureTileMenu(uint8_t screenId, uint8_t parentScreen, std::initializer_list<TileMenuItemDef> items);
         template <size_t N>
@@ -266,8 +307,8 @@
         }
 
         void setTileMenuStyle(uint8_t screenId,
-                              uint16_t cardColor,
-                              uint16_t cardActiveColor,
+                              uint32_t cardColor,
+                              uint32_t cardActiveColor,
                               uint8_t radius = 8,
                               uint8_t spacing = 8,
                               uint8_t columns = 2,
@@ -297,7 +338,7 @@
         void updateTileMenu(uint8_t screenId, uint8_t prevSelectedIndex);
 
         void configureStatusBar(bool enabled,
-                                uint16_t bgColor = 0x0000,
+                                uint32_t bgColor = 0x000000,
                                 uint8_t height = 0,
                                 StatusBarPosition pos = Top);
         void setStatusBarText(const String &left, const String &center, const String &right);
@@ -346,12 +387,28 @@
 
         void setFrcProfile(FrcProfile profile);
         FrcProfile frcProfile() const { return _frcProfile; }
-        void enableGamma22(bool enabled);
-        bool gamma22Enabled() const { return _frcProfile == FrcProfile::BlueNoiseGamma22; }
         void setFrcSeed(uint32_t seed) { _frcSeed = seed; }
         uint32_t frcSeed() const { return _frcSeed; }
-        void setFrcTemporalPeriodMs(uint16_t ms) { _frcTemporalPeriodMs = ms ? ms : 1; }
+        void setFrcTemporalPeriodMs(uint16_t ms) { _frcTemporalPeriodMs = ms; }
         uint16_t frcTemporalPeriodMs() const { return _frcTemporalPeriodMs; }
+
+        // Color creation - returns Color888 (RGB888 format)
+        static constexpr Color888 rgb888(uint8_t r, uint8_t g, uint8_t b)
+        {
+            return Color888{r, g, b};
+        }
+
+        // Convert Color888 to RGB565 using FRC dithering at given position
+        uint16_t colorTo565(Color888 c, int16_t x, int16_t y) const
+        {
+            if (c.isBlack() || c.isWhite())
+                return detail::quantize565(c, x, y, _frcSeed, FrcProfile::Off);
+            if (c.r == c.g && c.g == c.b)
+                return detail::quantize565(c, x, y, _frcSeed, FrcProfile::Off);
+            if (((c.r & 7U) == 0U) && ((c.g & 3U) == 0U) && ((c.b & 7U) == 0U))
+                return detail::quantize565(c, x, y, _frcSeed, FrcProfile::Off);
+            return detail::quantize565(c, x, y, _frcSeed, _frcProfile);
+        }
 
         uint16_t rgb888To565Frc(uint8_t r,
                                 uint8_t g,

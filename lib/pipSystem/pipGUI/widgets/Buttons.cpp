@@ -182,14 +182,14 @@ namespace pipgui
         uint8_t bg8 = (uint8_t)((bg >> 8) & 0xFF);
         uint8_t bb8 = (uint8_t)(bg & 0xFF);
 
-        uint16_t lum = (uint16_t)((br8 * 30U + bg8 * 59U + bb8 * 11U) / 100U);
-        uint16_t fgActive = (lum > 140U) ? 0x0000 : 0xFFFF;
+        uint32_t lum = (uint32_t)((br8 * 30U + bg8 * 59U + bb8 * 11U) / 100U);
+        uint32_t fgActive = (lum > 140U) ? 0x000000 : 0xFFFFFF;
 
         bool disabledVis = !state.enabled || (state.fadeLevel < 40);
-        uint16_t fg;
+        uint32_t fg;
         if (disabledVis)
         {
-            fg = (fgActive == 0xFFFF) ? 0xC618 : 0x4208;
+            fg = (fgActive == 0xFFFFFF) ? 0x808080 : 0x606060;
         }
         else
         {
@@ -279,13 +279,9 @@ namespace pipgui
         }
 
         setPSDFFontSize(px);
-        uint16_t bg565 = rgb888To565Frc((uint8_t)((bg >> 16) & 0xFF),
-                                        (uint8_t)((bg >> 8) & 0xFF),
-                                        (uint8_t)(bg & 0xFF),
-                                        tx,
-                                        ty,
-                                        FrcProfile::Off);
-        psdfDrawTextInternal(labelToDraw, tx, ty, fg, bg565, AlignLeft);
+        uint16_t fg565 = color888To565(tx, ty, fg);
+        uint16_t bg565 = color888To565(tx, ty, bg);
+        psdfDrawTextInternal(labelToDraw, tx, ty, fg565, bg565, AlignLeft);
     }
 
     void GUI::drawButton(const String &label,

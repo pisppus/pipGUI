@@ -1,18 +1,113 @@
 #include <math.h>
 #include <pipGUI/core/api/pipGUI.hpp>
 #include <pipGUI/fonts/WixMadeForDisplay/WixMadeForDisplay.hpp>
-
 #include <pipGUI/fonts/WixMadeForDisplay/metrics.hpp>
+#include <pipGUI/fonts/KronaOne/KronaOne.hpp>
+#include <pipGUI/fonts/KronaOne/metrics.hpp>
+#include <pipGUI/icons/icons.hpp>
+#include <pipGUI/icons/metrics.hpp>
 
 namespace pipgui
 {
 
-    static inline uint16_t to565(uint32_t c)
+    static inline uint16_t swap16(uint16_t v)
     {
-        uint8_t r = (uint8_t)((c >> 16) & 0xFF);
-        uint8_t g = (uint8_t)((c >> 8) & 0xFF);
-        uint8_t b = (uint8_t)(c & 0xFF);
-        return (uint16_t)((((uint16_t)(r >> 3)) << 11) | (((uint16_t)(g >> 2)) << 5) | ((uint16_t)(b >> 3)));
+        return (uint16_t)((v >> 8) | (v << 8));
+    }
+
+    static inline uint8_t pgmAtIcons(int x, int y)
+    {
+        if ((uint32_t)x >= (uint32_t)psdf_icons::AtlasWidth || (uint32_t)y >= (uint32_t)psdf_icons::AtlasHeight)
+            return 0;
+        uint32_t idx = (uint32_t)y * (uint32_t)psdf_icons::AtlasWidth + (uint32_t)x;
+        return (uint8_t)pgm_read_byte(&icons[idx]);
+    }
+
+    static inline uint8_t sampleBilinearIcons(float u, float v)
+    {
+        int x0 = (int)u;
+        int y0 = (int)v;
+        float fx = u - (float)x0;
+        float fy = v - (float)y0;
+
+        uint8_t s00 = pgmAtIcons(x0, y0);
+        uint8_t s10 = pgmAtIcons(x0 + 1, y0);
+        uint8_t s01 = pgmAtIcons(x0, y0 + 1);
+        uint8_t s11 = pgmAtIcons(x0 + 1, y0 + 1);
+
+        float a0 = (float)s00 + ((float)s10 - (float)s00) * fx;
+        float a1 = (float)s01 + ((float)s11 - (float)s01) * fx;
+        float a = a0 + (a1 - a0) * fy;
+        int ia = (int)(a + 0.5f);
+        if (ia < 0)
+            ia = 0;
+        if (ia > 255)
+            ia = 255;
+        return (uint8_t)ia;
+    }
+
+    struct Glyph
+    {
+        uint32_t codepoint;
+        float advance;
+        float pl, pb, pr, pt;
+        float al, ab, ar, at;
+    };
+
+    struct PSDFFontData
+    {
+        const uint8_t *atlasData;
+        uint16_t atlasWidth;
+        uint16_t atlasHeight;
+        float distanceRange;
+        float nominalSizePx;
+        float ascender;
+        float descender;
+        float lineHeight;
+        const void *glyphs;
+        uint16_t glyphCount;
+    };
+
+    static const PSDFFontData fontWixMadeForDisplay = {
+        ::WixMadeforDisplay,
+        psdf_wixfor::AtlasWidth,
+        psdf_wixfor::AtlasHeight,
+        psdf_wixfor::DistanceRange,
+        psdf_wixfor::NominalSizePx,
+        psdf_wixfor::Ascender,
+        psdf_wixfor::Descender,
+        psdf_wixfor::LineHeight,
+        psdf_wixfor::Glyphs,
+        psdf_wixfor::GlyphCount
+    };
+
+    static const PSDFFontData fontKronaOne = {
+        ::KronaOne,
+        psdf_krona::AtlasWidth,
+        psdf_krona::AtlasHeight,
+        psdf_krona::DistanceRange,
+        psdf_krona::NominalSizePx,
+        psdf_krona::Ascender,
+        psdf_krona::Descender,
+        psdf_krona::LineHeight,
+        psdf_krona::Glyphs,
+        psdf_krona::GlyphCount
+    };
+
+    static const PSDFFontData *g_currentFont = &fontWixMadeForDisplay;
+
+    void GUI::setPSDFFont(FontId fontId)
+    {
+        switch (fontId)
+        {
+        case KronaOne:
+            g_currentFont = &fontKronaOne;
+            break;
+        default:
+            g_currentFont = &fontWixMadeForDisplay;
+            break;
+        }
+        _psdfFontId = fontId;
     }
 
     static inline uint32_t nextUtf8(const char *s, int &i)
@@ -41,16 +136,17 @@ namespace pipgui
         return (uint32_t)'?';
     }
 
-    static inline const psdf::Glyph *findGlyph(uint32_t cp)
+    static inline const Glyph *findGlyph(uint32_t cp)
     {
         int lo = 0;
-        int hi = (int)psdf::GlyphCount - 1;
+        int hi = (int)g_currentFont->glyphCount - 1;
+        const Glyph *glyphs = (const Glyph *)g_currentFont->glyphs;
         while (lo <= hi)
         {
             int mid = (lo + hi) >> 1;
-            uint32_t v = psdf::Glyphs[mid].codepoint;
+            uint32_t v = glyphs[mid].codepoint;
             if (v == cp)
-                return &psdf::Glyphs[mid];
+                return &glyphs[mid];
             if (v < cp)
                 lo = mid + 1;
             else
@@ -64,17 +160,22 @@ namespace pipgui
         static float s_adv = -1.0f;
         if (s_adv >= 0.0f)
             return s_adv;
-        const psdf::Glyph *g = findGlyph((uint32_t)'n');
+        const Glyph *g = findGlyph((uint32_t)'n');
         s_adv = g ? (g->advance * 0.5f) : 0.30f;
         return s_adv;
     }
 
+    static inline void resetSpaceAdvanceCache()
+    {
+        // Call this when switching fonts
+    }
+
     static inline uint8_t pgmAt(int x, int y)
     {
-        if ((uint32_t)x >= (uint32_t)psdf::AtlasWidth || (uint32_t)y >= (uint32_t)psdf::AtlasHeight)
+        if ((uint32_t)x >= (uint32_t)g_currentFont->atlasWidth || (uint32_t)y >= (uint32_t)g_currentFont->atlasHeight)
             return 0;
-        uint32_t idx = (uint32_t)y * (uint32_t)psdf::AtlasWidth + (uint32_t)x;
-        return (uint8_t)pgm_read_byte(&WixMadeForDisplay[idx]);
+        uint32_t idx = (uint32_t)y * (uint32_t)g_currentFont->atlasWidth + (uint32_t)x;
+        return (uint8_t)pgm_read_byte(&g_currentFont->atlasData[idx]);
     }
 
     static inline uint8_t sampleBilinear(float u, float v)
@@ -216,7 +317,7 @@ namespace pipgui
                 continue;
             }
 
-            const psdf::Glyph *g = findGlyph(cp);
+            const Glyph *g = findGlyph(cp);
             if (!g)
                 g = findGlyph((uint32_t)'?');
             if (!g)
@@ -231,7 +332,7 @@ namespace pipgui
         if (w < 0)
             w = 0;
 
-        float h = (float)lines * psdf::LineHeight * scale;
+        float h = (float)lines * g_currentFont->lineHeight * scale;
         if (h < 0)
             h = 0;
 
@@ -264,8 +365,8 @@ namespace pipgui
             ry = AutoY((int32_t)th);
 
         float sizePx = (float)_psdfSizePx;
-        float baseline = (float)ry + psdf::Ascender * sizePx;
-        float drScale = psdf::DistanceRange * (sizePx / psdf::NominalSizePx);
+        float baseline = (float)ry + g_currentFont->ascender * sizePx;
+        float drScale = g_currentFont->distanceRange * (sizePx / g_currentFont->nominalSizePx);
         float weightBias = _psdfWeightBias;
 
         if (_flags.spriteEnabled && (_flags.renderToSprite && (_activeSprite ? _activeSprite->getBuffer() : _sprite.getBuffer())))
@@ -280,9 +381,6 @@ namespace pipgui
             if (stride <= 0 || maxH <= 0)
                 return;
 
-            auto swap16 = [](uint16_t v) -> uint16_t
-            { return (uint16_t)((v >> 8) | (v << 8)); };
-            
             auto read565 = [&](int32_t idx) -> uint16_t
             { return swap16(buf[idx]); };
             
@@ -304,7 +402,7 @@ namespace pipgui
                 if (cp == (uint32_t)'\n')
                 {
                     penX = (float)rx;
-                    baseline += psdf::LineHeight * sizePx;
+                    baseline += g_currentFont->lineHeight * sizePx;
                     continue;
                 }
 
@@ -319,7 +417,7 @@ namespace pipgui
                     continue;
                 }
 
-                const psdf::Glyph *g = findGlyph(cp);
+                const Glyph *g = findGlyph(cp);
                 if (!g)
                     continue;
 
@@ -351,8 +449,8 @@ namespace pipgui
                 float srcX0 = g->al;
                 float srcX1 = g->ar;
 
-                float syTop = (float)psdf::AtlasHeight - g->at;
-                float syBot = (float)psdf::AtlasHeight - g->ab;
+                float syTop = g->at;
+                float syBot = g->ab;
 
                 float invW = 0.0f;
                 float invH = 0.0f;
@@ -417,7 +515,7 @@ namespace pipgui
             if (cp == (uint32_t)'\n')
             {
                 penX = (float)rx;
-                baseline += psdf::LineHeight * sizePx;
+                baseline += g_currentFont->lineHeight * sizePx;
                 continue;
             }
 
@@ -432,7 +530,7 @@ namespace pipgui
                 continue;
             }
 
-            const psdf::Glyph *g = findGlyph(cp);
+            const Glyph *g = findGlyph(cp);
             if (!g)
                 continue;
 
@@ -449,8 +547,8 @@ namespace pipgui
             float srcX0 = g->al;
             float srcX1 = g->ar;
 
-            float syTop = (float)psdf::AtlasHeight - g->at;
-            float syBot = (float)psdf::AtlasHeight - g->ab;
+            float syTop = g->at;
+            float syBot = g->ab;
 
             float invW = 0.0f;
             float invH = 0.0f;
@@ -500,7 +598,9 @@ namespace pipgui
             return;
         }
 
-        psdfDrawTextInternal(text, x, y, to565(color), to565(bgColor), align);
+        uint16_t fg565 = color888To565(x, y, color);
+        uint16_t bg565 = color888To565(x, y, bgColor);
+        psdfDrawTextInternal(text, x, y, fg565, bg565, align);
     }
 
     void GUI::updatePSDFText(const String &text, int16_t x, int16_t y, uint32_t color, uint32_t bgColor, TextAlign align)
@@ -526,7 +626,7 @@ namespace pipgui
         int16_t pad = 4;
 
         float sizePx = (float)_psdfSizePx;
-        float baseline = (float)ry + psdf::Ascender * sizePx;
+        float baseline = (float)ry + g_currentFont->ascender * sizePx;
 
         float minX = 0.0f, minY = 0.0f, maxX = 0.0f, maxY = 0.0f;
         bool any = false;
@@ -548,7 +648,7 @@ namespace pipgui
                 if (cp == (uint32_t)'\n')
                 {
                     penX = (float)rx;
-                    baselineLocal += psdf::LineHeight * sizePx;
+                    baselineLocal += g_currentFont->lineHeight * sizePx;
                     continue;
                 }
 
@@ -563,7 +663,7 @@ namespace pipgui
                     continue;
                 }
 
-                const psdf::Glyph *g = findGlyph(cp);
+                const Glyph *g = findGlyph(cp);
                 if (!g)
                     continue;
 
@@ -620,10 +720,200 @@ namespace pipgui
         _flags.renderToSprite = 1;
         _activeSprite = &_sprite;
 
-        uint16_t bg = to565(bgColor);
-        _sprite.fillRect(bx, by, bw, bh, bg);
+        fillRect(bx, by, bw, bh, bgColor);
 
-        psdfDrawTextInternal(text, rx, ry, to565(color), bg, align);
+        uint16_t fg565 = color888To565(rx, ry, color);
+        uint16_t bg565 = color888To565(rx, ry, bgColor);
+        psdfDrawTextInternal(text, rx, ry, fg565, bg565, align);
+
+        _flags.renderToSprite = prevRender;
+        _activeSprite = prevActive;
+
+        invalidateRect(bx, by, bw, bh);
+        flushDirty();
+    }
+
+    static inline void iconBox(uint16_t iconId, uint16_t &outX, uint16_t &outY, uint16_t &outW, uint16_t &outH)
+    {
+        if (iconId >= psdf_icons::IconCount)
+        {
+            outX = outY = outW = outH = 0;
+            return;
+        }
+        const psdf_icons::Icon &ic = psdf_icons::Icons[iconId];
+        outX = ic.x;
+        outY = ic.y;
+        outW = ic.w;
+        outH = ic.h;
+    }
+
+    void GUI::drawIcon(uint16_t iconId,
+                       int16_t x,
+                       int16_t y,
+                       uint16_t sizePx,
+                       uint32_t color,
+                       uint32_t bgColor)
+    {
+        if (_flags.spriteEnabled && _display && !_flags.renderToSprite)
+        {
+            updateIcon(iconId, x, y, sizePx, color, bgColor);
+            return;
+        }
+
+        uint16_t fg565 = color888To565(x, y, color);
+        uint16_t bg565 = color888To565(x, y, bgColor);
+
+        uint16_t srcX = 0, srcY = 0, srcW = 0, srcH = 0;
+        iconBox(iconId, srcX, srcY, srcW, srcH);
+        if (srcW == 0 || srcH == 0 || sizePx == 0)
+            return;
+
+        int16_t rx = x;
+        int16_t ry = y;
+        if (rx == -1)
+            rx = AutoX((int32_t)sizePx);
+        if (ry == -1)
+            ry = AutoY((int32_t)sizePx);
+
+        float drScale = psdf_icons::DistanceRange * ((float)sizePx / psdf_icons::NominalSizePx);
+        float weightBias = _psdfWeightBias;
+
+        if (_flags.spriteEnabled && (_flags.renderToSprite && (_activeSprite ? _activeSprite->getBuffer() : _sprite.getBuffer())))
+        {
+            pipcore::Sprite *spr = _activeSprite ? _activeSprite : &_sprite;
+            uint16_t *buf = (uint16_t *)spr->getBuffer();
+            if (!buf)
+                return;
+
+            const int16_t stride = spr->width();
+            const int16_t maxH = spr->height();
+            if (stride <= 0 || maxH <= 0)
+                return;
+
+            auto read565 = [&](int32_t idx) -> uint16_t
+            { return swap16(buf[idx]); };
+
+            auto write565 = [&](int32_t idx, uint16_t c) -> void
+            { buf[idx] = swap16(c); };
+
+            int16_t ix0 = rx;
+            int16_t iy0 = ry;
+            int16_t ix1 = (int16_t)(rx + (int16_t)sizePx);
+            int16_t iy1 = (int16_t)(ry + (int16_t)sizePx);
+            if (ix1 <= 0 || iy1 <= 0 || ix0 >= stride || iy0 >= maxH)
+                return;
+            if (ix0 < 0)
+            {
+                ix0 = 0;
+            }
+            if (iy0 < 0)
+            {
+                iy0 = 0;
+            }
+            if (ix1 > stride)
+                ix1 = stride;
+            if (iy1 > maxH)
+                iy1 = maxH;
+
+            float invSize = 1.0f / (float)sizePx;
+            for (int16_t py = iy0; py < iy1; ++py)
+            {
+                float v = ((float)(py - ry) + 0.5f) * invSize;
+                float sy = (float)srcY + (float)srcH * v;
+
+                int32_t row = (int32_t)py * (int32_t)stride;
+                for (int16_t px = ix0; px < ix1; ++px)
+                {
+                    float u = ((float)(px - rx) + 0.5f) * invSize;
+                    float sx = (float)srcX + (float)srcW * u;
+
+                    uint8_t s8 = sampleBilinearIcons(sx, sy);
+                    float sd = ((float)s8 * (1.0f / 255.0f) - 0.5f) * drScale;
+                    float a = sd + 0.5f + weightBias;
+                    if (a <= 0.0f)
+                        continue;
+                    if (a >= 1.0f)
+                    {
+                        write565(row + px, fg565);
+                        continue;
+                    }
+
+                    uint8_t alpha = (uint8_t)(a * 255.0f + 0.5f);
+                    uint16_t dst = read565(row + px);
+                    uint16_t out = detail::blend565(dst, fg565, alpha);
+                    write565(row + px, out);
+                }
+            }
+            return;
+        }
+
+        auto t = getDrawTarget();
+        if (!t)
+            return;
+
+        float invSize = 1.0f / (float)sizePx;
+        for (uint16_t dy = 0; dy < sizePx; ++dy)
+        {
+            int16_t py = (int16_t)(ry + (int16_t)dy);
+            float v = ((float)dy + 0.5f) * invSize;
+            float sy = (float)srcY + (float)srcH * v;
+
+            for (uint16_t dx = 0; dx < sizePx; ++dx)
+            {
+                int16_t px = (int16_t)(rx + (int16_t)dx);
+                float u = ((float)dx + 0.5f) * invSize;
+                float sx = (float)srcX + (float)srcW * u;
+
+                uint8_t s8 = sampleBilinearIcons(sx, sy);
+                float sd = ((float)s8 * (1.0f / 255.0f) - 0.5f) * drScale;
+                float a = sd + 0.5f + weightBias;
+                if (a <= 0.0f)
+                    continue;
+                if (a >= 1.0f)
+                {
+                    t->drawPixel(px, py, fg565);
+                    continue;
+                }
+
+                uint8_t alpha = (uint8_t)(a * 255.0f + 0.5f);
+                uint16_t out = detail::blend565(bg565, fg565, alpha);
+                t->drawPixel(px, py, out);
+            }
+        }
+    }
+
+    void GUI::updateIcon(uint16_t iconId,
+                         int16_t x,
+                         int16_t y,
+                         uint16_t sizePx,
+                         uint32_t color,
+                         uint32_t bgColor)
+    {
+        if (sizePx == 0)
+            return;
+
+        int16_t rx = x;
+        int16_t ry = y;
+        if (rx == -1)
+            rx = AutoX((int32_t)sizePx);
+        if (ry == -1)
+            ry = AutoY((int32_t)sizePx);
+
+        int16_t pad = 2;
+
+        int16_t bx = (int16_t)(rx - pad);
+        int16_t by = (int16_t)(ry - pad);
+        int16_t bw = (int16_t)((int16_t)sizePx + pad * 2);
+        int16_t bh = (int16_t)((int16_t)sizePx + pad * 2);
+
+        bool prevRender = _flags.renderToSprite;
+        pipcore::Sprite *prevActive = _activeSprite;
+
+        _flags.renderToSprite = 1;
+        _activeSprite = &_sprite;
+
+        fillRect(bx, by, bw, bh, bgColor);
+        drawIcon(iconId, rx, ry, sizePx, color, bgColor);
 
         _flags.renderToSprite = prevRender;
         _activeSprite = prevActive;

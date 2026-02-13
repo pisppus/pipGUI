@@ -53,91 +53,133 @@ namespace pipcore
             return;
         const size_t pixels = static_cast<size_t>(_w) * static_cast<size_t>(_h);
         const uint16_t v = swap16(color565);
-        for (size_t i = 0; i < pixels; ++i)
-            _buf[i] = v;
+        
+        // Fast path: fill in chunks for better cache utilization
+        uint16_t *p = _buf;
+        size_t n = pixels;
+        
+        // Unroll first 8 pixels for alignment
+        while (n > 0 && ((uintptr_t)p & 15))
+        {
+            *p++ = v;
+            --n;
+        }
+        
+        // Fill 8 pixels at a time
+        const uint64_t vv64 = ((uint64_t)v << 48) | ((uint64_t)v << 32) | ((uint64_t)v << 16) | v;
+        uint64_t *p64 = (uint64_t *)p;
+        while (n >= 8)
+        {
+            *p64++ = vv64;
+            *p64++ = vv64;
+            n -= 8;
+        }
+        
+        // Fill remaining
+        p = (uint16_t *)p64;
+        while (n--)
+            *p++ = v;
     }
 
     void Sprite::drawPixel(int16_t x, int16_t y, uint16_t color565)
     {
         if (!_buf)
             return;
-        if (x < 0 || y < 0 || x >= _w || y >= _h)
+        // Hot path: bounds check combined with clip test
+        if ((uint16_t)x >= (uint16_t)_w || (uint16_t)y >= (uint16_t)_h)
             return;
-        if (!clipTest(x, y))
-            return;
+        if (_clipW != _w || _clipH != _h)
+        {
+            if (x < _clipX || y < _clipY || x >= _clipX + _clipW || y >= _clipY + _clipH)
+                return;
+        }
         _buf[static_cast<size_t>(y) * static_cast<size_t>(_w) + static_cast<size_t>(x)] = swap16(color565);
     }
 
     void Sprite::fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color565)
     {
-        if (!_buf)
-            return;
-        if (w <= 0 || h <= 0)
+        if (!_buf || w <= 0 || h <= 0)
             return;
 
         const uint16_t v = swap16(color565);
 
+        // Fast path: full sprite fill (no clip needed)
+        if (_clipW == _w && _clipH == _h && x == 0 && y == 0 && w == _w && h == _h)
+        {
+            fillScreen(color565);
+            return;
+        }
+
+        // Fast path: rect fully inside no-clip region
         if (_clipW == _w && _clipH == _h && x >= 0 && y >= 0 && x + w <= _w && y + h <= _h)
         {
             const size_t rowStride = static_cast<size_t>(_w);
             uint16_t *dst = _buf + static_cast<size_t>(y) * rowStride + static_cast<size_t>(x);
+            
             if (h == 1)
             {
-                for (int16_t xx = 0; xx < w; ++xx)
-                    dst[xx] = v;
+                // Single row: use word copy for wide fills
+                fillRow(dst, w, v);
                 return;
             }
+            
             for (int16_t yy = 0; yy < h; ++yy)
             {
-                uint16_t *row = dst + static_cast<size_t>(yy) * rowStride;
-                for (int16_t xx = 0; xx < w; ++xx)
-                    row[xx] = v;
+                fillRow(dst + static_cast<size_t>(yy) * rowStride, w, v);
             }
             return;
         }
+
+        // Clip region check
+        if (_clipW == 0 || _clipH == 0)
+            return;
 
         int16_t x0 = x;
         int16_t y0 = y;
         int16_t x1 = static_cast<int16_t>(x + w - 1);
         int16_t y1 = static_cast<int16_t>(y + h - 1);
 
-        if (x0 < 0)
-            x0 = 0;
-        if (y0 < 0)
-            y0 = 0;
-        if (x1 >= _w)
-            x1 = static_cast<int16_t>(_w - 1);
-        if (y1 >= _h)
-            y1 = static_cast<int16_t>(_h - 1);
-        if (x0 > x1 || y0 > y1)
-            return;
+        if (x0 < 0) x0 = 0;
+        if (y0 < 0) y0 = 0;
+        if (x1 >= _w) x1 = static_cast<int16_t>(_w - 1);
+        if (y1 >= _h) y1 = static_cast<int16_t>(_h - 1);
 
         int16_t cx0 = _clipX;
         int16_t cy0 = _clipY;
         int16_t cx1 = static_cast<int16_t>(_clipX + _clipW - 1);
         int16_t cy1 = static_cast<int16_t>(_clipY + _clipH - 1);
 
-        if (_clipW == 0 || _clipH == 0)
-            return;
-
-        if (x0 < cx0)
-            x0 = cx0;
-        if (y0 < cy0)
-            y0 = cy0;
-        if (x1 > cx1)
-            x1 = cx1;
-        if (y1 > cy1)
-            y1 = cy1;
+        if (x0 < cx0) x0 = cx0;
+        if (y0 < cy0) y0 = cy0;
+        if (x1 > cx1) x1 = cx1;
+        if (y1 > cy1) y1 = cy1;
         if (x0 > x1 || y0 > y1)
             return;
 
         const size_t rowStride = static_cast<size_t>(_w);
+        const int16_t clippedW = static_cast<int16_t>(x1 - x0 + 1);
+        
         for (int16_t yy = y0; yy <= y1; ++yy)
         {
             uint16_t *row = _buf + static_cast<size_t>(yy) * rowStride;
-            for (int16_t xx = x0; xx <= x1; ++xx)
-                row[xx] = v;
+            fillRow(row + x0, clippedW, v);
         }
+    }
+
+    // Internal: fill a row with word-copy optimization
+    inline void Sprite::fillRow(uint16_t *dst, int16_t w, uint16_t v)
+    {
+        // Unroll: copy 8 pixels at a time for wide fills
+        while (w >= 8)
+        {
+            dst[0] = v; dst[1] = v; dst[2] = v; dst[3] = v;
+            dst[4] = v; dst[5] = v; dst[6] = v; dst[7] = v;
+            dst += 8;
+            w -= 8;
+        }
+        // Remaining
+        while (w--)
+            *dst++ = v;
     }
 
     void Sprite::drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t color565)
@@ -165,9 +207,11 @@ namespace pipcore
 
         const uint16_t fg = color565;
 
-        auto plot = [&](int16_t x, int16_t y, uint8_t a)
+        auto blendPixel = [&](int16_t x, int16_t y, uint8_t a)
         {
-            if (x < 0 || y < 0 || x >= _w || y >= _h)
+            if (a == 0)
+                return;
+            if ((uint16_t)x >= (uint16_t)_w || (uint16_t)y >= (uint16_t)_h)
                 return;
             if (!clipTest(x, y))
                 return;
@@ -176,9 +220,20 @@ namespace pipcore
             *p = swap16(blend565(bg, fg, a));
         };
 
-        auto ipart = [](float x) -> int { return (int)floorf(x); };
-        auto fpart = [](float x) -> float { return x - floorf(x); };
-        auto rfpart = [&](float x) -> float { return 1.0f - fpart(x); };
+        auto intensityCubic = [&](float rAbs) -> uint8_t
+        {
+            // Cubic falloff in [0..1]. Outside -> 0.
+            if (rAbs <= 0.0f)
+                return 255;
+            if (rAbs >= 1.0f)
+                return 0;
+            // 1 - smoothstep(0,1,r)  where smoothstep = r^2(3-2r)
+            const float t = rAbs;
+            const float s = t * t * (3.0f - 2.0f * t);
+            const float v = 1.0f - s;
+            int a = (int)(v * 255.0f + 0.5f);
+            return u8clamp(a);
+        };
 
         bool steep = abs(y1 - y0) > abs(x1 - x0);
         if (steep)
@@ -192,59 +247,53 @@ namespace pipcore
             std::swap(y0, y1);
         }
 
-        const float dx = (float)(x1 - x0);
-        const float dy = (float)(y1 - y0);
-        const float gradient = (dx == 0.0f) ? 1.0f : (dy / dx);
+        const int dx = (int)x1 - (int)x0;
+        const int dyAbs = abs((int)y1 - (int)y0);
+        const int yStep = (y1 >= y0) ? 1 : -1;
 
-        float xend = roundf((float)x0);
-        float yend = (float)y0 + gradient * (xend - (float)x0);
-        float xgap = rfpart((float)x0 + 0.5f);
-        int xpxl1 = (int)xend;
-        int ypxl1 = ipart(yend);
-        if (steep)
-        {
-            plot((int16_t)ypxl1, (int16_t)xpxl1, u8clamp((int)(rfpart(yend) * xgap * 255.0f)));
-            plot((int16_t)(ypxl1 + 1), (int16_t)xpxl1, u8clamp((int)(fpart(yend) * xgap * 255.0f)));
-        }
-        else
-        {
-            plot((int16_t)xpxl1, (int16_t)ypxl1, u8clamp((int)(rfpart(yend) * xgap * 255.0f)));
-            plot((int16_t)xpxl1, (int16_t)(ypxl1 + 1), u8clamp((int)(fpart(yend) * xgap * 255.0f)));
-        }
-        float intery = yend + gradient;
+        const float length = sqrtf((float)dx * (float)dx + (float)dyAbs * (float)dyAbs);
+        if (length <= 0.0f)
+            return;
 
-        xend = roundf((float)x1);
-        yend = (float)y1 + gradient * (xend - (float)x1);
-        xgap = fpart((float)x1 + 0.5f);
-        int xpxl2 = (int)xend;
-        int ypxl2 = ipart(yend);
-        if (steep)
-        {
-            plot((int16_t)ypxl2, (int16_t)xpxl2, u8clamp((int)(rfpart(yend) * xgap * 255.0f)));
-            plot((int16_t)(ypxl2 + 1), (int16_t)xpxl2, u8clamp((int)(fpart(yend) * xgap * 255.0f)));
-        }
-        else
-        {
-            plot((int16_t)xpxl2, (int16_t)ypxl2, u8clamp((int)(rfpart(yend) * xgap * 255.0f)));
-            plot((int16_t)xpxl2, (int16_t)(ypxl2 + 1), u8clamp((int)(fpart(yend) * xgap * 255.0f)));
-        }
+        // Wikipedia/HandWiki pseudocode uses: sin = dx/len, cos = dy/len
+        // With our x-major iteration and abs(dy), these are positive.
+        const float sinT = (float)dx / length;
+        const float cosT = (float)dyAbs / length;
 
-        for (int x = xpxl1 + 1; x < xpxl2; ++x)
+        int x = x0;
+        int y = y0;
+        int d = 2 * dyAbs - dx; // discriminator
+        float D = 0.0f;         // signed distance of the central pixel from the line
+
+        while (x <= x1)
         {
-            int y = ipart(intery);
-            const uint8_t a1 = u8clamp((int)(rfpart(intery) * 255.0f));
-            const uint8_t a2 = u8clamp((int)(fpart(intery) * 255.0f));
+            // Intensify 3 pixels around the line in the minor axis.
+            // For steep lines, x/y were swapped above, so we swap back in plotting.
             if (steep)
             {
-                plot((int16_t)y, (int16_t)x, a1);
-                plot((int16_t)(y + 1), (int16_t)x, a2);
+                blendPixel((int16_t)(y - 1), (int16_t)x, intensityCubic(fabsf(D + cosT)));
+                blendPixel((int16_t)y, (int16_t)x, intensityCubic(fabsf(D)));
+                blendPixel((int16_t)(y + 1), (int16_t)x, intensityCubic(fabsf(D - cosT)));
             }
             else
             {
-                plot((int16_t)x, (int16_t)y, a1);
-                plot((int16_t)x, (int16_t)(y + 1), a2);
+                blendPixel((int16_t)x, (int16_t)(y - 1), intensityCubic(fabsf(D + cosT)));
+                blendPixel((int16_t)x, (int16_t)y, intensityCubic(fabsf(D)));
+                blendPixel((int16_t)x, (int16_t)(y + 1), intensityCubic(fabsf(D - cosT)));
             }
-            intery += gradient;
+
+            ++x;
+            if (d <= 0)
+            {
+                D += sinT;
+                d += 2 * dyAbs;
+            }
+            else
+            {
+                D += sinT - cosT;
+                d += 2 * (dyAbs - dx);
+                y += yStep;
+            }
         }
     }
 
