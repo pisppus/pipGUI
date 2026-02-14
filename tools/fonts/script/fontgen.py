@@ -113,6 +113,7 @@ def _gen_metrics_header(atlas: dict, font_ident: str) -> str:
 
     width = int(atlas_info.get("width", 0))
     height = int(atlas_info.get("height", 0))
+    y_origin = str(atlas_info.get("yOrigin", "top")).lower()
     distance_range = float(atlas_info.get("distanceRange", 0))
     nominal_size = float(atlas_info.get("size", 0))
 
@@ -163,6 +164,16 @@ def _gen_metrics_header(atlas: dict, font_ident: str) -> str:
             "ar": float(ab.get("right", 0)),
             "at": float(ab.get("top", 0)),
         }
+
+        # Normalize atlas coordinates to top-left origin.
+        # msdf-atlas-gen typically emits yOrigin=bottom.
+        # After normalization, both atlas pixel buffer and atlasBounds are top-left.
+        if y_origin == "bottom" and height > 0:
+            old_ab = item["ab"]
+            old_at = item["at"]
+            item["ab"] = float(height) - old_at
+            item["at"] = float(height) - old_ab
+
         items.append(item)
 
     items.sort(key=lambda x: x["code"])
@@ -493,6 +504,8 @@ def _main():
 
         font_base = os.path.splitext(os.path.basename(ttf_path))[0]
         font_folder = _snake_to_camel(font_base)
+        if font_base.lower() == "wixmadefordisplay":
+            font_folder = "WixMadeForDisplay"
         font_ident = _safe_ident(font_folder)
 
         out_fonts_dir = os.path.join(project_dir, "lib", "pipSystem", "pipGUI", "fonts", font_folder)
@@ -541,6 +554,20 @@ def _main():
             with open(bin_path, "rb") as f:
                 data = f.read()
 
+            # Normalize atlas pixel buffer to top-left origin if needed
+            atlas_info = atlas.get("atlas", {})
+            w = int(atlas_info.get("width", 0))
+            h = int(atlas_info.get("height", 0))
+            y_origin = str(atlas_info.get("yOrigin", "top")).lower()
+            if y_origin == "bottom" and w > 0 and h > 0 and len(data) == w * h:
+                row = w
+                flipped = bytearray(len(data))
+                for yy in range(h):
+                    src = (h - 1 - yy) * row
+                    dst = yy * row
+                    flipped[dst : dst + row] = data[src : src + row]
+                data = bytes(flipped)
+
             hpp_filename = os.path.basename(out_atlas_hpp)
             _write_if_changed(out_atlas_hpp, _gen_atlas_decl_hpp(font_folder))
             _write_if_changed(out_atlas_cpp, _gen_atlas_def_cpp(hpp_filename, font_folder, data))
@@ -582,6 +609,20 @@ def _main():
 
         with open(bin_path, "rb") as f:
             data = f.read()
+
+        # Normalize atlas pixel buffer to top-left origin if needed
+        atlas_info = atlas.get("atlas", {})
+        w = int(atlas_info.get("width", 0))
+        h = int(atlas_info.get("height", 0))
+        y_origin = str(atlas_info.get("yOrigin", "top")).lower()
+        if y_origin == "bottom" and w > 0 and h > 0 and len(data) == w * h:
+            row = w
+            flipped = bytearray(len(data))
+            for yy in range(h):
+                src = (h - 1 - yy) * row
+                dst = yy * row
+                flipped[dst : dst + row] = data[src : src + row]
+            data = bytes(flipped)
 
         hpp_filename = os.path.basename(out_atlas_hpp)
         _write_if_changed(out_atlas_hpp, _gen_atlas_decl_hpp(font_folder))

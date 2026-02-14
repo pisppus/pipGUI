@@ -1,2 +1,2 @@
 5aeff9ac82e80fdab515fe3015f17507bd10d4bef19dea5c21c1a2b25fb74952
-{"charset": "C:\\Users\\Pisppus\\Documents\\PlatformIO\\Projects\\pipGUI\\tools\\fonts\\PSDF\\WixMadeforDisplay\\charset.txt", "font": "C:\\Users\\Pisppus\\Documents\\PlatformIO\\Projects\\pipGUI\\tools\\fonts\\TTF\\WixMadeforDisplay.ttf", "potr": "1", "pxrange": "8", "size": "48", "type": "psdf"}
+{"charset": "C:\\Users\\Pisppus\\Documents\\PlatformIO\\Projects\\pipGUI\\tools\\fonts\\PSDF\\WixMadeForDisplay\\charset.txt", "font": "C:\\Users\\Pisppus\\Documents\\PlatformIO\\Projects\\pipGUI\\tools\\fonts\\TTF\\WixMadeforDisplay.ttf", "potr": "1", "pxrange": "8", "size": "48", "type": "psdf"}

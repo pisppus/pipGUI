@@ -2,4 +2,4 @@
 
 #include <stdint.h>
 
-extern const uint8_t WixMadeforDisplay[];
+extern const uint8_t WixMadeForDisplay[];

@@ -7,6 +7,9 @@
 .pio/
 .vscode/
 
+термометр/
+logs/
+
 # Syncthing (если ты его используешь)
 .stfolder/
 .stignore

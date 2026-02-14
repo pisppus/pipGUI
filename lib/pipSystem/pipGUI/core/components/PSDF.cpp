@@ -69,7 +69,7 @@ namespace pipgui
     };
 
     static const PSDFFontData fontWixMadeForDisplay = {
-        ::WixMadeforDisplay,
+        ::WixMadeForDisplay,
         psdf_wixfor::AtlasWidth,
         psdf_wixfor::AtlasHeight,
         psdf_wixfor::DistanceRange,
@@ -449,8 +449,8 @@ namespace pipgui
                 float srcX0 = g->al;
                 float srcX1 = g->ar;
 
-                float syTop = g->at;
-                float syBot = g->ab;
+                float syTop = g->ab;
+                float syBot = g->at;
 
                 float invW = 0.0f;
                 float invH = 0.0f;
@@ -547,8 +547,8 @@ namespace pipgui
             float srcX0 = g->al;
             float srcX1 = g->ar;
 
-            float syTop = g->at;
-            float syBot = g->ab;
+            float syTop = g->ab;
+            float syBot = g->at;
 
             float invW = 0.0f;
             float invH = 0.0f;
