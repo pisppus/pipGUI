@@ -10,6 +10,7 @@
 #include <pipCore/Graphics/Sprite.hpp>
 #include <pipCore/Button.hpp>
 #include <pipGUI/core/components/FRC.hpp>
+#include <pipGUI/core/Debug.hpp>
 #include "UiLayout.hpp"
 
 namespace pipgui
@@ -156,7 +157,6 @@ namespace pipgui
     {
         ProgressAnimNone,
         Shimmer,
-        Stripes,
         Indeterminate
     };
 
@@ -194,6 +194,14 @@ namespace pipgui
         Bar,
         WarningBar,
         ErrorBar
+    };
+
+    struct CornerRadii
+    {
+        uint8_t tl;
+        uint8_t tr;
+        uint8_t br;
+        uint8_t bl;
     };
 
     namespace detail

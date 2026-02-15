@@ -29,6 +29,32 @@
                       int16_t x1, int16_t y1,
                       uint32_t color);
 
+        void fillRoundRect(int16_t x,
+                           int16_t y,
+                           int16_t w,
+                           int16_t h,
+                           uint8_t radius,
+                           uint32_t color);
+        void drawRoundRect(int16_t x,
+                           int16_t y,
+                           int16_t w,
+                           int16_t h,
+                           uint8_t radius,
+                           uint32_t color);
+
+        void fillRoundRect(int16_t x,
+                           int16_t y,
+                           int16_t w,
+                           int16_t h,
+                           CornerRadii radii,
+                           uint32_t color);
+        void drawRoundRect(int16_t x,
+                           int16_t y,
+                           int16_t w,
+                           int16_t h,
+                           CornerRadii radii,
+                           uint32_t color);
+
         void drawCircle(int16_t cx, int16_t cy, int16_t r, uint32_t color);
         void fillCircle(int16_t cx, int16_t cy, int16_t r, uint32_t color);
 
@@ -44,6 +70,17 @@
         void fillTriangle(int16_t x0, int16_t y0,
                           int16_t x1, int16_t y1,
                           int16_t x2, int16_t y2,
+                          uint32_t color);
+
+        void drawTriangle(int16_t x0, int16_t y0,
+                          int16_t x1, int16_t y1,
+                          int16_t x2, int16_t y2,
+                          uint8_t radius,
+                          uint32_t color);
+        void fillTriangle(int16_t x0, int16_t y0,
+                          int16_t x1, int16_t y1,
+                          int16_t x2, int16_t y2,
+                          uint8_t radius,
                           uint32_t color);
 
         void drawSquircle(int16_t cx, int16_t cy, int16_t r, uint32_t color);
@@ -133,6 +170,50 @@
                                        uint8_t value,
                                        uint32_t color,
                                        ProgressAnim anim = None);
+
+        // TextProgress - progress bar with custom text display
+        void drawTextProgress(int16_t x,
+                              int16_t y,
+                              int16_t w,
+                              int16_t h,
+                              uint8_t value,
+                              const String &text,
+                              uint32_t baseColor,
+                              uint32_t fillColor,
+                              uint32_t textColor,
+                              uint8_t radius = 6,
+                              TextAlign align = Center);
+        void drawTextProgress(int16_t x,
+                              int16_t y,
+                              int16_t w,
+                              int16_t h,
+                              uint8_t value,
+                              const String &text,
+                              uint32_t color,
+                              uint32_t textColor,
+                              uint8_t radius = 6,
+                              TextAlign align = Center);
+        void updateTextProgress(int16_t x,
+                                int16_t y,
+                                int16_t w,
+                                int16_t h,
+                                uint8_t value,
+                                const String &text,
+                                uint32_t baseColor,
+                                uint32_t fillColor,
+                                uint32_t textColor,
+                                uint8_t radius = 6,
+                                TextAlign align = Center);
+        void updateTextProgress(int16_t x,
+                                int16_t y,
+                                int16_t w,
+                                int16_t h,
+                                uint8_t value,
+                                const String &text,
+                                uint32_t color,
+                                uint32_t textColor,
+                                uint8_t radius = 6,
+                                TextAlign align = Center);
 
         void updateStatusBar();
 
@@ -344,6 +425,9 @@
                                 uint8_t height = 0,
                                 StatusBarPosition pos = Top);
         void setStatusBarText(const String &left, const String &center, const String &right);
+        const String &statusBarTextLeft() const { return _statusTextLeft; }
+        const String &statusBarTextCenter() const { return _statusTextCenter; }
+        const String &statusBarTextRight() const { return _statusTextRight; }
         void setStatusBarBattery(int8_t levelPercent, BatteryStyle style);
         void clearStatusBarIcons()
         {
@@ -369,12 +453,15 @@
         void updateStatusBarBattery();
         void updateStatusBarCenter();
 
-        void setDebugShowDirtyRects(bool enabled) { _debugShowDirtyRects = enabled; }
-        bool debugShowDirtyRects() const { return _debugShowDirtyRects; }
-        void setDebugDirtyRectColor(uint16_t color) { _debugDirtyRectColor = color; }
-        uint16_t debugDirtyRectColor() const { return _debugDirtyRectColor; }
-        void setDebugDirtyRectActiveColor(uint16_t color) { _debugDirtyRectActiveColor = color; }
-        uint16_t debugDirtyRectActiveColor() const { return _debugDirtyRectActiveColor; }
+        void setDebugShowDirtyRects(bool enabled) { Debug::setDirtyRectEnabled(enabled); }
+        bool debugShowDirtyRects() const { return Debug::dirtyRectEnabled(); }
+        void setDebugDirtyRectColor(uint16_t color) { Debug::setDirtyRectColor(color); }
+        uint16_t debugDirtyRectColor() const { return Debug::dirtyRectColor(); }
+        void setDebugDirtyRectActiveColor(uint16_t color) { Debug::setDirtyRectActiveColor(color); }
+        uint16_t debugDirtyRectActiveColor() const { return Debug::dirtyRectActiveColor(); }
+
+        void setDebugStatusBarMetrics(bool enabled);
+        bool debugStatusBarMetrics() const { return _flags.statusBarDebugMetrics; }
 
         void enableRecovery(Button *prevButton,
                             Button *nextButton,

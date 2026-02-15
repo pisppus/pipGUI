@@ -1,4 +1,6 @@
 #include <pipGUI/core/api/pipGUI.hpp>
+#include <pipGUI/core/Debug.hpp>
+#include <pipGUI/core/GuiDebug.hpp>
 #include <math.h>
 
 namespace pipgui
@@ -258,7 +260,10 @@ namespace pipgui
             return;
 
 #if defined(PIPGUI_DEBUG_DIRTY_RECTS) && (PIPGUI_DEBUG_DIRTY_RECTS)
-        _debugShowDirtyRects = true;
+        Debug::setDirtyRectEnabled(true);
+#endif
+#if defined(PIPGUI_DEBUG_STATUS_BAR_METRICS) && (PIPGUI_DEBUG_STATUS_BAR_METRICS)
+        setDebugStatusBarMetrics(true);
 #endif
 
         if (_displayCfgConfigured)
@@ -376,6 +381,13 @@ namespace pipgui
         if (profile == FrcProfile::Off)
             profile = FrcProfile::BlueNoise;
         _frcProfile = profile;
+    }
+
+    void GUI::setDebugStatusBarMetrics(bool enabled)
+    {
+        _flags.statusBarDebugMetrics = enabled;
+        GuiDebug::setStatusBarMetricsEnabled(*this, enabled);
+        _statusBarDirtyMask = StatusBarDirtyAll;
     }
 
 }

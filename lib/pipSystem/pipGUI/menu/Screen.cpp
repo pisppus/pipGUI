@@ -1,4 +1,5 @@
 #include <pipGUI/core/api/pipGUI.hpp>
+#include <pipGUI/core/GuiDebug.hpp>
 #include <math.h>
 #include <algorithm>
 #include <cstdint>
@@ -268,10 +269,9 @@ namespace pipgui
         if (el >= dur)
         {
             _flags.screenTransition = 0;
-            _currentScreen = _screenTo;
-            _flags.needRedraw = 0;
-            freeScreenTransitionSprites();
+            return;
         }
+        renderNotificationOverlay();
     }
 
     void GUI::loop()
@@ -280,6 +280,7 @@ namespace pipgui
 
         tickRecovery(now);
         tickDebugDirtyOverlay(now);
+        GuiDebug::tick(*this, now);
 
         // Update FRC seed for temporal dithering (if enabled)
         if (_frcTemporalPeriodMs)
@@ -294,26 +295,33 @@ namespace pipgui
 
         if (_flags.bootActive)
         {
+            Debug::frameStart();
             renderBootFrame(now);
+            Debug::frameEnd();
             return;
         }
         if (_flags.errorActive)
         {
+            Debug::frameStart();
             renderErrorFrame(now);
             if (_flags.notifActive)
                 renderNotificationOverlay();
+            Debug::frameEnd();
             return;
         }
         if (_flags.screenTransition)
         {
+            Debug::frameStart();
             renderScreenTransition(now);
             if (_flags.notifActive)
                 renderNotificationOverlay();
+            Debug::frameEnd();
             return;
         }
 
         if (_flags.notifActive && _flags.spriteEnabled)
         {
+            Debug::frameStart();
             if (_currentScreen < _screenCapacity && _screens && _screens[_currentScreen])
             {
                 _flags.renderToSprite = 1;
@@ -324,11 +332,13 @@ namespace pipgui
                 renderStatusBar(true);
             }
             renderNotificationOverlay();
+            Debug::frameEnd();
             return;
         }
 
         if (_flags.needRedraw && _currentScreen < _screenCapacity && _screens && _screens[_currentScreen])
         {
+            Debug::frameStart();
             _flags.needRedraw = 0;
             if (_flags.spriteEnabled)
             {
@@ -341,6 +351,7 @@ namespace pipgui
                         updateStatusBar();
                         if (more)
                             _flags.needRedraw = 1;
+                        Debug::frameEnd();
                         return;
                     }
 
@@ -365,6 +376,7 @@ namespace pipgui
                 _screens[_currentScreen](*this);
                 renderStatusBar(false);
             }
+            Debug::frameEnd();
         }
 
         if (_flags.notifActive && !_flags.spriteEnabled)

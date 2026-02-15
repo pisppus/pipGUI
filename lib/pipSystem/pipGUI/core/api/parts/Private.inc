@@ -99,15 +99,6 @@
         DirtyRect _dirty[8] = {};
         uint8_t _dirtyCount = 0;
 
-        bool _debugShowDirtyRects = false;
-        uint16_t _debugDirtyRectColor = 0x39E7;
-        uint16_t _debugDirtyRectActiveColor = 0xF81F;
-        DirtyRect _debugRects[8] = {};
-        uint8_t _debugRectCount = 0;
-        uint32_t _debugHighlightUntilMs = 0;
-        uint8_t _debugOverlayDrawnState = 0;
-        uint32_t _debugLastFlushMs = 0;
-
         uint16_t _screenWidth = 0, _screenHeight = 0;
         uint32_t _bgColor = 0;
 
@@ -149,6 +140,7 @@
             unsigned notifDelayed : 1;
             unsigned notifAwaitRelease : 1;
             unsigned statusBarEnabled : 1;
+            unsigned statusBarDebugMetrics : 1;
             unsigned recoveryEnabled : 1;
             unsigned recoveryArmed : 1;
             unsigned recoveryActive : 1;

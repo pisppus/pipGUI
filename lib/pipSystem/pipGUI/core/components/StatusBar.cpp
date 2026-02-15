@@ -1,4 +1,5 @@
 #include <pipGUI/core/api/pipGUI.hpp>
+#include <pipGUI/core/Debug.hpp>
 #include <pipGUI/icons/metrics.hpp>
 
 namespace pipgui

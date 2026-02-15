@@ -1,5 +1,5 @@
 #include <pipGUI/core/api/pipGUI.hpp>
-
+#include <pipGUI/core/Debug.hpp>
 #include <math.h>
 
 namespace pipgui
@@ -705,6 +705,275 @@ namespace pipgui
         }
     }
 
+    void GUI::fillRoundRect(int16_t x,
+                            int16_t y,
+                            int16_t w,
+                            int16_t h,
+                            uint8_t radius,
+                            uint32_t color)
+    {
+        fillRoundRectFrc(x, y, w, h, radius, color);
+    }
+
+    void GUI::drawRoundRect(int16_t x,
+                            int16_t y,
+                            int16_t w,
+                            int16_t h,
+                            uint8_t radius,
+                            uint32_t color)
+    {
+        if (w <= 0 || h <= 0)
+            return;
+
+        int16_t r = (int16_t)radius;
+        int16_t maxR = (w < h ? w : h) / 2;
+        if (r > maxR)
+            r = maxR;
+        if (r < 0)
+            r = 0;
+
+        if (r == 0)
+        {
+            drawLine(x, y, (int16_t)(x + w - 1), y, color);
+            drawLine((int16_t)(x + w - 1), y, (int16_t)(x + w - 1), (int16_t)(y + h - 1), color);
+            drawLine((int16_t)(x + w - 1), (int16_t)(y + h - 1), x, (int16_t)(y + h - 1), color);
+            drawLine(x, (int16_t)(y + h - 1), x, y, color);
+            return;
+        }
+
+        int16_t x0 = x;
+        int16_t y0 = y;
+        int16_t x1 = (int16_t)(x + w - 1);
+        int16_t y1 = (int16_t)(y + h - 1);
+
+        // edges
+        drawLine((int16_t)(x0 + r), y0, (int16_t)(x1 - r), y0, color);
+        drawLine((int16_t)(x0 + r), y1, (int16_t)(x1 - r), y1, color);
+        drawLine(x0, (int16_t)(y0 + r), x0, (int16_t)(y1 - r), color);
+        drawLine(x1, (int16_t)(y0 + r), x1, (int16_t)(y1 - r), color);
+
+        // corners
+        drawArc((int16_t)(x0 + r), (int16_t)(y0 + r), r, 180.0f, 270.0f, color);
+        drawArc((int16_t)(x1 - r), (int16_t)(y0 + r), r, 270.0f, 360.0f, color);
+        drawArc((int16_t)(x1 - r), (int16_t)(y1 - r), r, 0.0f, 90.0f, color);
+        drawArc((int16_t)(x0 + r), (int16_t)(y1 - r), r, 90.0f, 180.0f, color);
+    }
+
+    void GUI::fillRoundRect(int16_t x,
+                            int16_t y,
+                            int16_t w,
+                            int16_t h,
+                            CornerRadii radii,
+                            uint32_t color)
+    {
+        if (w <= 0 || h <= 0)
+            return;
+        if (!_flags.spriteEnabled)
+            return;
+
+        pipcore::Sprite *spr = (_flags.renderToSprite && _flags.spriteEnabled)
+                                       ? (_activeSprite ? _activeSprite : &_sprite)
+                                       : &_sprite;
+
+        uint16_t *buf = (uint16_t *)spr->getBuffer();
+        if (!buf)
+            return;
+
+        int16_t stride = spr->width();
+        int16_t maxH = spr->height();
+        if (stride <= 0 || maxH <= 0)
+            return;
+
+        int16_t maxR = (w < h ? w : h) / 2;
+        int16_t rtl = (int16_t)radii.tl;
+        int16_t rtr = (int16_t)radii.tr;
+        int16_t rbr = (int16_t)radii.br;
+        int16_t rbl = (int16_t)radii.bl;
+
+        if (rtl > maxR) rtl = maxR;
+        if (rtr > maxR) rtr = maxR;
+        if (rbr > maxR) rbr = maxR;
+        if (rbl > maxR) rbl = maxR;
+
+        // Scale down if radii don't fit (CSS-like)
+        auto scalePair = [](int16_t a, int16_t b, int16_t limit, float &scale)
+        {
+            int16_t sum = (int16_t)(a + b);
+            if (sum > limit && sum > 0)
+            {
+                float s = (float)limit / (float)sum;
+                if (s < scale)
+                    scale = s;
+            }
+        };
+
+        float scale = 1.0f;
+        scalePair(rtl, rtr, w, scale);
+        scalePair(rbl, rbr, w, scale);
+        scalePair(rtl, rbl, h, scale);
+        scalePair(rtr, rbr, h, scale);
+
+        rtl = (int16_t)floorf((float)rtl * scale + 0.5f);
+        rtr = (int16_t)floorf((float)rtr * scale + 0.5f);
+        rbr = (int16_t)floorf((float)rbr * scale + 0.5f);
+        rbl = (int16_t)floorf((float)rbl * scale + 0.5f);
+
+        Color888 c = Color888::fromUint32(color);
+        FrcProfile profile = _frcProfile;
+        if (c.isBlack() || c.isWhite())
+            profile = FrcProfile::Off;
+
+        auto blendPixel = [&](int16_t px, int16_t py, uint8_t a)
+        {
+            if (a == 0)
+                return;
+            if ((uint16_t)px >= (uint16_t)stride || (uint16_t)py >= (uint16_t)maxH)
+                return;
+            uint16_t *p = buf + (int32_t)py * (int32_t)stride + px;
+            const uint16_t bg = swap16(*p);
+            const uint16_t fg = detail::quantize565(c, px, py, _frcSeed, profile);
+            *p = swap16(detail::blend565(bg, fg, a));
+        };
+
+        auto aaQuarter = [&](int16_t cx, int16_t cy, int16_t sx, int16_t sy, int16_t r)
+        {
+            if (r <= 0)
+                return;
+            const float rf = (float)r;
+            const float rrF = rf * rf;
+            for (int16_t dy = 0; dy <= r; ++dy)
+            {
+                const float yf = (float)dy;
+                const float xf = sqrtf(rrF - yf * yf);
+                const int16_t xi = (int16_t)floorf(xf);
+                const float frac = xf - (float)xi;
+                const uint8_t a = (uint8_t)std::min(255, (int)(frac * 255.0f));
+                blendPixel((int16_t)(cx + sx * (xi + 1)), (int16_t)(cy + sy * dy), a);
+            }
+            for (int16_t dx = 0; dx <= r; ++dx)
+            {
+                const float xf = (float)dx;
+                const float yf = sqrtf(rrF - xf * xf);
+                const int16_t yi = (int16_t)floorf(yf);
+                const float frac = yf - (float)yi;
+                const uint8_t a = (uint8_t)std::min(255, (int)(frac * 255.0f));
+                blendPixel((int16_t)(cx + sx * dx), (int16_t)(cy + sy * (yi + 1)), a);
+            }
+        };
+
+        // Scanline fill
+        for (int16_t dy = 0; dy < h; ++dy)
+        {
+            int16_t py = (int16_t)(y + dy);
+
+            int16_t leftInset = 0;
+            int16_t rightInset = 0;
+
+            if (dy < rtl)
+            {
+                int16_t yy = (int16_t)(rtl - dy);
+                int32_t inside = (int32_t)rtl * (int32_t)rtl - (int32_t)yy * (int32_t)yy;
+                if (inside < 0)
+                    inside = 0;
+                int32_t xx = 0;
+                while ((xx + 1) * (xx + 1) <= inside)
+                    ++xx;
+                leftInset = (int16_t)(rtl - (int16_t)xx);
+            }
+            else if (dy >= h - rbl)
+            {
+                int16_t ddy = (int16_t)(dy - (h - rbl) + 1);
+                int16_t yy = (int16_t)(rbl - ddy);
+                if (yy < 0)
+                    yy = 0;
+                int32_t inside = (int32_t)rbl * (int32_t)rbl - (int32_t)yy * (int32_t)yy;
+                if (inside < 0)
+                    inside = 0;
+                int32_t xx = 0;
+                while ((xx + 1) * (xx + 1) <= inside)
+                    ++xx;
+                leftInset = (int16_t)(rbl - (int16_t)xx);
+            }
+
+            if (dy < rtr)
+            {
+                int16_t yy = (int16_t)(rtr - dy);
+                int32_t inside = (int32_t)rtr * (int32_t)rtr - (int32_t)yy * (int32_t)yy;
+                if (inside < 0)
+                    inside = 0;
+                int32_t xx = 0;
+                while ((xx + 1) * (xx + 1) <= inside)
+                    ++xx;
+                rightInset = (int16_t)(rtr - (int16_t)xx);
+            }
+            else if (dy >= h - rbr)
+            {
+                int16_t ddy = (int16_t)(dy - (h - rbr) + 1);
+                int16_t yy = (int16_t)(rbr - ddy);
+                if (yy < 0)
+                    yy = 0;
+                int32_t inside = (int32_t)rbr * (int32_t)rbr - (int32_t)yy * (int32_t)yy;
+                if (inside < 0)
+                    inside = 0;
+                int32_t xx = 0;
+                while ((xx + 1) * (xx + 1) <= inside)
+                    ++xx;
+                rightInset = (int16_t)(rbr - (int16_t)xx);
+            }
+
+            int16_t spanX = (int16_t)(x + leftInset);
+            int16_t spanW = (int16_t)(w - leftInset - rightInset);
+            if (spanW <= 0)
+                continue;
+
+            fillRect888(spanX, py, spanW, 1, c.r, c.g, c.b, profile);
+        }
+
+        // AA pixels for each corner boundary
+        aaQuarter((int16_t)(x + rtl), (int16_t)(y + rtl), -1, -1, rtl);
+        aaQuarter((int16_t)(x + w - 1 - rtr), (int16_t)(y + rtr), +1, -1, rtr);
+        aaQuarter((int16_t)(x + rbl), (int16_t)(y + h - 1 - rbl), -1, +1, rbl);
+        aaQuarter((int16_t)(x + w - 1 - rbr), (int16_t)(y + h - 1 - rbr), +1, +1, rbr);
+    }
+
+    void GUI::drawRoundRect(int16_t x,
+                            int16_t y,
+                            int16_t w,
+                            int16_t h,
+                            CornerRadii radii,
+                            uint32_t color)
+    {
+        if (w <= 0 || h <= 0)
+            return;
+
+        int16_t maxR = (w < h ? w : h) / 2;
+        int16_t rtl = (int16_t)radii.tl;
+        int16_t rtr = (int16_t)radii.tr;
+        int16_t rbr = (int16_t)radii.br;
+        int16_t rbl = (int16_t)radii.bl;
+        if (rtl > maxR) rtl = maxR;
+        if (rtr > maxR) rtr = maxR;
+        if (rbr > maxR) rbr = maxR;
+        if (rbl > maxR) rbl = maxR;
+
+        int16_t x0 = x;
+        int16_t y0 = y;
+        int16_t x1 = (int16_t)(x + w - 1);
+        int16_t y1 = (int16_t)(y + h - 1);
+
+        // edges
+        drawLine((int16_t)(x0 + rtl), y0, (int16_t)(x1 - rtr), y0, color);
+        drawLine((int16_t)(x0 + rbl), y1, (int16_t)(x1 - rbr), y1, color);
+        drawLine(x0, (int16_t)(y0 + rtl), x0, (int16_t)(y1 - rbl), color);
+        drawLine(x1, (int16_t)(y0 + rtr), x1, (int16_t)(y1 - rbr), color);
+
+        // corners (skip if radius=0)
+        if (rtl > 0) drawArc((int16_t)(x0 + rtl), (int16_t)(y0 + rtl), rtl, 180.0f, 270.0f, color);
+        if (rtr > 0) drawArc((int16_t)(x1 - rtr), (int16_t)(y0 + rtr), rtr, 270.0f, 360.0f, color);
+        if (rbr > 0) drawArc((int16_t)(x1 - rbr), (int16_t)(y1 - rbr), rbr, 0.0f, 90.0f, color);
+        if (rbl > 0) drawArc((int16_t)(x0 + rbl), (int16_t)(y1 - rbl), rbl, 90.0f, 180.0f, color);
+    }
+
     void GUI::fillCircle(int16_t cx, int16_t cy, int16_t r, uint32_t color)
     {
         fillCircleFrc(cx, cy, r, color);
@@ -1021,6 +1290,140 @@ namespace pipgui
         drawLine(x2, y2, x0, y0, color);
     }
 
+    void GUI::drawTriangle(int16_t x0, int16_t y0,
+                           int16_t x1, int16_t y1,
+                           int16_t x2, int16_t y2,
+                           uint8_t radius,
+                           uint32_t color)
+    {
+        if (radius == 0)
+        {
+            drawTriangle(x0, y0, x1, y1, x2, y2, color);
+            return;
+        }
+
+        struct PtF
+        {
+            float x;
+            float y;
+        };
+
+        auto norm = [](PtF v) -> PtF
+        {
+            float l = sqrtf(v.x * v.x + v.y * v.y);
+            if (l <= 1e-6f)
+                return {0.0f, 0.0f};
+            return {v.x / l, v.y / l};
+        };
+
+        auto dot = [](PtF a, PtF b) -> float
+        { return a.x * b.x + a.y * b.y; };
+
+        auto cross = [](PtF a, PtF b) -> float
+        { return a.x * b.y - a.y * b.x; };
+
+        auto angleDeg = [](PtF v) -> float
+        { return atan2f(v.y, v.x) * 180.0f / 3.14159265f; };
+
+        PtF p[3] = {{(float)x0, (float)y0}, {(float)x1, (float)y1}, {(float)x2, (float)y2}};
+
+        float orient = cross({p[1].x - p[0].x, p[1].y - p[0].y}, {p[2].x - p[0].x, p[2].y - p[0].y});
+        bool ccw = orient > 0.0f;
+
+        PtF tanPrev[3];
+        PtF tanNext[3];
+        PtF center[3];
+        float rUsed[3];
+
+        for (int i = 0; i < 3; ++i)
+        {
+            int ip = (i + 2) % 3;
+            int in = (i + 1) % 3;
+
+            PtF a = norm({p[ip].x - p[i].x, p[ip].y - p[i].y});
+            PtF b = norm({p[in].x - p[i].x, p[in].y - p[i].y});
+
+            float lenA = sqrtf((p[ip].x - p[i].x) * (p[ip].x - p[i].x) + (p[ip].y - p[i].y) * (p[ip].y - p[i].y));
+            float lenB = sqrtf((p[in].x - p[i].x) * (p[in].x - p[i].x) + (p[in].y - p[i].y) * (p[in].y - p[i].y));
+
+            float r = (float)radius;
+            float maxLocal = std::min(lenA, lenB) * 0.45f;
+            if (r > maxLocal)
+                r = maxLocal;
+            if (r < 0.5f)
+                r = 0.0f;
+            rUsed[i] = r;
+
+            if (r <= 0.0f)
+            {
+                tanPrev[i] = p[i];
+                tanNext[i] = p[i];
+                center[i] = p[i];
+                continue;
+            }
+
+            PtF bis = norm({a.x + b.x, a.y + b.y});
+            float c = dot(a, b);
+            if (c > 1.0f) c = 1.0f;
+            if (c < -1.0f) c = -1.0f;
+            float theta = acosf(c);
+            float sinHalf = sinf(theta * 0.5f);
+            float tanHalf = tanf(theta * 0.5f);
+            if (fabsf(sinHalf) < 1e-6f || fabsf(tanHalf) < 1e-6f)
+            {
+                tanPrev[i] = p[i];
+                tanNext[i] = p[i];
+                center[i] = p[i];
+                rUsed[i] = 0.0f;
+                continue;
+            }
+
+            float d = r / sinHalf;
+            float t = r / tanHalf;
+
+            center[i] = {p[i].x + bis.x * d, p[i].y + bis.y * d};
+            tanPrev[i] = {p[i].x + a.x * t, p[i].y + a.y * t};
+            tanNext[i] = {p[i].x + b.x * t, p[i].y + b.y * t};
+        }
+
+        // Draw edge segments
+        for (int i = 0; i < 3; ++i)
+        {
+            int in = (i + 1) % 3;
+            int16_t ax = (int16_t)lroundf(tanNext[i].x);
+            int16_t ay = (int16_t)lroundf(tanNext[i].y);
+            int16_t bx = (int16_t)lroundf(tanPrev[in].x);
+            int16_t by = (int16_t)lroundf(tanPrev[in].y);
+            drawLine(ax, ay, bx, by, color);
+        }
+
+        // Draw corner arcs
+        for (int i = 0; i < 3; ++i)
+        {
+            float r = rUsed[i];
+            if (r <= 0.0f)
+                continue;
+
+            PtF v0 = {tanPrev[i].x - center[i].x, tanPrev[i].y - center[i].y};
+            PtF v1 = {tanNext[i].x - center[i].x, tanNext[i].y - center[i].y};
+            float a0 = angleDeg(v0);
+            float a1 = angleDeg(v1);
+
+            if (ccw)
+            {
+                while (a1 < a0)
+                    a1 += 360.0f;
+            }
+            else
+            {
+                while (a1 > a0)
+                    a1 -= 360.0f;
+            }
+
+            drawArc((int16_t)lroundf(center[i].x), (int16_t)lroundf(center[i].y), (int16_t)lroundf(r), a0, a1, color);
+        }
+    }
+
     void GUI::fillTriangle(int16_t x0, int16_t y0,
                            int16_t x1, int16_t y1,
                            int16_t x2, int16_t y2,
@@ -1073,6 +1476,175 @@ namespace pipgui
 
         // AA edges
         drawTriangle(x0, y0, x1, y1, x2, y2, color);
+    }
+
+    void GUI::fillTriangle(int16_t x0, int16_t y0,
+                           int16_t x1, int16_t y1,
+                           int16_t x2, int16_t y2,
+                           uint8_t radius,
+                           uint32_t color)
+    {
+        if (radius == 0)
+        {
+            fillTriangle(x0, y0, x1, y1, x2, y2, color);
+            return;
+        }
+
+        struct PtF
+        {
+            float x;
+            float y;
+        };
+
+        auto norm = [](PtF v) -> PtF
+        {
+            float l = sqrtf(v.x * v.x + v.y * v.y);
+            if (l <= 1e-6f)
+                return {0.0f, 0.0f};
+            return {v.x / l, v.y / l};
+        };
+
+        auto dot = [](PtF a, PtF b) -> float
+        { return a.x * b.x + a.y * b.y; };
+
+        auto cross = [](PtF a, PtF b) -> float
+        { return a.x * b.y - a.y * b.x; };
+
+        auto angleRad = [](PtF v) -> float
+        { return atan2f(v.y, v.x); };
+
+        PtF p[3] = {{(float)x0, (float)y0}, {(float)x1, (float)y1}, {(float)x2, (float)y2}};
+
+        float orient = cross({p[1].x - p[0].x, p[1].y - p[0].y}, {p[2].x - p[0].x, p[2].y - p[0].y});
+        bool ccw = orient > 0.0f;
+
+        PtF tanPrev[3];
+        PtF tanNext[3];
+        PtF center[3];
+        float rUsed[3];
+
+        for (int i = 0; i < 3; ++i)
+        {
+            int ip = (i + 2) % 3;
+            int in = (i + 1) % 3;
+
+            PtF a = norm({p[ip].x - p[i].x, p[ip].y - p[i].y});
+            PtF b = norm({p[in].x - p[i].x, p[in].y - p[i].y});
+
+            float lenA = sqrtf((p[ip].x - p[i].x) * (p[ip].x - p[i].x) + (p[ip].y - p[i].y) * (p[ip].y - p[i].y));
+            float lenB = sqrtf((p[in].x - p[i].x) * (p[in].x - p[i].x) + (p[in].y - p[i].y) * (p[in].y - p[i].y));
+
+            float r = (float)radius;
+            float maxLocal = std::min(lenA, lenB) * 0.45f;
+            if (r > maxLocal)
+                r = maxLocal;
+            if (r < 0.5f)
+                r = 0.0f;
+            rUsed[i] = r;
+
+            if (r <= 0.0f)
+            {
+                tanPrev[i] = p[i];
+                tanNext[i] = p[i];
+                center[i] = p[i];
+                continue;
+            }
+
+            PtF bis = norm({a.x + b.x, a.y + b.y});
+            float c = dot(a, b);
+            if (c > 1.0f) c = 1.0f;
+            if (c < -1.0f) c = -1.0f;
+            float theta = acosf(c);
+            float sinHalf = sinf(theta * 0.5f);
+            float tanHalf = tanf(theta * 0.5f);
+            if (fabsf(sinHalf) < 1e-6f || fabsf(tanHalf) < 1e-6f)
+            {
+                tanPrev[i] = p[i];
+                tanNext[i] = p[i];
+                center[i] = p[i];
+                rUsed[i] = 0.0f;
+                continue;
+            }
+
+            float d = r / sinHalf;
+            float t = r / tanHalf;
+
+            center[i] = {p[i].x + bis.x * d, p[i].y + bis.y * d};
+            tanPrev[i] = {p[i].x + a.x * t, p[i].y + a.y * t};
+            tanNext[i] = {p[i].x + b.x * t, p[i].y + b.y * t};
+        }
+
+        // Build polygon points around the rounded triangle (approx arcs)
+        PtF poly[64];
+        int polyCount = 0;
+
+        for (int i = 0; i < 3; ++i)
+        {
+            // arc from tanPrev[i] to tanNext[i]
+            float r = rUsed[i];
+            if (r <= 0.0f)
+            {
+                if (polyCount < 64)
+                    poly[polyCount++] = p[i];
+                continue;
+            }
+
+            PtF v0 = {tanPrev[i].x - center[i].x, tanPrev[i].y - center[i].y};
+            PtF v1 = {tanNext[i].x - center[i].x, tanNext[i].y - center[i].y};
+            float a0 = angleRad(v0);
+            float a1 = angleRad(v1);
+
+            if (ccw)
+            {
+                while (a1 < a0)
+                    a1 += 2.0f * 3.14159265f;
+            }
+            else
+            {
+                while (a1 > a0)
+                    a1 -= 2.0f * 3.14159265f;
+            }
+
+            float sweep = a1 - a0;
+            float absSweep = fabsf(sweep);
+            int steps = (int)std::min(12.0f, std::max(4.0f, absSweep * 6.0f));
+            if (steps < 1)
+                steps = 1;
+
+            for (int s = 0; s <= steps; ++s)
+            {
+                float t = (float)s / (float)steps;
+                float a = a0 + sweep * t;
+                PtF pt = {center[i].x + cosf(a) * r, center[i].y + sinf(a) * r};
+                if (polyCount < 64)
+                    poly[polyCount++] = pt;
+            }
+        }
+
+        if (polyCount < 3)
+            return;
+
+        // Fan triangulation around centroid
+        PtF c = {0.0f, 0.0f};
+        for (int i = 0; i < polyCount; ++i)
+        {
+            c.x += poly[i].x;
+            c.y += poly[i].y;
+        }
+        c.x /= (float)polyCount;
+        c.y /= (float)polyCount;
+
+        for (int i = 0; i < polyCount; ++i)
+        {
+            int j = (i + 1) % polyCount;
+            fillTriangle((int16_t)lroundf(c.x), (int16_t)lroundf(c.y),
+                         (int16_t)lroundf(poly[i].x), (int16_t)lroundf(poly[i].y),
+                         (int16_t)lroundf(poly[j].x), (int16_t)lroundf(poly[j].y),
+                         color);
+        }
+
+        // Outline for clean edge
+        drawTriangle(x0, y0, x1, y1, x2, y2, radius, color);
     }
 
     void GUI::drawSquircle(int16_t cx, int16_t cy, int16_t r, uint32_t color)
@@ -1812,14 +2384,6 @@ namespace pipgui
         if (w <= 0 || h <= 0)
             return;
 
-        if (_debugShowDirtyRects)
-        {
-            x = (int16_t)(x - 2);
-            y = (int16_t)(y - 2);
-            w = (int16_t)(w + 4);
-            h = (int16_t)(h + 4);
-        }
-
         if (x < 0)
         {
             w += x;
@@ -1841,19 +2405,9 @@ namespace pipgui
         if (w <= 0 || h <= 0)
             return;
 
-        if (_debugShowDirtyRects)
-        {
-            if (_debugRectCount < (uint8_t)(sizeof(_debugRects) / sizeof(_debugRects[0])))
-            {
-                _debugRects[_debugRectCount++] = {x, y, w, h};
-            }
-            else
-            {
-                for (uint8_t i = 1; i < _debugRectCount; ++i)
-                    _debugRects[i - 1] = _debugRects[i];
-                _debugRects[_debugRectCount - 1] = {x, y, w, h};
-            }
-        }
+        // Record debug rect AFTER clamping to match actual flush area
+        if (Debug::dirtyRectEnabled())
+            Debug::recordDirtyRect(x, y, w, h);
 
         auto intersectsOrTouches = [](const DirtyRect &a, int16_t bx, int16_t by, int16_t bw, int16_t bh) -> bool
         {
@@ -1958,92 +2512,12 @@ namespace pipgui
             if (w <= 0 || h <= 0)
                 continue;
 
-            if (_debugShowDirtyRects && buf && sw > 0 && sh > 0)
+            if (Debug::dirtyRectEnabled())
             {
                 if (w > 0 && h > 0)
                 {
-                    const uint32_t perim = (uint32_t)(w * 2) + (uint32_t)((h > 2) ? ((h - 2) * 2) : 0);
-                    uint16_t *saved = (uint16_t *)detail::guiAlloc(platform(), perim * sizeof(uint16_t), pipcore::GuiAllocCaps::Default);
-                    if (saved)
+                    if (Debug::drawOverlay(buf, stride, sw, sh, x0, y0, w, h))
                     {
-                        uint32_t idx = 0;
-
-                        const int32_t top = (int32_t)y0 * stride + x0;
-                        for (int16_t xx = 0; xx < w; ++xx)
-                            saved[idx++] = buf[top + xx];
-
-                        if (h > 1)
-                        {
-                            const int32_t bot = (int32_t)(y0 + h - 1) * stride + x0;
-                            for (int16_t xx = 0; xx < w; ++xx)
-                                saved[idx++] = buf[bot + xx];
-                        }
-
-                        if (h > 2)
-                        {
-                            for (int16_t yy = 1; yy < h - 1; ++yy)
-                                saved[idx++] = buf[((int32_t)(y0 + yy) * stride) + x0];
-                            if (w > 1)
-                            {
-                                for (int16_t yy = 1; yy < h - 1; ++yy)
-                                    saved[idx++] = buf[((int32_t)(y0 + yy) * stride) + (x0 + w - 1)];
-                            }
-                        }
-                        else if (w > 1)
-                        {
-                            for (int16_t yy = 0; yy < h; ++yy)
-                                saved[idx++] = buf[((int32_t)(y0 + yy) * stride) + (x0 + w - 1)];
-                        }
-
-                        const uint16_t col = swap16(_debugDirtyRectActiveColor);
-
-                        for (int16_t xx = 0; xx < w; ++xx)
-                            buf[top + xx] = col;
-
-                        if (h > 1)
-                        {
-                            const int32_t bot = (int32_t)(y0 + h - 1) * stride + x0;
-                            for (int16_t xx = 0; xx < w; ++xx)
-                                buf[bot + xx] = col;
-                        }
-
-                        for (int16_t yy = 1; yy < h - 1; ++yy)
-                        {
-                            buf[((int32_t)(y0 + yy) * stride) + x0] = col;
-                            if (w > 1)
-                                buf[((int32_t)(y0 + yy) * stride) + (x0 + w - 1)] = col;
-                        }
-
-                        _sprite.writeToDisplay(*_display, x0, y0, w, h);
-
-                        idx = 0;
-                        for (int16_t xx = 0; xx < w; ++xx)
-                            buf[top + xx] = saved[idx++];
-
-                        if (h > 1)
-                        {
-                            const int32_t bot = (int32_t)(y0 + h - 1) * stride + x0;
-                            for (int16_t xx = 0; xx < w; ++xx)
-                                buf[bot + xx] = saved[idx++];
-                        }
-
-                        if (h > 2)
-                        {
-                            for (int16_t yy = 1; yy < h - 1; ++yy)
-                                buf[((int32_t)(y0 + yy) * stride) + x0] = saved[idx++];
-                            if (w > 1)
-                            {
-                                for (int16_t yy = 1; yy < h - 1; ++yy)
-                                    buf[((int32_t)(y0 + yy) * stride) + (x0 + w - 1)] = saved[idx++];
-                            }
-                        }
-                        else if (w > 1)
-                        {
-                            for (int16_t yy = 0; yy < h; ++yy)
-                                buf[((int32_t)(y0 + yy) * stride) + (x0 + w - 1)] = saved[idx++];
-                        }
-
-                        detail::guiFree(platform(), saved);
                         continue;
                     }
                 }
@@ -2052,17 +2526,14 @@ namespace pipgui
             _sprite.writeToDisplay(*_display, x0, y0, w, h);
         }
 
-        _dirtyCount = 0;
+        Debug::clearRects();
     }
 
     void GUI::tickDebugDirtyOverlay(uint32_t now)
     {
-        if (!_debugShowDirtyRects || !_display)
-            return;
-        if (_debugRectCount == 0)
-            return;
-        if (_flags.bootActive || _flags.errorActive)
-            return;
+        // Logic moved to Debug class - called automatically during flushDirty
+        // This method is kept for API compatibility but does nothing now
+        (void)now;
     }
 
 }

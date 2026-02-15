@@ -300,27 +300,7 @@ namespace pipgui
             return (offsetLeft > offsetRight) ? offsetLeft : offsetRight;
         };
 
-        if (anim == Stripes)
-        {
-            uint32_t stripeColor = pipgui::detail::lighten888(fillColor, 20);
-            int16_t stripeW = 8;
-            int16_t gapW = 8;
-            int16_t period = stripeW + gapW;
-            int16_t phase = (int16_t)((now / 35U) % (uint32_t)period);
-
-            for (int16_t px = innerX; px < innerX + fillW; ++px)
-            {
-                int16_t local = (px - innerX + period - phase) % period;
-                if (local < stripeW)
-                {
-                    int16_t offset = getCornerOffset(px);
-                    int16_t lineH = innerH - (offset * 2);
-                    if (lineH > 0)
-                        fillRect(px, innerY + offset, 1, lineH, stripeColor);
-                }
-            }
-        }
-        else if (anim == Shimmer)
+        if (anim == Shimmer)
         {
             int16_t bandW = (innerW * 2) / 3;
             if (bandW < 40)
@@ -480,29 +460,7 @@ namespace pipgui
 
         uint32_t now = nowMs();
 
-        if (anim == Stripes)
-        {
-            uint32_t stripeColor = pipgui::detail::lighten888(fillColor, 20);
-            int16_t stripeW = 12;
-            int16_t gapW = 12;
-            int16_t period = stripeW + gapW;
-            int16_t phase = (int16_t)((now / 35U) % (uint32_t)period);
-
-            drawRingArcStrokeArc(*this, cx, cy, r, thickness, 0.0f, fillSpan, [&](float a) -> uint32_t
-                                 {
-                                     int32_t ai = (int32_t)(a + 0.5f);
-                                     int16_t local = (int16_t)((ai + period - phase) % period);
-                                     return (local < stripeW) ? stripeColor : fillColor;
-                                 });
-
-            drawRingArcCaps(*this, cx, cy, r, thickness, 0.0f, fillSpan, [&](float a) -> uint32_t
-                            {
-                                int32_t ai = (int32_t)(a + 0.5f);
-                                int16_t local = (int16_t)((ai + period - phase) % period);
-                                return (local < stripeW) ? stripeColor : fillColor;
-                            });
-        }
-        else if (anim == Shimmer)
+        if (anim == Shimmer)
         {
             float bandW = (fillSpan * 2.0f) / 3.0f;
             if (bandW < 50.0f)
@@ -776,5 +734,119 @@ namespace pipgui
     {
         uint32_t base = pipgui::detail::lighten888(color, 10);
         updateCircularProgressBar(x, y, r, thickness, value, base, color, anim);
+    }
+
+    // TextProgress implementation
+    void GUI::drawTextProgress(int16_t x, int16_t y,
+                               int16_t w, int16_t h,
+                               uint8_t value,
+                               const String &text,
+                               uint32_t baseColor,
+                               uint32_t fillColor,
+                               uint32_t textColor,
+                               uint8_t radius,
+                               TextAlign align)
+    {
+        if (w <= 0 || h <= 0)
+            return;
+        if (value > 100)
+            value = 100;
+
+        // Draw base progress bar
+        drawProgressBar(x, y, w, h, value, baseColor, fillColor, radius, ProgressAnimNone);
+
+        int16_t tw = 0;
+        int16_t th = 0;
+        if (!psdfMeasureText(text, tw, th))
+        {
+            tw = 0;
+            th = 0;
+        }
+
+        // PSDF expects y as top of text box (baseline is derived internally)
+        int16_t textY = (th > 0) ? (int16_t)(y + (h - th) / 2) : y;
+
+        int16_t textX;
+        if (align == AlignLeft)
+            textX = x + 8;
+        else if (align == AlignRight)
+            textX = x + w - 8;
+        else
+            textX = x + w / 2;
+
+        // Single pass (PSDF is expensive; double pass causes lag in progress demo)
+        drawPSDFText(text, textX, textY, textColor, baseColor, align);
+    }
+
+    void GUI::drawTextProgress(int16_t x, int16_t y,
+                               int16_t w, int16_t h,
+                               uint8_t value,
+                               const String &text,
+                               uint32_t color,
+                               uint32_t textColor,
+                               uint8_t radius,
+                               TextAlign align)
+    {
+        uint32_t base = pipgui::detail::lighten888(color, 10);
+        drawTextProgress(x, y, w, h, value, text, base, color, textColor, radius, align);
+    }
+
+    void GUI::updateTextProgress(int16_t x, int16_t y,
+                                 int16_t w, int16_t h,
+                                 uint8_t value,
+                                 const String &text,
+                                 uint32_t baseColor,
+                                 uint32_t fillColor,
+                                 uint32_t textColor,
+                                 uint8_t radius,
+                                 TextAlign align)
+    {
+        if (!_flags.spriteEnabled || !_display)
+        {
+            bool prevRender = _flags.renderToSprite;
+            pipcore::Sprite *prevActive = _activeSprite;
+
+            _flags.renderToSprite = 0;
+            drawTextProgress(x, y, w, h, value, text, baseColor, fillColor, textColor, radius, align);
+            _flags.renderToSprite = prevRender;
+            _activeSprite = prevActive;
+            return;
+        }
+
+        int16_t rx = x;
+        int16_t ry = y;
+        if (rx == center)
+            rx = AutoX(w);
+        if (ry == center)
+            ry = AutoY(h);
+
+        int16_t pad = 4;
+
+        bool prevRender = _flags.renderToSprite;
+        pipcore::Sprite *prevActive = _activeSprite;
+
+        _flags.renderToSprite = 1;
+        _activeSprite = &_sprite;
+
+        fillRect((int16_t)(rx - pad), (int16_t)(ry - pad), (int16_t)(w + pad * 2), (int16_t)(h + pad * 2), _bgColor);
+        drawTextProgress(x, y, w, h, value, text, baseColor, fillColor, textColor, radius, align);
+        _flags.renderToSprite = prevRender;
+        _activeSprite = prevActive;
+
+        invalidateRect((int16_t)(rx - pad), (int16_t)(ry - pad), (int16_t)(w + pad * 2), (int16_t)(h + pad * 2));
+        flushDirty();
+    }
+
+    void GUI::updateTextProgress(int16_t x, int16_t y,
+                                 int16_t w, int16_t h,
+                                 uint8_t value,
+                                 const String &text,
+                                 uint32_t color,
+                                 uint32_t textColor,
+                                 uint8_t radius,
+                                 TextAlign align)
+    {
+        uint32_t base = pipgui::detail::lighten888(color, 10);
+        updateTextProgress(x, y, w, h, value, text, base, color, textColor, radius, align);
     }
 }
