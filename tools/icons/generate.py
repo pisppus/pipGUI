@@ -374,7 +374,8 @@ def generate_all(project_dir: str) -> bool:
             y0 = cy * icon_px
             boxes.append((x0, y0, icon_px, icon_px))
             for yy in range(icon_px):
-                src_off = yy * icon_px
+                src_row = icon_px - 1 - yy
+                src_off = src_row * icon_px
                 dst_off = (y0 + yy) * atlas_w + x0
                 atlas[dst_off : dst_off + icon_px] = b[src_off : src_off + icon_px]
 

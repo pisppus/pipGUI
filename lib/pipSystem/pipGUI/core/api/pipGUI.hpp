@@ -11,6 +11,7 @@
 #include <pipCore/Button.hpp>
 #include <pipGUI/core/components/FRC.hpp>
 #include <pipGUI/core/Debug.hpp>
+#include <pipGUI/icons/metrics.hpp>
 #include "UiLayout.hpp"
 
 namespace pipgui
@@ -140,6 +141,12 @@ namespace pipgui
         StatusBarIconRight
     };
 
+    enum StatusBarStyle : uint8_t
+    {
+        StatusBarStyleSolid,
+        StatusBarStyleBlurGradient
+    };
+
     enum ScreenAnim : uint8_t
     {
         ScreenAnimNone,
@@ -157,7 +164,6 @@ namespace pipgui
     {
         ProgressAnimNone,
         Shimmer,
-        Stripes,
         Indeterminate
     };
 
@@ -283,6 +289,18 @@ namespace pipgui
         {
             constexpr operator GlowAnim() const { return GlowPulse; }
         };
+
+        // Pick high-contrast text color (black or white) for a given RGB888 background.
+        // threshold is in approximate luminance units 0..255 (after 30/59/11 weighting).
+        static inline uint32_t autoTextColor888(uint32_t bg, uint8_t threshold = 140)
+        {
+            uint8_t r = (uint8_t)((bg >> 16) & 0xFF);
+            uint8_t g = (uint8_t)((bg >> 8) & 0xFF);
+            uint8_t b = (uint8_t)(bg & 0xFF);
+            uint32_t lum = (uint32_t)r * 30U + (uint32_t)g * 59U + (uint32_t)b * 11U;
+            lum /= 100U;
+            return (lum > (uint32_t)threshold) ? 0x000000U : 0xFFFFFFU;
+        }
     }
 
     static constexpr detail::AlignToken Left{detail::TokLeft};
@@ -528,5 +546,7 @@ namespace pipgui
         uint8_t itemCapacity = 0;
     };
 
+#define PIPGUI_FLUENT_BUILDERS_INC 1
+#include "parts/FluentBuilders.inc"
 #include "parts/Gui.inc"
 }

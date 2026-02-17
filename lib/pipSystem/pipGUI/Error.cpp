@@ -353,17 +353,19 @@ namespace pipgui
             if (btnY >= 0 && dotsY > (int16_t)(btnY - 26))
                 dotsY = (int16_t)(btnY - 26);
 
-            drawScrollDots(center,
-                           dotsY,
-                           _errorCount,
-                           dotsActive,
-                           dotsPrev,
-                           dotsP,
-                           dotsAnim,
-                           dotsDir,
-                           dotsActiveColor,
-                           dotsInactiveColor,
-                           3, 14, 18);
+            drawScrollDots().at(center, dotsY)
+                .count(_errorCount)
+                .activeIndex(dotsActive)
+                .prevIndex(dotsPrev)
+                .animProgress(dotsP)
+                .animate(dotsAnim)
+                .animDirection(dotsDir)
+                .activeColor(dotsActiveColor)
+                .inactiveColor(dotsInactiveColor)
+                .dotRadius(3)
+                .spacing(14)
+                .activeWidth(18)
+                .draw();
         }
 
         if (_flags.spriteEnabled && _display)

@@ -251,6 +251,156 @@ namespace pipgui
         aaQuarter((int16_t)(x + w - 1 - r), (int16_t)(y + h - 1 - r), +1, +1);
     }
 
+    void GUI::fillRoundRectCornersFrc(int16_t x, int16_t y, int16_t w, int16_t h,
+                                      uint8_t radiusTL, uint8_t radiusTR,
+                                      uint8_t radiusBR, uint8_t radiusBL,
+                                      uint32_t color888)
+    {
+        if (w <= 0 || h <= 0)
+            return;
+
+        if (!_flags.spriteEnabled)
+            return;
+
+        pipcore::Sprite *spr = (_flags.renderToSprite && _flags.spriteEnabled)
+                                        ? (_activeSprite ? _activeSprite : &_sprite)
+                                        : &_sprite;
+
+        uint16_t *buf = (uint16_t *)spr->getBuffer();
+        if (!buf)
+            return;
+
+        int16_t stride = spr->width();
+        int16_t maxH = spr->height();
+        if (stride <= 0 || maxH <= 0)
+            return;
+
+        // Clamp radii to half of min(w, h)
+        int16_t maxR = (w < h ? w : h) / 2;
+        uint8_t rTL = (radiusTL > maxR) ? (uint8_t)maxR : radiusTL;
+        uint8_t rTR = (radiusTR > maxR) ? (uint8_t)maxR : radiusTR;
+        uint8_t rBR = (radiusBR > maxR) ? (uint8_t)maxR : radiusBR;
+        uint8_t rBL = (radiusBL > maxR) ? (uint8_t)maxR : radiusBL;
+
+        Color888 c = Color888::fromUint32(color888);
+        FrcProfile profile = _frcProfile;
+        if (c.isBlack() || c.isWhite())
+            profile = FrcProfile::Off;
+
+        // Fast path: all radii zero -> plain rect
+        if (rTL == 0 && rTR == 0 && rBR == 0 && rBL == 0)
+        {
+            fillRect888(x, y, w, h, c.r, c.g, c.b, profile);
+            return;
+        }
+
+        // For each scanline compute left/right inset from corners and draw horizontal span.
+        for (int16_t iy = 0; iy < h; ++iy)
+        {
+            int16_t insetL = 0;
+            int16_t insetR = 0;
+
+            // Top-left corner
+            if (rTL > 0 && iy < rTL)
+            {
+                int16_t dy = (int16_t)(rTL - 1 - iy);
+                int32_t rr = (int32_t)rTL * (int32_t)rTL;
+                int32_t inside = rr - (int32_t)dy * (int32_t)dy;
+                if (inside < 0)
+                    inside = 0;
+                int32_t xx = 0;
+                while ((xx + 1) * (xx + 1) <= inside)
+                    ++xx;
+                int16_t inset = (int16_t)(rTL - (int16_t)xx);
+                if (inset > insetL)
+                    insetL = inset;
+            }
+
+            // Bottom-left corner
+            if (rBL > 0 && iy >= h - rBL)
+            {
+                int16_t rowFromBottom = (int16_t)(h - 1 - iy);
+                int16_t dy = (int16_t)(rBL - 1 - rowFromBottom);
+                int32_t rr = (int32_t)rBL * (int32_t)rBL;
+                int32_t inside = rr - (int32_t)dy * (int32_t)dy;
+                if (inside < 0)
+                    inside = 0;
+                int32_t xx = 0;
+                while ((xx + 1) * (xx + 1) <= inside)
+                    ++xx;
+                int16_t inset = (int16_t)(rBL - (int16_t)xx);
+                if (inset > insetL)
+                    insetL = inset;
+            }
+
+            // Top-right corner
+            if (rTR > 0 && iy < rTR)
+            {
+                int16_t dy = (int16_t)(rTR - 1 - iy);
+                int32_t rr = (int32_t)rTR * (int32_t)rTR;
+                int32_t inside = rr - (int32_t)dy * (int32_t)dy;
+                if (inside < 0)
+                    inside = 0;
+                int32_t xx = 0;
+                while ((xx + 1) * (xx + 1) <= inside)
+                    ++xx;
+                int16_t inset = (int16_t)(rTR - (int16_t)xx);
+                if (inset > insetR)
+                    insetR = inset;
+            }
+
+            // Bottom-right corner
+            if (rBR > 0 && iy >= h - rBR)
+            {
+                int16_t rowFromBottom = (int16_t)(h - 1 - iy);
+                int16_t dy = (int16_t)(rBR - 1 - rowFromBottom);
+                int32_t rr = (int32_t)rBR * (int32_t)rBR;
+                int32_t inside = rr - (int32_t)dy * (int32_t)dy;
+                if (inside < 0)
+                    inside = 0;
+                int32_t xx = 0;
+                while ((xx + 1) * (xx + 1) <= inside)
+                    ++xx;
+                int16_t inset = (int16_t)(rBR - (int16_t)xx);
+                if (inset > insetR)
+                    insetR = inset;
+            }
+
+            int16_t spanX = (int16_t)(x + insetL);
+            int16_t spanW = (int16_t)(w - insetL - insetR);
+            if (spanW <= 0)
+                continue;
+
+            fillRect888(spanX, (int16_t)(y + iy), spanW, 1, c.r, c.g, c.b, profile);
+        }
+    }
+
+    void GUI::drawRoundRectCornersFrc(int16_t x, int16_t y, int16_t w, int16_t h,
+                                      uint8_t radiusTL, uint8_t radiusTR,
+                                      uint8_t radiusBR, uint8_t radiusBL,
+                                      uint32_t color888)
+    {
+        if (w <= 0 || h <= 0)
+            return;
+
+        if (w <= 2 || h <= 2)
+        {
+            fillRectImpl(x, y, w, h, color888);
+            return;
+        }
+
+        fillRoundRectCornersFrc(x, y, w, h, radiusTL, radiusTR, radiusBR, radiusBL, color888);
+
+        // Inner stroke: shrink rect by 1px and radii by 1 where non-zero, fill with background color.
+        uint8_t inTL = (radiusTL > 0) ? (uint8_t)(radiusTL - 1) : 0;
+        uint8_t inTR = (radiusTR > 0) ? (uint8_t)(radiusTR - 1) : 0;
+        uint8_t inBR = (radiusBR > 0) ? (uint8_t)(radiusBR - 1) : 0;
+        uint8_t inBL = (radiusBL > 0) ? (uint8_t)(radiusBL - 1) : 0;
+        if (w > 2 && h > 2)
+            fillRoundRectCornersFrc((int16_t)(x + 1), (int16_t)(y + 1), (int16_t)(w - 2), (int16_t)(h - 2),
+                                    inTL, inTR, inBR, inBL, _bgColor);
+    }
+
     void GUI::drawRoundRectFrc(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radius, uint32_t color888)
     {
         if (w <= 0 || h <= 0)
@@ -258,7 +408,7 @@ namespace pipgui
 
         if (w <= 2 || h <= 2)
         {
-            fillRect(x, y, w, h, color888);
+            fillRectImpl(x, y, w, h, color888);
             return;
         }
 
@@ -519,7 +669,7 @@ namespace pipgui
             invalidateRect(x, y, w, h);
     }
 
-    void GUI::drawLine(int16_t x0, int16_t y0,
+    void GUI::drawLineImpl(int16_t x0, int16_t y0,
                        int16_t x1, int16_t y1,
                        uint32_t color)
     {
@@ -541,14 +691,14 @@ namespace pipgui
         {
             if (x1 < x0)
                 std::swap(x0, x1);
-            fillRect(x0, y0, (int16_t)(x1 - x0 + 1), 1, color);
+            fillRectImpl(x0, y0, (int16_t)(x1 - x0 + 1), 1, color);
             return;
         }
         if (x0 == x1)
         {
             if (y1 < y0)
                 std::swap(y0, y1);
-            fillRect(x0, y0, 1, (int16_t)(y1 - y0 + 1), color);
+            fillRectImpl(x0, y0, 1, (int16_t)(y1 - y0 + 1), color);
             return;
         }
 
@@ -705,18 +855,18 @@ namespace pipgui
         }
     }
 
-    void GUI::fillCircle(int16_t cx, int16_t cy, int16_t r, uint32_t color)
+    void GUI::fillCircleImpl(int16_t cx, int16_t cy, int16_t r, uint32_t color)
     {
         fillCircleFrc(cx, cy, r, color);
-        drawCircle(cx, cy, r, color);
+        drawCircleImpl(cx, cy, r, color);
     }
 
-    void GUI::drawCircle(int16_t cx, int16_t cy, int16_t r, uint32_t color)
+    void GUI::drawCircleImpl(int16_t cx, int16_t cy, int16_t r, uint32_t color)
     {
-        drawArc(cx, cy, r, 0.0f, 360.0f, color);
+        drawArcImpl(cx, cy, r, 0.0f, 360.0f, color);
     }
 
-    void GUI::drawArc(int16_t cx, int16_t cy, int16_t r, float startDeg, float endDeg, uint32_t color)
+    void GUI::drawArcImpl(int16_t cx, int16_t cy, int16_t r, float startDeg, float endDeg, uint32_t color)
     {
         if (r <= 0)
             return;
@@ -866,7 +1016,7 @@ namespace pipgui
             invalidateRect(x0, y0, (int16_t)(x1 - x0 + 1), (int16_t)(y1 - y0 + 1));
     }
 
-    void GUI::fillEllipse(int16_t cx, int16_t cy, int16_t rx, int16_t ry, uint32_t color)
+    void GUI::fillEllipseImpl(int16_t cx, int16_t cy, int16_t rx, int16_t ry, uint32_t color)
     {
         if (rx <= 0 || ry <= 0)
             return;
@@ -883,13 +1033,13 @@ namespace pipgui
                 continue;
             const float xf = frx * sqrtf(t);
             const int16_t xi = (int16_t)floorf(xf);
-            fillRect((int16_t)(cx - xi), (int16_t)(cy + dy), (int16_t)(xi * 2 + 1), 1, color);
+            fillRectImpl((int16_t)(cx - xi), (int16_t)(cy + dy), (int16_t)(xi * 2 + 1), 1, color);
         }
 
-        drawEllipse(cx, cy, rx, ry, color);
+        drawEllipseImpl(cx, cy, rx, ry, color);
     }
 
-    void GUI::drawEllipse(int16_t cx, int16_t cy, int16_t rx, int16_t ry, uint32_t color)
+    void GUI::drawEllipseImpl(int16_t cx, int16_t cy, int16_t rx, int16_t ry, uint32_t color)
     {
         if (rx <= 0 || ry <= 0)
             return;
@@ -1011,17 +1161,17 @@ namespace pipgui
             invalidateRect(x0, y0, (int16_t)(x1 - x0 + 1), (int16_t)(y1 - y0 + 1));
     }
 
-    void GUI::drawTriangle(int16_t x0, int16_t y0,
+    void GUI::drawTriangleImpl(int16_t x0, int16_t y0,
                            int16_t x1, int16_t y1,
                            int16_t x2, int16_t y2,
                            uint32_t color)
     {
-        drawLine(x0, y0, x1, y1, color);
-        drawLine(x1, y1, x2, y2, color);
-        drawLine(x2, y2, x0, y0, color);
+        drawLineImpl(x0, y0, x1, y1, color);
+        drawLineImpl(x1, y1, x2, y2, color);
+        drawLineImpl(x2, y2, x0, y0, color);
     }
 
-    void GUI::fillTriangle(int16_t x0, int16_t y0,
+    void GUI::fillTriangleImpl(int16_t x0, int16_t y0,
                            int16_t x1, int16_t y1,
                            int16_t x2, int16_t y2,
                            uint32_t color)
@@ -1047,7 +1197,7 @@ namespace pipgui
         {
             int16_t minX = std::min<int16_t>(x0, std::min<int16_t>(x1, x2));
             int16_t maxX = std::max<int16_t>(x0, std::max<int16_t>(x1, x2));
-            fillRect(minX, y0, (int16_t)(maxX - minX + 1), 1, color);
+            fillRectImpl(minX, y0, (int16_t)(maxX - minX + 1), 1, color);
             return;
         }
 
@@ -1068,14 +1218,282 @@ namespace pipgui
             int16_t ix0 = (int16_t)ceilf(xa - 0.5f);
             int16_t ix1 = (int16_t)floorf(xb + 0.5f);
             if (ix1 >= ix0)
-                fillRect(ix0, y, (int16_t)(ix1 - ix0 + 1), 1, color);
+                fillRectImpl(ix0, y, (int16_t)(ix1 - ix0 + 1), 1, color);
         }
-
-        // AA edges
-        drawTriangle(x0, y0, x1, y1, x2, y2, color);
     }
 
-    void GUI::drawSquircle(int16_t cx, int16_t cy, int16_t r, uint32_t color)
+    void GUI::drawRoundTriangleImpl(int16_t x0, int16_t y0,
+                                int16_t x1, int16_t y1,
+                                int16_t x2, int16_t y2,
+                                uint8_t radius, uint32_t color)
+    {
+        if (radius == 0)
+        {
+            drawTriangleImpl(x0, y0, x1, y1, x2, y2, color);
+            return;
+        }
+
+        if (!_flags.spriteEnabled)
+            return;
+
+        auto spr = getDrawTarget();
+        if (!spr)
+            return;
+
+        // SDF-based rounded triangle outline (thin stroke around rounded triangle).
+        const float r = (float)radius;
+
+        struct Vec2
+        {
+            float x, y;
+        };
+        auto make = [](float x, float y) -> Vec2 { Vec2 v{x, y}; return v; };
+        auto sub = [](const Vec2 &a, const Vec2 &b) -> Vec2 { return Vec2{a.x - b.x, a.y - b.y}; };
+        auto dot2f = [](const Vec2 &v) -> float { return v.x * v.x + v.y * v.y; };
+        auto dotf = [](const Vec2 &a, const Vec2 &b) -> float { return a.x * b.x + a.y * b.y; };
+        auto cross2 = [](const Vec2 &a, const Vec2 &b) -> float { return a.x * b.y - a.y * b.x; };
+
+        auto distToSegment = [&](const Vec2 &p, const Vec2 &a, const Vec2 &b) -> float
+        {
+            Vec2 pa = sub(p, a);
+            Vec2 ba = sub(b, a);
+            float h = 0.0f;
+            float len2 = dot2f(ba);
+            if (len2 > 0.0f)
+            {
+                h = dotf(pa, ba) / len2;
+                if (h < 0.0f)
+                    h = 0.0f;
+                else if (h > 1.0f)
+                    h = 1.0f;
+            }
+            Vec2 v = Vec2{pa.x - ba.x * h, pa.y - ba.y * h};
+            return sqrtf(dot2f(v));
+        };
+
+        Vec2 v0 = make((float)x0, (float)y0);
+        Vec2 v1 = make((float)x1, (float)y1);
+        Vec2 v2 = make((float)x2, (float)y2);
+
+        Vec2 e0 = sub(v1, v0);
+        Vec2 e1 = sub(v2, v1);
+        Vec2 e2 = sub(v0, v2);
+        Vec2 v02 = sub(v2, v0);
+        float ori = cross2(e0, v02);
+
+        int16_t minX = std::min<int16_t>(x0, std::min<int16_t>(x1, x2));
+        int16_t maxX = std::max<int16_t>(x0, std::max<int16_t>(x1, x2));
+        int16_t minY = std::min<int16_t>(y0, std::min<int16_t>(y1, y2));
+        int16_t maxY = std::max<int16_t>(y0, std::max<int16_t>(y1, y2));
+
+        int16_t pad = (int16_t)radius + 2;
+        int16_t xStart = (int16_t)(minX - pad);
+        int16_t xEnd   = (int16_t)(maxX + pad);
+        int16_t yStart = (int16_t)(minY - pad);
+        int16_t yEnd   = (int16_t)(maxY + pad);
+
+        if (xStart > xEnd || yStart > yEnd)
+            return;
+
+        for (int16_t py = yStart; py <= yEnd; ++py)
+        {
+            for (int16_t px = xStart; px <= xEnd; ++px)
+            {
+                Vec2 p = make((float)px + 0.5f, (float)py + 0.5f);
+
+                Vec2 pv0 = sub(p, v0);
+                Vec2 pv1 = sub(p, v1);
+                Vec2 pv2 = sub(p, v2);
+
+                float c0 = cross2(e0, pv0);
+                float c1 = cross2(e1, pv1);
+                float c2 = cross2(e2, pv2);
+                if (ori < 0.0f)
+                {
+                    c0 = -c0;
+                    c1 = -c1;
+                    c2 = -c2;
+                }
+                bool inside = (c0 >= 0.0f && c1 >= 0.0f && c2 >= 0.0f);
+
+                float d0 = distToSegment(p, v0, v1);
+                float d1 = distToSegment(p, v1, v2);
+                float d2 = distToSegment(p, v2, v0);
+                float d = d0;
+                if (d1 < d) d = d1;
+                if (d2 < d) d = d2;
+
+                float sd = (inside ? -d : d) + r;
+
+                // Thin stroke around rounded triangle boundary.
+                if (fabsf(sd) <= 0.75f)
+                    spr->drawPixel(px, py, color888To565(px, py, color));
+            }
+        }
+
+        if (_display && _flags.spriteEnabled && !_flags.renderToSprite)
+        {
+            int16_t bx = xStart;
+            int16_t by = yStart;
+            int16_t bw = (int16_t)(xEnd - xStart + 1);
+            int16_t bh = (int16_t)(yEnd - yStart + 1);
+            invalidateRect(bx, by, bw, bh);
+        }
+    }
+
+    void GUI::fillRoundTriangleImpl(int16_t x0, int16_t y0,
+                                int16_t x1, int16_t y1,
+                                int16_t x2, int16_t y2,
+                                uint8_t radius, uint32_t color)
+    {
+        if (radius == 0)
+        {
+            fillTriangleImpl(x0, y0, x1, y1, x2, y2, color);
+            return;
+        }
+
+        if (!_flags.spriteEnabled)
+            return;
+
+        pipcore::Sprite *spr = (_flags.renderToSprite && _flags.spriteEnabled)
+                                        ? (_activeSprite ? _activeSprite : &_sprite)
+                                        : &_sprite;
+
+        uint16_t *buf = (uint16_t *)spr->getBuffer();
+        if (!buf)
+            return;
+
+        int16_t stride = spr->width();
+        int16_t maxH = spr->height();
+        if (stride <= 0 || maxH <= 0)
+            return;
+
+        int32_t clipX = 0, clipY = 0, clipW = stride, clipH = maxH;
+        spr->getClipRect(&clipX, &clipY, &clipW, &clipH);
+        if (clipW <= 0 || clipH <= 0)
+            return;
+
+        Color888 c = Color888::fromUint32(color);
+        FrcProfile profile = _frcProfile;
+        if (c.isBlack() || c.isWhite())
+            profile = FrcProfile::Off;
+        else if (c.r == c.g && c.g == c.b)
+            profile = FrcProfile::Off;
+        else if (((c.r & 7U) == 0U) && ((c.g & 3U) == 0U) && ((c.b & 7U) == 0U))
+            profile = FrcProfile::Off;
+
+        const float r = (float)radius;
+
+        struct Vec2
+        {
+            float x, y;
+        };
+        auto make = [](float x, float y) -> Vec2 { Vec2 v{x, y}; return v; };
+        auto sub = [](const Vec2 &a, const Vec2 &b) -> Vec2 { return Vec2{a.x - b.x, a.y - b.y}; };
+        auto dot2f = [](const Vec2 &v) -> float { return v.x * v.x + v.y * v.y; };
+        auto dotf = [](const Vec2 &a, const Vec2 &b) -> float { return a.x * b.x + a.y * b.y; };
+        auto cross2 = [](const Vec2 &a, const Vec2 &b) -> float { return a.x * b.y - a.y * b.x; };
+
+        auto distToSegment = [&](const Vec2 &p, const Vec2 &a, const Vec2 &b) -> float
+        {
+            Vec2 pa = sub(p, a);
+            Vec2 ba = sub(b, a);
+            float h = 0.0f;
+            float len2 = dot2f(ba);
+            if (len2 > 0.0f)
+            {
+                h = dotf(pa, ba) / len2;
+                if (h < 0.0f)
+                    h = 0.0f;
+                else if (h > 1.0f)
+                    h = 1.0f;
+            }
+            Vec2 v = Vec2{pa.x - ba.x * h, pa.y - ba.y * h};
+            return sqrtf(dot2f(v));
+        };
+
+        Vec2 v0 = make((float)x0, (float)y0);
+        Vec2 v1 = make((float)x1, (float)y1);
+        Vec2 v2 = make((float)x2, (float)y2);
+
+        Vec2 e0 = sub(v1, v0);
+        Vec2 e1 = sub(v2, v1);
+        Vec2 e2 = sub(v0, v2);
+        Vec2 v02 = sub(v2, v0);
+        float ori = cross2(e0, v02);
+
+        int16_t minX = std::min<int16_t>(x0, std::min<int16_t>(x1, x2));
+        int16_t maxX = std::max<int16_t>(x0, std::max<int16_t>(x1, x2));
+        int16_t minY = std::min<int16_t>(y0, std::min<int16_t>(y1, y2));
+        int16_t maxY = std::max<int16_t>(y0, std::max<int16_t>(y1, y2));
+
+        int16_t pad = (int16_t)radius + 2;
+        int16_t xStart = (int16_t)(minX - pad);
+        int16_t xEnd   = (int16_t)(maxX + pad);
+        int16_t yStart = (int16_t)(minY - pad);
+        int16_t yEnd   = (int16_t)(maxY + pad);
+
+        if (xStart > xEnd || yStart > yEnd)
+            return;
+
+        // Clamp to clip rect
+        if (xStart < (int16_t)clipX) xStart = (int16_t)clipX;
+        if (yStart < (int16_t)clipY) yStart = (int16_t)clipY;
+        if (xEnd > (int16_t)(clipX + clipW - 1)) xEnd = (int16_t)(clipX + clipW - 1);
+        if (yEnd > (int16_t)(clipY + clipH - 1)) yEnd = (int16_t)(clipY + clipH - 1);
+        if (xStart > xEnd || yStart > yEnd)
+            return;
+
+        for (int16_t py = yStart; py <= yEnd; ++py)
+        {
+            int32_t row = (int32_t)py * (int32_t)stride;
+            for (int16_t px = xStart; px <= xEnd; ++px)
+            {
+                Vec2 p = make((float)px + 0.5f, (float)py + 0.5f);
+
+                Vec2 pv0 = sub(p, v0);
+                Vec2 pv1 = sub(p, v1);
+                Vec2 pv2 = sub(p, v2);
+
+                float c0 = cross2(e0, pv0);
+                float c1 = cross2(e1, pv1);
+                float c2 = cross2(e2, pv2);
+                if (ori < 0.0f)
+                {
+                    c0 = -c0;
+                    c1 = -c1;
+                    c2 = -c2;
+                }
+                bool inside = (c0 >= 0.0f && c1 >= 0.0f && c2 >= 0.0f);
+
+                float d0 = distToSegment(p, v0, v1);
+                float d1 = distToSegment(p, v1, v2);
+                float d2 = distToSegment(p, v2, v0);
+                float d = d0;
+                if (d1 < d) d = d1;
+                if (d2 < d) d = d2;
+
+                float sd = (inside ? -d : d) + r;
+
+                if (sd <= 0.0f)
+                {
+                    uint16_t c565 = detail::quantize565(c, px, py, _frcSeed, profile);
+                    buf[row + px] = swap16(c565);
+                }
+            }
+        }
+
+        if (_display && _flags.spriteEnabled && !_flags.renderToSprite)
+        {
+            int16_t bx = xStart;
+            int16_t by = yStart;
+            int16_t bw = (int16_t)(xEnd - xStart + 1);
+            int16_t bh = (int16_t)(yEnd - yStart + 1);
+            invalidateRect(bx, by, bw, bh);
+        }
+    }
+
+    void GUI::drawSquircleImpl(int16_t cx, int16_t cy, int16_t r, uint32_t color)
     {
         if (r <= 0)
             return;
@@ -1199,7 +1617,7 @@ namespace pipgui
             invalidateRect(x0, y0, (int16_t)(x1 - x0 + 1), (int16_t)(y1 - y0 + 1));
     }
 
-    void GUI::fillSquircle(int16_t cx, int16_t cy, int16_t r, uint32_t color)
+    void GUI::fillSquircleImpl(int16_t cx, int16_t cy, int16_t r, uint32_t color)
     {
         if (r <= 0)
             return;
@@ -1217,10 +1635,10 @@ namespace pipgui
                 continue;
             float xf = powf(rem, 0.25f);
             int16_t xi = (int16_t)floorf(xf);
-            fillRect((int16_t)(cx - xi), (int16_t)(cy + dy), (int16_t)(xi * 2 + 1), 1, color);
+            fillRectImpl((int16_t)(cx - xi), (int16_t)(cy + dy), (int16_t)(xi * 2 + 1), 1, color);
         }
 
-        drawSquircle(cx, cy, r, color);
+        drawSquircleImpl(cx, cy, r, color);
     }
 
     pipcore::Sprite *GUI::getDrawTarget()
@@ -1263,8 +1681,9 @@ namespace pipgui
 
     int16_t GUI::AutoX(int32_t contentWidth) const
     {
-        int16_t left = (_flags.statusBarEnabled && _statusBarPos == Left) ? _statusBarHeight : 0;
-        int16_t availW = _screenWidth - ((_flags.statusBarEnabled && (_statusBarPos == Left || _statusBarPos == Right)) ? _statusBarHeight : 0);
+        int16_t sb = statusBarHeight();
+        int16_t left = (_flags.statusBarEnabled && _statusBarPos == Left) ? sb : 0;
+        int16_t availW = _screenWidth - ((_flags.statusBarEnabled && (_statusBarPos == Left || _statusBarPos == Right)) ? sb : 0);
 
         if (contentWidth > availW)
             availW = (int16_t)contentWidth;
@@ -1274,8 +1693,9 @@ namespace pipgui
 
     int16_t GUI::AutoY(int32_t contentHeight) const
     {
-        int16_t top = (_flags.statusBarEnabled && _statusBarPos == Top) ? _statusBarHeight : 0;
-        int16_t availH = _screenHeight - ((_flags.statusBarEnabled && (_statusBarPos == Top || _statusBarPos == Bottom)) ? _statusBarHeight : 0);
+        int16_t sb = statusBarHeight();
+        int16_t top = (_flags.statusBarEnabled && _statusBarPos == Top) ? sb : 0;
+        int16_t availH = _screenHeight - ((_flags.statusBarEnabled && (_statusBarPos == Top || _statusBarPos == Bottom)) ? sb : 0);
 
         if (contentHeight > availH)
             availH = (int16_t)contentHeight;
@@ -1283,15 +1703,17 @@ namespace pipgui
         return top + (availH - (int16_t)contentHeight) / 2;
     }
 
-    void GUI::fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t color)
+    void GUI::fillRectImpl(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t color)
     {
         uint8_t r = (uint8_t)((color >> 16) & 0xFF);
         uint8_t g = (uint8_t)((color >> 8) & 0xFF);
         uint8_t b = (uint8_t)(color & 0xFF);
-        fillRect888(x, y, w, h, r, g, b, _frcProfile);
+        // For axis-aligned rectangles we intentionally disable FRC/dithering
+        // to keep edges and fills perfectly clean (no \"smoothing\" noise).
+        fillRect888(x, y, w, h, r, g, b, FrcProfile::Off);
     }
 
-    void GUI::fillRectAlpha(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t color, uint8_t alpha)
+    void GUI::fillRectAlphaImpl(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t color, uint8_t alpha)
     {
         if (x == -1)
             x = AutoX(w);
@@ -1306,7 +1728,7 @@ namespace pipgui
             return;
         if (alpha >= 255)
         {
-            fillRect(x, y, w, h, color);
+            fillRectImpl(x, y, w, h, color);
             return;
         }
 
@@ -1412,7 +1834,7 @@ namespace pipgui
         return ((uint32_t)rr << 16) | ((uint32_t)gg << 8) | (uint32_t)bb8;
     }
 
-    void GUI::fillRectGradientVertical(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t topColor, uint32_t bottomColor)
+    void GUI::fillRectGradientVerticalImpl(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t topColor, uint32_t bottomColor)
     {
         if (x == -1)
             x = AutoX(w);
@@ -1424,13 +1846,23 @@ namespace pipgui
         if (!_flags.spriteEnabled)
             return;
 
+        // Gradients are one of the main places where FRC/dithering is beneficial.
+        FrcProfile prevProfile = _frcProfile;
+        _frcProfile = FrcProfile::BlueNoise;
+
         auto spr = getDrawTarget();
         if (!spr)
+        {
+            _frcProfile = prevProfile;
             return;
+        }
 
         uint16_t *buf = (uint16_t *)spr->getBuffer();
         if (!buf)
+        {
+            _frcProfile = prevProfile;
             return;
+        }
 
         const int16_t stride = spr->width();
         const int16_t maxH = spr->height();
@@ -1457,7 +1889,10 @@ namespace pipgui
             y1 = (int16_t)(clipY + clipH);
 
         if (x0 >= x1 || y0 >= y1)
+        {
+            _frcProfile = prevProfile;
             return;
+        }
 
         const int16_t fullY0 = y;
         const int16_t fullH = h;
@@ -1475,9 +1910,11 @@ namespace pipgui
 
         if (_display && _flags.spriteEnabled && !_flags.renderToSprite)
             invalidateRect(x0, y0, (int16_t)(x1 - x0), (int16_t)(y1 - y0));
+
+        _frcProfile = prevProfile;
     }
 
-    void GUI::fillRectGradientHorizontal(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t leftColor, uint32_t rightColor)
+    void GUI::fillRectGradientHorizontalImpl(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t leftColor, uint32_t rightColor)
     {
         if (x == -1)
             x = AutoX(w);
@@ -1489,13 +1926,22 @@ namespace pipgui
         if (!_flags.spriteEnabled)
             return;
 
+        FrcProfile prevProfile = _frcProfile;
+        _frcProfile = FrcProfile::BlueNoise;
+
         auto spr = getDrawTarget();
         if (!spr)
+        {
+            _frcProfile = prevProfile;
             return;
+        }
 
         uint16_t *buf = (uint16_t *)spr->getBuffer();
         if (!buf)
+        {
+            _frcProfile = prevProfile;
             return;
+        }
 
         const int16_t stride = spr->width();
         const int16_t maxH = spr->height();
@@ -1522,7 +1968,10 @@ namespace pipgui
             y1 = (int16_t)(clipY + clipH);
 
         if (x0 >= x1 || y0 >= y1)
+        {
+            _frcProfile = prevProfile;
             return;
+        }
 
         const int16_t fullX0 = x;
         const int16_t fullW = w;
@@ -1542,9 +1991,11 @@ namespace pipgui
 
         if (_display && _flags.spriteEnabled && !_flags.renderToSprite)
             invalidateRect(x0, y0, (int16_t)(x1 - x0), (int16_t)(y1 - y0));
+
+        _frcProfile = prevProfile;
     }
 
-    void GUI::fillRectGradient4(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t c00, uint32_t c10, uint32_t c01, uint32_t c11)
+    void GUI::fillRectGradient4Impl(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t c00, uint32_t c10, uint32_t c01, uint32_t c11)
     {
         if (x == -1)
             x = AutoX(w);
@@ -1556,13 +2007,22 @@ namespace pipgui
         if (!_flags.spriteEnabled)
             return;
 
+        FrcProfile prevProfile = _frcProfile;
+        _frcProfile = FrcProfile::BlueNoise;
+
         auto spr = getDrawTarget();
         if (!spr)
+        {
+            _frcProfile = prevProfile;
             return;
+        }
 
         uint16_t *buf = (uint16_t *)spr->getBuffer();
         if (!buf)
+        {
+            _frcProfile = prevProfile;
             return;
+        }
 
         const int16_t stride = spr->width();
         const int16_t maxH = spr->height();
@@ -1589,7 +2049,10 @@ namespace pipgui
             y1 = (int16_t)(clipY + clipH);
 
         if (x0 >= x1 || y0 >= y1)
+        {
+            _frcProfile = prevProfile;
             return;
+        }
 
         const int denomX = (w > 1) ? (w - 1) : 1;
         const int denomY = (h > 1) ? (h - 1) : 1;
@@ -1616,9 +2079,11 @@ namespace pipgui
 
         if (_display && _flags.spriteEnabled && !_flags.renderToSprite)
             invalidateRect(x0, y0, (int16_t)(x1 - x0), (int16_t)(y1 - y0));
+
+        _frcProfile = prevProfile;
     }
 
-    void GUI::fillRectGradientDiagonal(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t tlColor, uint32_t brColor)
+    void GUI::fillRectGradientDiagonalImpl(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t tlColor, uint32_t brColor)
     {
         if (x == -1)
             x = AutoX(w);
@@ -1630,13 +2095,22 @@ namespace pipgui
         if (!_flags.spriteEnabled)
             return;
 
+        FrcProfile prevProfile = _frcProfile;
+        _frcProfile = FrcProfile::BlueNoise;
+
         auto spr = getDrawTarget();
         if (!spr)
+        {
+            _frcProfile = prevProfile;
             return;
+        }
 
         uint16_t *buf = (uint16_t *)spr->getBuffer();
         if (!buf)
+        {
+            _frcProfile = prevProfile;
             return;
+        }
 
         const int16_t stride = spr->width();
         const int16_t maxH = spr->height();
@@ -1663,7 +2137,10 @@ namespace pipgui
             y1 = (int16_t)(clipY + clipH);
 
         if (x0 >= x1 || y0 >= y1)
+        {
+            _frcProfile = prevProfile;
             return;
+        }
 
         const int fullX0 = x;
         const int fullY0 = y;
@@ -1683,9 +2160,11 @@ namespace pipgui
 
         if (_display && _flags.spriteEnabled && !_flags.renderToSprite)
             invalidateRect(x0, y0, (int16_t)(x1 - x0), (int16_t)(y1 - y0));
+
+        _frcProfile = prevProfile;
     }
 
-    void GUI::fillRectGradientRadial(int16_t x, int16_t y, int16_t w, int16_t h, int16_t cx, int16_t cy, int16_t radius, uint32_t innerColor, uint32_t outerColor)
+    void GUI::fillRectGradientRadialImpl(int16_t x, int16_t y, int16_t w, int16_t h, int16_t cx, int16_t cy, int16_t radius, uint32_t innerColor, uint32_t outerColor)
     {
         if (x == -1)
             x = AutoX(w);
@@ -1697,13 +2176,22 @@ namespace pipgui
         if (!_flags.spriteEnabled)
             return;
 
+        FrcProfile prevProfile = _frcProfile;
+        _frcProfile = FrcProfile::BlueNoise;
+
         auto spr = getDrawTarget();
         if (!spr)
+        {
+            _frcProfile = prevProfile;
             return;
+        }
 
         uint16_t *buf = (uint16_t *)spr->getBuffer();
         if (!buf)
+        {
+            _frcProfile = prevProfile;
             return;
+        }
 
         const int16_t stride = spr->width();
         const int16_t maxH = spr->height();
@@ -1730,7 +2218,10 @@ namespace pipgui
             y1 = (int16_t)(clipY + clipH);
 
         if (x0 >= x1 || y0 >= y1)
+        {
+            _frcProfile = prevProfile;
             return;
+        }
 
         if (radius <= 0)
             radius = 1;
@@ -1756,6 +2247,8 @@ namespace pipgui
 
         if (_display && _flags.spriteEnabled && !_flags.renderToSprite)
             invalidateRect(x0, y0, (int16_t)(x1 - x0), (int16_t)(y1 - y0));
+
+        _frcProfile = prevProfile;
     }
 
     void GUI::drawCenteredTitle(const String &title, const String &subtitle, uint32_t fg, uint32_t bg)

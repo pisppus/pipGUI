@@ -1,0 +1,14 @@
+---
+description: After code changes, run full build to verify no errors
+alwaysApply: true
+---
+
+# Build verification
+
+After changing C++ or library code in this PlatformIO project:
+
+1. Run the build: `pio run` (from project root).
+2. Use a timeout that allows the build to finish (e.g. 120 seconds or more); do not assume success after compiling only part of the project.
+3. Treat the task as incomplete until the build finishes with **SUCCESS** or you have fixed any reported errors.
+
+This ensures missing symbols (e.g. `selectPressed`), wrong types, and link errors are caught before the user runs the build.

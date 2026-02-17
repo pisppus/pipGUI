@@ -4,7 +4,7 @@
 namespace pipgui
 {
 
-void GUI::drawGlowCircle(int16_t x, int16_t y,
+void GUI::drawGlowCircleImpl(int16_t x, int16_t y,
                          int16_t r,
                          uint32_t fillColor,
                          int32_t bgColor,
@@ -19,7 +19,7 @@ void GUI::drawGlowCircle(int16_t x, int16_t y,
 
     if (_flags.spriteEnabled && _display && !_flags.renderToSprite)
     {
-        updateGlowCircle(x, y, r, fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
+        updateGlowCircleImpl(x, y, r, fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
         return;
     }
 
@@ -72,7 +72,7 @@ void GUI::drawGlowCircle(int16_t x, int16_t y,
     fillCircleFrc(x, y, r, fillColor);
 }
 
-void GUI::updateGlowCircle(int16_t x, int16_t y,
+void GUI::updateGlowCircleImpl(int16_t x, int16_t y,
                            int16_t r,
                            uint32_t fillColor,
                            int32_t bgColor,
@@ -87,7 +87,7 @@ void GUI::updateGlowCircle(int16_t x, int16_t y,
         bool prevRender = _flags.renderToSprite;
         pipcore::Sprite *prevActive = _activeSprite;
         _flags.renderToSprite = 0;
-        drawGlowCircle(x, y, r, fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
+        drawGlowCircleImpl(x, y, r, fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
         _flags.renderToSprite = prevRender;
         _activeSprite = prevActive;
         return;
@@ -118,9 +118,13 @@ void GUI::updateGlowCircle(int16_t x, int16_t y,
     _flags.renderToSprite = 1;
     _activeSprite = &_sprite;
 
-    fillRect(bx, by, bw, bh, bg);
+    fillRect()
+        .at(bx, by)
+        .size(bw, bh)
+        .color(bg)
+        .draw();
 
-    drawGlowCircle(x, y, r, fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
+    drawGlowCircleImpl(x, y, r, fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
     _flags.renderToSprite = prevRender;
     _activeSprite = prevActive;
 
@@ -128,7 +132,7 @@ void GUI::updateGlowCircle(int16_t x, int16_t y,
     flushDirty();
 }
 
-void GUI::drawGlowRoundRect(int16_t x, int16_t y,
+void GUI::drawGlowRoundRectImpl(int16_t x, int16_t y,
                             int16_t w, int16_t h,
                             uint8_t radius,
                             uint32_t fillColor,
@@ -144,7 +148,7 @@ void GUI::drawGlowRoundRect(int16_t x, int16_t y,
 
     if (_flags.spriteEnabled && _display && !_flags.renderToSprite)
     {
-        updateGlowRoundRect(x, y, w, h, radius, fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
+        updateGlowRoundRectImpl(x, y, w, h, radius, fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
         return;
     }
 
@@ -197,7 +201,88 @@ void GUI::drawGlowRoundRect(int16_t x, int16_t y,
     fillRoundRectFrc(x, y, w, h, radius, fillColor);
 }
 
-void GUI::updateGlowRoundRect(int16_t x, int16_t y,
+void GUI::drawGlowRoundRectCornersImpl(int16_t x, int16_t y,
+                                   int16_t w, int16_t h,
+                                   uint8_t radiusTL, uint8_t radiusTR,
+                                   uint8_t radiusBR, uint8_t radiusBL,
+                                   uint32_t fillColor,
+                                   int32_t bgColor,
+                                   int32_t glowColor,
+                                   uint8_t glowSize,
+                                   uint8_t glowStrength,
+                                   GlowAnim anim,
+                                   uint16_t pulsePeriodMs)
+{
+    if (w <= 0 || h <= 0)
+        return;
+
+    if (_flags.spriteEnabled && _display && !_flags.renderToSprite)
+    {
+        updateGlowRoundRectCornersImpl(x, y, w, h, radiusTL, radiusTR, radiusBR, radiusBL,
+                                       fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
+        return;
+    }
+
+    uint32_t bg = (bgColor >= 0) ? static_cast<uint32_t>(bgColor) : _bgColor;
+    uint32_t glow = (glowColor >= 0) ? static_cast<uint32_t>(glowColor) : detail::blend888(fillColor, 0xFFFFFF, 80);
+
+    if (x == center)
+        x = (int16_t)(AutoX((int32_t)w + 2 * (int32_t)glowSize) + (int32_t)glowSize);
+    if (y == center)
+        y = (int16_t)(AutoY((int32_t)h + 2 * (int32_t)glowSize) + (int32_t)glowSize);
+
+    uint16_t strength = glowStrength;
+    if (anim == Pulse && pulsePeriodMs > 0)
+    {
+        float t = (float)(nowMs() % pulsePeriodMs) / (float)pulsePeriodMs;
+
+        float p = 0.5f + 0.5f * sinf(t * 6.283185307f);
+        float s = 0.30f + 0.70f * p;
+        strength = (uint16_t)((float)glowStrength * s);
+    }
+
+    auto target = getDrawTarget();
+
+    if (glowSize == 0 || strength < 2)
+    {
+        fillRoundRectCornersFrc(x, y, w, h, radiusTL, radiusTR, radiusBR, radiusBL, fillColor);
+        return;
+    }
+
+    float fGlowSize = (float)glowSize;
+    // For halo we approximate shape by using the maximum radius for expansion;
+    // inner shape will still use exact per-corner radii.
+    uint8_t baseR = radiusTL;
+    if (radiusTR > baseR) baseR = radiusTR;
+    if (radiusBR > baseR) baseR = radiusBR;
+    if (radiusBL > baseR) baseR = radiusBL;
+
+    for (int off = glowSize; off > 0; --off)
+    {
+        float norm = (fGlowSize - off + 1.0f) / fGlowSize;
+        float curve = norm * norm * norm;
+        int alpha16 = (int)(strength * curve);
+        if (alpha16 > 255)
+            alpha16 = 255;
+        uint8_t alpha = (uint8_t)alpha16;
+        if (alpha < 2)
+            continue;
+        uint32_t col = detail::blend888(bg, glow, alpha);
+        int16_t xx = x - off;
+        int16_t yy = y - off;
+        int16_t ww = w + off * 2;
+        int16_t hh = h + off * 2;
+        int16_t rr = (int16_t)(baseR + off);
+        int16_t maxR = (ww < hh ? ww : hh) / 2;
+        if (rr > maxR)
+            rr = maxR;
+        // Use uniform radius for halo for performance; inner fill uses per-corner radii.
+        fillRoundRectFrc(xx, yy, ww, hh, (uint8_t)rr, col);
+    }
+    fillRoundRectCornersFrc(x, y, w, h, radiusTL, radiusTR, radiusBR, radiusBL, fillColor);
+}
+
+void GUI::updateGlowRoundRectImpl(int16_t x, int16_t y,
                               int16_t w, int16_t h,
                               uint8_t radius,
                               uint32_t fillColor,
@@ -213,7 +298,7 @@ void GUI::updateGlowRoundRect(int16_t x, int16_t y,
         bool prevRender = _flags.renderToSprite;
         pipcore::Sprite *prevActive = _activeSprite;
         _flags.renderToSprite = 0;
-        drawGlowRoundRect(x, y, w, h, radius, fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
+        drawGlowRoundRectImpl(x, y, w, h, radius, fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
         _flags.renderToSprite = prevRender;
         _activeSprite = prevActive;
         return;
@@ -240,9 +325,73 @@ void GUI::updateGlowRoundRect(int16_t x, int16_t y,
     _flags.renderToSprite = 1;
     _activeSprite = &_sprite;
 
-    fillRect(bx, by, bw, bh, bg);
+    fillRect()
+        .at(bx, by)
+        .size(bw, bh)
+        .color(bg)
+        .draw();
 
-    drawGlowRoundRect(x, y, w, h, radius, fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
+    drawGlowRoundRectImpl(x, y, w, h, radius, fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
+    _flags.renderToSprite = prevRender;
+    _activeSprite = prevActive;
+
+    invalidateRect(bx, by, bw, bh);
+    flushDirty();
+}
+
+void GUI::updateGlowRoundRectCornersImpl(int16_t x, int16_t y,
+                                     int16_t w, int16_t h,
+                                     uint8_t radiusTL, uint8_t radiusTR,
+                                     uint8_t radiusBR, uint8_t radiusBL,
+                                     uint32_t fillColor,
+                                     int32_t bgColor,
+                                     int32_t glowColor,
+                                     uint8_t glowSize,
+                                     uint8_t glowStrength,
+                                     GlowAnim anim,
+                                     uint16_t pulsePeriodMs)
+{
+    if (!_flags.spriteEnabled || !_display)
+    {
+        bool prevRender = _flags.renderToSprite;
+        pipcore::Sprite *prevActive = _activeSprite;
+        _flags.renderToSprite = 0;
+        drawGlowRoundRectCornersImpl(x, y, w, h, radiusTL, radiusTR, radiusBR, radiusBL,
+                                     fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
+        _flags.renderToSprite = prevRender;
+        _activeSprite = prevActive;
+        return;
+    }
+
+    int16_t rx = x;
+    int16_t ry = y;
+    if (rx == center)
+        rx = (int16_t)(AutoX((int32_t)w + 2 * (int32_t)glowSize) + (int32_t)glowSize);
+    if (ry == center)
+        ry = (int16_t)(AutoY((int32_t)h + 2 * (int32_t)glowSize) + (int32_t)glowSize);
+
+    int16_t pad = 2;
+    int16_t bx = (int16_t)(rx - (int16_t)glowSize - pad);
+    int16_t by = (int16_t)(ry - (int16_t)glowSize - pad);
+    int16_t bw = (int16_t)(w + (int16_t)glowSize * 2 + pad * 2);
+    int16_t bh = (int16_t)(h + (int16_t)glowSize * 2 + pad * 2);
+
+    uint32_t bg = (bgColor >= 0) ? static_cast<uint32_t>(bgColor) : _bgColor;
+
+    bool prevRender = _flags.renderToSprite;
+    pipcore::Sprite *prevActive = _activeSprite;
+
+    _flags.renderToSprite = 1;
+    _activeSprite = &_sprite;
+
+    fillRect()
+        .at(bx, by)
+        .size(bw, bh)
+        .color(bg)
+        .draw();
+
+    drawGlowRoundRectCornersImpl(x, y, w, h, radiusTL, radiusTR, radiusBR, radiusBL,
+                                 fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
     _flags.renderToSprite = prevRender;
     _activeSprite = prevActive;
 
@@ -341,7 +490,7 @@ bool GUI::ensureBlurWorkBuffers(uint32_t smallLen, int16_t sw, int16_t sh) noexc
            _blurColR && _blurColG && _blurColB;
 }
  
- void GUI::drawBlurStrip(int16_t x, int16_t y,
+ void GUI::drawBlurStripImpl(int16_t x, int16_t y,
                          int16_t w, int16_t h,
                          uint8_t radius,
                          BlurDirection dir,
@@ -378,7 +527,7 @@ bool GUI::ensureBlurWorkBuffers(uint32_t smallLen, int16_t sw, int16_t sh) noexc
     {
         if (_flags.spriteEnabled && _display && !_flags.renderToSprite)
         {
-            updateBlurStrip(x, y, w, h, radius, dir, gradient, materialStrength, noiseAmount, materialColor);
+            updateBlurStripImpl(x, y, w, h, radius, dir, gradient, materialStrength, noiseAmount, materialColor);
             return;
         }
 
@@ -635,7 +784,7 @@ bool GUI::ensureBlurWorkBuffers(uint32_t smallLen, int16_t sw, int16_t sh) noexc
     }
 }
 
-void GUI::updateBlurStrip(int16_t x, int16_t y,
+void GUI::updateBlurStripImpl(int16_t x, int16_t y,
                           int16_t w, int16_t h,
                           uint8_t radius,
                           BlurDirection dir,
@@ -649,7 +798,7 @@ void GUI::updateBlurStrip(int16_t x, int16_t y,
         bool prevRender = _flags.renderToSprite;
         pipcore::Sprite *prevActive = _activeSprite;
         _flags.renderToSprite = 0;
-        drawBlurStrip(x, y, w, h, radius, dir, gradient, materialStrength, noiseAmount, materialColor);
+        drawBlurStripImpl(x, y, w, h, radius, dir, gradient, materialStrength, noiseAmount, materialColor);
         _flags.renderToSprite = prevRender;
         _activeSprite = prevActive;
         return;
@@ -660,7 +809,7 @@ void GUI::updateBlurStrip(int16_t x, int16_t y,
 
     _flags.renderToSprite = 1;
     _activeSprite = &_sprite;
-    drawBlurStrip(x, y, w, h, radius, dir, gradient, materialStrength, noiseAmount, materialColor);
+    drawBlurStripImpl(x, y, w, h, radius, dir, gradient, materialStrength, noiseAmount, materialColor);
     _flags.renderToSprite = prevRender;
     _activeSprite = prevActive;
 

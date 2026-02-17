@@ -42,15 +42,6 @@ namespace pipgui
         return (uint32_t)((r << 16) | (g << 8) | b);
     }
 
-    static uint32_t autoKnobColor888(uint32_t bg)
-    {
-        uint16_t r8 = (uint16_t)((bg >> 16) & 0xFF);
-        uint16_t g8 = (uint16_t)((bg >> 8) & 0xFF);
-        uint16_t b8 = (uint16_t)(bg & 0xFF);
-        uint16_t lum = (uint16_t)((r8 * 30U + g8 * 59U + b8 * 11U) / 100U);
-        return (lum > 140U) ? 0x000000 : 0xFFFFFF;
-    }
-
     bool GUI::updateToggleSwitch(ToggleSwitchState &s, bool pressed)
     {
         bool changed = false;
@@ -133,16 +124,17 @@ namespace pipgui
         {
             int16_t left = 0;
             int16_t availW = _screenWidth;
-            if (_flags.statusBarEnabled && _statusBarHeight > 0)
+            int16_t sb = statusBarHeight();
+            if (_flags.statusBarEnabled && sb > 0)
             {
                 if (_statusBarPos == Left)
                 {
-                    left += _statusBarHeight;
-                    availW -= _statusBarHeight;
+                    left += sb;
+                    availW -= sb;
                 }
                 else if (_statusBarPos == Right)
                 {
-                    availW -= _statusBarHeight;
+                    availW -= sb;
                 }
             }
             if (availW < w)
@@ -153,16 +145,17 @@ namespace pipgui
         {
             int16_t top = 0;
             int16_t availH = _screenHeight;
-            if (_flags.statusBarEnabled && _statusBarHeight > 0)
+            int16_t sb = statusBarHeight();
+            if (_flags.statusBarEnabled && sb > 0)
             {
                 if (_statusBarPos == Top)
                 {
-                    top += _statusBarHeight;
-                    availH -= _statusBarHeight;
+                    top += sb;
+                    availH -= sb;
                 }
                 else if (_statusBarPos == Bottom)
                 {
-                    availH -= _statusBarHeight;
+                    availH -= sb;
                 }
             }
             if (availH < h)
@@ -199,7 +192,7 @@ namespace pipgui
 
         uint32_t knob;
         if (knobColor < 0)
-            knob = autoKnobColor888(bg);
+            knob = detail::autoTextColor888(bg, 140);
         else
             knob = (uint32_t)knobColor;
 
@@ -250,7 +243,11 @@ namespace pipgui
         _flags.renderToSprite = 1;
         _activeSprite = &_sprite;
 
-        fillRect((int16_t)(rx - pad), (int16_t)(ry - pad), (int16_t)(w + pad * 2), (int16_t)(h + pad * 2), _bgColor);
+        fillRect()
+            .at((int16_t)(rx - pad), (int16_t)(ry - pad))
+            .size((int16_t)(w + pad * 2), (int16_t)(h + pad * 2))
+            .color(_bgColor)
+            .draw();
         drawToggleSwitch(x, y, w, h, state, activeColor, inactiveColor, knobColor);
 
         _flags.renderToSprite = prevRender;

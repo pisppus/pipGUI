@@ -2,6 +2,30 @@
 #error "Do not include this file directly. Include <pipGUI/core/api/pipGUI.hpp>"
 #endif
 
+        // Fluent builders call private *Impl() methods; each needs friend access.
+        friend struct FillRectFluent;
+        friend struct FillRectAlphaFluent;
+        friend struct FillRectGradientVerticalFluent;
+        friend struct FillRectGradientHorizontalFluent;
+        friend struct FillRectGradient4Fluent;
+        friend struct FillRectGradientDiagonalFluent;
+        friend struct FillRectGradientRadialFluent;
+        friend struct DrawLineFluent;
+        friend struct DrawCircleFluent;
+        friend struct FillCircleFluent;
+        friend struct DrawArcFluent;
+        friend struct DrawEllipseFluent;
+        friend struct FillEllipseFluent;
+        friend struct DrawTriangleFluent;
+        friend struct FillTriangleFluent;
+        friend struct DrawSquircleFluent;
+        friend struct FillSquircleFluent;
+        friend struct ToastFluent;
+        template <bool IsUpdate> friend struct BlurStripFluentT;
+        template <bool IsUpdate> friend struct ScrollDotsFluentT;
+        template <bool IsUpdate> friend struct GlowCircleFluentT;
+        template <bool IsUpdate> friend struct GlowRoundRectFluentT;
+
         void configureListMenu(uint8_t screenId, uint8_t parentScreen, const ListMenuItemDef *items, uint8_t itemCount);
         void configureTileMenu(uint8_t screenId, uint8_t parentScreen, const TileMenuItemDef *items, uint8_t itemCount);
 
@@ -32,7 +56,14 @@
 
         void renderScreenTransition(uint32_t now);
         void renderNotificationOverlay();
+        void renderToastOverlay();
         void renderStatusBar(bool useSprite);
+
+        void showToastInternal(const String &text,
+                               uint32_t durationMs,
+                               bool fromTop,
+                               IconId iconId,
+                               uint16_t iconSizePx);
 
         void invalidateRect(int16_t x, int16_t y, int16_t w, int16_t h);
         void flushDirty();
@@ -40,8 +71,63 @@
 
         uint16_t color888To565(int16_t x, int16_t y, uint32_t color888) const;
         void fillCircleFrc(int16_t cx, int16_t cy, int16_t r, uint32_t color888);
+
+        // Internal drawing implementation; called only by fluent builders on .draw(). Do not call from user code.
+        void fillRectImpl(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t color);
+        void fillRectAlphaImpl(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t color, uint8_t alpha);
+        void fillRectGradientVerticalImpl(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t topColor, uint32_t bottomColor);
+        void fillRectGradientHorizontalImpl(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t leftColor, uint32_t rightColor);
+        void fillRectGradient4Impl(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t c00, uint32_t c10, uint32_t c01, uint32_t c11);
+        void fillRectGradientDiagonalImpl(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t tlColor, uint32_t brColor);
+        void fillRectGradientRadialImpl(int16_t x, int16_t y, int16_t w, int16_t h, int16_t cx, int16_t cy, int16_t radius, uint32_t innerColor, uint32_t outerColor);
+        void drawBlurStripImpl(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radius, BlurDirection dir, bool gradient, uint8_t materialStrength, uint8_t noiseAmount, int32_t materialColor);
+        void updateBlurStripImpl(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radius, BlurDirection dir, bool gradient, uint8_t materialStrength, uint8_t noiseAmount, int32_t materialColor);
+        void drawScrollDotsImpl(int16_t x, int16_t y, uint8_t count, uint8_t activeIndex, uint8_t prevIndex, float animProgress, bool animate, int8_t animDirection, uint32_t activeColor, uint32_t inactiveColor, uint8_t dotRadius, uint8_t spacing, uint8_t activeWidth);
+        void updateScrollDotsImpl(int16_t x, int16_t y, uint8_t count, uint8_t activeIndex, uint8_t prevIndex, float animProgress, bool animate, int8_t animDirection, uint32_t activeColor, uint32_t inactiveColor, uint8_t dotRadius, uint8_t spacing, uint8_t activeWidth);
+        void drawGlowCircleImpl(int16_t x, int16_t y, int16_t r, uint32_t fillColor, int32_t bgColor, int32_t glowColor, uint8_t glowSize, uint8_t glowStrength, GlowAnim anim, uint16_t pulsePeriodMs);
+        void updateGlowCircleImpl(int16_t x, int16_t y, int16_t r, uint32_t fillColor, int32_t bgColor, int32_t glowColor, uint8_t glowSize, uint8_t glowStrength, GlowAnim anim, uint16_t pulsePeriodMs);
+        void drawGlowRoundRectImpl(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radius, uint32_t fillColor, int32_t bgColor, int32_t glowColor, uint8_t glowSize, uint8_t glowStrength, GlowAnim anim, uint16_t pulsePeriodMs);
+        void updateGlowRoundRectImpl(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radius, uint32_t fillColor, int32_t bgColor, int32_t glowColor, uint8_t glowSize, uint8_t glowStrength, GlowAnim anim, uint16_t pulsePeriodMs);
+        // Extended glow round-rect with per-corner radii.
+        void drawGlowRoundRectCornersImpl(int16_t x, int16_t y, int16_t w, int16_t h,
+                                          uint8_t radiusTL, uint8_t radiusTR,
+                                          uint8_t radiusBR, uint8_t radiusBL,
+                                          uint32_t fillColor, int32_t bgColor, int32_t glowColor,
+                                          uint8_t glowSize, uint8_t glowStrength, GlowAnim anim, uint16_t pulsePeriodMs);
+        void updateGlowRoundRectCornersImpl(int16_t x, int16_t y, int16_t w, int16_t h,
+                                            uint8_t radiusTL, uint8_t radiusTR,
+                                            uint8_t radiusBR, uint8_t radiusBL,
+                                            uint32_t fillColor, int32_t bgColor, int32_t glowColor,
+                                            uint8_t glowSize, uint8_t glowStrength, GlowAnim anim, uint16_t pulsePeriodMs);
+        void drawLineImpl(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint32_t color);
+        void drawCircleImpl(int16_t cx, int16_t cy, int16_t r, uint32_t color);
+        void fillCircleImpl(int16_t cx, int16_t cy, int16_t r, uint32_t color);
+        void drawArcImpl(int16_t cx, int16_t cy, int16_t r, float startDeg, float endDeg, uint32_t color);
+        void drawEllipseImpl(int16_t cx, int16_t cy, int16_t rx, int16_t ry, uint32_t color);
+        void fillEllipseImpl(int16_t cx, int16_t cy, int16_t rx, int16_t ry, uint32_t color);
+        void drawTriangleImpl(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint32_t color);
+        void fillTriangleImpl(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint32_t color);
+        void drawRoundTriangleImpl(int16_t x0, int16_t y0,
+                                   int16_t x1, int16_t y1,
+                                   int16_t x2, int16_t y2,
+                                   uint8_t radius, uint32_t color);
+        void fillRoundTriangleImpl(int16_t x0, int16_t y0,
+                                   int16_t x1, int16_t y1,
+                                   int16_t x2, int16_t y2,
+                                   uint8_t radius, uint32_t color);
+        void drawSquircleImpl(int16_t cx, int16_t cy, int16_t r, uint32_t color);
+        void fillSquircleImpl(int16_t cx, int16_t cy, int16_t r, uint32_t color);
         void fillRoundRectFrc(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radius, uint32_t color888);
         void drawRoundRectFrc(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radius, uint32_t color888);
+        // Extended variant: per-corner radii (top-left, top-right, bottom-right, bottom-left).
+        void fillRoundRectCornersFrc(int16_t x, int16_t y, int16_t w, int16_t h,
+                                     uint8_t radiusTL, uint8_t radiusTR,
+                                     uint8_t radiusBR, uint8_t radiusBL,
+                                     uint32_t color888);
+        void drawRoundRectCornersFrc(int16_t x, int16_t y, int16_t w, int16_t h,
+                                     uint8_t radiusTL, uint8_t radiusTR,
+                                     uint8_t radiusBR, uint8_t radiusBL,
+                                     uint32_t color888);
         void blitImage565Frc(int16_t x, int16_t y, const uint16_t *bitmap565, int16_t w, int16_t h);
 
         uint32_t nowMs() const;
@@ -102,7 +188,9 @@
         uint16_t _screenWidth = 0, _screenHeight = 0;
         uint32_t _bgColor = 0;
 
-        FrcProfile _frcProfile = FrcProfile::BlueNoise;
+        // Default: library renders in clean 565; FRC/dithering is enabled explicitly
+        // (e.g. in gradient routines) where risk of banding is high.
+        FrcProfile _frcProfile = FrcProfile::Off;
         uint32_t _frcSeed = 0x6D2B79F5U;
         uint32_t _frcLastUpdateMs = 0;
         uint16_t _frcTemporalPeriodMs = 0;
@@ -146,6 +234,7 @@
             unsigned recoveryActive : 1;
             unsigned bootWasActive : 1;
             unsigned recoverySavedStatusBarEnabled : 1;
+            unsigned toastActive : 1;
         } _flags = {};
 
         BootAnimation _bootAnim = None;
@@ -199,7 +288,16 @@
         uint32_t _notifUnlockMs = 0;
         ButtonVisualState _notifButtonState;
 
+        String _toastText;
+        IconId _toastIconId = WarningLayer0;
+        uint16_t _toastIconSizePx = 20;
+        uint32_t _toastStartMs = 0;
+        uint32_t _toastAnimDurMs = 420;
+        uint32_t _toastDisplayMs = 2500;
+        bool _toastFromTop = false;
+
         StatusBarPosition _statusBarPos = Top;
+        StatusBarStyle _statusBarStyle = StatusBarStyleSolid;
         uint8_t _statusBarHeight = 0;
         uint32_t _statusBarBg = 0x000000;
         uint32_t _statusBarFg = 0xFFFFFF;

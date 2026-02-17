@@ -1,3 +1,5 @@
+// Alert dialog overlay: modal with title, message and button (showNotification API).
+
 #include <pipGUI/core/api/pipGUI.hpp>
 
 namespace pipgui
@@ -161,10 +163,21 @@ namespace pipgui
             else
                 btnColor = 0x00D604;
 
-            int16_t finalW = 138;
-            int16_t finalH = 92;
+            int16_t finalW = 148;
+            int16_t finalH = 96;
 
-            float scale = 0.5f + 0.5f * p;
+            // Apple‑style feel: alert \"ложится\" на экран с лёгким уменьшением
+            float scale;
+            if (_flags.notifClosing)
+            {
+                // Close: subtle shrink and fade out
+                scale = 1.0f - 0.06f * p; // 1.00 -> 0.94
+            }
+            else
+            {
+                // Open: start слегка увеличенной и мягко приземляется к 1.0
+                scale = 1.06f - 0.06f * p; // 1.06 -> 1.00
+            }
 
             float cardWf = finalW * scale;
             float cardHf = finalH * scale;
@@ -175,16 +188,17 @@ namespace pipgui
 
             int16_t cTop = 0;
             int16_t cH = (int16_t)_screenHeight;
-            if (_flags.statusBarEnabled && _statusBarHeight > 0)
+            int16_t sb = statusBarHeight();
+            if (_flags.statusBarEnabled && sb > 0 && _statusBarStyle == StatusBarStyleSolid)
             {
                 if (_statusBarPos == Top)
                 {
-                    cTop += (int16_t)_statusBarHeight;
-                    cH -= (int16_t)_statusBarHeight;
+                    cTop += sb;
+                    cH -= sb;
                 }
                 else if (_statusBarPos == Bottom)
                 {
-                    cH -= (int16_t)_statusBarHeight;
+                    cH -= sb;
                 }
             }
             if (cH <= 0)

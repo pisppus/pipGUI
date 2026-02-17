@@ -48,12 +48,9 @@ namespace pipgui
             _statusBarHeight = hLocal;
         }
 
-        uint8_t r = (uint8_t)((bgColor >> 16) & 0xFF);
-        uint8_t g = (uint8_t)((bgColor >> 8) & 0xFF);
-        uint8_t b = (uint8_t)(bgColor & 0xFF);
-        uint32_t y = (uint32_t)r * 30U + (uint32_t)g * 59U + (uint32_t)b * 11U;
-        uint32_t maxY = (30U * 255U + 59U * 255U + 11U * 255U);
-        _statusBarFg = (y > (maxY / 2U)) ? 0x000000 : 0xFFFFFF;
+        // Auto-pick text color (black/white) based on background brightness.
+        // Use mid-luminance threshold so light bars get dark text and vice versa.
+        _statusBarFg = detail::autoTextColor888(bgColor, 128);
     }
 
     void GUI::setStatusBarText(const String &left, const String &center, const String &right)
@@ -444,7 +441,12 @@ namespace pipgui
 
     int16_t GUI::statusBarHeight() const
     {
-        return (_flags.statusBarEnabled && _statusBarHeight > 0) ? (int16_t)_statusBarHeight : 0;
+        if (!_flags.statusBarEnabled || _statusBarHeight == 0)
+            return 0;
+        // Only Solid style reserves layout space. Blur overlays content.
+        if (_statusBarStyle != StatusBarStyleSolid)
+            return 0;
+        return (int16_t)_statusBarHeight;
     }
 
     void GUI::renderStatusBar(bool useSprite)
@@ -511,8 +513,30 @@ namespace pipgui
             return;
         }
 
-        fillRect(x, y, w, h, bg888);
-        
+        if (_statusBarStyle == StatusBarStyleSolid)
+        {
+            fillRect()
+                .at(x, y)
+                .size(w, h)
+                .color(bg888)
+                .draw();
+        }
+        else if (_statusBarStyle == StatusBarStyleBlurGradient)
+        {
+            BlurDirection dir = TopDown;
+            if (_statusBarPos == Bottom)
+                dir = BottomUp;
+            else if (_statusBarPos == Left)
+                dir = RightLeft;
+            else if (_statusBarPos == Right)
+                dir = LeftRight;
+            int16_t dim = (h > w) ? h : w;
+            uint8_t blurRadius = (uint8_t)(dim / 8);
+            if (blurRadius < 1)
+                blurRadius = 1;
+            drawBlurStripImpl(x, y, w, h, blurRadius, dir, true, 0, 0, -1);
+        }
+
         // If debug metrics mode is enabled, only render metrics and skip normal content
         if (_flags.statusBarDebugMetrics)
         {
@@ -657,7 +681,11 @@ namespace pipgui
 
             drawIcon(pipgui::battery_layer2, bx, by, (uint16_t)iconSize, fillCol, bg888);
             int16_t cutX = (int16_t)(bx + (int32_t)iconSize * _batteryLevel / 100);
-            fillRect(cutX, by, (int16_t)(bx + iconSize - cutX), (int16_t)iconSize, bg888);
+            fillRect()
+                .at(cutX, by)
+                .size((int16_t)(bx + iconSize - cutX), (int16_t)iconSize)
+                .color(bg888)
+                .draw();
 
             drawIcon(pipgui::battery_layer0, bx, by, (uint16_t)iconSize, frameColor, bg888);
             drawIcon(pipgui::battery_layer1, bx, by, (uint16_t)iconSize, frameColor, bg888);

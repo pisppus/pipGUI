@@ -25,29 +25,16 @@
                              float speed = 1.0f);
         void updateGraphLine(uint8_t lineIndex, int16_t value, uint32_t color, int16_t valueMin, int16_t valueMax);
 
-        void drawLine(int16_t x0, int16_t y0,
-                      int16_t x1, int16_t y1,
-                      uint32_t color);
-
-        void drawCircle(int16_t cx, int16_t cy, int16_t r, uint32_t color);
-        void fillCircle(int16_t cx, int16_t cy, int16_t r, uint32_t color);
-
-        void drawArc(int16_t cx, int16_t cy, int16_t r, float startDeg, float endDeg, uint32_t color);
-
-        void drawEllipse(int16_t cx, int16_t cy, int16_t rx, int16_t ry, uint32_t color);
-        void fillEllipse(int16_t cx, int16_t cy, int16_t rx, int16_t ry, uint32_t color);
-
-        void drawTriangle(int16_t x0, int16_t y0,
-                          int16_t x1, int16_t y1,
-                          int16_t x2, int16_t y2,
-                          uint32_t color);
-        void fillTriangle(int16_t x0, int16_t y0,
-                          int16_t x1, int16_t y1,
-                          int16_t x2, int16_t y2,
-                          uint32_t color);
-
-        void drawSquircle(int16_t cx, int16_t cy, int16_t r, uint32_t color);
-        void fillSquircle(int16_t cx, int16_t cy, int16_t r, uint32_t color);
+        DrawLineFluent drawLine() { return DrawLineFluent(this); }
+        DrawCircleFluent drawCircle() { return DrawCircleFluent(this); }
+        FillCircleFluent fillCircle() { return FillCircleFluent(this); }
+        DrawArcFluent drawArc() { return DrawArcFluent(this); }
+        DrawEllipseFluent drawEllipse() { return DrawEllipseFluent(this); }
+        FillEllipseFluent fillEllipse() { return FillEllipseFluent(this); }
+        DrawTriangleFluent drawTriangle() { return DrawTriangleFluent(this); }
+        FillTriangleFluent fillTriangle() { return FillTriangleFluent(this); }
+        DrawSquircleFluent drawSquircle() { return DrawSquircleFluent(this); }
+        FillSquircleFluent fillSquircle() { return FillSquircleFluent(this); }
 
         void drawProgressBar(int16_t x,
                              int16_t y,
@@ -99,7 +86,8 @@
                                uint32_t baseColor,
                                uint32_t fillColor,
                                uint8_t radius = 6,
-                               ProgressAnim anim = None);
+                               ProgressAnim anim = None,
+                               bool doFlush = true);
         void updateProgressBar(int16_t x,
                                int16_t y,
                                int16_t w,
@@ -107,7 +95,8 @@
                                uint8_t value,
                                uint32_t color,
                                uint8_t radius = 6,
-                               ProgressAnim anim = None);
+                               ProgressAnim anim = None,
+                               bool doFlush = true);
         void updateProgressBar(ProgressBarState &s,
                                int16_t x,
                                int16_t y,
@@ -125,14 +114,16 @@
                                        uint8_t value,
                                        uint32_t baseColor,
                                        uint32_t fillColor,
-                                       ProgressAnim anim = None);
+                                       ProgressAnim anim = None,
+                                       bool doFlush = true);
         void updateCircularProgressBar(int16_t x,
                                        int16_t y,
                                        int16_t r,
                                        uint8_t thickness,
                                        uint8_t value,
                                        uint32_t color,
-                                       ProgressAnim anim = None);
+                                       ProgressAnim anim = None,
+                                       bool doFlush = true);
 
         void updateStatusBar();
 
@@ -207,6 +198,15 @@
                             uint32_t bgColor,
                             TextAlign align = Left);
 
+        void drawDrumRollHorizontal(int16_t x, int16_t y, int16_t w, int16_t h,
+                                    const String *options, uint8_t count,
+                                    uint8_t selectedIndex, uint8_t prevIndex, float animProgress,
+                                    uint32_t fgColor, uint32_t bgColor, uint16_t fontPx = 0);
+        void drawDrumRollVertical(int16_t x, int16_t y, int16_t w, int16_t h,
+                                  const String *options, uint8_t count,
+                                  uint8_t selectedIndex, uint8_t prevIndex, float animProgress,
+                                  uint32_t fgColor, uint32_t bgColor, uint16_t fontPx = 0);
+
         void drawIcon(uint16_t iconId,
                       int16_t x,
                       int16_t y,
@@ -257,6 +257,30 @@
                               NotificationType type = Normal);
         void setNotificationButtonDown(bool down);
         bool notificationActive() const;
+
+        ToastFluent showToast() { return ToastFluent(this); }
+        bool toastActive() const;
+
+        // Optional text overlay helpers for determinate progress bars
+        void drawProgressText(int16_t x,
+                              int16_t y,
+                              int16_t w,
+                              int16_t h,
+                              const String &text,
+                              TextAlign align = AlignCenter,
+                              uint32_t textColor = 0xFFFFFF,
+                              uint32_t bgColor = 0x000000,
+                              uint16_t fontPx = 0);
+
+        void drawProgressPercent(int16_t x,
+                                 int16_t y,
+                                 int16_t w,
+                                 int16_t h,
+                                 uint8_t value,
+                                 TextAlign align = AlignCenter,
+                                 uint32_t textColor = 0xFFFFFF,
+                                 uint32_t bgColor = 0x000000,
+                                 uint16_t fontPx = 0);
 
         void showError(const String &title,
                        const String &message,
@@ -345,6 +369,7 @@
                                 uint32_t bgColor = 0x000000,
                                 uint8_t height = 0,
                                 StatusBarPosition pos = Top);
+        void setStatusBarStyle(StatusBarStyle style) { _statusBarStyle = style; _statusBarDirtyMask = StatusBarDirtyAll; }
         void setStatusBarText(const String &left, const String &center, const String &right);
         void setStatusBarBattery(int8_t levelPercent, BatteryStyle style);
         void clearStatusBarIcons()

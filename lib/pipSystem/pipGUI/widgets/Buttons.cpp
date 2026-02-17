@@ -178,12 +178,8 @@ namespace pipgui
 
         fillRoundRectFrc(bx, by, bw, bh, (uint8_t)br, bg);
 
-        uint8_t br8 = (uint8_t)((bg >> 16) & 0xFF);
-        uint8_t bg8 = (uint8_t)((bg >> 8) & 0xFF);
-        uint8_t bb8 = (uint8_t)(bg & 0xFF);
-
-        uint32_t lum = (uint32_t)((br8 * 30U + bg8 * 59U + bb8 * 11U) / 100U);
-        uint32_t fgActive = (lum > 140U) ? 0x000000 : 0xFFFFFF;
+        // Pick readable text color against current button background.
+        uint32_t fgActive = detail::autoTextColor888(bg, 140);
 
         bool disabledVis = !state.enabled || (state.fadeLevel < 40);
         uint32_t fg;
@@ -328,11 +324,11 @@ namespace pipgui
         _flags.renderToSprite = 1;
         _activeSprite = &_sprite;
 
-        fillRect((int16_t)(rx - pad),
-                 (int16_t)(ry - pad),
-                 (int16_t)(w + pad * 2),
-                 (int16_t)(h + pad * 2),
-                 _bgColor);
+        fillRect()
+            .at((int16_t)(rx - pad), (int16_t)(ry - pad))
+            .size((int16_t)(w + pad * 2), (int16_t)(h + pad * 2))
+            .color(_bgColor)
+            .draw();
         drawButton(label, iconBitmap, iconW, iconH, x, y, w, h, baseColor, radius, state);
 
         _flags.renderToSprite = prevRender;

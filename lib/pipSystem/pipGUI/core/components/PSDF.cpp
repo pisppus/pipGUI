@@ -759,7 +759,11 @@ namespace pipgui
         _flags.renderToSprite = 1;
         _activeSprite = &_sprite;
 
-        fillRect(bx, by, bw, bh, bgColor);
+        fillRect()
+            .at(bx, by)
+            .size(bw, bh)
+            .color(bgColor)
+            .draw();
 
         uint16_t fg565 = color888To565(rx, ry, color);
         uint16_t bg565 = color888To565(rx, ry, bgColor);
@@ -858,7 +862,6 @@ namespace pipgui
             for (int16_t py = iy0; py < iy1; ++py)
             {
                 float v = ((float)(py - ry) + 0.5f) * invSize;
-                v = 1.0f - v;
                 float sy = (float)srcY + (float)srcH * v;
 
                 int32_t row = (int32_t)py * (int32_t)stride;
@@ -896,7 +899,6 @@ namespace pipgui
         {
             int16_t py = (int16_t)(ry + (int16_t)dy);
             float v = ((float)dy + 0.5f) * invSize;
-            v = 1.0f - v;
             float sy = (float)srcY + (float)srcH * v;
 
             for (uint16_t dx = 0; dx < sizePx; ++dx)
@@ -953,7 +955,11 @@ namespace pipgui
         _flags.renderToSprite = 1;
         _activeSprite = &_sprite;
 
-        fillRect(bx, by, bw, bh, bgColor);
+        fillRect()
+            .at(bx, by)
+            .size(bw, bh)
+            .color(bgColor)
+            .draw();
         drawIcon(iconId, rx, ry, sizePx, color, bgColor);
 
         _flags.renderToSprite = prevRender;

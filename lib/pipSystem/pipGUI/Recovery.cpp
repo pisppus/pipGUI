@@ -295,16 +295,17 @@ void GUI::renderRecoveryScreen()
     clear(_bgColor);
 
     int16_t left = 0, right = _screenWidth, top = 0, bottom = _screenHeight;
-    if (_flags.statusBarEnabled && _statusBarHeight > 0)
+    int16_t sb = statusBarHeight();
+    if (_flags.statusBarEnabled && sb > 0 && _statusBarStyle == StatusBarStyleSolid)
     {
         if (_statusBarPos == Top)
-            top += _statusBarHeight;
+            top += sb;
         else if (_statusBarPos == Bottom)
-            bottom -= _statusBarHeight;
+            bottom -= sb;
         else if (_statusBarPos == Left)
-            left += _statusBarHeight;
+            left += sb;
         else if (_statusBarPos == Right)
-            right -= _statusBarHeight;
+            right -= sb;
     }
 
     int16_t usableW = right - left;

@@ -308,6 +308,8 @@ namespace pipgui
             renderErrorFrame(now);
             if (_flags.notifActive)
                 renderNotificationOverlay();
+            if (_flags.toastActive)
+                renderToastOverlay();
             Debug::endRender();
             return;
         }
@@ -317,6 +319,8 @@ namespace pipgui
             renderScreenTransition(now);
             if (_flags.notifActive)
                 renderNotificationOverlay();
+            if (_flags.toastActive)
+                renderToastOverlay();
             Debug::endRender();
             return;
         }
@@ -335,6 +339,8 @@ namespace pipgui
                 Debug::endRender();
             }
             renderNotificationOverlay();
+            if (_flags.toastActive)
+                renderToastOverlay();
             return;
         }
 
@@ -365,7 +371,12 @@ namespace pipgui
 
                     renderStatusBar(true);
                     if (_display)
-                        _sprite.writeToDisplay(*_display, 0, 0, (int16_t)_screenWidth, (int16_t)_screenHeight);
+                    {
+                        if (_flags.toastActive)
+                            renderToastOverlay();
+                        else
+                            _sprite.writeToDisplay(*_display, 0, 0, (int16_t)_screenWidth, (int16_t)_screenHeight);
+                    }
                     Debug::endRender();
                     _dirtyCount = 0;
                 }
@@ -384,6 +395,8 @@ namespace pipgui
 
         if (_flags.notifActive && !_flags.spriteEnabled)
             renderNotificationOverlay();
+        if (_flags.toastActive)
+            _flags.needRedraw = 1;
     }
 
     void GUI::loopWithInput(Button &next, Button &prev)

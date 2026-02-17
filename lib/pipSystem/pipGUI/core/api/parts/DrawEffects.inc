@@ -13,98 +13,23 @@
         uint16_t screenHeight() const;
 
         void clear(uint32_t color = 0x000000);
-        void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t color);
 
-        void fillRectAlpha(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t color, uint8_t alpha);
+        FillRectFluent fillRect() { return FillRectFluent(this); }
+        FillRectAlphaFluent fillRectAlpha() { return FillRectAlphaFluent(this); }
+        FillRectGradientVerticalFluent fillRectGradientVertical() { return FillRectGradientVerticalFluent(this); }
+        FillRectGradientHorizontalFluent fillRectGradientHorizontal() { return FillRectGradientHorizontalFluent(this); }
+        FillRectGradient4Fluent fillRectGradient4() { return FillRectGradient4Fluent(this); }
+        FillRectGradientDiagonalFluent fillRectGradientDiagonal() { return FillRectGradientDiagonalFluent(this); }
+        FillRectGradientRadialFluent fillRectGradientRadial() { return FillRectGradientRadialFluent(this); }
 
-        void fillRectGradientVertical(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t topColor, uint32_t bottomColor);
-        void fillRectGradientHorizontal(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t leftColor, uint32_t rightColor);
-        void fillRectGradient4(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t c00, uint32_t c10, uint32_t c01, uint32_t c11);
-        void fillRectGradientDiagonal(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t tlColor, uint32_t brColor);
-        void fillRectGradientRadial(int16_t x, int16_t y, int16_t w, int16_t h, int16_t cx, int16_t cy, int16_t radius, uint32_t innerColor, uint32_t outerColor);
+        DrawBlurStripFluent drawBlurStrip() { return DrawBlurStripFluent(this); }
+        UpdateBlurStripFluent updateBlurStrip() { return UpdateBlurStripFluent(this); }
 
-        void drawBlurStrip(int16_t x, int16_t y,
-                           int16_t w, int16_t h,
-                           uint8_t radius,
-                           BlurDirection dir,
-                           bool gradient = true,
-                           uint8_t materialStrength = 32,
-                           uint8_t noiseAmount = 8,
-                           int32_t materialColor = -1);
+        DrawScrollDotsFluent drawScrollDots() { return DrawScrollDotsFluent(this); }
+        UpdateScrollDotsFluent updateScrollDots() { return UpdateScrollDotsFluent(this); }
 
-        void updateBlurStrip(int16_t x, int16_t y,
-                             int16_t w, int16_t h,
-                             uint8_t radius,
-                             BlurDirection dir,
-                             bool gradient = true,
-                             uint8_t materialStrength = 32,
-                             uint8_t noiseAmount = 8,
-                             int32_t materialColor = -1);
+        DrawGlowCircleFluent drawGlowCircle() { return DrawGlowCircleFluent(this); }
+        UpdateGlowCircleFluent updateGlowCircle() { return UpdateGlowCircleFluent(this); }
 
-        void drawScrollDots(int16_t x, int16_t y,
-                            uint8_t count,
-                            uint8_t activeIndex,
-                            uint8_t prevIndex = 0,
-                            float animProgress = 0.0f,
-                            bool animate = false,
-                            int8_t animDirection = 0,
-                            uint32_t activeColor = 0xFFFFFF,
-                            uint32_t inactiveColor = 0x7B817B,
-                            uint8_t dotRadius = 3,
-                            uint8_t spacing = 14,
-                            uint8_t activeWidth = 18);
-
-        void updateScrollDots(int16_t x, int16_t y,
-                              uint8_t count,
-                              uint8_t activeIndex,
-                              uint8_t prevIndex = 0,
-                              float animProgress = 0.0f,
-                              bool animate = false,
-                              int8_t animDirection = 0,
-                              uint32_t activeColor = 0xFFFFFF,
-                              uint32_t inactiveColor = 0x7B817B,
-                              uint8_t dotRadius = 3,
-                              uint8_t spacing = 14,
-                              uint8_t activeWidth = 18);
-
-        void drawGlowCircle(int16_t x, int16_t y,
-                            int16_t r,
-                            uint32_t fillColor,
-                            int32_t bgColor = -1,
-                            int32_t glowColor = -1,
-                            uint8_t glowSize = 12,
-                            uint8_t glowStrength = 220,
-                            GlowAnim anim = None,
-                            uint16_t pulsePeriodMs = 1000);
-
-        void updateGlowCircle(int16_t x, int16_t y,
-                              int16_t r,
-                              uint32_t fillColor,
-                              int32_t bgColor = -1,
-                              int32_t glowColor = -1,
-                              uint8_t glowSize = 12,
-                              uint8_t glowStrength = 220,
-                              GlowAnim anim = None,
-                              uint16_t pulsePeriodMs = 1000);
-
-        void drawGlowRoundRect(int16_t x, int16_t y,
-                               int16_t w, int16_t h,
-                               uint8_t radius,
-                               uint32_t fillColor,
-                               int32_t bgColor = -1,
-                               int32_t glowColor = -1,
-                               uint8_t glowSize = 12,
-                               uint8_t glowStrength = 220,
-                               GlowAnim anim = None,
-                               uint16_t pulsePeriodMs = 1000);
-
-        void updateGlowRoundRect(int16_t x, int16_t y,
-                                 int16_t w, int16_t h,
-                                 uint8_t radius,
-                                 uint32_t fillColor,
-                                 int32_t bgColor = -1,
-                                 int32_t glowColor = -1,
-                                 uint8_t glowSize = 12,
-                                 uint8_t glowStrength = 220,
-                                 GlowAnim anim = None,
-                                 uint16_t pulsePeriodMs = 1000);
+        DrawGlowRoundRectFluent drawGlowRoundRect() { return DrawGlowRoundRectFluent(this); }
+        UpdateGlowRoundRectFluent updateGlowRoundRect() { return UpdateGlowRoundRectFluent(this); }

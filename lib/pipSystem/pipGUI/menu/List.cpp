@@ -337,7 +337,7 @@ namespace pipgui
         ListMenuState *pm = getListMenu(screenId);
         if (!pm)
             return;
-        
+
         clearListMenuCache(*pm, _platform);
         pm->cacheValid = false;
         requestRedraw();
@@ -346,16 +346,17 @@ namespace pipgui
     void GUI::renderListMenu(uint8_t screenId)
     {
         int16_t left = 0, right = _screenWidth, top = 0, bottom = _screenHeight;
-        if (_flags.statusBarEnabled && _statusBarHeight > 0)
+        int16_t sb = statusBarHeight();
+        if (_flags.statusBarEnabled && sb > 0 && _statusBarStyle == StatusBarStyleSolid)
         {
             if (_statusBarPos == Top)
-                top += _statusBarHeight;
+                top += sb;
             else if (_statusBarPos == Bottom)
-                bottom -= _statusBarHeight;
+                bottom -= sb;
             else if (_statusBarPos == Left)
-                left += _statusBarHeight;
+                left += sb;
             else if (_statusBarPos == Right)
-                right -= _statusBarHeight;
+                right -= sb;
         }
         int16_t w = right - left;
         int16_t h = bottom - top;
@@ -677,7 +678,11 @@ namespace pipgui
             }
             else
             {
-                fillRect(0, 0, m.cacheW, m.cacheH, from565(bg));
+                fillRect()
+                    .at(0, 0)
+                    .size(m.cacheW, m.cacheH)
+                    .color(from565(bg))
+                    .draw();
             }
 
             int16_t txLocal = 12;

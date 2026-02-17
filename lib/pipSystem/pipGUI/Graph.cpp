@@ -214,16 +214,17 @@ namespace pipgui
         if (x == center)
         {
             int16_t left = 0, availW = _screenWidth;
-            if (_flags.statusBarEnabled && _statusBarHeight > 0)
+            int16_t sb = statusBarHeight();
+            if (_flags.statusBarEnabled && sb > 0)
             {
                 if (_statusBarPos == StatusBarLeft)
                 {
-                    left += _statusBarHeight;
-                    availW -= _statusBarHeight;
+                    left += sb;
+                    availW -= sb;
                 }
                 else if (_statusBarPos == Right)
                 {
-                    availW -= _statusBarHeight;
+                    availW -= sb;
                 }
             }
             if (availW < w)
@@ -234,16 +235,17 @@ namespace pipgui
         if (y == center)
         {
             int16_t top = 0, availH = _screenHeight;
-            if (_flags.statusBarEnabled && _statusBarHeight > 0)
+            int16_t sb = statusBarHeight();
+            if (_flags.statusBarEnabled && sb > 0)
             {
                 if (_statusBarPos == Top)
                 {
-                    top += _statusBarHeight;
-                    availH -= _statusBarHeight;
+                    top += sb;
+                    availH -= sb;
                 }
                 else if (_statusBarPos == Bottom)
                 {
-                    availH -= _statusBarHeight;
+                    availH -= sb;
                 }
             }
             if (availH < h)
@@ -610,7 +612,11 @@ namespace pipgui
 
             if (stripW > 0)
             {
-                fillRect(stripX, area.innerY, stripW, area.innerH, area.bgColor);
+                fillRect()
+                    .at(stripX, area.innerY)
+                    .size(stripW, area.innerH)
+                    .color(area.bgColor)
+                    .draw();
 
                 if (area.gridCellsX >= 2)
                 {
