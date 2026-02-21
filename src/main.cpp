@@ -9,7 +9,7 @@ using namespace pipgui;
 
 GUI ui;
 
-static pipcore::Esp32GuiPlatform g_platform;
+static pipcore::ESP32Platform g_platform;
 
 Button btnNext(2);
 Button btnPrev(4);

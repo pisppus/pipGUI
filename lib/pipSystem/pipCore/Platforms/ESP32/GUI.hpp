@@ -1,24 +1,23 @@
 #pragma once
 
-#include <pipCore/Platforms/GUIPlatform.hpp>
+#include <pipCore/Platforms/GuiPlatform.hpp>
 
 #if !defined(ESP32)
-#error "pipcore::Esp32GuiPlatform requires ESP32"
+#error "pipcore::ESP32Platform requires ESP32"
 #endif
 
 #include <Arduino.h>
 #include <Preferences.h>
-
 #include <pipCore/Displays/ST7789/Display.hpp>
-#include <pipCore/Platforms/ESP32/St7789Spi.hpp>
+#include <pipCore/Platforms/ESP32/Transports/St7789Spi.hpp>
 
 namespace pipcore
 {
-    class Esp32GuiPlatform final : public GuiPlatform
+    class ESP32Platform final : public GuiPlatform
     {
     public:
-        Esp32GuiPlatform() = default;
-        ~Esp32GuiPlatform();
+        ESP32Platform() = default;
+        ~ESP32Platform();
 
         void ioPinModeInput(uint8_t pin, bool pullup) override;
         bool ioDigitalRead(uint8_t pin) override;
@@ -46,7 +45,6 @@ namespace pipcore
         uint8_t _backlightChannel = 0;
         uint8_t _backlightResolution = 12;
 
-        // ESP32-specific SPI transport for ST7789
         Esp32St7789Spi *_transport = nullptr;
         ST7789Display _display;
         bool _displayConfigured = false;

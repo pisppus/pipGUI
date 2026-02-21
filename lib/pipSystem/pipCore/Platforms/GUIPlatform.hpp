@@ -1,10 +1,9 @@
 #pragma once
 
-#include <stdint.h>
-#include <stddef.h>
-#include <stdlib.h>
-
 #include <pipCore/Platforms/GuiDisplay.hpp>
+#include <cstdint>
+#include <cstddef>
+#include <cstdlib>
 
 namespace pipcore
 {
@@ -24,7 +23,7 @@ namespace pipcore
         uint16_t width = 0;
         uint16_t height = 0;
         uint32_t hz = 0;
-        uint8_t order = 0; // 0 = RGB (default), 1 = BGR
+        uint8_t order = 0;
         bool invert = true;
         bool swap = false;
         int16_t xOffset = 0;

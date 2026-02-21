@@ -6,7 +6,6 @@
 #error "Esp32St7789Spi requires ESP32"
 #endif
 
-// Forward declare ESP-IDF types to avoid including headers here
 struct spi_transaction_t;
 
 typedef void (*transaction_cb_t)(spi_transaction_t *trans);

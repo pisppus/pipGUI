@@ -1,8 +1,7 @@
 #pragma once
 
-#include <stdint.h>
-
-#include <pipCore/Platforms/GUIPlatform.hpp>
+#include <pipCore/Platforms/GuiPlatform.hpp>
+#include <cstdint>
 
 namespace pipcore
 {

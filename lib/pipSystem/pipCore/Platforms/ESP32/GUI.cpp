@@ -1,12 +1,10 @@
 #include <pipCore/Platforms/ESP32/GUI.hpp>
-
 #include <esp_heap_caps.h>
 
 namespace pipcore
 {
-    Esp32GuiPlatform::~Esp32GuiPlatform()
+    ESP32Platform::~ESP32Platform()
     {
-        // Transport will be cleaned up by display destructor or manually
         if (_transport)
         {
             delete _transport;
@@ -14,17 +12,17 @@ namespace pipcore
         }
     }
 
-    void Esp32GuiPlatform::ioPinModeInput(uint8_t pin, bool pullup)
+    void ESP32Platform::ioPinModeInput(uint8_t pin, bool pullup)
     {
         pinMode(pin, pullup ? INPUT_PULLUP : INPUT);
     }
 
-    bool Esp32GuiPlatform::ioDigitalRead(uint8_t pin)
+    bool ESP32Platform::ioDigitalRead(uint8_t pin)
     {
         return digitalRead(pin) != 0;
     }
 
-    void Esp32GuiPlatform::configureBacklightPin(uint8_t pin, uint8_t channel, uint32_t freqHz, uint8_t resolutionBits)
+    void ESP32Platform::configureBacklightPin(uint8_t pin, uint8_t channel, uint32_t freqHz, uint8_t resolutionBits)
     {
         const uint8_t resolvedBits = resolutionBits > 16 ? 12 : resolutionBits;
         ledcSetup(channel, freqHz, resolvedBits);
@@ -34,12 +32,12 @@ namespace pipcore
         _backlightResolution = resolvedBits;
     }
 
-    uint32_t Esp32GuiPlatform::nowMs()
+    uint32_t ESP32Platform::nowMs()
     {
         return millis();
     }
 
-    uint8_t Esp32GuiPlatform::loadMaxBrightnessPercent()
+    uint8_t ESP32Platform::loadMaxBrightnessPercent()
     {
         if (!_prefsInited)
         {
@@ -53,7 +51,7 @@ namespace pipcore
         return static_cast<uint8_t>(raw);
     }
 
-    void Esp32GuiPlatform::storeMaxBrightnessPercent(uint8_t percent)
+    void ESP32Platform::storeMaxBrightnessPercent(uint8_t percent)
     {
         if (percent > 100)
             percent = 100;
@@ -67,7 +65,7 @@ namespace pipcore
         _prefs.putUShort("bmax", percent);
     }
 
-    void Esp32GuiPlatform::setBacklightPercent(uint8_t percent)
+    void ESP32Platform::setBacklightPercent(uint8_t percent)
     {
         if (!_backlightConfigured)
             return;
@@ -80,7 +78,7 @@ namespace pipcore
         ledcWrite(_backlightChannel, dutyMax - duty);
     }
 
-    void *Esp32GuiPlatform::guiAlloc(size_t bytes, GuiAllocCaps caps)
+    void *ESP32Platform::guiAlloc(size_t bytes, GuiAllocCaps caps)
     {
         if (bytes == 0)
             return nullptr;
@@ -96,28 +94,25 @@ namespace pipcore
         return heap_caps_malloc(bytes, MALLOC_CAP_8BIT);
     }
 
-    void Esp32GuiPlatform::guiFree(void *ptr)
+    void ESP32Platform::guiFree(void *ptr)
     {
         heap_caps_free(ptr);
     }
 
-    bool Esp32GuiPlatform::guiConfigureDisplay(const GuiDisplayConfig &cfg)
+    bool ESP32Platform::guiConfigureDisplay(const GuiDisplayConfig &cfg)
     {
         if (cfg.width == 0 || cfg.height == 0)
             return false;
 
-        // Clean up existing transport if reconfiguring
         if (_transport)
         {
             delete _transport;
             _transport = nullptr;
         }
 
-        // Create ESP32 SPI transport with configuration
         _transport = new Esp32St7789Spi(
             cfg.mosi, cfg.sclk, cfg.cs, cfg.dc, cfg.rst, cfg.hz);
 
-        // Configure display with the transport
         bool ok = _display.configure(_transport, cfg.width, cfg.height, cfg.order, cfg.invert, cfg.swap, cfg.xOffset, cfg.yOffset);
         if (!ok)
         {
@@ -130,7 +125,7 @@ namespace pipcore
         return true;
     }
 
-    bool Esp32GuiPlatform::guiBeginDisplay(uint8_t rotation)
+    bool ESP32Platform::guiBeginDisplay(uint8_t rotation)
     {
         if (!_displayConfigured)
             return false;
@@ -138,7 +133,7 @@ namespace pipcore
         return _display.begin(rotation);
     }
 
-    GuiDisplay *Esp32GuiPlatform::guiDisplay()
+    GuiDisplay *ESP32Platform::guiDisplay()
     {
         if (!_displayConfigured)
             return nullptr;

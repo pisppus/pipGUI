@@ -455,7 +455,7 @@ ui.drawGlowRoundRect()
 #include <pipGUI/core/api/pipGUI.hpp>
 #include <pipCore/Platforms/ESP32/GUI.hpp>
 
-static pipcore::Esp32GuiPlatform platform;
+static pipcore::ESP32Platform platform;
 static pipgui::GUI ui;
 
 void setup() {
@@ -528,7 +528,7 @@ public:
 - **`setBacklightCallback(cb)`** - передаёте функцию, которая **физически выставляет яркость** (PWM, драйвер и т.п.).
   - Аргумент `level` - `0..100` процентов яркости. 0 - экран погашен, 100 - логический максимум.
 - **`setBacklightPin(pin, channel = 0, freqHz = 5000, resolutionBits = 12)`** - настройка подсветки через HAL платформу.
-  - на ESP32 это реализовано в `pipcore::Esp32GuiPlatform` через LEDC;
+  - на ESP32 это реализовано в `pipcore::ESP32Platform` через LEDC;
   - в прошивке достаточно вызвать `ui.setPlatform(&platform)` и затем `ui.setBacklightPin(pin)`.
 - **`setMaxBrightness(percent)`** - задаёте **глобальный максимум** яркости в процентах `0..100` (например, можно ограничить максимум 70%).
 - **`maxBrightness()`** - позволяет **прочитать текущее значение максимума** (в процентах).

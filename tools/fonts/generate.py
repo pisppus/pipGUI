@@ -22,7 +22,7 @@ from psdf import (
 def _gen_atlas_decl_hpp(var_name: str) -> str:
     out = []
     out.append("#pragma once\n\n")
-    out.append("#include <stdint.h>\n\n")
+    out.append("#include <cstdint>\n\n")
     out.append(f"extern const uint8_t {var_name}[];\n")
     return "".join(out)
 
@@ -62,7 +62,7 @@ def _gen_metrics_header(atlas: dict, font_ident: str) -> str:
 
     out = []
     out.append("#pragma once\n")
-    out.append("#include <stdint.h>\n")
+    out.append("#include <cstdint>\n")
     out.append("\n")
     out.append("namespace pipgui\n{")
     out.append(f"\nnamespace {ns_name}\n{{")

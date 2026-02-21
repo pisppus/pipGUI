@@ -172,7 +172,7 @@ def _msdf_transform_from_viewbox(viewbox, out_px: int):
 def _gen_icons_decl_hpp() -> str:
     out = []
     out.append("#pragma once\n\n")
-    out.append("#include <stdint.h>\n\n")
+    out.append("#include <cstdint>\n\n")
     out.append("extern const uint8_t icons[];\n")
     return "".join(out)
 
@@ -192,7 +192,7 @@ def _gen_icons_def_cpp(data: bytes) -> str:
 def _gen_icons_metrics_hpp(icon_names, icon_aliases, icon_boxes, atlas_w, atlas_h, nominal_px, pxrange) -> str:
     out = []
     out.append("#pragma once\n")
-    out.append("#include <stdint.h>\n")
+    out.append("#include <cstdint>\n")
     out.append("\n")
     out.append("namespace pipgui\n{")
     out.append("\nnamespace psdf_icons\n{")

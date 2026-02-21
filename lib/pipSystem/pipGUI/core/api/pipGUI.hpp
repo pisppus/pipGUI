@@ -3,12 +3,12 @@
 #include <Arduino.h>
 #include <assert.h>
 #include <initializer_list>
-#include <stdlib.h>
+#include <cstdlib>
 #include <algorithm>
 #include <utility>
-#include <pipCore/Platforms/GUIPlatform.hpp>
+#include <pipCore/Platforms/GuiPlatform.hpp>
 #include <pipCore/Graphics/Sprite.hpp>
-#include <pipCore/Button.hpp>
+#include <pipCore/Input/Button.hpp>
 #include <pipGUI/core/components/FRC.hpp>
 #include <pipGUI/core/Debug.hpp>
 #include <pipGUI/icons/metrics.hpp>
