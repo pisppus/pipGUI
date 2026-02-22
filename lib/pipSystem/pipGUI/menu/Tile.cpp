@@ -1,4 +1,4 @@
-#include <pipGUI/core/api/pipGUI.hpp>
+﻿#include <pipGUI/core/api/pipGUI.hpp>
 #include <pipGUI/core/utils/Colors.hpp>
 #include <math.h>
 
@@ -65,7 +65,7 @@ namespace pipgui
         }
         if (m.style.cardColor == 0 && m.style.cardActiveColor == 0)
         {
-            uint32_t base = _bgColor ? _bgColor : 0x000000;
+            uint32_t base = _render.bgColor ? _render.bgColor : 0x000000;
             m.style.cardColor = pipgui::detail::lighten888(base, 4);
             m.style.cardActiveColor = rgb(0, 130, 220);
             m.style.radius = 10;
@@ -304,7 +304,7 @@ namespace pipgui
 
         if (changed)
         {
-            if (_flags.spriteEnabled && _display && !_flags.renderToSprite && _currentScreen == screenId)
+            if (_flags.spriteEnabled && _disp.display && !_flags.renderToSprite && _screen.current == screenId)
                 updateTileMenu(screenId, prevSelected);
             else
                 requestRedraw();
@@ -321,14 +321,14 @@ namespace pipgui
         if (!m.configured || m.itemCount == 0)
             return;
 
-        if (!_flags.spriteEnabled || !_display)
+        if (!_flags.spriteEnabled || !_disp.display)
         {
             bool prevRender = _flags.renderToSprite;
-            pipcore::Sprite *prevActive = _activeSprite;
+            pipcore::Sprite *prevActive = _render.activeSprite;
             _flags.renderToSprite = 0;
             renderTileMenu(screenId);
             _flags.renderToSprite = prevRender;
-            _activeSprite = prevActive;
+            _render.activeSprite = prevActive;
             return;
         }
 
@@ -337,17 +337,17 @@ namespace pipgui
         if (m.selectedIndex >= m.itemCount)
             m.selectedIndex = m.itemCount - 1;
 
-        int16_t left = 0, right = _screenWidth, top = 0, bottom = _screenHeight;
+        int16_t left = 0, right = _render.screenWidth, top = 0, bottom = _render.screenHeight;
         int16_t sb = statusBarHeight();
-        if (_flags.statusBarEnabled && sb > 0 && _statusBarStyle == StatusBarStyleSolid)
+        if (_flags.statusBarEnabled && sb > 0 && _status.style == StatusBarStyleSolid)
         {
-            if (_statusBarPos == Top)
+            if (_status.pos == Top)
                 top += sb;
-            else if (_statusBarPos == Bottom)
+            else if (_status.pos == Bottom)
                 bottom -= sb;
-            else if (_statusBarPos == Left)
+            else if (_status.pos == Left)
                 left += sb;
-            else if (_statusBarPos == Right)
+            else if (_status.pos == Right)
                 right -= sb;
         }
         if (right - left <= 0 || bottom - top <= 0)
@@ -488,27 +488,27 @@ namespace pipgui
         int16_t bhNew = (int16_t)(hNew + pad * 2);
 
         bool prevRender = _flags.renderToSprite;
-        pipcore::Sprite *prevActive = _activeSprite;
+        pipcore::Sprite *prevActive = _render.activeSprite;
 
         int32_t clipX = 0, clipY = 0, clipW = 0, clipH = 0;
-        _sprite.getClipRect(&clipX, &clipY, &clipW, &clipH);
+        _render.sprite.getClipRect(&clipX, &clipY, &clipW, &clipH);
 
         _flags.renderToSprite = 1;
-        _activeSprite = &_sprite;
+        _render.activeSprite = &_render.sprite;
 
-        _sprite.setClipRect(bxOld, byOld, bwOld, bhOld);
+        _render.sprite.setClipRect(bxOld, byOld, bwOld, bhOld);
         renderTileMenu(screenId);
 
         if (prevSelectedIndex != m.selectedIndex)
         {
-            _sprite.setClipRect(bxNew, byNew, bwNew, bhNew);
+            _render.sprite.setClipRect(bxNew, byNew, bwNew, bhNew);
             renderTileMenu(screenId);
         }
 
-        _sprite.setClipRect(clipX, clipY, clipW, clipH);
+        _render.sprite.setClipRect(clipX, clipY, clipW, clipH);
 
         _flags.renderToSprite = prevRender;
-        _activeSprite = prevActive;
+        _render.activeSprite = prevActive;
 
         invalidateRect(bxOld, byOld, bwOld, bhOld);
         if (prevSelectedIndex != m.selectedIndex)
@@ -528,17 +528,17 @@ namespace pipgui
 
         auto t = getDrawTarget();
 
-        int16_t left = 0, right = _screenWidth, top = 0, bottom = _screenHeight;
-        if (_flags.statusBarEnabled && _statusBarHeight > 0)
+        int16_t left = 0, right = _render.screenWidth, top = 0, bottom = _render.screenHeight;
+        if (_flags.statusBarEnabled && _status.height > 0)
         {
-            if (_statusBarPos == Top)
-                top += _statusBarHeight;
-            else if (_statusBarPos == Bottom)
-                bottom -= _statusBarHeight;
-            else if (_statusBarPos == Left)
-                left += _statusBarHeight;
-            else if (_statusBarPos == Right)
-                right -= _statusBarHeight;
+            if (_status.pos == Top)
+                top += _status.height;
+            else if (_status.pos == Bottom)
+                bottom -= _status.height;
+            else if (_status.pos == Left)
+                left += _status.height;
+            else if (_status.pos == Right)
+                right -= _status.height;
         }
         if (right - left <= 0 || bottom - top <= 0)
             return;
@@ -549,7 +549,7 @@ namespace pipgui
         fillRect()
             .at(left, top)
             .size(usableW, (int16_t)(bottom - top))
-            .color(_bgColor)
+            .color(_render.bgColor)
             .draw();
 
         uint8_t cols = 1;
@@ -673,7 +673,7 @@ namespace pipgui
 
             uint32_t bg = (i == m.selectedIndex) ? m.style.cardActiveColor : m.style.cardColor;
             if (bg == 0)
-                bg = _bgColor;
+                bg = _render.bgColor;
             fillRoundRectFrc(x, y, tileW, tileH, r, bg);
             uint32_t border = pipgui::detail::lighten888(bg, 4);
 
@@ -785,3 +785,5 @@ namespace pipgui
         }
     }
 }
+
+

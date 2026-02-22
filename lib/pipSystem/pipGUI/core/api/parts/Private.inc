@@ -2,390 +2,513 @@
 #error "Do not include this file directly. Include <pipGUI/core/api/pipGUI.hpp>"
 #endif
 
-        // Fluent builders call private *Impl() methods; each needs friend access.
-        friend struct FillRectFluent;
-        friend struct FillRectAlphaFluent;
-        friend struct FillRectGradientVerticalFluent;
-        friend struct FillRectGradientHorizontalFluent;
-        friend struct FillRectGradient4Fluent;
-        friend struct FillRectGradientDiagonalFluent;
-        friend struct FillRectGradientRadialFluent;
-        friend struct DrawLineFluent;
-        friend struct DrawCircleFluent;
-        friend struct FillCircleFluent;
-        friend struct DrawArcFluent;
-        friend struct DrawEllipseFluent;
-        friend struct FillEllipseFluent;
-        friend struct DrawTriangleFluent;
-        friend struct FillTriangleFluent;
-        friend struct DrawSquircleFluent;
-        friend struct FillSquircleFluent;
-        friend struct ToastFluent;
-        template <bool IsUpdate> friend struct BlurStripFluentT;
-        template <bool IsUpdate> friend struct ScrollDotsFluentT;
-        template <bool IsUpdate> friend struct GlowCircleFluentT;
-        template <bool IsUpdate> friend struct GlowRoundRectFluentT;
+#define PIPGUI_FRIEND_FLUENT_BUILDERS               \
+    friend struct FillRectFluent;                   \
+    friend struct FillRectAlphaFluent;              \
+    friend struct FillRectGradientVerticalFluent;   \
+    friend struct FillRectGradientHorizontalFluent; \
+    friend struct FillRectGradient4Fluent;          \
+    friend struct FillRectGradientDiagonalFluent;   \
+    friend struct FillRectGradientRadialFluent;     \
+    friend struct DrawLineFluent;                   \
+    friend struct DrawCircleFluent;                 \
+    friend struct FillCircleFluent;                 \
+    friend struct DrawArcFluent;                    \
+    friend struct DrawEllipseFluent;                \
+    friend struct FillEllipseFluent;                \
+    friend struct DrawTriangleFluent;               \
+    friend struct FillTriangleFluent;               \
+    friend struct DrawSquircleFluent;               \
+    friend struct FillSquircleFluent;               \
+    friend struct ToastFluent;                      \
+    template <bool IsUpdate>                        \
+    friend struct BlurStripFluentT;                 \
+    template <bool IsUpdate>                        \
+    friend struct ScrollDotsFluentT;                \
+    template <bool IsUpdate>                        \
+    friend struct GlowCircleFluentT;                \
+    template <bool IsUpdate>                        \
+    friend struct GlowRoundRectFluentT;
 
-        void configureListMenu(uint8_t screenId, uint8_t parentScreen, const ListMenuItemDef *items, uint8_t itemCount);
-        void configureTileMenu(uint8_t screenId, uint8_t parentScreen, const TileMenuItemDef *items, uint8_t itemCount);
+PIPGUI_FRIEND_FLUENT_BUILDERS
+#undef PIPGUI_FRIEND_FLUENT_BUILDERS
 
-        pipcore::Sprite *getDrawTarget();
-        int16_t AutoX(int32_t contentWidth) const;
-        int16_t AutoY(int32_t contentHeight) const;
+struct DisplayState
+{
+    pipcore::GuiPlatform *platform = nullptr;
+    pipcore::GuiDisplay *display = nullptr;
+    pipcore::GuiDisplayConfig cfg;
+    bool cfgConfigured = false;
+    BacklightCallback backlightCb = nullptr;
+    uint8_t brightnessMax = 100;
+} _disp;
 
-        bool psdfMeasureText(const String &text, int16_t &outW, int16_t &outH) const;
-        void psdfDrawTextInternal(const String &text, int16_t x, int16_t y, uint16_t fg565, uint16_t bg565, TextAlign align);
+struct RenderState
+{
+    pipcore::Sprite sprite;
+    pipcore::Sprite screenFromSprite;
+    pipcore::Sprite screenToSprite;
+    pipcore::Sprite *activeSprite = nullptr;
+    uint16_t screenWidth = 0;
+    uint16_t screenHeight = 0;
+    uint32_t bgColor = 0;
+} _render;
 
-        void drawCenteredTitle(const String &title,
-                               const String &subtitle,
-                               uint32_t fg,
-                               uint32_t bg);
-        void drawErrorCard(pipcore::Sprite &t,
-                           int16_t x,
-                           int16_t y,
-                           int16_t w,
-                           int16_t h,
-                           const String &title,
-                           const String &detail,
-                           uint32_t accentColor,
-                           uint8_t opacity,
-                           int scrollX);
+struct ClipState
+{
+    bool enabled = false;
+    int16_t x = 0;
+    int16_t y = 0;
+    int16_t w = 0;
+    int16_t h = 0;
+} _clip;
 
-        void renderBootFrame(uint32_t now);
-        void renderErrorFrame(uint32_t now);
+struct DirtyRect
+{
+    int16_t x, y, w, h;
+};
+struct DirtyState
+{
+    DirtyRect rects[8] = {};
+    uint8_t count = 0;
+} _dirty;
 
-        void renderScreenTransition(uint32_t now);
-        void renderNotificationOverlay();
-        void renderToastOverlay();
-        void renderStatusBar(bool useSprite);
+struct FrcState
+{
+    FrcProfile profile = FrcProfile::Off;
+    uint32_t seed = 0x6D2B79F5U;
+    uint32_t lastUpdateMs = 0;
+    uint16_t temporalPeriodMs = 0;
+} _frc;
 
-        void showToastInternal(const String &text,
-                               uint32_t durationMs,
-                               bool fromTop,
-                               IconId iconId,
-                               uint16_t iconSizePx);
+struct ScreenState
+{
+    ScreenCallback *callbacks = nullptr;
+    GraphArea **graphAreas = nullptr;
+    ListMenuState **listMenus = nullptr;
+    TileMenuState **tileMenus = nullptr;
+    uint16_t capacity = 0;
+    uint8_t current = 255;
 
-        void invalidateRect(int16_t x, int16_t y, int16_t w, int16_t h);
-        void flushDirty();
-        void tickDebugDirtyOverlay(uint32_t now);
+    ScreenAnim anim = None;
+    uint8_t from = 0;
+    uint8_t to = 0;
+    int8_t transDir = 0;
+    uint32_t animStartMs = 0;
+    uint32_t animDurationMs = 0;
+} _screen;
 
-        uint16_t color888To565(int16_t x, int16_t y, uint32_t color888) const;
-        void fillCircleFrc(int16_t cx, int16_t cy, int16_t r, uint32_t color888);
+struct BootState
+{
+    BootAnimation anim = None;
+    String title;
+    String subtitle;
+    uint32_t fgColor = 0;
+    uint32_t bgColor = 0;
+    uint32_t startMs = 0;
+    uint32_t durationMs = 0;
+    int16_t x = 0;
+    int16_t y = 0;
+} _boot;
 
-        // Internal drawing implementation; called only by fluent builders on .draw(). Do not call from user code.
-        void fillRectImpl(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t color);
-        void fillRectAlphaImpl(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t color, uint8_t alpha);
-        void fillRectGradientVerticalImpl(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t topColor, uint32_t bottomColor);
-        void fillRectGradientHorizontalImpl(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t leftColor, uint32_t rightColor);
-        void fillRectGradient4Impl(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t c00, uint32_t c10, uint32_t c01, uint32_t c11);
-        void fillRectGradientDiagonalImpl(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t tlColor, uint32_t brColor);
-        void fillRectGradientRadialImpl(int16_t x, int16_t y, int16_t w, int16_t h, int16_t cx, int16_t cy, int16_t radius, uint32_t innerColor, uint32_t outerColor);
-        void drawBlurStripImpl(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radius, BlurDirection dir, bool gradient, uint8_t materialStrength, uint8_t noiseAmount, int32_t materialColor);
-        void updateBlurStripImpl(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radius, BlurDirection dir, bool gradient, uint8_t materialStrength, uint8_t noiseAmount, int32_t materialColor);
-        void drawScrollDotsImpl(int16_t x, int16_t y, uint8_t count, uint8_t activeIndex, uint8_t prevIndex, float animProgress, bool animate, int8_t animDirection, uint32_t activeColor, uint32_t inactiveColor, uint8_t dotRadius, uint8_t spacing, uint8_t activeWidth);
-        void updateScrollDotsImpl(int16_t x, int16_t y, uint8_t count, uint8_t activeIndex, uint8_t prevIndex, float animProgress, bool animate, int8_t animDirection, uint32_t activeColor, uint32_t inactiveColor, uint8_t dotRadius, uint8_t spacing, uint8_t activeWidth);
-        void drawGlowCircleImpl(int16_t x, int16_t y, int16_t r, uint32_t fillColor, int32_t bgColor, int32_t glowColor, uint8_t glowSize, uint8_t glowStrength, GlowAnim anim, uint16_t pulsePeriodMs);
-        void updateGlowCircleImpl(int16_t x, int16_t y, int16_t r, uint32_t fillColor, int32_t bgColor, int32_t glowColor, uint8_t glowSize, uint8_t glowStrength, GlowAnim anim, uint16_t pulsePeriodMs);
-        void drawGlowRoundRectImpl(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radius, uint32_t fillColor, int32_t bgColor, int32_t glowColor, uint8_t glowSize, uint8_t glowStrength, GlowAnim anim, uint16_t pulsePeriodMs);
-        void updateGlowRoundRectImpl(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radius, uint32_t fillColor, int32_t bgColor, int32_t glowColor, uint8_t glowSize, uint8_t glowStrength, GlowAnim anim, uint16_t pulsePeriodMs);
-        // Extended glow round-rect with per-corner radii.
-        void drawGlowRoundRectCornersImpl(int16_t x, int16_t y, int16_t w, int16_t h,
-                                          uint8_t radiusTL, uint8_t radiusTR,
-                                          uint8_t radiusBR, uint8_t radiusBL,
-                                          uint32_t fillColor, int32_t bgColor, int32_t glowColor,
-                                          uint8_t glowSize, uint8_t glowStrength, GlowAnim anim, uint16_t pulsePeriodMs);
-        void updateGlowRoundRectCornersImpl(int16_t x, int16_t y, int16_t w, int16_t h,
-                                            uint8_t radiusTL, uint8_t radiusTR,
-                                            uint8_t radiusBR, uint8_t radiusBL,
-                                            uint32_t fillColor, int32_t bgColor, int32_t glowColor,
-                                            uint8_t glowSize, uint8_t glowStrength, GlowAnim anim, uint16_t pulsePeriodMs);
-        void drawLineImpl(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint32_t color);
-        void drawCircleImpl(int16_t cx, int16_t cy, int16_t r, uint32_t color);
-        void fillCircleImpl(int16_t cx, int16_t cy, int16_t r, uint32_t color);
-        void drawArcImpl(int16_t cx, int16_t cy, int16_t r, float startDeg, float endDeg, uint32_t color);
-        void drawEllipseImpl(int16_t cx, int16_t cy, int16_t rx, int16_t ry, uint32_t color);
-        void fillEllipseImpl(int16_t cx, int16_t cy, int16_t rx, int16_t ry, uint32_t color);
-        void drawTriangleImpl(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint32_t color);
-        void fillTriangleImpl(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint32_t color);
-        void drawRoundTriangleImpl(int16_t x0, int16_t y0,
-                                   int16_t x1, int16_t y1,
-                                   int16_t x2, int16_t y2,
-                                   uint8_t radius, uint32_t color);
-        void fillRoundTriangleImpl(int16_t x0, int16_t y0,
-                                   int16_t x1, int16_t y1,
-                                   int16_t x2, int16_t y2,
-                                   uint8_t radius, uint32_t color);
-        void drawSquircleImpl(int16_t cx, int16_t cy, int16_t r, uint32_t color);
-        void fillSquircleImpl(int16_t cx, int16_t cy, int16_t r, uint32_t color);
-        void fillRoundRectFrc(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radius, uint32_t color888);
-        void drawRoundRectFrc(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radius, uint32_t color888);
-        // Extended variant: per-corner radii (top-left, top-right, bottom-right, bottom-left).
-        void fillRoundRectCornersFrc(int16_t x, int16_t y, int16_t w, int16_t h,
-                                     uint8_t radiusTL, uint8_t radiusTR,
-                                     uint8_t radiusBR, uint8_t radiusBL,
-                                     uint32_t color888);
-        void drawRoundRectCornersFrc(int16_t x, int16_t y, int16_t w, int16_t h,
-                                     uint8_t radiusTL, uint8_t radiusTR,
-                                     uint8_t radiusBR, uint8_t radiusBL,
-                                     uint32_t color888);
-        void blitImage565Frc(int16_t x, int16_t y, const uint16_t *bitmap565, int16_t w, int16_t h);
+struct TypographyState
+{
+    uint16_t logoTitleSizePx = 0;
+    uint16_t logoSubtitleSizePx = 0;
+    uint16_t h1Px = 24;
+    uint16_t h2Px = 18;
+    uint16_t bodyPx = 14;
+    uint16_t captionPx = 12;
+    uint16_t psdfSizePx = 0;
+    uint16_t psdfWeight = 500;
+    float psdfWeightBias = 0.083f;
+    FontId psdfFontId = WixMadeForDisplay;
+} _typo;
 
-        uint32_t nowMs() const;
-        void ensureScreenStorage(uint8_t id);
-        void prepareScreenTransition(ScreenCallback fromCb, ScreenCallback toCb);
-        bool ensureScreenTransitionSprites();
-        void freeScreenTransitionSprites();
-        bool ensureBlurWorkBuffers(uint32_t smallLen, int16_t sw, int16_t sh) noexcept;
+struct ErrorEntry
+{
+    String title, detail;
+    ErrorType type;
+    int16_t scrollPos, textWidth;
+};
+struct ErrorState
+{
+    ErrorEntry *entries = nullptr;
+    uint8_t count = 0;
+    uint8_t capacity = 0;
+    uint8_t currentIndex = 0;
+    uint8_t nextIndex = 0;
+    uint32_t animStartMs = 0;
+    uint32_t lastScrollMs = 0;
+    ErrorType type = Warning;
+    String title;
+    String message;
+    String buttonText;
+    uint32_t lastToggleMs = 0;
+    uint32_t flashIntervalMs = 0;
+    uint32_t endMs = 0;
+    ButtonVisualState buttonState;
+} _error;
 
-        void freeBlurBuffers(pipcore::GuiPlatform *plat) noexcept;
-        void freeGraphAreas(pipcore::GuiPlatform *plat) noexcept;
-        void freeListMenus(pipcore::GuiPlatform *plat) noexcept;
-        void freeTileMenus(pipcore::GuiPlatform *plat) noexcept;
-        void freeScreenStorage(pipcore::GuiPlatform *plat) noexcept;
-        void freeRecovery(pipcore::GuiPlatform *plat) noexcept;
-        void freeErrors(pipcore::GuiPlatform *plat) noexcept;
-        void freeStatusBarIcons(pipcore::GuiPlatform *plat) noexcept;
+struct NotificationState
+{
+    String title;
+    String message;
+    String buttonText;
+    NotificationType type = Normal;
+    uint32_t startMs = 0;
+    uint32_t animDurationMs = 0;
+    uint32_t unlockMs = 0;
+    ButtonVisualState buttonState;
+} _notif;
 
-        bool ensureErrorCapacity(uint8_t need);
-        bool ensureTileCapacity(TileMenuState &m, uint8_t need);
+struct ToastState
+{
+    String text;
+    IconId iconId = WarningLayer0;
+    uint16_t iconSizePx = 20;
+    uint32_t startMs = 0;
+    uint32_t animDurMs = 420;
+    uint32_t displayMs = 2500;
+    bool fromTop = false;
+} _toast;
 
-        void setTileMenuLayout(uint8_t screenId,
-                               uint8_t layoutCols,
-                               uint8_t layoutRows,
-                               const TileLayoutCell *tiles,
-                               uint8_t count);
+enum StatusBarDirty : uint8_t
+{
+    StatusBarDirtyLeft = 1 << 0,
+    StatusBarDirtyCenter = 1 << 1,
+    StatusBarDirtyRight = 1 << 2,
+    StatusBarDirtyBattery = 1 << 3,
+    StatusBarDirtyAll = 0xFF,
+};
 
-        GraphArea &ensureGraphArea(uint8_t screenId);
-        ListMenuState &ensureListMenu(uint8_t screenId);
-        TileMenuState &ensureTileMenu(uint8_t screenId);
-        ListMenuState *getListMenu(uint8_t screenId);
-        TileMenuState *getTileMenu(uint8_t screenId);
+struct StatusBarState
+{
+    StatusBarPosition pos = Top;
+    StatusBarStyle style = StatusBarStyleSolid;
+    uint8_t height = 0;
+    uint32_t bg = 0x000000;
+    uint32_t fg = 0xFFFFFF;
 
-        pipcore::GuiPlatform *_platform = nullptr;
-        BacklightCallback _backlightCb = nullptr;
-        uint8_t _brightnessMax = 100;
+    String textLeft;
+    String textCenter;
+    String textRight;
+    StatusBarCustomCallback custom = nullptr;
 
-        pipcore::GuiDisplay *_display = nullptr;
-        pipcore::Sprite _sprite;
-        pipcore::Sprite _screenFromSprite;
-        pipcore::Sprite _screenToSprite;
-        pipcore::Sprite *_activeSprite = nullptr;
+    uint8_t dirtyMask = 0;
+    DirtyRect lastLeft = {};
+    DirtyRect lastCenter = {};
+    DirtyRect lastRight = {};
+    DirtyRect lastBattery = {};
 
-        bool _clipEnabled = false;
-        int16_t _clipX = 0;
-        int16_t _clipY = 0;
-        int16_t _clipW = 0;
-        int16_t _clipH = 0;
+    int8_t batteryLevel = -1;
+    BatteryStyle batteryStyle = Hidden;
 
-        struct DirtyRect
-        {
-            int16_t x, y, w, h;
-        };
+    StatusIcon *iconsLeft = nullptr;
+    StatusIcon *iconsCenter = nullptr;
+    StatusIcon *iconsRight = nullptr;
 
-        DirtyRect _dirty[8] = {};
-        uint8_t _dirtyCount = 0;
+    uint8_t iconLeftCount = 0;
+    uint8_t iconCenterCount = 0;
+    uint8_t iconRightCount = 0;
 
-        uint16_t _screenWidth = 0, _screenHeight = 0;
-        uint32_t _bgColor = 0;
+    uint8_t iconLeftCapacity = 0;
+    uint8_t iconCenterCapacity = 0;
+    uint8_t iconRightCapacity = 0;
+} _status;
 
-        // Default: library renders in clean 565; FRC/dithering is enabled explicitly
-        // (e.g. in gradient routines) where risk of banding is high.
-        FrcProfile _frcProfile = FrcProfile::Off;
-        uint32_t _frcSeed = 0x6D2B79F5U;
-        uint32_t _frcLastUpdateMs = 0;
-        uint16_t _frcTemporalPeriodMs = 0;
+struct BlurState
+{
+    uint16_t *prevOrig = nullptr;
+    uint32_t prevOrigLen = 0;
+    int16_t prevX = 0, prevY = 0;
+    int16_t prevW = 0, prevH = 0;
+    uint8_t prevScale = 1;
 
-        pipcore::GuiDisplayConfig _displayCfg;
-        bool _displayCfgConfigured = false;
+    uint16_t *smallIn = nullptr;
+    uint16_t *smallTmp = nullptr;
+    uint32_t *rowR = nullptr;
+    uint32_t *rowG = nullptr;
+    uint32_t *rowB = nullptr;
+    uint32_t *colR = nullptr;
+    uint32_t *colG = nullptr;
+    uint32_t *colB = nullptr;
+    uint32_t workLen = 0;
+    uint16_t rowCap = 0;
+    uint16_t colCap = 0;
+} _blur;
 
-        uint16_t _screenCapacity = 0;
-        ScreenCallback *_screens = nullptr;
-        uint8_t _currentScreen = 255;
+struct Flags
+{
+    unsigned inited : 1;
+    unsigned displayInited : 1;
+    unsigned spriteEnabled : 1;
+    unsigned renderToSprite : 1;
+    unsigned screenSpritesEnabled : 1;
+    unsigned needRedraw : 1;
+    unsigned bootActive : 1;
+    unsigned showBoot : 1;
+    unsigned showScreenTransition : 1;
+    unsigned screenTransition : 1;
+    unsigned showError : 1;
+    unsigned errorActive : 1;
+    unsigned errorTransition : 1;
+    unsigned errorFlashState : 1;
+    unsigned errorButtonDown : 1;
+    unsigned errorAwaitRelease : 1;
+    unsigned notifActive : 1;
+    unsigned notifButtonDown : 1;
+    unsigned notifClosing : 1;
+    unsigned notifDelayed : 1;
+    unsigned notifAwaitRelease : 1;
+    unsigned statusBarEnabled : 1;
+    unsigned statusBarDebugMetrics : 1;
+    unsigned psdfLoaded : 1;
+    unsigned psdfEnabled : 1;
+    unsigned toastActive : 1;
+} _flags = {};
 
-        ScreenAnim _screenAnim = None;
-        uint8_t _screenFrom = 0, _screenTo = 0;
-        int8_t _screenTransDir = 0;
-        uint32_t _screenAnimStartMs = 0, _screenAnimDurationMs = 0;
+uint32_t nowMs() const;
 
-        struct Flags
-        {
-            unsigned needRedraw : 1;
-            unsigned spriteEnabled : 1;
-            unsigned renderToSprite : 1;
-            unsigned screenTransition : 1;
-            unsigned screenSpritesEnabled : 1;
-            unsigned bootActive : 1;
-            unsigned psdfLoaded : 1;
-            unsigned psdfEnabled : 1;
-            unsigned errorTransition : 1;
-            unsigned errorActive : 1;
-            unsigned errorFlashState : 1;
-            unsigned errorButtonDown : 1;
-            unsigned errorAwaitRelease : 1;
-            unsigned notifActive : 1;
-            unsigned notifButtonDown : 1;
-            unsigned notifClosing : 1;
-            unsigned notifDelayed : 1;
-            unsigned notifAwaitRelease : 1;
-            unsigned statusBarEnabled : 1;
-            unsigned statusBarDebugMetrics : 1;
-            unsigned recoveryEnabled : 1;
-            unsigned recoveryArmed : 1;
-            unsigned recoveryActive : 1;
-            unsigned bootWasActive : 1;
-            unsigned recoverySavedStatusBarEnabled : 1;
-            unsigned toastActive : 1;
-        } _flags = {};
+// --- Initialization helpers ---
+bool initDisplay(
+    pipcore::GuiPlatform *plat, uint8_t rotation,
+    uint16_t bgColor);
 
-        BootAnimation _bootAnim = None;
-        String _bootTitle;
-        String _bootSubtitle;
-        uint32_t _bootFgColor = 0, _bootBgColor = 0;
-        uint32_t _bootStartMs = 0, _bootDurationMs = 0;
-        int16_t _bootX = 0, _bootY = 0;
+bool initSprites();
+void initFonts();
 
-        uint16_t _logoTitleSizePx = 0;
-        uint16_t _logoSubtitleSizePx = 0;
+pipcore::Sprite *getDrawTarget();
 
-        uint16_t _textStyleH1Px = 24;
-        uint16_t _textStyleH2Px = 18;
-        uint16_t _textStyleBodyPx = 14;
-        uint16_t _textStyleCaptionPx = 12;
+void flushDirty();
 
-        uint16_t _psdfSizePx = 0;
-        uint16_t _psdfWeight = 500;
-        float _psdfWeightBias = 0.083f;
-        FontId _psdfFontId = WixMadeForDisplay;
+void invalidateRect(
+    int16_t x, int16_t y,
+    int16_t w, int16_t h);
 
-        struct ErrorEntry
-        {
-            String title, detail;
-            ErrorType type;
-            int16_t scrollPos, textWidth;
-        };
+void tickDebugDirtyOverlay(uint32_t now);
 
-        ErrorEntry *_errorEntries = nullptr;
-        uint8_t _errorCount = 0;
-        uint8_t _errorCapacity = 0;
-        uint8_t _errorCurrentIndex = 0;
-        uint8_t _errorNextIndex = 0;
-        uint32_t _errorAnimStartMs = 0;
-        uint32_t _errorLastScrollMs = 0;
+// --- Screen Management ---
+void ensureScreenStorage(uint8_t id);
 
-        ErrorType _errorType = Warning;
-        String _errorTitle;
-        String _errorMessage;
-        String _errorButtonText;
+void freeScreenStorage(pipcore::GuiPlatform *plat) noexcept;
 
-        uint32_t _errorLastToggleMs = 0, _errorFlashIntervalMs = 0, _errorEndMs = 0;
-        ButtonVisualState _errorButtonState;
+void prepareScreenTransition(ScreenCallback fromCb, ScreenCallback toCb);
 
-        String _notifTitle;
-        String _notifMessage;
-        String _notifButtonText;
-        NotificationType _notifType = Normal;
-        uint32_t _notifStartMs = 0, _notifAnimDurationMs = 0;
-        uint32_t _notifUnlockMs = 0;
-        ButtonVisualState _notifButtonState;
+bool ensureScreenTransitionSprites();
+void freeScreenTransitionSprites();
 
-        String _toastText;
-        IconId _toastIconId = WarningLayer0;
-        uint16_t _toastIconSizePx = 20;
-        uint32_t _toastStartMs = 0;
-        uint32_t _toastAnimDurMs = 420;
-        uint32_t _toastDisplayMs = 2500;
-        bool _toastFromTop = false;
+void renderScreenTransition(uint32_t now);
 
-        StatusBarPosition _statusBarPos = Top;
-        StatusBarStyle _statusBarStyle = StatusBarStyleSolid;
-        uint8_t _statusBarHeight = 0;
-        uint32_t _statusBarBg = 0x000000;
-        uint32_t _statusBarFg = 0xFFFFFF;
-        String _statusTextLeft;
-        String _statusTextCenter;
-        String _statusTextRight;
-        StatusBarCustomCallback _statusBarCustom = nullptr;
+void renderBootFrame(uint32_t now);
 
-        enum StatusBarDirty : uint8_t
-        {
-            StatusBarDirtyLeft = 1 << 0,
-            StatusBarDirtyCenter = 1 << 1,
-            StatusBarDirtyRight = 1 << 2,
-            StatusBarDirtyBattery = 1 << 3,
-            StatusBarDirtyAll = 0xFF,
-        };
+// --- Graphics: Basic Primitives ---
+uint16_t color888To565(int16_t x, int16_t y, uint32_t color888) const;
 
-        uint8_t _statusBarDirtyMask = 0;
-        DirtyRect _statusBarLastLeft = {};
-        DirtyRect _statusBarLastCenter = {};
-        DirtyRect _statusBarLastRight = {};
-        DirtyRect _statusBarLastBattery = {};
+void blitImage565Frc(
+    int16_t x, int16_t y, const uint16_t *bitmap565, int16_t w, int16_t h);
 
-        int8_t _batteryLevel = -1;
-        BatteryStyle _batteryStyle = Hidden;
+void drawLineImpl(
+    int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint32_t color);
 
-        StatusIcon *_iconsLeft = nullptr;
-        StatusIcon *_iconsCenter = nullptr;
-        StatusIcon *_iconsRight = nullptr;
-        uint8_t _iconLeftCount = 0, _iconCenterCount = 0, _iconRightCount = 0;
-        uint8_t _iconLeftCapacity = 0, _iconCenterCapacity = 0, _iconRightCapacity = 0;
+void drawCircleImpl(
+    int16_t cx, int16_t cy, int16_t r, uint32_t color);
 
-        GraphArea **_graphAreas = nullptr;
-        ListMenuState **_listMenus = nullptr;
-        TileMenuState **_tileMenus = nullptr;
+void fillCircleImpl(
+    int16_t cx, int16_t cy, int16_t r, uint32_t color);
 
-        uint16_t *_blurPrevOrig = nullptr;
-        uint32_t _blurPrevOrigLen = 0;
-        int16_t _blurPrevX = 0, _blurPrevY = 0;
-        int16_t _blurPrevW = 0, _blurPrevH = 0;
-        uint8_t _blurPrevScale = 1;
+void fillCircleFrc(
+    int16_t cx, int16_t cy, int16_t r, uint32_t color888);
 
-        uint16_t *_blurSmallIn = nullptr;
-        uint16_t *_blurSmallTmp = nullptr;
-        uint32_t *_blurRowR = nullptr;
-        uint32_t *_blurRowG = nullptr;
-        uint32_t *_blurRowB = nullptr;
-        uint32_t *_blurColR = nullptr;
-        uint32_t *_blurColG = nullptr;
-        uint32_t *_blurColB = nullptr;
-        uint32_t _blurWorkLen = 0;
-        uint16_t _blurRowCap = 0;
-        uint16_t _blurColCap = 0;
+void drawArcImpl(
+    int16_t cx, int16_t cy, int16_t r, float startDeg, float endDeg, uint32_t color);
 
-        struct RecoveryEntry
-        {
-            String title;
-            String subtitle;
-            RecoveryActionCallback action;
-            uint8_t actionScreen;
-        };
+void drawEllipseImpl(
+    int16_t cx, int16_t cy, int16_t rx, int16_t ry, uint32_t color);
 
-        Button *_recoveryPrev = nullptr;
-        Button *_recoveryNext = nullptr;
-        Button *_recoveryHold = nullptr;
+void fillEllipseImpl(
+    int16_t cx, int16_t cy, int16_t rx, int16_t ry, uint32_t color);
 
-        uint32_t _recoveryHoldMs = 900;
-        uint32_t _recoveryHoldStartMs = 0;
-        uint8_t _recoveryScreenId = 250;
-        uint8_t _recoveryActionScreenId = 251;
-        uint8_t _recoveryExitScreenId = 252;
-        uint8_t _recoveryReturnScreen = 255;
-        uint8_t _recoveryItemCount = 0;
-        uint8_t _recoveryItemCapacity = 0;
-        RecoveryEntry *_recoveryItems = nullptr;
+void drawTriangleImpl(
+    int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint32_t color);
 
-        uint32_t _recoverySavedBgColor = 0;
-        StatusBarPosition _recoverySavedStatusBarPos = Top;
-        uint8_t _recoverySavedStatusBarHeight = 0;
-        uint32_t _recoverySavedStatusBarBg = 0x000000;
-        uint32_t _recoverySavedStatusBarFg = 0xFFFFFF;
-        String _recoverySavedStatusLeft;
-        String _recoverySavedStatusCenter;
-        String _recoverySavedStatusRight;
-        int8_t _recoverySavedBatteryLevel = -1;
-        BatteryStyle _recoverySavedBatteryStyle = Hidden;
+void fillTriangleImpl(
+    int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint32_t color);
 
-        void tickRecovery(uint32_t now);
-        void renderRecoveryScreen();
-        static void recoveryScreenCallback(GUI &ui);
-        static void recoveryExitAction(GUI &ui);
+void drawRoundTriangleImpl(
+    int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint8_t radius, uint32_t color);
+
+void fillRoundTriangleImpl(
+    int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint8_t radius, uint32_t color);
+
+void drawSquircleImpl(
+    int16_t cx, int16_t cy, int16_t r, uint32_t color);
+
+void fillSquircleImpl(
+    int16_t cx, int16_t cy, int16_t r, uint32_t color);
+
+void drawRoundRectFrc(
+    int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radius, uint32_t color888);
+
+void fillRoundRectFrc(
+    int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radius, uint32_t color888);
+
+void drawRoundRectCornersFrc(
+    int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radiusTL, uint8_t radiusTR, uint8_t radiusBR, uint8_t radiusBL, uint32_t color888);
+
+void fillRoundRectCornersFrc(
+    int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radiusTL, uint8_t radiusTR, uint8_t radiusBR, uint8_t radiusBL, uint32_t color888);
+
+// --- Graphics: Rects & Gradients ---
+void fillRectImpl(
+    int16_t x, int16_t y, int16_t w, int16_t h, uint32_t color);
+
+void fillRectAlphaImpl(
+    int16_t x, int16_t y, int16_t w, int16_t h, uint32_t color, uint8_t alpha);
+
+void fillRectGradientVerticalImpl(
+    int16_t x, int16_t y, int16_t w, int16_t h, uint32_t topColor, uint32_t bottomColor);
+
+void fillRectGradientHorizontalImpl(
+    int16_t x, int16_t y, int16_t w, int16_t h, uint32_t leftColor, uint32_t rightColor);
+
+void fillRectGradient4Impl(
+    int16_t x, int16_t y, int16_t w, int16_t h, uint32_t c00, uint32_t c10, uint32_t c01, uint32_t c11);
+
+void fillRectGradientDiagonalImpl(
+    int16_t x, int16_t y, int16_t w, int16_t h, uint32_t tlColor, uint32_t brColor);
+
+void fillRectGradientRadialImpl(
+    int16_t x, int16_t y, int16_t w, int16_t h, int16_t cx, int16_t cy, int16_t radius, uint32_t innerColor, uint32_t outerColor);
+
+// --- Text & Layout ---
+int16_t AutoX(int32_t contentWidth) const;
+
+int16_t AutoY(int32_t contentHeight) const;
+
+bool psdfMeasureText(const String &text, int16_t &outW, int16_t &outH) const;
+
+void psdfDrawTextInternal(const String &text, int16_t x, int16_t y, uint16_t fg565, uint16_t bg565, TextAlign align);
+
+void drawCenteredTitle(const String &title, const String &subtitle, uint32_t fg, uint32_t bg);
+
+// --- Visual Effects: Blur ---
+bool ensureBlurWorkBuffers(uint32_t smallLen, int16_t sw, int16_t sh) noexcept;
+
+void freeBlurBuffers(pipcore::GuiPlatform *plat) noexcept;
+
+void drawBlurStripImpl(
+    int16_t x, int16_t y, int16_t w, int16_t h,
+    uint8_t radius, BlurDirection dir,
+    bool gradient, uint8_t materialStrength,
+    uint8_t noiseAmount, int32_t materialColor);
+
+void updateBlurStripImpl(
+    int16_t x, int16_t y,
+    int16_t w, int16_t h,
+    uint8_t radius, BlurDirection dir,
+    bool gradient, uint8_t materialStrength,
+    uint8_t noiseAmount, int32_t materialColor);
+
+// --- Visual Effects: Scroll Dots ---
+void drawScrollDotsImpl(
+    int16_t x, int16_t y,
+    uint8_t count, uint8_t activeIndex,
+    uint8_t prevIndex, float animProgress,
+    bool animate, int8_t animDirection,
+    uint32_t activeColor, uint32_t inactiveColor,
+    uint8_t dotRadius, uint8_t spacing,
+    uint8_t activeWidth);
+
+void updateScrollDotsImpl(
+    int16_t x, int16_t y,
+    uint8_t count, uint8_t activeIndex,
+    uint8_t prevIndex, float animProgress,
+    bool animate, int8_t animDirection,
+    uint32_t activeColor, uint32_t inactiveColor,
+    uint8_t dotRadius, uint8_t spacing,
+    uint8_t activeWidth);
+
+// --- Visual Effects: Glow ---
+void drawGlowCircleImpl(
+    int16_t x, int16_t y,
+    int16_t r, uint32_t fillColor,
+    int32_t bgColor, int32_t glowColor,
+    uint8_t glowSize, uint8_t glowStrength,
+    GlowAnim anim, uint16_t pulsePeriodMs);
+
+void updateGlowCircleImpl(
+    int16_t x, int16_t y,
+    int16_t r, uint32_t fillColor,
+    int32_t bgColor, int32_t glowColor,
+    uint8_t glowSize, uint8_t glowStrength,
+    GlowAnim anim, uint16_t pulsePeriodMs);
+
+void drawGlowRoundRectImpl(
+    int16_t x, int16_t y,
+    int16_t w, int16_t h,
+    uint8_t radius, uint32_t fillColor,
+    int32_t bgColor, int32_t glowColor,
+    uint8_t glowSize, uint8_t glowStrength,
+    GlowAnim anim, uint16_t pulsePeriodMs);
+
+void updateGlowRoundRectImpl(
+    int16_t x, int16_t y,
+    int16_t w, int16_t h,
+    uint8_t radius, uint32_t fillColor,
+    int32_t bgColor, int32_t glowColor,
+    uint8_t glowSize, uint8_t glowStrength,
+    GlowAnim anim, uint16_t pulsePeriodMs);
+
+void drawGlowRoundRectCornersImpl(
+    int16_t x, int16_t y,
+    int16_t w, int16_t h,
+    uint8_t radiusTL, uint8_t radiusTR,
+    uint8_t radiusBR, uint8_t radiusBL,
+    uint32_t fillColor, int32_t bgColor,
+    int32_t glowColor, uint8_t glowSize,
+    uint8_t glowStrength, GlowAnim anim,
+    uint16_t pulsePeriodMs);
+
+void updateGlowRoundRectCornersImpl(
+    int16_t x, int16_t y,
+    int16_t w, int16_t h,
+    uint8_t radiusTL, uint8_t radiusTR,
+    uint8_t radiusBR, uint8_t radiusBL,
+    uint32_t fillColor, int32_t bgColor,
+    int32_t glowColor, uint8_t glowSize,
+    uint8_t glowStrength, GlowAnim anim,
+    uint16_t pulsePeriodMs);
+
+// --- UI: Menus & Graphs ---
+GraphArea &ensureGraphArea(uint8_t screenId);
+ListMenuState &ensureListMenu(uint8_t screenId);
+TileMenuState &ensureTileMenu(uint8_t screenId);
+ListMenuState *getListMenu(uint8_t screenId);
+TileMenuState *getTileMenu(uint8_t screenId);
+
+void configureListMenu(uint8_t screenId, uint8_t parentScreen, const ListMenuItemDef *items, uint8_t itemCount);
+void configureTileMenu(uint8_t screenId, uint8_t parentScreen, const TileMenuItemDef *items, uint8_t itemCount);
+bool ensureTileCapacity(TileMenuState &m, uint8_t need);
+void setTileMenuLayout(uint8_t screenId, uint8_t layoutCols, uint8_t layoutRows, const TileLayoutCell *tiles, uint8_t count);
+
+void freeGraphAreas(pipcore::GuiPlatform *plat) noexcept;
+void freeListMenus(pipcore::GuiPlatform *plat) noexcept;
+void freeTileMenus(pipcore::GuiPlatform *plat) noexcept;
+
+// --- UI: Status Bar ---
+void renderStatusBar(bool useSprite);
+void freeStatusBarIcons(pipcore::GuiPlatform *plat) noexcept;
+
+// --- UI: Toasts & Notifications ---
+void renderToastOverlay();
+void renderNotificationOverlay();
+void showToastInternal(const String &text, uint32_t durationMs, bool fromTop, IconId iconId, uint16_t iconSizePx);
+
+// --- UI: Error Handling ---
+void renderErrorFrame(uint32_t now);
+bool ensureErrorCapacity(uint8_t need);
+void freeErrors(pipcore::GuiPlatform *plat) noexcept;
+void drawErrorCard(pipcore::Sprite &t, int16_t x, int16_t y, int16_t w, int16_t h,
+                   const String &title, const String &detail,
+                   uint32_t accentColor, uint8_t opacity, int scrollX);

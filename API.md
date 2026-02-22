@@ -467,6 +467,71 @@ void setup() {
 
 ---
 
+# Кнопки (ввод)
+
+## 1. Создание кнопок
+
+```cpp
+using namespace pipgui;
+
+Button btnNext(2, Pulldown);
+Button btnPrev(4, Pulldown);
+```
+
+Доступны параметры `Pullup`, `Pulldown`.
+
+## 2. Инициализация
+
+В `setup()` нужно вызвать `begin()` для каждой кнопки:
+
+```cpp
+void setup()
+{
+    btnNext.begin();
+    btnPrev.begin();
+}
+```
+
+## 3. Обновление в loop() и события
+
+Рекомендуемый вариант (самый быстрый отклик): вызывать `update()` как можно чаще (обычно каждый проход `loop()`), а событие брать через `wasPressed()`:
+
+```cpp
+void loop()
+{
+    btnNext.update();
+    btnPrev.update();
+
+    if (btnNext.wasPressed())
+        ui.nextScreen();
+
+    if (btnPrev.wasPressed())
+        ui.prevScreen();
+
+    ui.loop();
+}
+```
+
+Текущее состояние удержания:
+
+```cpp
+bool nextDown = btnNext.isDown();
+```
+
+## 4. Насколько быстро реагирует кнопка
+
+Внутри `Button` используется debounce на основе Vertical Counter (очень быстрый и устойчивый к шуму).
+Переключение стабильного состояния происходит примерно после **4 подряд** подтверждённых сэмплов.
+
+Задержка реакции зависит от частоты вызова `update()`:
+
+- Если `update()` вызывается:
+  - каждые ~`1 ms` → отклик ~`4 ms`
+  - каждые ~`5 ms` → ~`20 ms`
+  - каждые ~`10 ms` → ~`40 ms`
+
+---
+
 # Дисплей (инициализация)
 
 ## 1. configureDisplay
@@ -1423,53 +1488,6 @@ void drawCircularProgressBar(
 
 ---
 
-# Recovery Mode
-
-Recovery Mode — это встроенный экран восстановления, который можно открыть **удержанием кнопки при старте**.
-Идея: если прошивка загрузилась, но приложение «в плохом состоянии», пользователь может зайти в минимальное меню и выполнить действия вида сброса настроек/перезагрузки/сервиса.
-
-## 1. Включение
-
-В прошивке нужно передать `GUI` указатели на кнопки и (опционально) отдельную кнопку удержания:
-
-```cpp
-// Вариант 1: удержание одной из рабочих кнопок
-ui.enableRecovery(&btnPrev, &btnNext, 900);
-
-// Вариант 2: отдельная кнопка удержания
-ui.enableRecovery(&btnPrev, &btnNext, &btnOk, 900);
-```
-
-После того как экран boot‑логотипа завершился, `GUI` начинает «армить» Recovery.
-Если заданная кнопка удерживается `holdMs`, режим активируется.
-
-## 2. Меню Recovery
-
-Меню задаётся списком действий:
-
-```cpp
-ui.setRecoveryMenu({
-    {"Restart",   "Reboot device",  [](GUI &ui) { /* reboot */ }},
-    {"Safe mode", "Minimal boot",   [](GUI &ui) { /* ... */ }},
-    {"Wipe",      "Reset settings", [](GUI &ui) { /* ... */ }},
-});
-```
-
-- **`title`** — заголовок пункта.
-- **`subtitle`** — подзаголовок/описание.
-- **`action`** — колбэк, который вызовется при выборе пункта.
-
-## 3. Управление в Recovery
-
-Recovery использует те же две кнопки, что и обычные меню:
-
-- **Prev**: вверх / назад.
-- **Next**: вниз / выбор.
-
-Пока Recovery активен, он сам читает кнопки и маршрутизирует ввод внутрь своего меню.
-
----
-
 # Layout helpers (лёгкая раскладка)
 
 Эти типы нужны, чтобы проще раскладывать UI без ручного пересчёта координат.
@@ -1485,37 +1503,49 @@ struct UiInsets { int16_t l, t, r, b; };
 
 ## 2. Slicing API (разрезание области)
 
-`UiLayout` умеет «нарезать» область под блоки:
+Можно «нарезать» область под блоки (header/footer/content) без ручной математики:
 
 ```cpp
 UiRect root{0, 0, ui.width(), ui.height()};
 
-UiRect work = UiLayout::inset(root, 10);
-UiRect header = UiLayout::takeTop(work, 24, 8);   // верхняя панель + gap
-UiRect footer = UiLayout::takeBottom(work, 28, 8);
+UiRect work = inset(root, 10);
+UiRect header = takeTop(work, 24, 8);   // верхняя панель + gap
+UiRect footer = takeBottom(work, 28, 8);
 UiRect content = work;                            // остаток
+UiRect centered = placeInside(area, size, Center, Center);
+UiRect centered = centerIn(area, size);
+UiRect insetted = inset(area, 10, 20, 10, 20);
 ```
 
 Доступные операции:
 
-- `UiLayout::inset(rect, all)`
-- `UiLayout::inset(rect, UiInsets{...})`
-- `UiLayout::takeTop/Bottom/Left/Right(rect, size, gap)`
+- `inset(rect, all)` — отступы со всех сторон
+- `inset(rect, l, t, r, b)` — отступы по сторонам
+- `inset(rect, UiInsets{...})` — через структуру
+- `takeTop/Bottom/Left/Right(rect, size, gap)` — вырезать часть области
+- `placeInside(area, size, hJustify, vAlign)` — разместить прямоугольник внутри области
+- `centerIn(area, size)` — сокращение для центрирования
 
-## 3. Flow API (равномерная раскладка по строке/колонке)
+Примечание: все эти функции также доступны в форме `UiLayout::...`.
 
-Если нужно разложить N элементов по строке/колонке с `gap` и выравниванием:
+## 3. Flow API (равномерная раскладка)
+
+Пример — три кнопки в строке с отступами:
 
 ```cpp
 UiSize sizes[3] = {{40, 20}, {60, 20}, {40, 20}};
 UiRect out[3];
 
-UiLayout::flowRow(area, sizes, out, 3, 10, UiJustify::Center, UiAlign::Center);
-UiLayout::flowColumn(area, sizes, out, 3, 6, UiJustify::Start, UiAlign::Center);
+flowRow(area, sizes, out, count, gap, justify, align);
 ```
 
-- `UiJustify`: `Start/Center/End/SpaceBetween/SpaceEvenly`
-- `UiAlign`: `Start/Center/End`
+Параметры: `flowRow(area, sizesArray, outArray, count, gap, justify, align)`
+
+Значения для justify: `Start`, `Center`, `End`
+
+Для распределения: `layout::SpaceBetween`, `layout::SpaceEvenly`
+
+Аналогично `flowColumn()` для вертикальной раскладки.
 
 ## 4. Cursor-based API (вариант 2)
 
@@ -1524,7 +1554,7 @@ UiLayout::flowColumn(area, sizes, out, 3, 6, UiJustify::Start, UiAlign::Center);
 
 ```cpp
 UiRect rowArea{10, 40, 220, 30};
-UiFlowRow<3> row(rowArea, 10, UiJustify::SpaceBetween, UiAlign::Center);
+UiFlowRow<3> row(rowArea, 10, layout::SpaceEvenly, Center);
 
 row.next(40, 24);
 row.next(60, 24);
@@ -1537,7 +1567,7 @@ row.finish();
 Аналогично для колонок:
 
 ```cpp
-UiFlowColumn<4> col(area, 6, UiJustify::Start, UiAlign::Center);
+UiFlowColumn<4> col(area, 6, Start, Center);
 col.next(200, 18);
 col.next(200, 18);
 col.next(200, 18);

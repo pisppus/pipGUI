@@ -1,4 +1,4 @@
-#include <pipGUI/core/api/pipGUI.hpp>
+﻿#include <pipGUI/core/api/pipGUI.hpp>
 #include <math.h>
 
 namespace pipgui
@@ -28,15 +28,15 @@ namespace pipgui
     void GUI::showLogo(const String &t, const String &s, BootAnimation a, uint32_t fg, uint32_t bg, uint32_t dur, int16_t x, int16_t y)
     {
         _flags.bootActive = 1;
-        _bootAnim = a;
-        _bootTitle = t;
-        _bootSubtitle = s;
-        _bootFgColor = fg;
-        _bootBgColor = bg;
-        _bootDurationMs = dur;
-        _bootX = x;
-        _bootY = y;
-        _bootStartMs = nowMs();
+        _boot.anim = a;
+        _boot.title = t;
+        _boot.subtitle = s;
+        _boot.fgColor = fg;
+        _boot.bgColor = bg;
+        _boot.durationMs = dur;
+        _boot.x = x;
+        _boot.y = y;
+        _boot.startMs = nowMs();
     }
 
     void GUI::renderBootFrame(uint32_t now)
@@ -47,7 +47,7 @@ namespace pipgui
         // Use KronaOne font for boot title
         setPSDFFont(KronaOne);
 
-        uint32_t el = now - _bootStartMs, dur = _bootDurationMs ? _bootDurationMs : 1;
+        uint32_t el = now - _boot.startMs, dur = _boot.durationMs ? _boot.durationMs : 1;
         bool done = (el >= dur);
 
         auto draw = [&](uint32_t fg)
@@ -55,36 +55,36 @@ namespace pipgui
             if (_flags.spriteEnabled)
             {
                 bool prevRender = _flags.renderToSprite;
-                pipcore::Sprite *prevActive = _activeSprite;
+                pipcore::Sprite *prevActive = _render.activeSprite;
 
-                _activeSprite = &_sprite;
+                _render.activeSprite = &_render.sprite;
                 _flags.renderToSprite = 1;
-                drawCenteredTitle(_bootTitle, _bootSubtitle, fg, _bootBgColor);
+                drawCenteredTitle(_boot.title, _boot.subtitle, fg, _boot.bgColor);
 
                 _flags.renderToSprite = prevRender;
-                _activeSprite = prevActive;
-                if (_display && _flags.spriteEnabled)
-                    _sprite.writeToDisplay(*_display, 0, 0, (int16_t)_screenWidth, (int16_t)_screenHeight);
+                _render.activeSprite = prevActive;
+                if (_disp.display && _flags.spriteEnabled)
+                    _render.sprite.writeToDisplay(*_disp.display, 0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight);
             }
             else
             {
-                drawCenteredTitle(_bootTitle, _bootSubtitle, fg, _bootBgColor);
+                drawCenteredTitle(_boot.title, _boot.subtitle, fg, _boot.bgColor);
             }
         }; 
 
-        switch (_bootAnim)
+        switch (_boot.anim)
         {
         case BootAnimNone:
-            draw(_bootFgColor);
+            draw(_boot.fgColor);
             done = true;
             break;
 
         case LightFade:
         {
-            uint32_t p = done ? _brightnessMax : (el * (uint32_t)_brightnessMax) / dur;
-            if (_backlightCb)
-                _backlightCb(min((uint32_t)_brightnessMax, p));
-            draw(_bootFgColor);
+            uint32_t p = done ? _disp.brightnessMax : (el * (uint32_t)_disp.brightnessMax) / dur;
+            if (_disp.backlightCb)
+                _disp.backlightCb(min((uint32_t)_disp.brightnessMax, p));
+            draw(_boot.fgColor);
             break;
         }
 
@@ -104,21 +104,21 @@ namespace pipgui
 
             bool useSprite = _flags.spriteEnabled;
             bool prevRender = _flags.renderToSprite;
-            pipcore::Sprite *prevActive = _activeSprite;
+            pipcore::Sprite *prevActive = _render.activeSprite;
 
             if (useSprite)
             {
-                _activeSprite = &_sprite;
+                _render.activeSprite = &_render.sprite;
                 _flags.renderToSprite = 1;
             }
 
-            clear(_bootBgColor);
+            clear(_boot.bgColor);
 
             uint8_t alpha = (uint8_t)(fadeEase * 255.0f + 0.5f);
-            uint32_t fgBlend = detail::blend888(_bootBgColor, _bootFgColor, alpha);
+            uint32_t fgBlend = detail::blend888(_boot.bgColor, _boot.fgColor, alpha);
 
-            uint16_t baseTitlePx = _logoTitleSizePx ? _logoTitleSizePx : _textStyleH1Px;
-            uint16_t baseSubPx = _logoSubtitleSizePx ? _logoSubtitleSizePx : (uint16_t)((baseTitlePx * 3U) / 4U);
+            uint16_t baseTitlePx = _typo.logoTitleSizePx ? _typo.logoTitleSizePx : _typo.h1Px;
+            uint16_t baseSubPx = _typo.logoSubtitleSizePx ? _typo.logoSubtitleSizePx : (uint16_t)((baseTitlePx * 3U) / 4U);
 
             float scale = 0.50f + 0.50f * zoomEase;
 
@@ -128,9 +128,9 @@ namespace pipgui
             int16_t titleW = 0;
             int16_t titleH = 0;
             setPSDFFontSize(titlePx);
-            psdfMeasureText(_bootTitle, titleW, titleH);
+            psdfMeasureText(_boot.title, titleW, titleH);
 
-            bool hasSub = _bootSubtitle.length() > 0;
+            bool hasSub = _boot.subtitle.length() > 0;
             int16_t subW = 0;
             int16_t subH = 0;
 
@@ -141,33 +141,33 @@ namespace pipgui
             if (hasSub)
             {
                 setPSDFFontSize(subPx);
-                psdfMeasureText(_bootSubtitle, subW, subH);
+                psdfMeasureText(_boot.subtitle, subW, subH);
             }
 
             int16_t totalH = hasSub ? (titleH + spacing + subH) : titleH;
-            int16_t topY = (_bootY != -1) ? _bootY : (int16_t)((_screenHeight - totalH) / 2);
-            int16_t cx = (_bootX != -1) ? _bootX : (int16_t)(_screenWidth / 2);
+            int16_t topY = (_boot.y != -1) ? _boot.y : (int16_t)((_render.screenHeight - totalH) / 2);
+            int16_t cx = (_boot.x != -1) ? _boot.x : (int16_t)(_render.screenWidth / 2);
 
             uint16_t fgBlend565 = color888To565(cx, topY, fgBlend);
-            uint16_t bg565 = color888To565(cx, topY, _bootBgColor);
+            uint16_t bg565 = color888To565(cx, topY, _boot.bgColor);
             setPSDFFontSize(titlePx);
-            psdfDrawTextInternal(_bootTitle, cx, topY, fgBlend565, bg565, AlignCenter);
+            psdfDrawTextInternal(_boot.title, cx, topY, fgBlend565, bg565, AlignCenter);
 
             if (hasSub)
             {
                 int16_t subY = topY + titleH + spacing;
                 uint16_t fgBlendSub = color888To565(cx, subY, fgBlend);
-                uint16_t bg565Sub = color888To565(cx, subY, _bootBgColor);
+                uint16_t bg565Sub = color888To565(cx, subY, _boot.bgColor);
                 setPSDFFontSize(subPx);
-                psdfDrawTextInternal(_bootSubtitle, cx, subY, fgBlendSub, bg565Sub, AlignCenter);
+                psdfDrawTextInternal(_boot.subtitle, cx, subY, fgBlendSub, bg565Sub, AlignCenter);
             }
 
             if (useSprite)
             {
                 _flags.renderToSprite = prevRender;
-                _activeSprite = prevActive;
-                if (_display && _flags.spriteEnabled)
-                    _sprite.writeToDisplay(*_display, 0, 0, (int16_t)_screenWidth, (int16_t)_screenHeight);
+                _render.activeSprite = prevActive;
+                if (_disp.display && _flags.spriteEnabled)
+                    _render.sprite.writeToDisplay(*_disp.display, 0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight);
             }
             break;
         }
@@ -177,36 +177,36 @@ namespace pipgui
             auto t = getDrawTarget();
 
             int16_t th = 0, sh = 0, sp = 4;
-            bool sub = _bootSubtitle.length() > 0;
+            bool sub = _boot.subtitle.length() > 0;
 
-            uint16_t titlePx = _logoTitleSizePx ? _logoTitleSizePx : _textStyleH1Px;
-            uint16_t subPx = _logoSubtitleSizePx ? _logoSubtitleSizePx : (uint16_t)((titlePx * 3U) / 4U);
+            uint16_t titlePx = _typo.logoTitleSizePx ? _typo.logoTitleSizePx : _typo.h1Px;
+            uint16_t subPx = _typo.logoSubtitleSizePx ? _typo.logoSubtitleSizePx : (uint16_t)((titlePx * 3U) / 4U);
 
             int16_t tmpW = 0;
             setPSDFFontSize(titlePx);
-            psdfMeasureText(_bootTitle, tmpW, th);
+            psdfMeasureText(_boot.title, tmpW, th);
 
             if (sub)
             {
                 setPSDFFontSize(subPx);
-                psdfMeasureText(_bootSubtitle, tmpW, sh);
+                psdfMeasureText(_boot.subtitle, tmpW, sh);
             }
 
             int16_t totH = sub ? (th + sp + sh) : th;
-            int16_t targetY = (_bootY != -1) ? _bootY : (_screenHeight - totH) / 2;
+            int16_t targetY = (_boot.y != -1) ? _boot.y : (_render.screenHeight - totH) / 2;
 
             uint32_t mot = min(dur, (uint32_t)1000UL), mel = min(el, mot);
             float eased = bezierEase01((float)mel / mot, 0.30f, 0.80f);
             uint32_t p = (uint32_t)(eased * 255.0f);
 
-            int16_t off = _screenHeight - (int16_t)((_screenHeight - targetY) * p / 255);
+            int16_t off = _render.screenHeight - (int16_t)((_render.screenHeight - targetY) * p / 255);
             if (off < targetY)
                 off = targetY;
 
-            int16_t saveY = _bootY;
-            _bootY = off;
-            draw(_bootFgColor);
-            _bootY = saveY;
+            int16_t saveY = _boot.y;
+            _boot.y = off;
+            draw(_boot.fgColor);
+            _boot.y = saveY;
             break;
         }
         }
@@ -215,8 +215,8 @@ namespace pipgui
         {
             _flags.bootActive = 0;
             _flags.needRedraw = 1;
-            if (_bootAnim == LightFade && _backlightCb)
-                _backlightCb(_brightnessMax);
+            if (_boot.anim == LightFade && _disp.backlightCb)
+                _disp.backlightCb(_disp.brightnessMax);
             // Reset font back to default after boot
             setPSDFFont(WixMadeForDisplay);
         }

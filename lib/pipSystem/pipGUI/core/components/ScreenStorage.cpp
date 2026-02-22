@@ -1,4 +1,4 @@
-#include <pipGUI/core/api/pipGUI.hpp>
+﻿#include <pipGUI/core/api/pipGUI.hpp>
 #include <new>
 
 namespace pipgui
@@ -56,10 +56,10 @@ namespace pipgui
 
     void GUI::ensureScreenStorage(uint8_t id)
     {
-        if (id < _screenCapacity)
+        if (id < _screen.capacity)
             return;
         pipcore::GuiPlatform *plat = platform();
-        uint16_t newCap = _screenCapacity ? _screenCapacity : 8;
+        uint16_t newCap = _screen.capacity ? _screen.capacity : 8;
         while (newCap <= id)
         {
             uint16_t next = (uint16_t)(newCap * 2);
@@ -95,62 +95,63 @@ namespace pipgui
             newLists[i] = nullptr;
             newTiles[i] = nullptr;
         }
-        if (_screenCapacity > 0)
+        if (_screen.capacity > 0)
         {
-            for (uint16_t i = 0; i < _screenCapacity; ++i)
+            for (uint16_t i = 0; i < _screen.capacity; ++i)
             {
-                if (_screens)
-                    newScreens[i] = _screens[i];
-                if (_graphAreas)
-                    newGraphs[i] = _graphAreas[i];
-                if (_listMenus)
-                    newLists[i] = _listMenus[i];
-                if (_tileMenus)
-                    newTiles[i] = _tileMenus[i];
+                if (_screen.callbacks)
+                    newScreens[i] = _screen.callbacks[i];
+                if (_screen.graphAreas)
+                    newGraphs[i] = _screen.graphAreas[i];
+                if (_screen.listMenus)
+                    newLists[i] = _screen.listMenus[i];
+                if (_screen.tileMenus)
+                    newTiles[i] = _screen.tileMenus[i];
             }
         }
-        if (_screens)
-            detail::guiFree(plat, _screens);
-        if (_graphAreas)
-            detail::guiFree(plat, _graphAreas);
-        if (_listMenus)
-            detail::guiFree(plat, _listMenus);
-        if (_tileMenus)
-            detail::guiFree(plat, _tileMenus);
-        _screens = newScreens;
-        _graphAreas = newGraphs;
-        _listMenus = newLists;
-        _tileMenus = newTiles;
-        _screenCapacity = newCap;
+        if (_screen.callbacks)
+            detail::guiFree(plat, _screen.callbacks);
+        if (_screen.graphAreas)
+            detail::guiFree(plat, _screen.graphAreas);
+        if (_screen.listMenus)
+            detail::guiFree(plat, _screen.listMenus);
+        if (_screen.tileMenus)
+            detail::guiFree(plat, _screen.tileMenus);
+        _screen.callbacks = newScreens;
+        _screen.graphAreas = newGraphs;
+        _screen.listMenus = newLists;
+        _screen.tileMenus = newTiles;
+        _screen.capacity = newCap;
     }
 
     GraphArea &GUI::ensureGraphArea(uint8_t screenId)
     {
         ensureScreenStorage(screenId);
-        return ensureLazy<GraphArea>(screenId, _graphAreas, _screenCapacity, initGraphAreaDefaults);
+        return ensureLazy<GraphArea>(screenId, _screen.graphAreas, _screen.capacity, initGraphAreaDefaults);
     }
     ListMenuState &GUI::ensureListMenu(uint8_t screenId)
     {
         ensureScreenStorage(screenId);
-        return ensureLazy<ListMenuState>(screenId, _listMenus, _screenCapacity, initListMenuDefaults);
+        return ensureLazy<ListMenuState>(screenId, _screen.listMenus, _screen.capacity, initListMenuDefaults);
     }
     TileMenuState &GUI::ensureTileMenu(uint8_t screenId)
     {
         ensureScreenStorage(screenId);
-        return ensureLazy<TileMenuState>(screenId, _tileMenus, _screenCapacity, initTileMenuDefaults);
+        return ensureLazy<TileMenuState>(screenId, _screen.tileMenus, _screen.capacity, initTileMenuDefaults);
     }
 
     ListMenuState *GUI::getListMenu(uint8_t screenId)
     {
-        if (screenId >= _screenCapacity || !_listMenus)
+        if (screenId >= _screen.capacity || !_screen.listMenus)
             return nullptr;
-        return _listMenus[screenId];
+        return _screen.listMenus[screenId];
     }
     TileMenuState *GUI::getTileMenu(uint8_t screenId)
     {
-        if (screenId >= _screenCapacity || !_tileMenus)
+        if (screenId >= _screen.capacity || !_screen.tileMenus)
             return nullptr;
-        return _tileMenus[screenId];
+        return _screen.tileMenus[screenId];
     }
 
 }
+

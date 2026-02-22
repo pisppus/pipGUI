@@ -1,4 +1,4 @@
-#include <math.h>
+﻿#include <math.h>
 #include <pipGUI/core/api/pipGUI.hpp>
 #include <pipGUI/fonts/WixMadeForDisplay/WixMadeForDisplay.hpp>
 #include <pipGUI/fonts/WixMadeForDisplay/metrics.hpp>
@@ -107,7 +107,7 @@ namespace pipgui
             g_currentFont = &fontWixMadeForDisplay;
             break;
         }
-        _psdfFontId = fontId;
+        _typo.psdfFontId = fontId;
     }
 
     static inline uint32_t nextUtf8(const char *s, int &i)
@@ -209,28 +209,28 @@ namespace pipgui
 
     void GUI::configureTextStyles(uint16_t h1Px, uint16_t h2Px, uint16_t bodyPx, uint16_t captionPx)
     {
-        _textStyleH1Px = h1Px;
-        _textStyleH2Px = h2Px;
-        _textStyleBodyPx = bodyPx;
-        _textStyleCaptionPx = captionPx;
+        _typo.h1Px = h1Px;
+        _typo.h2Px = h2Px;
+        _typo.bodyPx = bodyPx;
+        _typo.captionPx = captionPx;
     }
 
     void GUI::setTextStyle(TextStyle style)
     {
-        uint16_t px = _textStyleBodyPx;
+        uint16_t px = _typo.bodyPx;
         switch (style)
         {
         case H1:
-            px = _textStyleH1Px;
+            px = _typo.h1Px;
             break;
         case H2:
-            px = _textStyleH2Px;
+            px = _typo.h2Px;
             break;
         case Body:
-            px = _textStyleBodyPx;
+            px = _typo.bodyPx;
             break;
         case Caption:
-            px = _textStyleCaptionPx;
+            px = _typo.captionPx;
             break;
         default:
             break;
@@ -256,12 +256,12 @@ namespace pipgui
 
     void GUI::setPSDFFontSize(uint16_t px)
     {
-        _psdfSizePx = px;
+        _typo.psdfSizePx = px;
     }
 
     uint16_t GUI::psdfFontSize() const
     {
-        return _psdfSizePx;
+        return _typo.psdfSizePx;
     }
 
     static inline float weightToBias(uint16_t weight)
@@ -294,23 +294,23 @@ namespace pipgui
 
     void GUI::setPSDFWeight(uint16_t weight)
     {
-        _psdfWeight = weight;
-        _psdfWeightBias = weightToBias(weight);
+        _typo.psdfWeight = weight;
+        _typo.psdfWeightBias = weightToBias(weight);
     }
 
     uint16_t GUI::psdfWeight() const
     {
-        return _psdfWeight;
+        return _typo.psdfWeight;
     }
 
     void GUI::setPSDFWeightBias(float bias)
     {
-        _psdfWeightBias = bias;
+        _typo.psdfWeightBias = bias;
     }
 
     float GUI::psdfWeightBias() const
     {
-        return _psdfWeightBias;
+        return _typo.psdfWeightBias;
     }
 
     bool GUI::psdfMeasureText(const String &text, int16_t &outW, int16_t &outH) const
@@ -318,10 +318,10 @@ namespace pipgui
         outW = 0;
         outH = 0;
 
-        if (_psdfSizePx == 0)
+        if (_typo.psdfSizePx == 0)
             return false;
 
-        float scale = (float)_psdfSizePx;
+        float scale = (float)_typo.psdfSizePx;
         float penX = 0.0f;
         float maxX = 0.0f;
         uint16_t lines = 1;
@@ -382,7 +382,7 @@ namespace pipgui
 
     void GUI::psdfDrawTextInternal(const String &text, int16_t x, int16_t y, uint16_t fg565, uint16_t bg565, TextAlign align)
     {
-        if (_psdfSizePx == 0)
+        if (_typo.psdfSizePx == 0)
             return;
 
         int16_t tw = 0;
@@ -403,14 +403,14 @@ namespace pipgui
         if (ry == -1)
             ry = AutoY((int32_t)th);
 
-        float sizePx = (float)_psdfSizePx;
+        float sizePx = (float)_typo.psdfSizePx;
         float baseline = (float)ry + g_currentFont->ascender * sizePx;
         float drScale = g_currentFont->distanceRange * (sizePx / g_currentFont->nominalSizePx);
-        float weightBias = _psdfWeightBias;
+        float weightBias = _typo.psdfWeightBias;
 
-        if (_flags.spriteEnabled && (_flags.renderToSprite && (_activeSprite ? _activeSprite->getBuffer() : _sprite.getBuffer())))
+        if (_flags.spriteEnabled && (_flags.renderToSprite && (_render.activeSprite ? _render.activeSprite->getBuffer() : _render.sprite.getBuffer())))
         {
-            pipcore::Sprite *spr = _activeSprite ? _activeSprite : &_sprite;
+            pipcore::Sprite *spr = _render.activeSprite ? _render.activeSprite : &_render.sprite;
             uint16_t *buf = (uint16_t *)spr->getBuffer();
             if (!buf)
                 return;
@@ -631,7 +631,7 @@ namespace pipgui
 
     void GUI::drawPSDFText(const String &text, int16_t x, int16_t y, uint32_t color, uint32_t bgColor, TextAlign align)
     {
-        if (_flags.spriteEnabled && _display && !_flags.renderToSprite)
+        if (_flags.spriteEnabled && _disp.display && !_flags.renderToSprite)
         {
             updatePSDFText(text, x, y, color, bgColor, align);
             return;
@@ -664,7 +664,7 @@ namespace pipgui
 
         int16_t pad = 4;
 
-        float sizePx = (float)_psdfSizePx;
+        float sizePx = (float)_typo.psdfSizePx;
         float baseline = (float)ry + g_currentFont->ascender * sizePx;
 
         float minX = 0.0f, minY = 0.0f, maxX = 0.0f, maxY = 0.0f;
@@ -754,10 +754,10 @@ namespace pipgui
         int16_t bh = (int16_t)((iy1 - iy0) + pad * 2);
 
         bool prevRender = _flags.renderToSprite;
-        pipcore::Sprite *prevActive = _activeSprite;
+        pipcore::Sprite *prevActive = _render.activeSprite;
 
         _flags.renderToSprite = 1;
-        _activeSprite = &_sprite;
+        _render.activeSprite = &_render.sprite;
 
         fillRect()
             .at(bx, by)
@@ -770,7 +770,7 @@ namespace pipgui
         psdfDrawTextInternal(text, rx, ry, fg565, bg565, align);
 
         _flags.renderToSprite = prevRender;
-        _activeSprite = prevActive;
+        _render.activeSprite = prevActive;
 
         invalidateRect(bx, by, bw, bh);
         flushDirty();
@@ -797,7 +797,7 @@ namespace pipgui
                        uint32_t color,
                        uint32_t bgColor)
     {
-        if (_flags.spriteEnabled && _display && !_flags.renderToSprite)
+        if (_flags.spriteEnabled && _disp.display && !_flags.renderToSprite)
         {
             updateIcon(iconId, x, y, sizePx, color, bgColor);
             return;
@@ -819,11 +819,11 @@ namespace pipgui
             ry = AutoY((int32_t)sizePx);
 
         float drScale = psdf_icons::DistanceRange * ((float)sizePx / psdf_icons::NominalSizePx);
-        float weightBias = _psdfWeightBias;
+        float weightBias = _typo.psdfWeightBias;
 
-        if (_flags.spriteEnabled && (_flags.renderToSprite && (_activeSprite ? _activeSprite->getBuffer() : _sprite.getBuffer())))
+        if (_flags.spriteEnabled && (_flags.renderToSprite && (_render.activeSprite ? _render.activeSprite->getBuffer() : _render.sprite.getBuffer())))
         {
-            pipcore::Sprite *spr = _activeSprite ? _activeSprite : &_sprite;
+            pipcore::Sprite *spr = _render.activeSprite ? _render.activeSprite : &_render.sprite;
             uint16_t *buf = (uint16_t *)spr->getBuffer();
             if (!buf)
                 return;
@@ -950,10 +950,10 @@ namespace pipgui
         int16_t bh = (int16_t)((int16_t)sizePx + pad * 2);
 
         bool prevRender = _flags.renderToSprite;
-        pipcore::Sprite *prevActive = _activeSprite;
+        pipcore::Sprite *prevActive = _render.activeSprite;
 
         _flags.renderToSprite = 1;
-        _activeSprite = &_sprite;
+        _render.activeSprite = &_render.sprite;
 
         fillRect()
             .at(bx, by)
@@ -963,10 +963,12 @@ namespace pipgui
         drawIcon(iconId, rx, ry, sizePx, color, bgColor);
 
         _flags.renderToSprite = prevRender;
-        _activeSprite = prevActive;
+        _render.activeSprite = prevActive;
 
         invalidateRect(bx, by, bw, bh);
         flushDirty();
     }
 
 }
+
+

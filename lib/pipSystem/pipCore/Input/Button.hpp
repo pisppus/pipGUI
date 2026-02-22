@@ -5,62 +5,75 @@
 
 namespace pipcore
 {
+    enum PullMode : uint8_t
+    {
+        Pullup,
+        Pulldown
+    };
+
     class Button
     {
     public:
-        Button(uint8_t pin, bool usePullup = true, bool activeLow = true, uint16_t debounceMs = 30)
+        Button(uint8_t pin, PullMode pull = Pullup)
             : _platform(nullptr),
               _pin(pin),
-              _usePullup(usePullup),
-              _activeLow(activeLow),
-              _debounceMs(debounceMs),
+              _pull(pull),
+              _activeLow(true),
               _stableState(false),
-              _lastReadState(false),
-              _lastChangeMs(0),
-              _pressedFlag(false)
+              _pressedFlag(false),
+              _vc0(0xFF),
+              _vc1(0xFF)
         {
+            applyPullDefaults();
         }
 
-        Button(GuiPlatform *platform, uint8_t pin, bool usePullup = true, bool activeLow = true, uint16_t debounceMs = 30)
+        Button(GuiPlatform *platform, uint8_t pin, PullMode pull = Pullup)
             : _platform(platform),
               _pin(pin),
-              _usePullup(usePullup),
-              _activeLow(activeLow),
-              _debounceMs(debounceMs),
+              _pull(pull),
+              _activeLow(true),
               _stableState(false),
-              _lastReadState(false),
-              _lastChangeMs(0),
-              _pressedFlag(false)
+              _pressedFlag(false),
+              _vc0(0xFF),
+              _vc1(0xFF)
         {
+            applyPullDefaults();
         }
 
         void begin()
         {
             GuiPlatform *plat = platform();
             if (plat)
-                plat->ioPinModeInput(_pin, _usePullup);
-            _stableState = _lastReadState = readRaw();
-            _lastChangeMs = nowMs();
+            {
+                const bool enablePullup = (_pull == Pullup);
+                plat->ioPinModeInput(_pin, enablePullup);
+            }
+
+            bool raw = readRaw();
+
+            _stableState = raw;
             _pressedFlag = false;
+
+            _vc0 = 0xFF;
+            _vc1 = 0xFF;
         }
 
         void update()
         {
-            bool raw = readRaw();
-            uint32_t now = nowMs();
-            if (raw != _lastReadState)
+            const uint8_t sample = readRaw() ? 0x01 : 0x00;
+            const uint8_t deb = _stableState ? 0x01 : 0x00;
+            const uint8_t delta = (uint8_t)(sample ^ deb);
+
+            _vc0 = (uint8_t)~(_vc0 & delta);
+            _vc1 = (uint8_t)(_vc0 ^ (_vc1 & delta));
+            const uint8_t toggles = (uint8_t)(delta & _vc0 & _vc1);
+
+            if (toggles)
             {
-                _lastReadState = raw;
-                _lastChangeMs = now;
-            }
-            if ((uint32_t)(now - _lastChangeMs) >= _debounceMs)
-            {
-                if (_stableState != _lastReadState)
-                {
-                    _stableState = _lastReadState;
-                    if (_stableState)
-                        _pressedFlag = true;
-                }
+                const bool prev = _stableState;
+                _stableState = !_stableState;
+                if (!prev && _stableState)
+                    _pressedFlag = true;
             }
         }
 
@@ -77,15 +90,18 @@ namespace pipcore
 
         bool isDown() const { return _stableState; }
 
+        uint8_t pin() const { return _pin; }
+        PullMode pullMode() const { return _pull; }
+
     private:
         GuiPlatform *platform() const { return _platform ? _platform : GuiPlatform::defaultPlatform(); }
 
-        uint32_t nowMs() const
+        void applyPullDefaults()
         {
-            GuiPlatform *plat = platform();
-            if (plat)
-                return plat->nowMs();
-            return 0;
+            if (_pull == Pullup)
+                _activeLow = true;
+            else if (_pull == Pulldown)
+                _activeLow = false;
         }
 
         bool readRaw() const
@@ -99,12 +115,11 @@ namespace pipcore
 
         GuiPlatform *_platform;
         uint8_t _pin;
-        bool _usePullup;
+        PullMode _pull;
         bool _activeLow;
-        uint16_t _debounceMs;
         bool _stableState;
-        bool _lastReadState;
-        uint32_t _lastChangeMs;
         bool _pressedFlag;
+        uint8_t _vc0;
+        uint8_t _vc1;
     };
 }

@@ -1,4 +1,4 @@
-#include <pipGUI/core/api/pipGUI.hpp>
+﻿#include <pipGUI/core/api/pipGUI.hpp>
 namespace pipgui
 {
     static pipcore::GuiPlatform *graphPlatform()
@@ -201,28 +201,28 @@ namespace pipgui
         if (w <= 0 || h <= 0)
             return;
 
-        if (_flags.spriteEnabled && _display && !_flags.renderToSprite)
+        if (_flags.spriteEnabled && _disp.display && !_flags.renderToSprite)
         {
             updateGraphGrid(x, y, w, h, radius, dir, bgColor, gridColor, speed);
             return;
         }
 
-        uint8_t idx = (_currentScreen < _screenCapacity) ? _currentScreen : 0;
+        uint8_t idx = (_screen.current < _screen.capacity) ? _screen.current : 0;
         GraphArea &area = ensureGraphArea(idx);
         auto t = getDrawTarget();
 
         if (x == center)
         {
-            int16_t left = 0, availW = _screenWidth;
+            int16_t left = 0, availW = _render.screenWidth;
             int16_t sb = statusBarHeight();
             if (_flags.statusBarEnabled && sb > 0)
             {
-                if (_statusBarPos == StatusBarLeft)
+                if (_status.pos == StatusBarLeft)
                 {
                     left += sb;
                     availW -= sb;
                 }
-                else if (_statusBarPos == Right)
+                else if (_status.pos == Right)
                 {
                     availW -= sb;
                 }
@@ -234,16 +234,16 @@ namespace pipgui
 
         if (y == center)
         {
-            int16_t top = 0, availH = _screenHeight;
+            int16_t top = 0, availH = _render.screenHeight;
             int16_t sb = statusBarHeight();
             if (_flags.statusBarEnabled && sb > 0)
             {
-                if (_statusBarPos == Top)
+                if (_status.pos == Top)
                 {
                     top += sb;
                     availH -= sb;
                 }
-                else if (_statusBarPos == Bottom)
+                else if (_status.pos == Bottom)
                 {
                     availH -= sb;
                 }
@@ -339,29 +339,29 @@ namespace pipgui
                               uint32_t gridColor,
                               float speed)
     {
-        if (!_flags.spriteEnabled || !_display)
+        if (!_flags.spriteEnabled || !_disp.display)
         {
             bool prevRender = _flags.renderToSprite;
-            pipcore::Sprite *prevActive = _activeSprite;
+            pipcore::Sprite *prevActive = _render.activeSprite;
             _flags.renderToSprite = 0;
             drawGraphGrid(x, y, w, h, radius, dir, bgColor, gridColor, speed);
             _flags.renderToSprite = prevRender;
-            _activeSprite = prevActive;
+            _render.activeSprite = prevActive;
             return;
         }
 
         bool prevRender = _flags.renderToSprite;
-        pipcore::Sprite *prevActive = _activeSprite;
+        pipcore::Sprite *prevActive = _render.activeSprite;
 
         _flags.renderToSprite = 1;
-        _activeSprite = &_sprite;
+        _render.activeSprite = &_render.sprite;
         drawGraphGrid(x, y, w, h, radius, dir, bgColor, gridColor, speed);
         _flags.renderToSprite = prevRender;
-        _activeSprite = prevActive;
+        _render.activeSprite = prevActive;
 
-        if (_currentScreen >= _screenCapacity)
+        if (_screen.current >= _screen.capacity)
             return;
-        GraphArea &area = ensureGraphArea(_currentScreen);
+        GraphArea &area = ensureGraphArea(_screen.current);
         int16_t pad = 2;
         invalidateRect((int16_t)(area.x - pad), (int16_t)(area.y - pad), (int16_t)(area.w + pad * 2), (int16_t)(area.h + pad * 2));
         flushDirty();
@@ -369,9 +369,9 @@ namespace pipgui
 
     void GUI::setGraphAutoScale(bool enabled)
     {
-        if (_currentScreen >= _screenCapacity)
+        if (_screen.current >= _screen.capacity)
             return;
-        GraphArea &area = ensureGraphArea(_currentScreen);
+        GraphArea &area = ensureGraphArea(_screen.current);
         area.autoScaleEnabled = enabled;
         if (!enabled)
             area.autoScaleInitialized = false;
@@ -383,15 +383,15 @@ namespace pipgui
                             int16_t valueMin,
                             int16_t valueMax)
     {
-        if (_flags.spriteEnabled && _display && !_flags.renderToSprite)
+        if (_flags.spriteEnabled && _disp.display && !_flags.renderToSprite)
         {
             updateGraphLine(lineIndex, value, color, valueMin, valueMax);
             return;
         }
-        if (_currentScreen >= _screenCapacity)
+        if (_screen.current >= _screen.capacity)
             return;
 
-        GraphArea &area = ensureGraphArea(_currentScreen);
+        GraphArea &area = ensureGraphArea(_screen.current);
         if (area.innerW <= 1 || area.innerH <= 1)
             return;
 
@@ -682,7 +682,7 @@ namespace pipgui
 
                 if (!skipLine)
                 {
-                    drawBoldGraphLine(t, prevX, prevY, x, y, color, area.bgColor, _frcSeed, _frcProfile);
+                    drawBoldGraphLine(t, prevX, prevY, x, y, color, area.bgColor, _frc.seed, _frc.profile);
                 }
             }
 
@@ -697,29 +697,29 @@ namespace pipgui
                               int16_t valueMin,
                               int16_t valueMax)
     {
-        if (!_flags.spriteEnabled || !_display)
+        if (!_flags.spriteEnabled || !_disp.display)
         {
             bool prevRender = _flags.renderToSprite;
-            pipcore::Sprite *prevActive = _activeSprite;
+            pipcore::Sprite *prevActive = _render.activeSprite;
             _flags.renderToSprite = 0;
             drawGraphLine(lineIndex, value, color, valueMin, valueMax);
             _flags.renderToSprite = prevRender;
-            _activeSprite = prevActive;
+            _render.activeSprite = prevActive;
             return;
         }
 
         bool prevRender = _flags.renderToSprite;
-        pipcore::Sprite *prevActive = _activeSprite;
+        pipcore::Sprite *prevActive = _render.activeSprite;
 
         _flags.renderToSprite = 1;
-        _activeSprite = &_sprite;
+        _render.activeSprite = &_render.sprite;
         drawGraphLine(lineIndex, value, color, valueMin, valueMax);
         _flags.renderToSprite = prevRender;
-        _activeSprite = prevActive;
+        _render.activeSprite = prevActive;
 
-        if (_currentScreen >= _screenCapacity)
+        if (_screen.current >= _screen.capacity)
             return;
-        GraphArea &area = ensureGraphArea(_currentScreen);
+        GraphArea &area = ensureGraphArea(_screen.current);
         
         // Invalidate entire graph inner area
         // The graph redraws its entire background in drawGraphLine(), so we need to
@@ -730,3 +730,4 @@ namespace pipgui
         flushDirty();
     }
 }
+

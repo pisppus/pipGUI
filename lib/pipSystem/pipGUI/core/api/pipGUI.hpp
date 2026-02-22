@@ -1,8 +1,6 @@
 #pragma once
 
 #include <Arduino.h>
-#include <assert.h>
-#include <initializer_list>
 #include <cstdlib>
 #include <algorithm>
 #include <utility>
@@ -13,7 +11,6 @@
 #include <pipGUI/core/Debug.hpp>
 #include <pipGUI/icons/metrics.hpp>
 #include "UiLayout.hpp"
-
 namespace pipgui
 {
 
@@ -35,8 +32,6 @@ namespace pipgui
               cs(cs_),
               dc(dc_),
               rst(rst_) {}
-
-        constexpr DisplayPins() = default;
     };
 
     namespace detail
@@ -107,6 +102,9 @@ namespace pipgui
     }
 
     using Button = pipcore::Button;
+    using PullMode = pipcore::PullMode;
+    using pipcore::Pulldown;
+    using pipcore::Pullup;
 
     enum BootAnimation : uint8_t
     {
@@ -138,13 +136,19 @@ namespace pipgui
         Caption
     };
 
-    static constexpr uint16_t PSDF_WEIGHT_THIN = 100;
-    static constexpr uint16_t PSDF_WEIGHT_LIGHT = 300;
-    static constexpr uint16_t PSDF_WEIGHT_REGULAR = 400;
-    static constexpr uint16_t PSDF_WEIGHT_MEDIUM = 500;
-    static constexpr uint16_t PSDF_WEIGHT_SEMIBOLD = 600;
-    static constexpr uint16_t PSDF_WEIGHT_BOLD = 700;
-    static constexpr uint16_t PSDF_WEIGHT_BLACK = 900;
+    struct WeightToken
+    {
+        uint16_t value;
+        constexpr operator uint16_t() const { return value; }
+    };
+
+    static constexpr WeightToken Thin{100};
+    static constexpr WeightToken Light{300};
+    static constexpr WeightToken Regular{400};
+    static constexpr WeightToken Medium{500};
+    static constexpr WeightToken Semibold{600};
+    static constexpr WeightToken Bold{700};
+    static constexpr WeightToken Black{900};
 
     static constexpr int16_t center = -1;
 
@@ -155,40 +159,34 @@ namespace pipgui
         StatusBarLeft,
         StatusBarRight
     };
-
     enum StatusBarIconPos : uint8_t
     {
         StatusBarIconLeft,
         StatusBarIconCenter,
         StatusBarIconRight
     };
-
     enum StatusBarStyle : uint8_t
     {
         StatusBarStyleSolid,
         StatusBarStyleBlurGradient
     };
-
     enum ScreenAnim : uint8_t
     {
         ScreenAnimNone,
         Slide
     };
-
     enum GraphDirection : uint8_t
     {
         LeftToRight,
         RightToLeft,
         Oscilloscope
     };
-
     enum ProgressAnim : uint8_t
     {
         ProgressAnimNone,
         Shimmer,
         Indeterminate
     };
-
     enum BlurDirection : uint8_t
     {
         TopDown,
@@ -196,26 +194,22 @@ namespace pipgui
         LeftRight,
         RightLeft
     };
-
     enum GlowAnim : uint8_t
     {
         GlowNone,
         GlowPulse
     };
-
     enum ErrorType : uint8_t
     {
         ErrorTypeWarning,
         Crash
     };
-
     enum NotificationType : uint8_t
     {
         Normal,
         NotificationTypeWarning,
         Error
     };
-
     enum BatteryStyle : uint8_t
     {
         Hidden,
@@ -227,20 +221,44 @@ namespace pipgui
 
     namespace detail
     {
-        enum AlignTokenCode : uint8_t
+
+        static inline uint32_t blend888(uint32_t bg, uint32_t fg, uint32_t alpha)
         {
-            TokLeft,
-            TokCenter,
-            TokRight,
-            TokTop,
-            TokBottom
-        };
+            uint32_t a = alpha + (alpha >> 7);
+            uint32_t invA = 256 - a;
+            uint32_t bg_rb = bg & 0x00FF00FF;
+            uint32_t fg_rb = fg & 0x00FF00FF;
+            uint32_t bg_g = bg & 0x0000FF00;
+            uint32_t fg_g = fg & 0x0000FF00;
+            uint32_t res_rb = ((bg_rb * invA) + (fg_rb * a)) >> 8;
+            uint32_t res_g = ((bg_g * invA) + (fg_g * a)) >> 8;
+            return (res_rb & 0x00FF00FF) | (res_g & 0x0000FF00);
+        }
+
+        static inline uint16_t blend565(uint32_t bg, uint32_t fg, uint32_t alpha)
+        {
+            uint32_t a = (alpha + 7) >> 3;
+            uint32_t invA = 32 - a;
+            uint32_t bg32 = (bg | (bg << 16)) & 0x07E0F81F;
+            uint32_t fg32 = (fg | (fg << 16)) & 0x07E0F81F;
+            uint32_t res = ((bg32 * invA) + (fg32 * a)) >> 5;
+            return (uint16_t)((res & 0xF81F) | ((res >> 16) & 0x07E0));
+        }
 
         struct AlignToken
         {
-            constexpr AlignToken(AlignTokenCode c) : code(c) {}
+            enum Code : uint8_t
+            {
+                TokLeft,
+                TokCenter,
+                TokRight,
+                TokTop,
+                TokBottom
+            };
 
-            AlignTokenCode code;
+            constexpr AlignToken(Code c) : code(c) {}
+
+            Code code;
 
             constexpr operator TextAlign() const
             {
@@ -256,42 +274,17 @@ namespace pipgui
             {
                 return (code == TokCenter) ? StatusBarIconCenter : ((code == TokRight) ? StatusBarIconRight : StatusBarIconLeft);
             }
+
+            constexpr operator UiAlign() const
+            {
+                return (code == TokCenter) ? UiAlign::Center : ((code == TokRight) ? UiAlign::End : UiAlign::Start);
+            }
+
+            constexpr operator UiJustify() const
+            {
+                return (code == TokCenter) ? UiJustify::Center : ((code == TokRight) ? UiJustify::End : UiJustify::Start);
+            }
         };
-
-        static inline uint32_t blend888(uint32_t bg, uint32_t fg, uint8_t alpha)
-        {
-            if (alpha == 0)
-                return bg;
-            if (alpha >= 255)
-                return fg;
-
-            uint32_t invAlpha = 255 - alpha;
-            uint8_t br = (uint8_t)((bg >> 16) & 0xFF);
-            uint8_t bgc = (uint8_t)((bg >> 8) & 0xFF);
-            uint8_t bb = (uint8_t)(bg & 0xFF);
-            uint8_t fr = (uint8_t)((fg >> 16) & 0xFF);
-            uint8_t fgc = (uint8_t)((fg >> 8) & 0xFF);
-            uint8_t fb = (uint8_t)(fg & 0xFF);
-
-            uint8_t r = (uint8_t)((br * invAlpha + fr * alpha) >> 8);
-            uint8_t g = (uint8_t)((bgc * invAlpha + fgc * alpha) >> 8);
-            uint8_t b = (uint8_t)((bb * invAlpha + fb * alpha) >> 8);
-            return (uint32_t)((r << 16) | (g << 8) | b);
-        }
-
-        static inline uint16_t blend565(uint16_t bg, uint16_t fg, uint8_t alpha)
-        {
-            if (alpha == 0)
-                return bg;
-            if (alpha >= 255)
-                return fg;
-
-            uint16_t invAlpha = 255 - alpha;
-            uint16_t r = (((bg >> 11) & 0x1F) * invAlpha + ((fg >> 11) & 0x1F) * alpha) >> 8;
-            uint16_t g = (((bg >> 5) & 0x3F) * invAlpha + ((fg >> 5) & 0x3F) * alpha) >> 8;
-            uint16_t b = ((bg & 0x1F) * invAlpha + (fg & 0x1F) * alpha) >> 8;
-            return (uint16_t)((r << 11) | (g << 5) | b);
-        }
 
         struct NoneToken
         {
@@ -312,8 +305,6 @@ namespace pipgui
             constexpr operator GlowAnim() const { return GlowPulse; }
         };
 
-        // Pick high-contrast text color (black or white) for a given RGB888 background.
-        // threshold is in approximate luminance units 0..255 (after 30/59/11 weighting).
         static inline uint32_t autoTextColor888(uint32_t bg, uint8_t threshold = 140)
         {
             uint8_t r = (uint8_t)((bg >> 16) & 0xFF);
@@ -325,11 +316,11 @@ namespace pipgui
         }
     }
 
-    static constexpr detail::AlignToken Left{detail::TokLeft};
-    static constexpr detail::AlignToken Center{detail::TokCenter};
-    static constexpr detail::AlignToken Right{detail::TokRight};
-    static constexpr detail::AlignToken Top{detail::TokTop};
-    static constexpr detail::AlignToken Bottom{detail::TokBottom};
+    static constexpr detail::AlignToken Left{detail::AlignToken::TokLeft};
+    static constexpr detail::AlignToken Center{detail::AlignToken::TokCenter};
+    static constexpr detail::AlignToken Right{detail::AlignToken::TokRight};
+    static constexpr detail::AlignToken Top{detail::AlignToken::TokTop};
+    static constexpr detail::AlignToken Bottom{detail::AlignToken::TokBottom};
 
     static constexpr detail::NoneToken None{};
     static constexpr detail::WarningToken Warning{};
@@ -340,17 +331,11 @@ namespace pipgui
     using ScreenCallback = void (*)(GUI &ui);
     using BacklightCallback = void (*)(uint16_t level);
     using StatusBarCustomCallback = void (*)(GUI &ui, int16_t x, int16_t y, int16_t w, int16_t h);
-    using RecoveryActionCallback = void (*)(GUI &ui);
-
-    struct RecoveryItemDef
-    {
-        const char *title;
-        const char *subtitle;
-        RecoveryActionCallback action;
-    };
 
     struct ButtonVisualStyle
     {
+        uint16_t fontPx = 0;
+        uint8_t iconScale = 1;
         uint16_t bgColor, bgPressedColor, bgDisabledColor, textColor;
         uint8_t radius, font;
     };

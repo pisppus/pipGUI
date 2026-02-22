@@ -28,7 +28,7 @@ namespace pipgui
         if (animProgress < 0.0f) animProgress = 0.0f;
         if (animProgress > 1.0f) animProgress = 1.0f;
 
-        uint16_t savePx = _psdfSizePx;
+        uint16_t savePx = _typo.psdfSizePx;
         if (fontPx > 0)
             setPSDFFontSize(fontPx);
         else if (h > 4)
@@ -108,7 +108,7 @@ namespace pipgui
         if (animProgress < 0.0f) animProgress = 0.0f;
         if (animProgress > 1.0f) animProgress = 1.0f;
 
-        uint16_t savePx = _psdfSizePx;
+        uint16_t savePx = _typo.psdfSizePx;
         if (fontPx > 0)
             setPSDFFontSize(fontPx);
         else if (w > 4)

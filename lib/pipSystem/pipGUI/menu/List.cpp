@@ -1,4 +1,4 @@
-#include <pipGUI/core/api/pipGUI.hpp>
+﻿#include <pipGUI/core/api/pipGUI.hpp>
 #include <pipGUI/core/utils/Colors.hpp>
 #include <math.h>
 #include <new>
@@ -186,7 +186,7 @@ namespace pipgui
 
         if (m.style.cardColor == 0 && m.style.cardActiveColor == 0)
         {
-            uint16_t base = _bgColor ? (uint16_t)_bgColor : 0x0000;
+            uint16_t base = _render.bgColor ? (uint16_t)_render.bgColor : 0x0000;
             m.style.cardColor = to565(pipgui::detail::lighten888(from565(base), 4));
             m.style.cardActiveColor = to565(rgb(0, 130, 220));
             m.style.radius = 10;
@@ -338,24 +338,24 @@ namespace pipgui
         if (!pm)
             return;
 
-        clearListMenuCache(*pm, _platform);
+        clearListMenuCache(*pm, _disp.platform);
         pm->cacheValid = false;
         requestRedraw();
     }
 
     void GUI::renderListMenu(uint8_t screenId)
     {
-        int16_t left = 0, right = _screenWidth, top = 0, bottom = _screenHeight;
+        int16_t left = 0, right = _render.screenWidth, top = 0, bottom = _render.screenHeight;
         int16_t sb = statusBarHeight();
-        if (_flags.statusBarEnabled && sb > 0 && _statusBarStyle == StatusBarStyleSolid)
+        if (_flags.statusBarEnabled && sb > 0 && _status.style == StatusBarStyleSolid)
         {
-            if (_statusBarPos == Top)
+            if (_status.pos == Top)
                 top += sb;
-            else if (_statusBarPos == Bottom)
+            else if (_status.pos == Bottom)
                 bottom -= sb;
-            else if (_statusBarPos == Left)
+            else if (_status.pos == Left)
                 left += sb;
-            else if (_statusBarPos == Right)
+            else if (_status.pos == Right)
                 right -= sb;
         }
         int16_t w = right - left;
@@ -363,7 +363,7 @@ namespace pipgui
         if (w <= 0 || h <= 0)
             return;
 
-        renderListMenu(screenId, left, top, w, h, _bgColor);
+        renderListMenu(screenId, left, top, w, h, _render.bgColor);
     }
 
     void GUI::renderListMenu(uint8_t screenId, int16_t x, int16_t y, int16_t w, int16_t h, uint32_t bgColor)
@@ -505,7 +505,7 @@ namespace pipgui
 
         pipcore::GuiPlatform *plat = platform();
 
-        bool useCache = (cardMode || plainMode) && (bgColor == (uint16_t)_bgColor);
+        bool useCache = (cardMode || plainMode) && (bgColor == (uint16_t)_render.bgColor);
 
         if (!useCache && m.cacheValid)
         {
@@ -534,7 +534,7 @@ namespace pipgui
             if (!slot)
                 return nullptr;
 
-            if (!_display)
+            if (!_disp.display)
             {
                 detail::guiFree(plat, slot);
                 slot = nullptr;
@@ -553,7 +553,7 @@ namespace pipgui
             const String &sub = m.items[index].subtitle;
             bool hasSub = sub.length() > 0;
 
-            spr.fillScreen(_bgColor);
+            spr.fillScreen(_render.bgColor);
             fillRoundRectFrc(0, 0, m.cacheW, m.cacheH, r, from565(bg));
 
             int16_t txLocal = 10;
@@ -590,7 +590,7 @@ namespace pipgui
 
             if (hasSub && subPx > 0)
             {
-                setPSDFWeight(PSDF_WEIGHT_MEDIUM);
+                setPSDFWeight(Medium);
                 setPSDFFontSize(subPx);
                 psdfMeasureText(sub, subW, subH);
             }
@@ -608,23 +608,23 @@ namespace pipgui
             int16_t tySubLocal = baseY + titleH + (hasSub ? gapPx : 0);
 
             bool prevRender = _flags.renderToSprite;
-            pipcore::Sprite *prevActive = _activeSprite;
+            pipcore::Sprite *prevActive = _render.activeSprite;
             _flags.renderToSprite = 1;
-            _activeSprite = &spr;
+            _render.activeSprite = &spr;
 
             setPSDFFontSize(titlePx);
             psdfDrawTextInternal(title, txLocal, tyTitleLocal, txtCol, bg, AlignLeft);
 
             if (hasSub && subPx > 0)
             {
-                setPSDFWeight(PSDF_WEIGHT_MEDIUM);
+                setPSDFWeight(Medium);
                 setPSDFFontSize(subPx);
                 psdfDrawTextInternal(sub, txLocal, tySubLocal, subCol, bg, AlignLeft);
             }
 
             setPSDFWeight(prevW);
             _flags.renderToSprite = prevRender;
-            _activeSprite = prevActive;
+            _render.activeSprite = prevActive;
 
             memcpy(slot, (uint16_t *)spr.getBuffer(), pixels * sizeof(uint16_t));
             spr.deleteSprite();
@@ -654,7 +654,7 @@ namespace pipgui
             if (!slot)
                 return nullptr;
 
-            if (!_display)
+            if (!_disp.display)
             {
                 detail::guiFree(plat, slot);
                 slot = nullptr;
@@ -671,7 +671,7 @@ namespace pipgui
 
             const String &title = m.items[index].title;
 
-            spr.fillScreen(_bgColor);
+            spr.fillScreen(_render.bgColor);
             if (activeState)
             {
                 fillRoundRectFrc(0, 0, m.cacheW, m.cacheH, r, from565(bg));
@@ -703,16 +703,16 @@ namespace pipgui
                 baseY = 2;
 
             bool prevRender = _flags.renderToSprite;
-            pipcore::Sprite *prevActive = _activeSprite;
+            pipcore::Sprite *prevActive = _render.activeSprite;
             _flags.renderToSprite = 1;
-            _activeSprite = &spr;
+            _render.activeSprite = &spr;
 
             setPSDFFontSize(titlePx);
             psdfDrawTextInternal(title, txLocal, baseY, txtCol, bg, AlignLeft);
 
             setPSDFWeight(prevW);
             _flags.renderToSprite = prevRender;
-            _activeSprite = prevActive;
+            _render.activeSprite = prevActive;
 
             memcpy(slot, (uint16_t *)spr.getBuffer(), pixels * sizeof(uint16_t));
             spr.deleteSprite();
@@ -844,7 +844,7 @@ namespace pipgui
 
             if (hasSub && subPx > 0)
             {
-                setPSDFWeight(PSDF_WEIGHT_MEDIUM);
+                setPSDFWeight(Medium);
                 setPSDFFontSize(subPx);
                 psdfMeasureText(sub, subW, subH);
             }
@@ -866,7 +866,7 @@ namespace pipgui
 
             if (hasSub && subPx > 0)
             {
-                setPSDFWeight(PSDF_WEIGHT_MEDIUM);
+                setPSDFWeight(Medium);
                 setPSDFFontSize(subPx);
                 psdfDrawTextInternal(sub, tx, tySub, subCol, bg, AlignLeft);
             }
@@ -954,17 +954,17 @@ namespace pipgui
 
     bool GUI::updateListMenu(uint8_t screenId)
     {
-        int16_t left = 0, right = _screenWidth, top = 0, bottom = _screenHeight;
-        if (_flags.statusBarEnabled && _statusBarHeight > 0)
+        int16_t left = 0, right = _render.screenWidth, top = 0, bottom = _render.screenHeight;
+        if (_flags.statusBarEnabled && _status.height > 0)
         {
-            if (_statusBarPos == Top)
-                top += _statusBarHeight;
-            else if (_statusBarPos == Bottom)
-                bottom -= _statusBarHeight;
-            else if (_statusBarPos == Left)
-                left += _statusBarHeight;
-            else if (_statusBarPos == Right)
-                right -= _statusBarHeight;
+            if (_status.pos == Top)
+                top += _status.height;
+            else if (_status.pos == Bottom)
+                bottom -= _status.height;
+            else if (_status.pos == Left)
+                left += _status.height;
+            else if (_status.pos == Right)
+                right -= _status.height;
         }
 
         int16_t w = right - left;
@@ -972,7 +972,7 @@ namespace pipgui
         if (w <= 0 || h <= 0)
             return false;
 
-        return updateListMenu(screenId, left, top, w, h, _bgColor);
+        return updateListMenu(screenId, left, top, w, h, _render.bgColor);
     }
 
     bool GUI::updateListMenu(uint8_t screenId, int16_t x, int16_t y, int16_t w, int16_t h, uint32_t bgColor)
@@ -986,15 +986,15 @@ namespace pipgui
         if (w <= 0 || h <= 0)
             return false;
 
-        if (!_flags.spriteEnabled || !_display)
+        if (!_flags.spriteEnabled || !_disp.display)
         {
             bool prevRender = _flags.renderToSprite;
-            pipcore::Sprite *prevActive = _activeSprite;
+            pipcore::Sprite *prevActive = _render.activeSprite;
 
             _flags.renderToSprite = 0;
             renderListMenu(screenId, x, y, w, h, bgColor);
             _flags.renderToSprite = prevRender;
-            _activeSprite = prevActive;
+            _render.activeSprite = prevActive;
             return true;
         }
 
@@ -1030,7 +1030,7 @@ namespace pipgui
 
         uint8_t prevNeedRedraw = _flags.needRedraw;
         bool prevRender = _flags.renderToSprite;
-        pipcore::Sprite *prevActive = _activeSprite;
+        pipcore::Sprite *prevActive = _render.activeSprite;
 
         bool incrementalUsed = false;
         int16_t dirtyX = 0, dirtyY = 0, dirtyW = w, dirtyH = h;
@@ -1076,7 +1076,7 @@ namespace pipgui
                                   m.viewportItemSpanPx == itemSpanPx;
 
             _flags.renderToSprite = 1;
-            _activeSprite = vp;
+            _render.activeSprite = vp;
             _flags.needRedraw = 0;
 
             int32_t vpClipX = 0, vpClipY = 0, vpClipW = 0, vpClipH = 0;
@@ -1289,28 +1289,28 @@ namespace pipgui
         else
         {
             int32_t clipX = 0, clipY = 0, clipW = 0, clipH = 0;
-            _sprite.getClipRect(&clipX, &clipY, &clipW, &clipH);
+            _render.sprite.getClipRect(&clipX, &clipY, &clipW, &clipH);
 
-            _sprite.setClipRect(x, y, w, h);
+            _render.sprite.setClipRect(x, y, w, h);
 
             _flags.renderToSprite = 1;
-            _activeSprite = &_sprite;
+            _render.activeSprite = &_render.sprite;
             _flags.needRedraw = 0;
             renderListMenu(screenId, x, y, w, h, bgColor);
 
-            _sprite.setClipRect(clipX, clipY, clipW, clipH);
+            _render.sprite.setClipRect(clipX, clipY, clipW, clipH);
         }
 
         bool requestedMore = (_flags.needRedraw != 0);
 
         _flags.needRedraw = prevNeedRedraw;
         _flags.renderToSprite = prevRender;
-        _activeSprite = prevActive;
+        _render.activeSprite = prevActive;
 
         if (usedViewport)
         {
             int32_t clipX = 0, clipY = 0, clipW = 0, clipH = 0;
-            _sprite.getClipRect(&clipX, &clipY, &clipW, &clipH);
+            _render.sprite.getClipRect(&clipX, &clipY, &clipW, &clipH);
 
             int32_t vpClipX = 0, vpClipY = 0, vpClipW = 0, vpClipH = 0;
             vp->getClipRect(&vpClipX, &vpClipY, &vpClipW, &vpClipH);
@@ -1319,15 +1319,15 @@ namespace pipgui
                 vp->setClipRect(dirtyX, dirtyY, dirtyW, dirtyH);
 
             if (incrementalUsed)
-                _sprite.setClipRect((int16_t)(x + dirtyX), (int16_t)(y + dirtyY), dirtyW, dirtyH);
+                _render.sprite.setClipRect((int16_t)(x + dirtyX), (int16_t)(y + dirtyY), dirtyW, dirtyH);
             else
-                _sprite.setClipRect(x, y, w, h);
+                _render.sprite.setClipRect(x, y, w, h);
 
-            vp->pushSprite(&_sprite, x, y);
+            vp->pushSprite(&_render.sprite, x, y);
 
             if (incrementalUsed)
                 vp->setClipRect(vpClipX, vpClipY, vpClipW, vpClipH);
-            _sprite.setClipRect(clipX, clipY, clipW, clipH);
+            _render.sprite.setClipRect(clipX, clipY, clipW, clipH);
         }
 
         if (usedViewport && incrementalUsed)
@@ -1342,3 +1342,4 @@ namespace pipgui
         return requestedMore;
     }
 }
+

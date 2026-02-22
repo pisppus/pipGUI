@@ -1,6 +1,5 @@
 #include <pipGUI/core/api/pipGUI.hpp>
 #include <pipGUI/core/Debug.hpp>
-#include <math.h>
 
 namespace pipgui
 {
@@ -17,6 +16,10 @@ namespace pipgui
         p->setBacklightPercent(static_cast<uint8_t>(level));
     }
 
+    GUI::GUI()
+    {
+    }
+
     GUI::~GUI() noexcept
     {
         pipcore::GuiPlatform *plat = platform();
@@ -25,49 +28,96 @@ namespace pipgui
         freeGraphAreas(plat);
         freeListMenus(plat);
         freeTileMenus(plat);
-        freeRecovery(plat);
         freeErrors(plat);
         freeStatusBarIcons(plat);
         freeScreenStorage(plat);
 
-        _sprite.deleteSprite();
-        _screenFromSprite.deleteSprite();
-        _screenToSprite.deleteSprite();
+        _render.sprite.deleteSprite();
+        _render.screenFromSprite.deleteSprite();
+        _render.screenToSprite.deleteSprite();
         _flags.spriteEnabled = 0;
         _flags.screenSpritesEnabled = 0;
     }
 
+    template <typename T>
+    static void safeFree(pipcore::GuiPlatform *plat, T *&ptr) noexcept
+    {
+        if (ptr)
+        {
+            detail::guiFree(plat, ptr);
+            ptr = nullptr;
+        }
+    }
+
+    template <typename T>
+    static void safeFreeArray(pipcore::GuiPlatform *plat, T *&arr, uint16_t count) noexcept
+    {
+        if (!arr)
+            return;
+        for (uint16_t i = 0; i < count; ++i)
+            arr[i].~T();
+        detail::guiFree(plat, arr);
+        arr = nullptr;
+    }
+
+    template <typename T>
+    static void safeFreeEntryArray(pipcore::GuiPlatform *plat, T *&arr,
+                                   uint8_t &capacity, uint8_t &count) noexcept
+    {
+        if (!arr)
+            return;
+        for (uint8_t i = 0; i < count; ++i)
+            arr[i].~T();
+        detail::guiFree(plat, arr);
+        arr = nullptr;
+        capacity = 0;
+        count = 0;
+    }
+
+    template <typename T>
+    struct ObjectGuard
+    {
+        pipcore::GuiPlatform *plat;
+        T *&ptr;
+        bool released;
+
+        ObjectGuard(pipcore::GuiPlatform *p, T *&obj)
+            : plat(p), ptr(obj), released(false) {}
+
+        ~ObjectGuard()
+        {
+            if (!released && ptr)
+            {
+                ptr->~T();
+                detail::guiFree(plat, ptr);
+                ptr = nullptr;
+            }
+        }
+
+        void release() { released = true; }
+    };
+
     void GUI::freeBlurBuffers(pipcore::GuiPlatform *plat) noexcept
     {
-        detail::guiFree(plat, _blurPrevOrig);
-        detail::guiFree(plat, _blurSmallIn);
-        detail::guiFree(plat, _blurSmallTmp);
-        detail::guiFree(plat, _blurRowR);
-        detail::guiFree(plat, _blurRowG);
-        detail::guiFree(plat, _blurRowB);
-        detail::guiFree(plat, _blurColR);
-        detail::guiFree(plat, _blurColG);
-        detail::guiFree(plat, _blurColB);
-
-        _blurPrevOrig = nullptr;
-        _blurSmallIn = nullptr;
-        _blurSmallTmp = nullptr;
-        _blurRowR = nullptr;
-        _blurRowG = nullptr;
-        _blurRowB = nullptr;
-        _blurColR = nullptr;
-        _blurColG = nullptr;
-        _blurColB = nullptr;
+        safeFree(plat, _blur.prevOrig);
+        safeFree(plat, _blur.smallIn);
+        safeFree(plat, _blur.smallTmp);
+        safeFree(plat, _blur.rowR);
+        safeFree(plat, _blur.rowG);
+        safeFree(plat, _blur.rowB);
+        safeFree(plat, _blur.colR);
+        safeFree(plat, _blur.colG);
+        safeFree(plat, _blur.colB);
     }
 
     void GUI::freeGraphAreas(pipcore::GuiPlatform *plat) noexcept
     {
-        if (!_graphAreas)
+        if (!_screen.graphAreas)
             return;
 
-        for (uint16_t i = 0; i < _screenCapacity; ++i)
+        for (uint16_t i = 0; i < _screen.capacity; ++i)
         {
-            GraphArea *a = _graphAreas[i];
+            GraphArea *a = _screen.graphAreas[i];
             if (!a)
                 continue;
 
@@ -76,24 +126,25 @@ namespace pipgui
                 for (uint16_t line = 0; line < a->lineCount; ++line)
                     detail::guiFree(plat, a->samples[line]);
                 detail::guiFree(plat, a->samples);
+                a->samples = nullptr;
             }
-            detail::guiFree(plat, a->sampleCounts);
-            detail::guiFree(plat, a->sampleHead);
 
-            a->~GraphArea();
-            detail::guiFree(plat, a);
-            _graphAreas[i] = nullptr;
+            safeFree(plat, a->sampleCounts);
+            safeFree(plat, a->sampleHead);
+
+            _screen.graphAreas[i] = nullptr;
+            ObjectGuard<GraphArea> guard(plat, a);
         }
     }
 
     void GUI::freeListMenus(pipcore::GuiPlatform *plat) noexcept
     {
-        if (!_listMenus)
+        if (!_screen.listMenus)
             return;
 
-        for (uint16_t i = 0; i < _screenCapacity; ++i)
+        for (uint16_t i = 0; i < _screen.capacity; ++i)
         {
-            ListMenuState *m = _listMenus[i];
+            ListMenuState *m = _screen.listMenus[i];
             if (!m)
                 continue;
 
@@ -102,22 +153,18 @@ namespace pipgui
                 for (uint8_t j = 0; j < m->capacity; ++j)
                     detail::guiFree(plat, m->cacheNormal[j]);
                 detail::guiFree(plat, m->cacheNormal);
+                m->cacheNormal = nullptr;
             }
+
             if (m->cacheActive)
             {
                 for (uint8_t j = 0; j < m->capacity; ++j)
                     detail::guiFree(plat, m->cacheActive[j]);
                 detail::guiFree(plat, m->cacheActive);
+                m->cacheActive = nullptr;
             }
 
-            if (m->items)
-            {
-                using ListItem = pipgui::ListMenuState::Item;
-                for (uint8_t j = 0; j < m->capacity; ++j)
-                    m->items[j].~ListItem();
-                detail::guiFree(plat, m->items);
-                m->items = nullptr;
-            }
+            safeFreeArray(plat, m->items, m->capacity);
 
             if (m->viewportSprite)
             {
@@ -127,112 +174,62 @@ namespace pipgui
                 m->viewportSprite = nullptr;
             }
 
-            m->~ListMenuState();
-            detail::guiFree(plat, m);
-            _listMenus[i] = nullptr;
+            ObjectGuard<ListMenuState> guard(plat, m);
+            _screen.listMenus[i] = nullptr;
         }
     }
 
     void GUI::freeTileMenus(pipcore::GuiPlatform *plat) noexcept
     {
-        if (!_tileMenus)
+        if (!_screen.tileMenus)
             return;
 
-        for (uint16_t i = 0; i < _screenCapacity; ++i)
+        for (uint16_t i = 0; i < _screen.capacity; ++i)
         {
-            TileMenuState *t = _tileMenus[i];
+            TileMenuState *t = _screen.tileMenus[i];
             if (!t)
                 continue;
 
             const uint8_t cap = t->itemCapacity;
 
-            if (t->items)
-            {
-                using Item = TileMenuState::Item;
-                for (uint8_t j = 0; j < cap; ++j)
-                    t->items[j].~Item();
-                detail::guiFree(plat, t->items);
-                t->items = nullptr;
-            }
-            if (t->layout)
-            {
-                for (uint8_t j = 0; j < cap; ++j)
-                    t->layout[j].~TileLayoutCell();
-                detail::guiFree(plat, t->layout);
-                t->layout = nullptr;
-            }
+            safeFreeArray(plat, t->items, cap);
+            safeFreeArray(plat, t->layout, cap);
 
             t->itemCapacity = 0;
 
-            t->~TileMenuState();
-            detail::guiFree(plat, t);
-            _tileMenus[i] = nullptr;
+            ObjectGuard<TileMenuState> guard(plat, t);
+            _screen.tileMenus[i] = nullptr;
         }
     }
 
     void GUI::freeScreenStorage(pipcore::GuiPlatform *plat) noexcept
     {
-        detail::guiFree(plat, _screens);
-        detail::guiFree(plat, _graphAreas);
-        detail::guiFree(plat, _listMenus);
-        detail::guiFree(plat, _tileMenus);
+        freeGraphAreas(plat);
+        freeListMenus(plat);
+        freeTileMenus(plat);
 
-        _screens = nullptr;
-        _graphAreas = nullptr;
-        _listMenus = nullptr;
-        _tileMenus = nullptr;
-        _screenCapacity = 0;
-    }
+        detail::guiFree(plat, _screen.callbacks);
+        detail::guiFree(plat, _screen.graphAreas);
+        detail::guiFree(plat, _screen.listMenus);
+        detail::guiFree(plat, _screen.tileMenus);
 
-    void GUI::freeRecovery(pipcore::GuiPlatform *plat) noexcept
-    {
-        if (!_recoveryItems)
-            return;
-
-        for (uint8_t i = 0; i < _recoveryItemCount; ++i)
-            _recoveryItems[i].~RecoveryEntry();
-        detail::guiFree(plat, _recoveryItems);
-        _recoveryItems = nullptr;
-        _recoveryItemCapacity = 0;
-        _recoveryItemCount = 0;
+        _screen.callbacks = nullptr;
+        _screen.graphAreas = nullptr;
+        _screen.listMenus = nullptr;
+        _screen.tileMenus = nullptr;
+        _screen.capacity = 0;
     }
 
     void GUI::freeErrors(pipcore::GuiPlatform *plat) noexcept
     {
-        if (!_errorEntries)
-            return;
-
-        for (uint8_t i = 0; i < _errorCapacity; ++i)
-            _errorEntries[i].~ErrorEntry();
-        detail::guiFree(plat, _errorEntries);
-        _errorEntries = nullptr;
-        _errorCapacity = 0;
-        _errorCount = 0;
+        safeFreeEntryArray(plat, _error.entries, _error.capacity, _error.count);
     }
 
     void GUI::freeStatusBarIcons(pipcore::GuiPlatform *plat) noexcept
     {
-        if (_iconsLeft)
-        {
-            detail::guiFree(plat, _iconsLeft);
-            _iconsLeft = nullptr;
-            _iconLeftCapacity = 0;
-            _iconLeftCount = 0;
-        }
-        if (_iconsCenter)
-        {
-            detail::guiFree(plat, _iconsCenter);
-            _iconsCenter = nullptr;
-            _iconCenterCapacity = 0;
-            _iconCenterCount = 0;
-        }
-        if (_iconsRight)
-        {
-            detail::guiFree(plat, _iconsRight);
-            _iconsRight = nullptr;
-            _iconRightCapacity = 0;
-            _iconRightCount = 0;
-        }
+        safeFreeEntryArray(plat, _status.iconsLeft, _status.iconLeftCapacity, _status.iconLeftCount);
+        safeFreeEntryArray(plat, _status.iconsCenter, _status.iconCenterCapacity, _status.iconCenterCount);
+        safeFreeEntryArray(plat, _status.iconsRight, _status.iconRightCapacity, _status.iconRightCount);
     }
 
     ConfigureDisplayFluent GUI::configureDisplay()
@@ -242,13 +239,13 @@ namespace pipgui
 
     void GUI::configureDisplay(const pipcore::GuiDisplayConfig &cfg)
     {
-        _displayCfg = cfg;
-        if (_displayCfg.hz == 0)
-            _displayCfg.hz = 80000000;
+        _disp.cfg = cfg;
+        if (_disp.cfg.hz == 0)
+            _disp.cfg.hz = 80000000;
 
-        _displayCfgConfigured = true;
+        _disp.cfgConfigured = true;
         if (pipcore::GuiPlatform *plat = platform())
-            plat->guiConfigureDisplay(_displayCfg);
+            plat->guiConfigureDisplay(_disp.cfg);
     }
 
     void ConfigureDisplayFluent::apply()
@@ -270,74 +267,84 @@ namespace pipgui
 #if defined(PIPGUI_DEBUG_DIRTY_RECTS) && (PIPGUI_DEBUG_DIRTY_RECTS)
         Debug::setDirtyRectEnabled(true);
 #endif
-#if defined(PIPGUI_DEBUG_STATUS_BAR_METRICS) && (PIPGUI_DEBUG_STATUS_BAR_METRICS)
-        setDebugStatusBarMetrics(true);
+#if defined(PIPGUI_DEBUG_METRICS) && (PIPGUI_DEBUG_METRICS)
+        setDebugMetrics(true);
 #endif
 
-        if (_displayCfgConfigured)
+        if (_disp.cfgConfigured)
         {
-            if (!plat->guiConfigureDisplay(_displayCfg))
+            if (!plat->guiConfigureDisplay(_disp.cfg))
                 return;
         }
 
         if (!plat->guiBeginDisplay(rotation))
             return;
 
-        _display = plat->guiDisplay();
-        if (!_display)
+        _disp.display = plat->guiDisplay();
+        if (!_disp.display)
             return;
 
-        _screenWidth = _display->width();
-        _screenHeight = _display->height();
-        _bgColor = bgColor;
+        _render.screenWidth = _disp.display->width();
+        _render.screenHeight = _disp.display->height();
+        _render.bgColor = bgColor;
 
-        _display->fillScreen565(_bgColor);
+        _disp.display->fillScreen565(_render.bgColor);
 
-        _sprite.deleteSprite();
-        _screenFromSprite.deleteSprite();
-        _screenToSprite.deleteSprite();
+        _render.sprite.deleteSprite();
+        _render.screenFromSprite.deleteSprite();
+        _render.screenToSprite.deleteSprite();
 
-        _flags.spriteEnabled = _sprite.createSprite((int16_t)_screenWidth, (int16_t)_screenHeight);
-        _activeSprite = _flags.spriteEnabled ? &_sprite : nullptr;
+        _flags.spriteEnabled = _render.sprite.createSprite((int16_t)_render.screenWidth, (int16_t)_render.screenHeight);
+        _render.activeSprite = _flags.spriteEnabled ? &_render.sprite : nullptr;
 
-        bool fromOk = _screenFromSprite.createSprite((int16_t)_screenWidth, (int16_t)_screenHeight);
-        bool toOk = fromOk && _screenToSprite.createSprite((int16_t)_screenWidth, (int16_t)_screenHeight);
+        bool fromOk = _render.screenFromSprite.createSprite((int16_t)_render.screenWidth, (int16_t)_render.screenHeight);
+        bool toOk = fromOk && _render.screenToSprite.createSprite((int16_t)_render.screenWidth, (int16_t)_render.screenHeight);
 
         if (!(fromOk && toOk))
         {
-            _screenFromSprite.deleteSprite();
-            _screenToSprite.deleteSprite();
+            _render.screenFromSprite.deleteSprite();
+            _render.screenToSprite.deleteSprite();
 
-            int16_t halfW = (int16_t)(_screenWidth / 2);
-            int16_t halfH = (int16_t)(_screenHeight / 2);
+            int16_t halfW = (int16_t)(_render.screenWidth / 2);
+            int16_t halfH = (int16_t)(_render.screenHeight / 2);
 
             if (halfW > 0 && halfH > 0 && _flags.spriteEnabled)
             {
-                fromOk = _screenFromSprite.createSprite(halfW, halfH);
-                toOk = fromOk && _screenToSprite.createSprite(halfW, halfH);
+                fromOk = _render.screenFromSprite.createSprite(halfW, halfH);
+                toOk = fromOk && _render.screenToSprite.createSprite(halfW, halfH);
 
                 if (!(fromOk && toOk))
                 {
-                    _screenFromSprite.deleteSprite();
-                    _screenToSprite.deleteSprite();
+                    _render.screenFromSprite.deleteSprite();
+                    _render.screenToSprite.deleteSprite();
                 }
             }
         }
 
         _flags.screenSpritesEnabled = fromOk && toOk;
 
-        if (plat)
-            _brightnessMax = plat->loadMaxBrightnessPercent();
+        _disp.brightnessMax = plat->loadMaxBrightnessPercent();
 
+        initFonts();
+    }
+
+    void GUI::initFonts()
+    {
         loadBuiltinPSDF();
         enablePSDF(true);
-        if (_psdfSizePx == 0)
-            _psdfSizePx = _textStyleBodyPx;
+        if (_typo.psdfSizePx == 0)
+            _typo.psdfSizePx = _typo.bodyPx;
+    }
+
+    uint32_t GUI::nowMs() const
+    {
+        pipcore::GuiPlatform *plat = platform();
+        return plat ? plat->nowMs() : 0U;
     }
 
     void GUI::setPlatform(pipcore::GuiPlatform *platform)
     {
-        _platform = platform;
+        _disp.platform = platform;
         if (platform)
             g_sharedPlatform = platform;
 
@@ -346,18 +353,12 @@ namespace pipgui
 
     pipcore::GuiPlatform *GUI::platform() const
     {
-        return _platform ? _platform : g_sharedPlatform;
+        return _disp.platform ? _disp.platform : g_sharedPlatform;
     }
 
     pipcore::GuiPlatform *GUI::sharedPlatform()
     {
         return g_sharedPlatform;
-    }
-
-    uint32_t GUI::nowMs() const
-    {
-        pipcore::GuiPlatform *plat = platform();
-        return plat ? plat->nowMs() : 0U;
     }
 
     void GUI::setBacklightPin(uint8_t pin, uint8_t channel, uint32_t freqHz, uint8_t resolutionBits)
@@ -373,34 +374,31 @@ namespace pipgui
     {
         if (percent > 100)
             percent = 100;
-        _brightnessMax = percent;
+        _disp.brightnessMax = percent;
         if (pipcore::GuiPlatform *plat = platform())
-            plat->storeMaxBrightnessPercent(_brightnessMax);
+            plat->storeMaxBrightnessPercent(_disp.brightnessMax);
     }
 
     void GUI::setScreenAnimation(ScreenAnim anim, uint32_t durationMs)
     {
-        _screenAnim = anim;
-        _screenAnimDurationMs = durationMs;
+        _screen.anim = anim;
+        _screen.animDurationMs = durationMs;
     }
 
     void GUI::setFrcProfile(FrcProfile profile)
     {
         if (profile == FrcProfile::Off)
             profile = FrcProfile::BlueNoise;
-        _frcProfile = profile;
+        _frc.profile = profile;
     }
 
-    void GUI::setDebugStatusBarMetrics(bool enabled)
+    void GUI::setDebugMetrics(bool enabled)
     {
         _flags.statusBarDebugMetrics = enabled;
         Debug::setMetricsStatusBarEnabled(enabled);
         if (enabled)
-        {
             Debug::init();
-        }
-        _statusBarDirtyMask = StatusBarDirtyAll;
-        requestRedraw(); // Force redraw to recalculate layout
+        _status.dirtyMask = StatusBarDirtyAll;
+        requestRedraw();
     }
-
 }

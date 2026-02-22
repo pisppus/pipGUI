@@ -1,4 +1,4 @@
-#include <pipGUI/core/api/pipGUI.hpp>
+﻿#include <pipGUI/core/api/pipGUI.hpp>
 #include <math.h>
 #include <algorithm>
 #include <cstdint>
@@ -59,21 +59,21 @@ namespace pipgui
     void GUI::regScreen(uint8_t id, ScreenCallback cb)
     {
         ensureScreenStorage(id);
-        if (id < _screenCapacity && _screens)
-            _screens[id] = cb;
+        if (id < _screen.capacity && _screen.callbacks)
+            _screen.callbacks[id] = cb;
     }
 
     void GUI::setScreen(uint8_t id)
     {
         ensureScreenStorage(id);
-        if (id < _screenCapacity)
-            _currentScreen = id;
+        if (id < _screen.capacity)
+            _screen.current = id;
         else
-            _currentScreen = 255;
+            _screen.current = 255;
         _flags.needRedraw = 1;
     }
 
-    uint8_t GUI::currentScreen() const { return _currentScreen; }
+    uint8_t GUI::currentScreen() const { return _screen.current; }
 
     void GUI::requestRedraw() { _flags.needRedraw = 1; }
 
@@ -81,31 +81,31 @@ namespace pipgui
     {
         if (_flags.screenTransition)
             return;
-        if (_screenCapacity == 0 || !_screens)
+        if (_screen.capacity == 0 || !_screen.callbacks)
             return;
-        uint16_t cap = _screenCapacity;
-        uint16_t idx = (_currentScreen < cap) ? _currentScreen : 0;
+        uint16_t cap = _screen.capacity;
+        uint16_t idx = (_screen.current < cap) ? _screen.current : 0;
         for (uint16_t i = 0; i < cap; i++)
         {
             idx = (idx + 1) % cap;
-            if (_screens[idx])
+            if (_screen.callbacks[idx])
             {
-                if (_screenAnim == Slide && _flags.spriteEnabled && ensureScreenTransitionSprites())
+                if (_screen.anim == Slide && _flags.spriteEnabled && ensureScreenTransitionSprites())
                 {
-                    _screenFrom = _currentScreen;
-                    _screenTo = (uint8_t)idx;
-                    _screenTransDir = 1;
-                    _screenAnimStartMs = nowMs();
+                    _screen.from = _screen.current;
+                    _screen.to = (uint8_t)idx;
+                    _screen.transDir = 1;
+                    _screen.animStartMs = nowMs();
 
-                    ScreenCallback fromCb = _screens[_screenFrom];
-                    ScreenCallback toCb = _screens[_screenTo];
+                    ScreenCallback fromCb = _screen.callbacks[_screen.from];
+                    ScreenCallback toCb = _screen.callbacks[_screen.to];
 
                     prepareScreenTransition(fromCb, toCb);
 
                     _flags.screenTransition = 1;
                     return;
                 }
-                _currentScreen = (uint8_t)idx;
+                _screen.current = (uint8_t)idx;
                 _flags.needRedraw = 1;
                 return;
             }
@@ -116,31 +116,31 @@ namespace pipgui
     {
         if (_flags.screenTransition)
             return;
-        if (_screenCapacity == 0 || !_screens)
+        if (_screen.capacity == 0 || !_screen.callbacks)
             return;
-        uint16_t cap = _screenCapacity;
-        uint16_t idx = (_currentScreen < cap) ? _currentScreen : 0;
+        uint16_t cap = _screen.capacity;
+        uint16_t idx = (_screen.current < cap) ? _screen.current : 0;
         for (uint16_t i = 0; i < cap; i++)
         {
             idx = (idx + cap - 1) % cap;
-            if (_screens[idx])
+            if (_screen.callbacks[idx])
             {
-                if (_screenAnim == Slide && _flags.spriteEnabled && ensureScreenTransitionSprites())
+                if (_screen.anim == Slide && _flags.spriteEnabled && ensureScreenTransitionSprites())
                 {
-                    _screenFrom = _currentScreen;
-                    _screenTo = (uint8_t)idx;
-                    _screenTransDir = -1;
-                    _screenAnimStartMs = nowMs();
+                    _screen.from = _screen.current;
+                    _screen.to = (uint8_t)idx;
+                    _screen.transDir = -1;
+                    _screen.animStartMs = nowMs();
 
-                    ScreenCallback fromCb = _screens[_screenFrom];
-                    ScreenCallback toCb = _screens[_screenTo];
+                    ScreenCallback fromCb = _screen.callbacks[_screen.from];
+                    ScreenCallback toCb = _screen.callbacks[_screen.to];
 
                     prepareScreenTransition(fromCb, toCb);
 
                     _flags.screenTransition = 1;
                     return;
                 }
-                _currentScreen = (uint8_t)idx;
+                _screen.current = (uint8_t)idx;
                 _flags.needRedraw = 1;
                 return;
             }
@@ -149,67 +149,67 @@ namespace pipgui
 
     void GUI::prepareScreenTransition(ScreenCallback fromCb, ScreenCallback toCb)
     {
-        pipcore::Sprite *prevActive = _activeSprite;
+        pipcore::Sprite *prevActive = _render.activeSprite;
         bool prevRender = _flags.renderToSprite;
 
-        _activeSprite = &_sprite;
+        _render.activeSprite = &_render.sprite;
         _flags.renderToSprite = 1;
 
-        clear(_bgColor);
+        clear(_render.bgColor);
         if (fromCb)
             fromCb(*this);
 
-        int16_t fw = _screenFromSprite.width();
-        int16_t fh = _screenFromSprite.height();
-        _screenFromSprite.fillScreen(color888To565(0, 0, _bgColor));
-        drawScaledSprite(_screenFromSprite, _sprite, fw, fh, 0, 0);
+        int16_t fw = _render.screenFromSprite.width();
+        int16_t fh = _render.screenFromSprite.height();
+        _render.screenFromSprite.fillScreen(color888To565(0, 0, _render.bgColor));
+        drawScaledSprite(_render.screenFromSprite, _render.sprite, fw, fh, 0, 0);
 
-        clear(_bgColor);
+        clear(_render.bgColor);
         if (toCb)
             toCb(*this);
 
-        int16_t tw = _screenToSprite.width();
-        int16_t th = _screenToSprite.height();
-        _screenToSprite.fillScreen(color888To565(0, 0, _bgColor));
-        drawScaledSprite(_screenToSprite, _sprite, tw, th, 0, 0);
+        int16_t tw = _render.screenToSprite.width();
+        int16_t th = _render.screenToSprite.height();
+        _render.screenToSprite.fillScreen(color888To565(0, 0, _render.bgColor));
+        drawScaledSprite(_render.screenToSprite, _render.sprite, tw, th, 0, 0);
 
-        _activeSprite = prevActive;
+        _render.activeSprite = prevActive;
         _flags.renderToSprite = prevRender;
     }
 
     bool GUI::ensureScreenTransitionSprites()
     {
-        if (!_flags.spriteEnabled || !_display)
+        if (!_flags.spriteEnabled || !_disp.display)
             return false;
 
-        if (_screenFromSprite.getBuffer() && _screenToSprite.getBuffer())
+        if (_render.screenFromSprite.getBuffer() && _render.screenToSprite.getBuffer())
         {
             _flags.screenSpritesEnabled = 1;
             return true;
         }
 
-        _screenFromSprite.deleteSprite();
-        _screenToSprite.deleteSprite();
+        _render.screenFromSprite.deleteSprite();
+        _render.screenToSprite.deleteSprite();
 
-        bool fromOk = _screenFromSprite.createSprite(_screenWidth, _screenHeight);
-        bool toOk = fromOk && _screenToSprite.createSprite(_screenWidth, _screenHeight);
+        bool fromOk = _render.screenFromSprite.createSprite(_render.screenWidth, _render.screenHeight);
+        bool toOk = fromOk && _render.screenToSprite.createSprite(_render.screenWidth, _render.screenHeight);
 
         if (!(fromOk && toOk))
         {
-            _screenFromSprite.deleteSprite();
-            _screenToSprite.deleteSprite();
+            _render.screenFromSprite.deleteSprite();
+            _render.screenToSprite.deleteSprite();
 
-            int16_t halfW = _screenWidth / 2;
-            int16_t halfH = _screenHeight / 2;
+            int16_t halfW = _render.screenWidth / 2;
+            int16_t halfH = _render.screenHeight / 2;
             if (halfW > 0 && halfH > 0)
             {
-                fromOk = _screenFromSprite.createSprite(halfW, halfH);
-                toOk = fromOk && _screenToSprite.createSprite(halfW, halfH);
+                fromOk = _render.screenFromSprite.createSprite(halfW, halfH);
+                toOk = fromOk && _render.screenToSprite.createSprite(halfW, halfH);
 
                 if (!(fromOk && toOk))
                 {
-                    _screenFromSprite.deleteSprite();
-                    _screenToSprite.deleteSprite();
+                    _render.screenFromSprite.deleteSprite();
+                    _render.screenToSprite.deleteSprite();
                 }
             }
         }
@@ -220,8 +220,8 @@ namespace pipgui
 
     void GUI::freeScreenTransitionSprites()
     {
-        _screenFromSprite.deleteSprite();
-        _screenToSprite.deleteSprite();
+        _render.screenFromSprite.deleteSprite();
+        _render.screenToSprite.deleteSprite();
         _flags.screenSpritesEnabled = 0;
     }
 
@@ -229,46 +229,46 @@ namespace pipgui
     {
         if (!_flags.screenTransition)
             return;
-        if (_screenTo >= _screenCapacity || !_flags.spriteEnabled || !_screens)
+        if (_screen.to >= _screen.capacity || !_flags.spriteEnabled || !_screen.callbacks)
         {
-            _currentScreen = _screenTo;
+            _screen.current = _screen.to;
             _flags.needRedraw = 1;
             _flags.screenTransition = 0;
             freeScreenTransitionSprites();
             return;
         }
 
-        uint32_t el = now - _screenAnimStartMs, dur = _screenAnimDurationMs ? _screenAnimDurationMs : 1;
+        uint32_t el = now - _screen.animStartMs, dur = _screen.animDurationMs ? _screen.animDurationMs : 1;
         if (el > dur)
             el = dur;
         float p = fastEase((float)el / dur);
 
         {
-            pipcore::Sprite *prevActive = _activeSprite;
+            pipcore::Sprite *prevActive = _render.activeSprite;
             bool prevRender = _flags.renderToSprite;
-            _activeSprite = &_sprite;
+            _render.activeSprite = &_render.sprite;
             _flags.renderToSprite = 1;
-            clear(_bgColor);
-            _activeSprite = prevActive;
+            clear(_render.bgColor);
+            _render.activeSprite = prevActive;
             _flags.renderToSprite = prevRender;
         }
-        int dir = (_screenTransDir > 0) ? -1 : 1;
+        int dir = (_screen.transDir > 0) ? -1 : 1;
         float scale = 1.0f - p * 0.15f;
-        int w = round(_screenWidth * scale), h = round(_screenHeight * scale);
+        int w = round(_render.screenWidth * scale), h = round(_render.screenHeight * scale);
         int offY = round(p * 45.0f * dir);
 
-        drawScaledSprite(_sprite, _screenFromSprite, w, h, (_screenWidth - w) / 2, offY);
+        drawScaledSprite(_render.sprite, _render.screenFromSprite, w, h, (_render.screenWidth - w) / 2, offY);
 
-        int slideY = round(p * _screenHeight);
-        int destY = (dir == -1) ? (_screenHeight - slideY) : (slideY - _screenHeight);
-        _screenToSprite.pushSprite(&_sprite, 0, destY);
-        if (_display)
-            _sprite.writeToDisplay(*_display, 0, 0, (int16_t)_screenWidth, (int16_t)_screenHeight);
+        int slideY = round(p * _render.screenHeight);
+        int destY = (dir == -1) ? (_render.screenHeight - slideY) : (slideY - _render.screenHeight);
+        _render.screenToSprite.pushSprite(&_render.sprite, 0, destY);
+        if (_disp.display)
+            _render.sprite.writeToDisplay(*_disp.display, 0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight);
 
         if (el >= dur)
         {
             _flags.screenTransition = 0;
-            _currentScreen = _screenTo;
+            _screen.current = _screen.to;
             _flags.needRedraw = 0;
             freeScreenTransitionSprites();
         }
@@ -280,17 +280,15 @@ namespace pipgui
 
         // Update debug metrics periodically
         Debug::update();
-
-        tickRecovery(now);
         tickDebugDirtyOverlay(now);
 
         // Update FRC seed for temporal dithering (if enabled)
-        if (_frcTemporalPeriodMs)
+        if (_frc.temporalPeriodMs)
         {
-            if ((now - _frcLastUpdateMs) >= _frcTemporalPeriodMs)
+            if ((now - _frc.lastUpdateMs) >= _frc.temporalPeriodMs)
             {
-                _frcLastUpdateMs = now;
-                _frcSeed = (uint32_t)((uint64_t)_frcSeed * 1664525U + 1013904223U);
+                _frc.lastUpdateMs = now;
+                _frc.seed = (uint32_t)((uint64_t)_frc.seed * 1664525U + 1013904223U);
                 _flags.needRedraw = 1;
             }
         }
@@ -327,12 +325,12 @@ namespace pipgui
 
         if (_flags.notifActive && _flags.spriteEnabled)
         {
-            if (_currentScreen < _screenCapacity && _screens && _screens[_currentScreen])
+            if (_screen.current < _screen.capacity && _screen.callbacks && _screen.callbacks[_screen.current])
             {
                 Debug::beginRender();
                 _flags.renderToSprite = 1;
-                clear(_bgColor);
-                _screens[_currentScreen](*this);
+                clear(_render.bgColor);
+                _screen.callbacks[_screen.current](*this);
 
                 _flags.renderToSprite = 0;
                 renderStatusBar(true);
@@ -344,18 +342,18 @@ namespace pipgui
             return;
         }
 
-        if (_flags.needRedraw && _currentScreen < _screenCapacity && _screens && _screens[_currentScreen])
+        if (_flags.needRedraw && _screen.current < _screen.capacity && _screen.callbacks && _screen.callbacks[_screen.current])
         {
             _flags.needRedraw = 0;
             if (_flags.spriteEnabled)
             {
-                if (_display)
+                if (_disp.display)
                 {
-                    ListMenuState *lm = getListMenu(_currentScreen);
+                    ListMenuState *lm = getListMenu(_screen.current);
                     if (lm && lm->configured && lm->itemCount > 0)
                     {
                         Debug::beginRender();
-                        bool more = updateListMenu(_currentScreen);
+                        bool more = updateListMenu(_screen.current);
                         updateStatusBar();
                         Debug::endRender();
                         if (more)
@@ -365,30 +363,30 @@ namespace pipgui
 
                     Debug::beginRender();
                     _flags.renderToSprite = 1;
-                    clear(_bgColor);
-                    _screens[_currentScreen](*this);
+                    clear(_render.bgColor);
+                    _screen.callbacks[_screen.current](*this);
                     _flags.renderToSprite = 0;
 
                     renderStatusBar(true);
-                    if (_display)
+                    if (_disp.display)
                     {
                         if (_flags.toastActive)
                             renderToastOverlay();
                         else
-                            _sprite.writeToDisplay(*_display, 0, 0, (int16_t)_screenWidth, (int16_t)_screenHeight);
+                            _render.sprite.writeToDisplay(*_disp.display, 0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight);
                     }
                     Debug::endRender();
-                    _dirtyCount = 0;
+                    _dirty.count = 0;
                 }
                 else
                 {
-                    _screens[_currentScreen](*this);
+                    _screen.callbacks[_screen.current](*this);
                     renderStatusBar(false);
                 }
             }
             else
             {
-                _screens[_currentScreen](*this);
+                _screen.callbacks[_screen.current](*this);
                 renderStatusBar(false);
             }
         }
@@ -406,3 +404,4 @@ namespace pipgui
         loop();
     }
 }
+

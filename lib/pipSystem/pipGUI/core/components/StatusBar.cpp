@@ -1,4 +1,4 @@
-#include <pipGUI/core/api/pipGUI.hpp>
+﻿#include <pipGUI/core/api/pipGUI.hpp>
 #include <pipGUI/core/Debug.hpp>
 #include <pipGUI/icons/metrics.hpp>
 
@@ -9,83 +9,81 @@ namespace pipgui
     {
         _flags.statusBarEnabled = enabled;
 
-        _statusBarDirtyMask = StatusBarDirtyAll;
-        _statusBarLastLeft = {};
-        _statusBarLastCenter = {};
-        _statusBarLastRight = {};
-        _statusBarLastBattery = {};
+        _status.dirtyMask = StatusBarDirtyAll;
+        _status.lastLeft = {};
+        _status.lastCenter = {};
+        _status.lastRight = {};
+        _status.lastBattery = {};
 
         if (!_flags.statusBarEnabled)
         {
-            _statusBarHeight = 0;
+            _status.height = 0;
             return;
         }
 
-        _statusBarBg = bgColor;
-        _statusBarPos = pos;
+        _status.bg = bgColor;
+        _status.pos = pos;
 
         uint8_t hLocal = height;
         if (hLocal == 0)
             hLocal = 18;
 
-        if (_screenWidth == 0 || _screenHeight == 0)
-        {
-            _statusBarHeight = hLocal;
-        }
+        if (_render.screenWidth == 0 || _render.screenHeight == 0)
+            _status.height = hLocal;
         else
         {
             if (pos == Left || pos == Right)
             {
-                if (hLocal > _screenWidth)
-                    hLocal = (uint8_t)_screenWidth;
+                if (hLocal > _render.screenWidth)
+                    hLocal = (uint8_t)_render.screenWidth;
             }
             else
             {
-                if (hLocal > _screenHeight)
-                    hLocal = (uint8_t)_screenHeight;
+                if (hLocal > _render.screenHeight)
+                    hLocal = (uint8_t)_render.screenHeight;
             }
 
-            _statusBarHeight = hLocal;
+            _status.height = hLocal;
         }
 
         // Auto-pick text color (black/white) based on background brightness.
         // Use mid-luminance threshold so light bars get dark text and vice versa.
-        _statusBarFg = detail::autoTextColor888(bgColor, 128);
+        _status.fg = detail::autoTextColor888(bgColor, 128);
     }
 
     void GUI::setStatusBarText(const String &left, const String &center, const String &right)
     {
-        if (_statusTextLeft != left)
-            _statusBarDirtyMask |= StatusBarDirtyLeft;
-        if (_statusTextCenter != center)
-            _statusBarDirtyMask |= StatusBarDirtyCenter;
-        if (_statusTextRight != right)
-            _statusBarDirtyMask |= StatusBarDirtyRight;
-        if (_statusBarDirtyMask == 0)
+        if (_status.textLeft != left)
+            _status.dirtyMask |= StatusBarDirtyLeft;
+        if (_status.textCenter != center)
+            _status.dirtyMask |= StatusBarDirtyCenter;
+        if (_status.textRight != right)
+            _status.dirtyMask |= StatusBarDirtyRight;
+        if (_status.dirtyMask == 0)
             return;
-        _statusTextLeft = left;
-        _statusTextCenter = center;
-        _statusTextRight = right;
+        _status.textLeft = left;
+        _status.textCenter = center;
+        _status.textRight = right;
     }
 
     void GUI::setStatusBarBattery(int8_t levelPercent, BatteryStyle style)
     {
         if (levelPercent < 0)
         {
-            if (_batteryLevel == -1 && _batteryStyle == Hidden)
+            if (_status.batteryLevel == -1 && _status.batteryStyle == Hidden)
                 return;
-            _batteryLevel = -1;
-            _batteryStyle = Hidden;
-            _statusBarDirtyMask |= StatusBarDirtyBattery;
+            _status.batteryLevel = -1;
+            _status.batteryStyle = Hidden;
+            _status.dirtyMask |= StatusBarDirtyBattery;
             return;
         }
 
         int8_t lvl = (levelPercent > 100) ? 100 : levelPercent;
-        if (_batteryLevel == lvl && _batteryStyle == style)
+        if (_status.batteryLevel == lvl && _status.batteryStyle == style)
             return;
-        _batteryLevel = lvl;
-        _batteryStyle = style;
-        _statusBarDirtyMask |= StatusBarDirtyBattery;
+        _status.batteryLevel = lvl;
+        _status.batteryStyle = style;
+        _status.dirtyMask |= StatusBarDirtyBattery;
     }
 
     void GUI::updateStatusBarBattery()
@@ -100,9 +98,9 @@ namespace pipgui
 
     void GUI::updateStatusBar()
     {
-        if (!_flags.statusBarEnabled || _statusBarHeight == 0)
+        if (!_flags.statusBarEnabled || _status.height == 0)
             return;
-        if (!_display)
+        if (!_disp.display)
             return;
 
         auto unionRect = [](DirtyRect a, DirtyRect b) -> DirtyRect
@@ -126,23 +124,23 @@ namespace pipgui
         {
             int16_t x = 0;
             int16_t y = 0;
-            int16_t w = (int16_t)_screenWidth;
-            int16_t h = (int16_t)_statusBarHeight;
+            int16_t w = (int16_t)_render.screenWidth;
+            int16_t h = (int16_t)_status.height;
 
-            if (_statusBarPos == Bottom)
+            if (_status.pos == Bottom)
             {
-                y = (int16_t)(_screenHeight - h);
+                y = (int16_t)(_render.screenHeight - h);
             }
-            else if (_statusBarPos == Left)
+            else if (_status.pos == Left)
             {
-                w = (int16_t)_statusBarHeight;
-                h = (int16_t)_screenHeight;
+                w = (int16_t)_status.height;
+                h = (int16_t)_render.screenHeight;
             }
-            else if (_statusBarPos == Right)
+            else if (_status.pos == Right)
             {
-                w = (int16_t)_statusBarHeight;
-                h = (int16_t)_screenHeight;
-                x = (int16_t)(_screenWidth - w);
+                w = (int16_t)_status.height;
+                h = (int16_t)_render.screenHeight;
+                x = (int16_t)(_render.screenWidth - w);
             }
 
             return {x, y, w, h};
@@ -150,22 +148,22 @@ namespace pipgui
 
         if (!_flags.spriteEnabled)
         {
-            if (_statusBarDirtyMask == 0)
+            if (_status.dirtyMask == 0)
                 return;
 
             bool prevRender = _flags.renderToSprite;
-            pipcore::Sprite *prevActive = _activeSprite;
+            pipcore::Sprite *prevActive = _render.activeSprite;
 
             _flags.renderToSprite = 0;
             renderStatusBar(false);
             _flags.renderToSprite = prevRender;
-            _activeSprite = prevActive;
+            _render.activeSprite = prevActive;
 
-            _statusBarDirtyMask = 0;
+            _status.dirtyMask = 0;
             return;
         }
 
-        if (_statusBarDirtyMask == 0)
+        if (_status.dirtyMask == 0)
             return;
 
         // Update debug metrics if enabled
@@ -174,13 +172,13 @@ namespace pipgui
             Debug::update();
             // Always mark as dirty when debug metrics are enabled to update values
             // And invalidate the entire status bar to avoid flickering
-            _statusBarDirtyMask = StatusBarDirtyAll;
+            _status.dirtyMask = StatusBarDirtyAll;
         }
 
         DirtyRect bar = calcBarRect();
         if (bar.w <= 0 || bar.h <= 0)
         {
-            _statusBarDirtyMask = 0;
+            _status.dirtyMask = 0;
             return;
         }
 
@@ -190,17 +188,17 @@ namespace pipgui
             invalidateRect(bar.x, bar.y, bar.w, bar.h);
             renderStatusBar(true);
             // Don't flush here - let the main loop handle it
-            _statusBarDirtyMask = 0;
+            _status.dirtyMask = 0;
             return;
         }
 
-        if (_statusBarPos == Left || _statusBarPos == Right)
-            _statusBarDirtyMask = StatusBarDirtyAll;
+        if (_status.pos == Left || _status.pos == Right)
+            _status.dirtyMask = StatusBarDirtyAll;
 
-        if (_statusBarCustom)
-            _statusBarDirtyMask = StatusBarDirtyAll;
+        if (_status.custom)
+            _status.dirtyMask = StatusBarDirtyAll;
 
-        uint8_t mask = _statusBarDirtyMask;
+        uint8_t mask = _status.dirtyMask;
         if (mask == StatusBarDirtyAll)
             mask = (uint8_t)(StatusBarDirtyLeft | StatusBarDirtyCenter | StatusBarDirtyRight | StatusBarDirtyBattery);
 
@@ -233,9 +231,9 @@ namespace pipgui
 
             int16_t startX = bar.x + 2;
             int16_t cursor = startX;
-            for (uint8_t i = 0; i < _iconLeftCount; ++i)
+            for (uint8_t i = 0; i < _status.iconLeftCount; ++i)
             {
-                const StatusIcon &ic = _iconsLeft[i];
+                const StatusIcon &ic = _status.iconsLeft[i];
                 if (!ic.bitmap || ic.w == 0 || ic.h == 0)
                     continue;
                 if (cursor + (int16_t)ic.w > bar.x + bar.w)
@@ -244,18 +242,18 @@ namespace pipgui
             }
 
             int16_t iconsSpanW = cursor - startX;
-            int16_t tw = textWidth(_statusTextLeft);
+            int16_t tw = textWidth(_status.textLeft);
             int16_t totalW = iconsSpanW + tw;
             if (totalW > 0)
                 newLeft = {(int16_t)(startX - pad), (int16_t)(bar.y - pad), (int16_t)(totalW + pad * 2), (int16_t)(bar.h + pad * 2)};
 
-            DirtyRect merged = unionRect(newLeft, _statusBarLastLeft);
+            DirtyRect merged = unionRect(newLeft, _status.lastLeft);
             dirtyLeft = merged;
-            _statusBarLastLeft = newLeft;
+            _status.lastLeft = newLeft;
         }
 
         DirtyRect newBat = {};
-        if (_batteryStyle != Hidden && _batteryLevel >= 0)
+        if (_status.batteryStyle != Hidden && _status.batteryLevel >= 0)
         {
             int16_t rightCursor = bar.x + bar.w - 2;
 
@@ -285,9 +283,9 @@ namespace pipgui
 
         if ((mask & StatusBarDirtyBattery) != 0)
         {
-            DirtyRect merged = unionRect(newBat, _statusBarLastBattery);
+            DirtyRect merged = unionRect(newBat, _status.lastBattery);
             dirtyBattery = merged;
-            _statusBarLastBattery = newBat;
+            _status.lastBattery = newBat;
         }
 
         if ((mask & StatusBarDirtyCenter) != 0)
@@ -295,9 +293,9 @@ namespace pipgui
             DirtyRect newCenter = {};
 
             int16_t iconsW = 0;
-            for (uint8_t i = 0; i < _iconCenterCount; ++i)
+            for (uint8_t i = 0; i < _status.iconCenterCount; ++i)
             {
-                const StatusIcon &ic = _iconsCenter[i];
+                const StatusIcon &ic = _status.iconsCenter[i];
                 if (!ic.bitmap || ic.w == 0)
                     continue;
                 if (iconsW > 0)
@@ -305,7 +303,7 @@ namespace pipgui
                 iconsW += ic.w;
             }
 
-            int16_t textW = textWidth(_statusTextCenter);
+            int16_t textW = textWidth(_status.textCenter);
 
             int16_t gap = (iconsW > 0 && textW > 0) ? 4 : 0;
             int16_t totalW = iconsW + gap + textW;
@@ -316,9 +314,9 @@ namespace pipgui
                 newCenter = {(int16_t)(startX - pad), (int16_t)(bar.y - pad), (int16_t)(totalW + pad * 2), (int16_t)(bar.h + pad * 2)};
             }
 
-            DirtyRect merged = unionRect(newCenter, _statusBarLastCenter);
+            DirtyRect merged = unionRect(newCenter, _status.lastCenter);
             dirtyCenter = merged;
-            _statusBarLastCenter = newCenter;
+            _status.lastCenter = newCenter;
         }
 
         if ((mask & StatusBarDirtyRight) != 0)
@@ -334,9 +332,9 @@ namespace pipgui
 
             int16_t rightBound = rightCursor;
             int16_t cursor = rightCursor;
-            for (int i = (int)_iconRightCount - 1; i >= 0; --i)
+            for (int i = (int)_status.iconRightCount - 1; i >= 0; --i)
             {
-                const StatusIcon &ic = _iconsRight[i];
+                const StatusIcon &ic = _status.iconsRight[i];
                 if (!ic.bitmap || ic.w == 0 || ic.h == 0)
                     continue;
                 if (cursor - (int16_t)ic.w < bar.x + 2)
@@ -345,7 +343,7 @@ namespace pipgui
             }
 
             int16_t iconsSpanW = rightBound - cursor;
-            int16_t tw = textWidth(_statusTextRight);
+            int16_t tw = textWidth(_status.textRight);
             int16_t totalW = iconsSpanW + tw;
             if (totalW > 0)
             {
@@ -355,9 +353,9 @@ namespace pipgui
                 newRight = {(int16_t)(startX - pad), (int16_t)(bar.y - pad), (int16_t)(totalW + pad * 2), (int16_t)(bar.h + pad * 2)};
             }
 
-            DirtyRect merged = unionRect(newRight, _statusBarLastRight);
+            DirtyRect merged = unionRect(newRight, _status.lastRight);
             dirtyRight = merged;
-            _statusBarLastRight = newRight;
+            _status.lastRight = newRight;
         }
 
         bool anyDirty = false;
@@ -385,13 +383,13 @@ namespace pipgui
 
         if (!anyDirty)
         {
-            _statusBarDirtyMask = 0;
+            _status.dirtyMask = 0;
             return;
         }
 
         renderStatusBar(true);
         flushDirty();
-        _statusBarDirtyMask &= (uint8_t)~(mask);
+        _status.dirtyMask &= (uint8_t)~(mask);
     }
 
     static void addStatusIcon(pipgui::StatusIcon *&arr, uint8_t &count, uint8_t &capacity,
@@ -413,54 +411,54 @@ namespace pipgui
         switch (pos)
         {
         case StatusBarIconLeft:
-            addStatusIcon(_iconsLeft, _iconLeftCount, _iconLeftCapacity, bitmap, w, h);
+            addStatusIcon(_status.iconsLeft, _status.iconLeftCount, _status.iconLeftCapacity, bitmap, w, h);
             break;
         case StatusBarIconCenter:
-            addStatusIcon(_iconsCenter, _iconCenterCount, _iconCenterCapacity, bitmap, w, h);
+            addStatusIcon(_status.iconsCenter, _status.iconCenterCount, _status.iconCenterCapacity, bitmap, w, h);
             break;
         case StatusBarIconRight:
-            addStatusIcon(_iconsRight, _iconRightCount, _iconRightCapacity, bitmap, w, h);
+            addStatusIcon(_status.iconsRight, _status.iconRightCount, _status.iconRightCapacity, bitmap, w, h);
             break;
         default:
             break;
         }
 
         if (pos == StatusBarIconLeft)
-            _statusBarDirtyMask |= StatusBarDirtyLeft;
+            _status.dirtyMask |= StatusBarDirtyLeft;
         else if (pos == StatusBarIconCenter)
-            _statusBarDirtyMask |= StatusBarDirtyCenter;
+            _status.dirtyMask |= StatusBarDirtyCenter;
         else if (pos == StatusBarIconRight)
-            _statusBarDirtyMask |= StatusBarDirtyRight;
+            _status.dirtyMask |= StatusBarDirtyRight;
     }
 
     void GUI::setStatusBarCustom(StatusBarCustomCallback cb)
     {
-        _statusBarCustom = cb;
-        _statusBarDirtyMask = StatusBarDirtyAll;
+        _status.custom = cb;
+        _status.dirtyMask = StatusBarDirtyAll;
     }
 
     int16_t GUI::statusBarHeight() const
     {
-        if (!_flags.statusBarEnabled || _statusBarHeight == 0)
+        if (!_flags.statusBarEnabled || _status.height == 0)
             return 0;
         // Only Solid style reserves layout space. Blur overlays content.
-        if (_statusBarStyle != StatusBarStyleSolid)
+        if (_status.style != StatusBarStyleSolid)
             return 0;
-        return (int16_t)_statusBarHeight;
+        return (int16_t)_status.height;
     }
 
     void GUI::renderStatusBar(bool useSprite)
     {
-        if (!_flags.statusBarEnabled || _statusBarHeight == 0)
+        if (!_flags.statusBarEnabled || _status.height == 0)
             return;
 
         bool prevRender = _flags.renderToSprite;
-        pipcore::Sprite *prevActive = _activeSprite;
+        pipcore::Sprite *prevActive = _render.activeSprite;
 
         if (useSprite && _flags.spriteEnabled)
         {
             _flags.renderToSprite = 1;
-            _activeSprite = &_sprite;
+            _render.activeSprite = &_render.sprite;
         }
         else
         {
@@ -482,38 +480,38 @@ namespace pipgui
             return (uint32_t)((r8 << 16) | (g8 << 8) | b8);
         };
 
-        uint32_t bg888 = expand565(_statusBarBg);
-        uint32_t fg888 = expand565(_statusBarFg);
+        uint32_t bg888 = expand565(_status.bg);
+        uint32_t fg888 = expand565(_status.fg);
 
         int16_t x = 0;
         int16_t y = 0;
-        int16_t w = (int16_t)_screenWidth;
-        int16_t h = (int16_t)_statusBarHeight;
+        int16_t w = (int16_t)_render.screenWidth;
+        int16_t h = (int16_t)_status.height;
 
-        if (_statusBarPos == Bottom)
+        if (_status.pos == Bottom)
         {
-            y = (int16_t)(_screenHeight - h);
+            y = (int16_t)(_render.screenHeight - h);
         }
-        else if (_statusBarPos == Left)
+        else if (_status.pos == Left)
         {
-            w = (int16_t)_statusBarHeight;
-            h = (int16_t)_screenHeight;
+            w = (int16_t)_status.height;
+            h = (int16_t)_render.screenHeight;
         }
-        else if (_statusBarPos == Right)
+        else if (_status.pos == Right)
         {
-            w = (int16_t)_statusBarHeight;
-            h = (int16_t)_screenHeight;
-            x = (int16_t)(_screenWidth - w);
+            w = (int16_t)_status.height;
+            h = (int16_t)_render.screenHeight;
+            x = (int16_t)(_render.screenWidth - w);
         }
 
         if (w <= 0 || h <= 0)
         {
             _flags.renderToSprite = prevRender;
-            _activeSprite = prevActive;
+            _render.activeSprite = prevActive;
             return;
         }
 
-        if (_statusBarStyle == StatusBarStyleSolid)
+        if (_status.style == StatusBarStyleSolid)
         {
             fillRect()
                 .at(x, y)
@@ -521,14 +519,14 @@ namespace pipgui
                 .color(bg888)
                 .draw();
         }
-        else if (_statusBarStyle == StatusBarStyleBlurGradient)
+        else if (_status.style == StatusBarStyleBlurGradient)
         {
             BlurDirection dir = TopDown;
-            if (_statusBarPos == Bottom)
+            if (_status.pos == Bottom)
                 dir = BottomUp;
-            else if (_statusBarPos == Left)
+            else if (_status.pos == Left)
                 dir = RightLeft;
-            else if (_statusBarPos == Right)
+            else if (_status.pos == Right)
                 dir = LeftRight;
             int16_t dim = (h > w) ? h : w;
             uint8_t blurRadius = (uint8_t)(dim / 8);
@@ -583,7 +581,7 @@ namespace pipgui
             drawTextAt(String(metricsText), mx);
 
             _flags.renderToSprite = prevRender;
-            _activeSprite = prevActive;
+            _render.activeSprite = prevActive;
             return;
         }
         
@@ -625,9 +623,9 @@ namespace pipgui
         };
 
         int16_t leftX = x + 2;
-        for (uint8_t i = 0; i < _iconLeftCount; ++i)
+        for (uint8_t i = 0; i < _status.iconLeftCount; ++i)
         {
-            const StatusIcon &ic = _iconsLeft[i];
+            const StatusIcon &ic = _status.iconsLeft[i];
             if (!ic.bitmap || ic.w == 0 || ic.h == 0)
                 continue;
             if (leftX + ic.w > x + w)
@@ -639,17 +637,17 @@ namespace pipgui
             leftX += ic.w + 2;
         }
 
-        if (_statusTextLeft.length() > 0)
+        if (_status.textLeft.length() > 0)
         {
             int16_t lx = leftX;
             if (lx > x + w - 4)
                 lx = x + w - 4;
-            drawTextAt(_statusTextLeft, lx);
+            drawTextAt(_status.textLeft, lx);
         }
 
         int16_t rightCursor = x + w - 2;
 
-        if (_batteryStyle != Hidden && _batteryLevel >= 0)
+        if (_status.batteryStyle != Hidden && _status.batteryLevel >= 0)
         {
             int16_t bwTotal = 27;
             if (bwTotal + 2 > w)
@@ -676,11 +674,11 @@ namespace pipgui
             if (by < y)
                 by = y;
 
-            uint32_t frameColor = _statusBarFg;
-            uint32_t fillCol = (_batteryLevel <= 20) ? 0xFF0000 : 0x00D604;
+            uint32_t frameColor = _status.fg;
+            uint32_t fillCol = (_status.batteryLevel <= 20) ? 0xFF0000 : 0x00D604;
 
             drawIcon(pipgui::battery_layer2, bx, by, (uint16_t)iconSize, fillCol, bg888);
-            int16_t cutX = (int16_t)(bx + (int32_t)iconSize * _batteryLevel / 100);
+            int16_t cutX = (int16_t)(bx + (int32_t)iconSize * _status.batteryLevel / 100);
             fillRect()
                 .at(cutX, by)
                 .size((int16_t)(bx + iconSize - cutX), (int16_t)iconSize)
@@ -693,9 +691,9 @@ namespace pipgui
             rightCursor = bx - 4;
         }
 
-        for (int i = (int)_iconRightCount - 1; i >= 0; --i)
+        for (int i = (int)_status.iconRightCount - 1; i >= 0; --i)
         {
-            const StatusIcon &ic = _iconsRight[i];
+            const StatusIcon &ic = _status.iconsRight[i];
             if (!ic.bitmap || ic.w == 0 || ic.h == 0)
                 continue;
             if (rightCursor - (int16_t)ic.w < x + 2)
@@ -708,22 +706,22 @@ namespace pipgui
             rightCursor = ixr - 2;
         }
 
-        if (_statusTextRight.length() > 0)
+        if (_status.textRight.length() > 0)
         {
-            int16_t tw = measureText(_statusTextRight);
+            int16_t tw = measureText(_status.textRight);
             int16_t rx = rightCursor - tw;
             if (rx < x + 2)
                 rx = x + 2;
-            drawTextAt(_statusTextRight, rx);
+            drawTextAt(_status.textRight, rx);
             rightCursor = rx - 4;
         }
 
-        if (_statusTextCenter.length() > 0 || _iconCenterCount > 0)
+        if (_status.textCenter.length() > 0 || _status.iconCenterCount > 0)
         {
             int16_t iconsW = 0;
-            for (uint8_t i = 0; i < _iconCenterCount; ++i)
+            for (uint8_t i = 0; i < _status.iconCenterCount; ++i)
             {
-                const StatusIcon &ic = _iconsCenter[i];
+                const StatusIcon &ic = _status.iconsCenter[i];
                 if (!ic.bitmap || ic.w == 0)
                     continue;
                 if (iconsW > 0)
@@ -731,7 +729,7 @@ namespace pipgui
                 iconsW += ic.w;
             }
 
-            int16_t textW = measureText(_statusTextCenter);
+            int16_t textW = measureText(_status.textCenter);
             int16_t gap = (iconsW > 0 && textW > 0) ? 4 : 0;
             int16_t totalW = iconsW + gap + textW;
 
@@ -740,9 +738,9 @@ namespace pipgui
                 int16_t startX = x + (w - totalW) / 2;
                 int16_t curX = startX;
 
-                for (uint8_t i = 0; i < _iconCenterCount; ++i)
+                for (uint8_t i = 0; i < _status.iconCenterCount; ++i)
                 {
-                    const StatusIcon &ic = _iconsCenter[i];
+                    const StatusIcon &ic = _status.iconsCenter[i];
                     if (!ic.bitmap || ic.w == 0 || ic.h == 0)
                         continue;
                     int16_t iy = y + (h - ic.h) / 2;
@@ -754,20 +752,19 @@ namespace pipgui
 
                 if (textW > 0)
                 {
-                    if (curX < startX)
-                        curX = startX;
+                    if (curX < x + 2)
+                        curX = x + 2;
                     if (curX + textW > x + w - 2)
                         curX = x + w - 2 - textW;
-                    drawTextAt(_statusTextCenter, curX);
+                    drawTextAt(_status.textCenter, curX);
                 }
             }
         }
 
-        if (_statusBarCustom)
-            _statusBarCustom(*this, x, y, w, h);
+        if (_status.custom)
+            _status.custom(*this, x, y, w, h);
 
         _flags.renderToSprite = prevRender;
-        _activeSprite = prevActive;
+        _render.activeSprite = prevActive;
     }
-
 }

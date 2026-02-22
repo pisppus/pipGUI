@@ -1,4 +1,4 @@
-#include <pipGUI/core/api/pipGUI.hpp>
+﻿#include <pipGUI/core/api/pipGUI.hpp>
 
 namespace pipgui
 {
@@ -109,7 +109,7 @@ namespace pipgui
         if (w <= 0 || h <= 0)
             return;
 
-        if (_flags.spriteEnabled && _display && !_flags.renderToSprite)
+        if (_flags.spriteEnabled && _disp.display && !_flags.renderToSprite)
         {
             updateToggleSwitch(x, y, w, h, state, activeColor, inactiveColor, knobColor);
             return;
@@ -123,16 +123,16 @@ namespace pipgui
         if (x0 == center)
         {
             int16_t left = 0;
-            int16_t availW = _screenWidth;
+            int16_t availW = _render.screenWidth;
             int16_t sb = statusBarHeight();
             if (_flags.statusBarEnabled && sb > 0)
             {
-                if (_statusBarPos == Left)
+                if (_status.pos == Left)
                 {
                     left += sb;
                     availW -= sb;
                 }
-                else if (_statusBarPos == Right)
+                else if (_status.pos == Right)
                 {
                     availW -= sb;
                 }
@@ -144,16 +144,16 @@ namespace pipgui
         if (y0 == center)
         {
             int16_t top = 0;
-            int16_t availH = _screenHeight;
+            int16_t availH = _render.screenHeight;
             int16_t sb = statusBarHeight();
             if (_flags.statusBarEnabled && sb > 0)
             {
-                if (_statusBarPos == Top)
+                if (_status.pos == Top)
                 {
                     top += sb;
                     availH -= sb;
                 }
-                else if (_statusBarPos == Bottom)
+                else if (_status.pos == Bottom)
                 {
                     availH -= sb;
                 }
@@ -212,15 +212,15 @@ namespace pipgui
                                  int32_t inactiveColor,
                                  int32_t knobColor)
     {
-        if (!_flags.spriteEnabled || !_display)
+        if (!_flags.spriteEnabled || !_disp.display)
         {
             bool prevRender = _flags.renderToSprite;
-            pipcore::Sprite *prevActive = _activeSprite;
+            pipcore::Sprite *prevActive = _render.activeSprite;
 
             _flags.renderToSprite = 0;
             drawToggleSwitch(x, y, w, h, state, activeColor, inactiveColor, knobColor);
             _flags.renderToSprite = prevRender;
-            _activeSprite = prevActive;
+            _render.activeSprite = prevActive;
             return;
         }
 
@@ -238,22 +238,24 @@ namespace pipgui
         int16_t pad = 2;
 
         bool prevRender = _flags.renderToSprite;
-        pipcore::Sprite *prevActive = _activeSprite;
+        pipcore::Sprite *prevActive = _render.activeSprite;
 
         _flags.renderToSprite = 1;
-        _activeSprite = &_sprite;
+        _render.activeSprite = &_render.sprite;
 
         fillRect()
             .at((int16_t)(rx - pad), (int16_t)(ry - pad))
             .size((int16_t)(w + pad * 2), (int16_t)(h + pad * 2))
-            .color(_bgColor)
+            .color(_render.bgColor)
             .draw();
         drawToggleSwitch(x, y, w, h, state, activeColor, inactiveColor, knobColor);
 
         _flags.renderToSprite = prevRender;
-        _activeSprite = prevActive;
+        _render.activeSprite = prevActive;
 
         invalidateRect((int16_t)(rx - pad), (int16_t)(ry - pad), (int16_t)(w + pad * 2), (int16_t)(h + pad * 2));
         flushDirty();
     }
 }
+
+

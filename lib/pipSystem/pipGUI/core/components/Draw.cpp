@@ -1,4 +1,4 @@
-#include <pipGUI/core/api/pipGUI.hpp>
+﻿#include <pipGUI/core/api/pipGUI.hpp>
 #include <pipGUI/core/Debug.hpp>
 #include <math.h>
 
@@ -27,8 +27,8 @@ namespace pipgui
         return (uint16_t)((v >> 8) | (v << 8));
     }
 
-    uint16_t GUI::screenWidth() const { return _screenWidth; }
-    uint16_t GUI::screenHeight() const { return _screenHeight; }
+    uint16_t GUI::screenWidth() const { return _render.screenWidth; }
+    uint16_t GUI::screenHeight() const { return _render.screenHeight; }
 
     uint32_t GUI::rgb(uint8_t r, uint8_t g, uint8_t b) const
     {
@@ -43,12 +43,12 @@ namespace pipgui
             (uint8_t)(color888 & 0xFF),
         };
         if (c.isBlack() || c.isWhite())
-            return detail::quantize565(c, x, y, _frcSeed, FrcProfile::Off);
+            return detail::quantize565(c, x, y, _frc.seed, FrcProfile::Off);
         if (c.r == c.g && c.g == c.b)
-            return detail::quantize565(c, x, y, _frcSeed, FrcProfile::Off);
+            return detail::quantize565(c, x, y, _frc.seed, FrcProfile::Off);
         if (((c.r & 7U) == 0U) && ((c.g & 3U) == 0U) && ((c.b & 7U) == 0U))
-            return detail::quantize565(c, x, y, _frcSeed, FrcProfile::Off);
-        return detail::quantize565(c, x, y, _frcSeed, _frcProfile);
+            return detail::quantize565(c, x, y, _frc.seed, FrcProfile::Off);
+        return detail::quantize565(c, x, y, _frc.seed, _frc.profile);
     }
 
     void GUI::fillCircleFrc(int16_t cx, int16_t cy, int16_t r, uint32_t color888)
@@ -60,8 +60,8 @@ namespace pipgui
             return;
 
         pipcore::Sprite *spr = (_flags.renderToSprite && _flags.spriteEnabled)
-                                        ? (_activeSprite ? _activeSprite : &_sprite)
-                                        : &_sprite;
+                                        ? (_render.activeSprite ? _render.activeSprite : &_render.sprite)
+                                        : &_render.sprite;
 
         uint16_t *buf = (uint16_t *)spr->getBuffer();
         if (!buf)
@@ -73,7 +73,7 @@ namespace pipgui
             return;
 
         Color888 c = Color888::fromUint32(color888);
-        FrcProfile profile = _frcProfile;
+        FrcProfile profile = _frc.profile;
         if (c.isBlack() || c.isWhite())
             profile = FrcProfile::Off;
         else if (c.r == c.g && c.g == c.b)
@@ -109,7 +109,7 @@ namespace pipgui
                 return;
             uint16_t *p = buf + (int32_t)py * (int32_t)stride + px;
             const uint16_t bg = swap16(*p);
-            const uint16_t fg = detail::quantize565(c, px, py, _frcSeed, profile);
+            const uint16_t fg = detail::quantize565(c, px, py, _frc.seed, profile);
             *p = swap16(detail::blend565(bg, fg, a));
         };
 
@@ -150,8 +150,8 @@ namespace pipgui
             return;
 
         pipcore::Sprite *spr = (_flags.renderToSprite && _flags.spriteEnabled)
-                                        ? (_activeSprite ? _activeSprite : &_sprite)
-                                        : &_sprite;
+                                        ? (_render.activeSprite ? _render.activeSprite : &_render.sprite)
+                                        : &_render.sprite;
 
         uint16_t *buf = (uint16_t *)spr->getBuffer();
         if (!buf)
@@ -170,7 +170,7 @@ namespace pipgui
             r = 0;
 
         Color888 c = Color888::fromUint32(color888);
-        FrcProfile profile = _frcProfile;
+        FrcProfile profile = _frc.profile;
         if (c.isBlack() || c.isWhite())
             profile = FrcProfile::Off;
 
@@ -213,7 +213,7 @@ namespace pipgui
                 return;
             uint16_t *p = buf + (int32_t)py * (int32_t)stride + px;
             const uint16_t bg = swap16(*p);
-            const uint16_t fg = detail::quantize565(c, px, py, _frcSeed, profile);
+            const uint16_t fg = detail::quantize565(c, px, py, _frc.seed, profile);
             *p = swap16(detail::blend565(bg, fg, a));
         };
 
@@ -263,8 +263,8 @@ namespace pipgui
             return;
 
         pipcore::Sprite *spr = (_flags.renderToSprite && _flags.spriteEnabled)
-                                        ? (_activeSprite ? _activeSprite : &_sprite)
-                                        : &_sprite;
+                                        ? (_render.activeSprite ? _render.activeSprite : &_render.sprite)
+                                        : &_render.sprite;
 
         uint16_t *buf = (uint16_t *)spr->getBuffer();
         if (!buf)
@@ -283,7 +283,7 @@ namespace pipgui
         uint8_t rBL = (radiusBL > maxR) ? (uint8_t)maxR : radiusBL;
 
         Color888 c = Color888::fromUint32(color888);
-        FrcProfile profile = _frcProfile;
+        FrcProfile profile = _frc.profile;
         if (c.isBlack() || c.isWhite())
             profile = FrcProfile::Off;
 
@@ -398,7 +398,7 @@ namespace pipgui
         uint8_t inBL = (radiusBL > 0) ? (uint8_t)(radiusBL - 1) : 0;
         if (w > 2 && h > 2)
             fillRoundRectCornersFrc((int16_t)(x + 1), (int16_t)(y + 1), (int16_t)(w - 2), (int16_t)(h - 2),
-                                    inTL, inTR, inBR, inBL, _bgColor);
+                                    inTL, inTR, inBR, inBL, _render.bgColor);
     }
 
     void GUI::drawRoundRectFrc(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radius, uint32_t color888)
@@ -413,7 +413,7 @@ namespace pipgui
         }
 
         fillRoundRectFrc(x, y, w, h, radius, color888);
-        fillRoundRectFrc(x + 1, y + 1, w - 2, h - 2, radius > 0 ? (uint8_t)(radius - 1) : 0, _bgColor);
+        fillRoundRectFrc(x + 1, y + 1, w - 2, h - 2, radius > 0 ? (uint8_t)(radius - 1) : 0, _render.bgColor);
     }
 
     void GUI::blitImage565Frc(int16_t x, int16_t y, const uint16_t *bitmap565, int16_t w, int16_t h)
@@ -455,19 +455,19 @@ namespace pipgui
     uint16_t GUI::rgb888To565Frc(uint8_t r, uint8_t g, uint8_t b, int16_t x, int16_t y, FrcProfile profile) const
     {
         Color888 c{r, g, b};
-        return detail::quantize565(c, x, y, _frcSeed, profile);
+        return detail::quantize565(c, x, y, _frc.seed, profile);
     }
 
     void GUI::clear888(uint8_t r, uint8_t g, uint8_t b, FrcProfile profile)
     {
-        _bgColor = rgb(r, g, b);
+        _render.bgColor = rgb(r, g, b);
 
         if (!_flags.spriteEnabled)
             return;
 
         pipcore::Sprite *spr = (_flags.renderToSprite && _flags.spriteEnabled)
-                                        ? (_activeSprite ? _activeSprite : &_sprite)
-                                        : &_sprite;
+                                        ? (_render.activeSprite ? _render.activeSprite : &_render.sprite)
+                                        : &_render.sprite;
 
         uint16_t *buf = (uint16_t *)spr->getBuffer();
         if (!buf)
@@ -503,7 +503,7 @@ namespace pipgui
                     p[xx] = v;
             }
 
-            if (_display && _flags.spriteEnabled && !_flags.renderToSprite)
+            if (_disp.display && _flags.spriteEnabled && !_flags.renderToSprite)
                 invalidateRect((int16_t)clipX, (int16_t)clipY, (int16_t)clipW, (int16_t)clipH);
             return;
         }
@@ -513,7 +513,7 @@ namespace pipgui
         for (int16_t ty = 0; ty < 16; ++ty)
         {
             for (int16_t tx = 0; tx < 16; ++tx)
-                tile[(uint16_t)ty * 16U + (uint16_t)tx] = swap16(detail::quantize565(c, tx, ty, _frcSeed, profile));
+                tile[(uint16_t)ty * 16U + (uint16_t)tx] = swap16(detail::quantize565(c, tx, ty, _frc.seed, profile));
         }
 
         for (int32_t yy = 0; yy < clipH; ++yy)
@@ -528,7 +528,7 @@ namespace pipgui
             }
         }
 
-        if (_display && _flags.spriteEnabled && !_flags.renderToSprite)
+        if (_disp.display && _flags.spriteEnabled && !_flags.renderToSprite)
             invalidateRect((int16_t)clipX, (int16_t)clipY, (int16_t)clipW, (int16_t)clipH);
     }
 
@@ -546,8 +546,8 @@ namespace pipgui
             return;
 
         pipcore::Sprite *spr = (_flags.renderToSprite && _flags.spriteEnabled)
-                                        ? (_activeSprite ? _activeSprite : &_sprite)
-                                        : &_sprite;
+                                        ? (_render.activeSprite ? _render.activeSprite : &_render.sprite)
+                                        : &_render.sprite;
 
         uint16_t *buf = (uint16_t *)spr->getBuffer();
         if (!buf)
@@ -621,7 +621,7 @@ namespace pipgui
                     p[xx] = v;
             }
 
-            if (_display && _flags.spriteEnabled && !_flags.renderToSprite)
+            if (_disp.display && _flags.spriteEnabled && !_flags.renderToSprite)
                 invalidateRect(x, y, w, h);
             return;
         }
@@ -637,7 +637,7 @@ namespace pipgui
                 for (int16_t xx = 0; xx < w; ++xx)
                 {
                     int16_t px = (int16_t)(x + xx);
-                    uint16_t c565 = detail::quantize565(c, px, py, _frcSeed, profile);
+                    uint16_t c565 = detail::quantize565(c, px, py, _frc.seed, profile);
                     buf[row + px] = swap16(c565);
                 }
             }
@@ -649,7 +649,7 @@ namespace pipgui
             for (int16_t ty = 0; ty < 16; ++ty)
             {
                 for (int16_t tx = 0; tx < 16; ++tx)
-                    tile[(uint16_t)ty * 16U + (uint16_t)tx] = swap16(detail::quantize565(c, tx, ty, _frcSeed, profile));
+                    tile[(uint16_t)ty * 16U + (uint16_t)tx] = swap16(detail::quantize565(c, tx, ty, _frc.seed, profile));
             }
 
             for (int16_t yy = 0; yy < h; ++yy)
@@ -665,7 +665,7 @@ namespace pipgui
             }
         }
 
-        if (_display && _flags.spriteEnabled && !_flags.renderToSprite)
+        if (_disp.display && _flags.spriteEnabled && !_flags.renderToSprite)
             invalidateRect(x, y, w, h);
     }
 
@@ -839,7 +839,7 @@ namespace pipgui
             }
         }
 
-        if (_display && _flags.spriteEnabled && !_flags.renderToSprite)
+        if (_disp.display && _flags.spriteEnabled && !_flags.renderToSprite)
         {
             // Conservative invalidate: bounding box expanded by 1px due to AA.
             int16_t minX = (x0 < x1) ? x0 : x1;
@@ -1012,7 +1012,7 @@ namespace pipgui
             }
         }
 
-        if (_display && _flags.spriteEnabled && !_flags.renderToSprite)
+        if (_disp.display && _flags.spriteEnabled && !_flags.renderToSprite)
             invalidateRect(x0, y0, (int16_t)(x1 - x0 + 1), (int16_t)(y1 - y0 + 1));
     }
 
@@ -1157,7 +1157,7 @@ namespace pipgui
             }
         }
 
-        if (_display && _flags.spriteEnabled && !_flags.renderToSprite)
+        if (_disp.display && _flags.spriteEnabled && !_flags.renderToSprite)
             invalidateRect(x0, y0, (int16_t)(x1 - x0 + 1), (int16_t)(y1 - y0 + 1));
     }
 
@@ -1331,7 +1331,7 @@ namespace pipgui
             }
         }
 
-        if (_display && _flags.spriteEnabled && !_flags.renderToSprite)
+        if (_disp.display && _flags.spriteEnabled && !_flags.renderToSprite)
         {
             int16_t bx = xStart;
             int16_t by = yStart;
@@ -1356,8 +1356,8 @@ namespace pipgui
             return;
 
         pipcore::Sprite *spr = (_flags.renderToSprite && _flags.spriteEnabled)
-                                        ? (_activeSprite ? _activeSprite : &_sprite)
-                                        : &_sprite;
+                                        ? (_render.activeSprite ? _render.activeSprite : &_render.sprite)
+                                        : &_render.sprite;
 
         uint16_t *buf = (uint16_t *)spr->getBuffer();
         if (!buf)
@@ -1374,7 +1374,7 @@ namespace pipgui
             return;
 
         Color888 c = Color888::fromUint32(color);
-        FrcProfile profile = _frcProfile;
+        FrcProfile profile = _frc.profile;
         if (c.isBlack() || c.isWhite())
             profile = FrcProfile::Off;
         else if (c.r == c.g && c.g == c.b)
@@ -1477,13 +1477,13 @@ namespace pipgui
 
                 if (sd <= 0.0f)
                 {
-                    uint16_t c565 = detail::quantize565(c, px, py, _frcSeed, profile);
+                    uint16_t c565 = detail::quantize565(c, px, py, _frc.seed, profile);
                     buf[row + px] = swap16(c565);
                 }
             }
         }
 
-        if (_display && _flags.spriteEnabled && !_flags.renderToSprite)
+        if (_disp.display && _flags.spriteEnabled && !_flags.renderToSprite)
         {
             int16_t bx = xStart;
             int16_t by = yStart;
@@ -1613,7 +1613,7 @@ namespace pipgui
             }
         }
 
-        if (_display && _flags.spriteEnabled && !_flags.renderToSprite)
+        if (_disp.display && _flags.spriteEnabled && !_flags.renderToSprite)
             invalidateRect(x0, y0, (int16_t)(x1 - x0 + 1), (int16_t)(y1 - y0 + 1));
     }
 
@@ -1645,30 +1645,30 @@ namespace pipgui
     {
         pipcore::Sprite *spr = nullptr;
         if (_flags.renderToSprite && _flags.spriteEnabled)
-            spr = _activeSprite ? _activeSprite : &_sprite;
+            spr = _render.activeSprite ? _render.activeSprite : &_render.sprite;
         else
-            spr = &_sprite;
+            spr = &_render.sprite;
 
-        applyGuiClipToSprite(spr, _clipEnabled, _clipX, _clipY, _clipW, _clipH);
+        applyGuiClipToSprite(spr, _clip.enabled, _clip.x, _clip.y, _clip.w, _clip.h);
         return spr;
     }
 
     void GUI::setClipWindow(int16_t x, int16_t y, int16_t w, int16_t h)
     {
-        _clipEnabled = true;
-        _clipX = x;
-        _clipY = y;
-        _clipW = w;
-        _clipH = h;
+        _clip.enabled = true;
+        _clip.x = x;
+        _clip.y = y;
+        _clip.w = w;
+        _clip.h = h;
     }
 
     void GUI::resetClipWindow()
     {
-        _clipEnabled = false;
-        _clipX = 0;
-        _clipY = 0;
-        _clipW = 0;
-        _clipH = 0;
+        _clip.enabled = false;
+        _clip.x = 0;
+        _clip.y = 0;
+        _clip.w = 0;
+        _clip.h = 0;
     }
 
     void GUI::clear(uint32_t color)
@@ -1676,14 +1676,14 @@ namespace pipgui
         uint8_t r = (uint8_t)((color >> 16) & 0xFF);
         uint8_t g = (uint8_t)((color >> 8) & 0xFF);
         uint8_t b = (uint8_t)(color & 0xFF);
-        clear888(r, g, b, _frcProfile);
+        clear888(r, g, b, _frc.profile);
     }
 
     int16_t GUI::AutoX(int32_t contentWidth) const
     {
         int16_t sb = statusBarHeight();
-        int16_t left = (_flags.statusBarEnabled && _statusBarPos == Left) ? sb : 0;
-        int16_t availW = _screenWidth - ((_flags.statusBarEnabled && (_statusBarPos == Left || _statusBarPos == Right)) ? sb : 0);
+        int16_t left = (_flags.statusBarEnabled && _status.pos == Left) ? sb : 0;
+        int16_t availW = _render.screenWidth - ((_flags.statusBarEnabled && (_status.pos == Left || _status.pos == Right)) ? sb : 0);
 
         if (contentWidth > availW)
             availW = (int16_t)contentWidth;
@@ -1694,8 +1694,8 @@ namespace pipgui
     int16_t GUI::AutoY(int32_t contentHeight) const
     {
         int16_t sb = statusBarHeight();
-        int16_t top = (_flags.statusBarEnabled && _statusBarPos == Top) ? sb : 0;
-        int16_t availH = _screenHeight - ((_flags.statusBarEnabled && (_statusBarPos == Top || _statusBarPos == Bottom)) ? sb : 0);
+        int16_t top = (_flags.statusBarEnabled && _status.pos == Top) ? sb : 0;
+        int16_t availH = _render.screenHeight - ((_flags.statusBarEnabled && (_status.pos == Top || _status.pos == Bottom)) ? sb : 0);
 
         if (contentHeight > availH)
             availH = (int16_t)contentHeight;
@@ -1811,7 +1811,7 @@ namespace pipgui
             }
         }
 
-        if (_display && _flags.spriteEnabled && !_flags.renderToSprite)
+        if (_disp.display && _flags.spriteEnabled && !_flags.renderToSprite)
             invalidateRect(x0, y0, (int16_t)(x1 - x0), (int16_t)(y1 - y0));
     }
 
@@ -1847,20 +1847,20 @@ namespace pipgui
             return;
 
         // Gradients are one of the main places where FRC/dithering is beneficial.
-        FrcProfile prevProfile = _frcProfile;
-        _frcProfile = FrcProfile::BlueNoise;
+        FrcProfile prevProfile = _frc.profile;
+        _frc.profile = FrcProfile::BlueNoise;
 
         auto spr = getDrawTarget();
         if (!spr)
         {
-            _frcProfile = prevProfile;
+            _frc.profile = prevProfile;
             return;
         }
 
         uint16_t *buf = (uint16_t *)spr->getBuffer();
         if (!buf)
         {
-            _frcProfile = prevProfile;
+            _frc.profile = prevProfile;
             return;
         }
 
@@ -1890,7 +1890,7 @@ namespace pipgui
 
         if (x0 >= x1 || y0 >= y1)
         {
-            _frcProfile = prevProfile;
+            _frc.profile = prevProfile;
             return;
         }
 
@@ -1908,10 +1908,10 @@ namespace pipgui
                 buf[row + px] = swap16(color888To565(px, py, c));
         }
 
-        if (_display && _flags.spriteEnabled && !_flags.renderToSprite)
+        if (_disp.display && _flags.spriteEnabled && !_flags.renderToSprite)
             invalidateRect(x0, y0, (int16_t)(x1 - x0), (int16_t)(y1 - y0));
 
-        _frcProfile = prevProfile;
+        _frc.profile = prevProfile;
     }
 
     void GUI::fillRectGradientHorizontalImpl(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t leftColor, uint32_t rightColor)
@@ -1926,20 +1926,20 @@ namespace pipgui
         if (!_flags.spriteEnabled)
             return;
 
-        FrcProfile prevProfile = _frcProfile;
-        _frcProfile = FrcProfile::BlueNoise;
+        FrcProfile prevProfile = _frc.profile;
+        _frc.profile = FrcProfile::BlueNoise;
 
         auto spr = getDrawTarget();
         if (!spr)
         {
-            _frcProfile = prevProfile;
+            _frc.profile = prevProfile;
             return;
         }
 
         uint16_t *buf = (uint16_t *)spr->getBuffer();
         if (!buf)
         {
-            _frcProfile = prevProfile;
+            _frc.profile = prevProfile;
             return;
         }
 
@@ -1969,7 +1969,7 @@ namespace pipgui
 
         if (x0 >= x1 || y0 >= y1)
         {
-            _frcProfile = prevProfile;
+            _frc.profile = prevProfile;
             return;
         }
 
@@ -1989,10 +1989,10 @@ namespace pipgui
             }
         }
 
-        if (_display && _flags.spriteEnabled && !_flags.renderToSprite)
+        if (_disp.display && _flags.spriteEnabled && !_flags.renderToSprite)
             invalidateRect(x0, y0, (int16_t)(x1 - x0), (int16_t)(y1 - y0));
 
-        _frcProfile = prevProfile;
+        _frc.profile = prevProfile;
     }
 
     void GUI::fillRectGradient4Impl(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t c00, uint32_t c10, uint32_t c01, uint32_t c11)
@@ -2007,20 +2007,20 @@ namespace pipgui
         if (!_flags.spriteEnabled)
             return;
 
-        FrcProfile prevProfile = _frcProfile;
-        _frcProfile = FrcProfile::BlueNoise;
+        FrcProfile prevProfile = _frc.profile;
+        _frc.profile = FrcProfile::BlueNoise;
 
         auto spr = getDrawTarget();
         if (!spr)
         {
-            _frcProfile = prevProfile;
+            _frc.profile = prevProfile;
             return;
         }
 
         uint16_t *buf = (uint16_t *)spr->getBuffer();
         if (!buf)
         {
-            _frcProfile = prevProfile;
+            _frc.profile = prevProfile;
             return;
         }
 
@@ -2050,7 +2050,7 @@ namespace pipgui
 
         if (x0 >= x1 || y0 >= y1)
         {
-            _frcProfile = prevProfile;
+            _frc.profile = prevProfile;
             return;
         }
 
@@ -2077,10 +2077,10 @@ namespace pipgui
             }
         }
 
-        if (_display && _flags.spriteEnabled && !_flags.renderToSprite)
+        if (_disp.display && _flags.spriteEnabled && !_flags.renderToSprite)
             invalidateRect(x0, y0, (int16_t)(x1 - x0), (int16_t)(y1 - y0));
 
-        _frcProfile = prevProfile;
+        _frc.profile = prevProfile;
     }
 
     void GUI::fillRectGradientDiagonalImpl(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t tlColor, uint32_t brColor)
@@ -2095,20 +2095,20 @@ namespace pipgui
         if (!_flags.spriteEnabled)
             return;
 
-        FrcProfile prevProfile = _frcProfile;
-        _frcProfile = FrcProfile::BlueNoise;
+        FrcProfile prevProfile = _frc.profile;
+        _frc.profile = FrcProfile::BlueNoise;
 
         auto spr = getDrawTarget();
         if (!spr)
         {
-            _frcProfile = prevProfile;
+            _frc.profile = prevProfile;
             return;
         }
 
         uint16_t *buf = (uint16_t *)spr->getBuffer();
         if (!buf)
         {
-            _frcProfile = prevProfile;
+            _frc.profile = prevProfile;
             return;
         }
 
@@ -2138,7 +2138,7 @@ namespace pipgui
 
         if (x0 >= x1 || y0 >= y1)
         {
-            _frcProfile = prevProfile;
+            _frc.profile = prevProfile;
             return;
         }
 
@@ -2158,10 +2158,10 @@ namespace pipgui
             }
         }
 
-        if (_display && _flags.spriteEnabled && !_flags.renderToSprite)
+        if (_disp.display && _flags.spriteEnabled && !_flags.renderToSprite)
             invalidateRect(x0, y0, (int16_t)(x1 - x0), (int16_t)(y1 - y0));
 
-        _frcProfile = prevProfile;
+        _frc.profile = prevProfile;
     }
 
     void GUI::fillRectGradientRadialImpl(int16_t x, int16_t y, int16_t w, int16_t h, int16_t cx, int16_t cy, int16_t radius, uint32_t innerColor, uint32_t outerColor)
@@ -2176,20 +2176,20 @@ namespace pipgui
         if (!_flags.spriteEnabled)
             return;
 
-        FrcProfile prevProfile = _frcProfile;
-        _frcProfile = FrcProfile::BlueNoise;
+        FrcProfile prevProfile = _frc.profile;
+        _frc.profile = FrcProfile::BlueNoise;
 
         auto spr = getDrawTarget();
         if (!spr)
         {
-            _frcProfile = prevProfile;
+            _frc.profile = prevProfile;
             return;
         }
 
         uint16_t *buf = (uint16_t *)spr->getBuffer();
         if (!buf)
         {
-            _frcProfile = prevProfile;
+            _frc.profile = prevProfile;
             return;
         }
 
@@ -2219,7 +2219,7 @@ namespace pipgui
 
         if (x0 >= x1 || y0 >= y1)
         {
-            _frcProfile = prevProfile;
+            _frc.profile = prevProfile;
             return;
         }
 
@@ -2245,10 +2245,10 @@ namespace pipgui
             }
         }
 
-        if (_display && _flags.spriteEnabled && !_flags.renderToSprite)
+        if (_disp.display && _flags.spriteEnabled && !_flags.renderToSprite)
             invalidateRect(x0, y0, (int16_t)(x1 - x0), (int16_t)(y1 - y0));
 
-        _frcProfile = prevProfile;
+        _frc.profile = prevProfile;
     }
 
     void GUI::drawCenteredTitle(const String &title, const String &subtitle, uint32_t fg, uint32_t bg)
@@ -2257,8 +2257,8 @@ namespace pipgui
 
         clear(bg);
 
-        uint16_t titlePx = _logoTitleSizePx ? _logoTitleSizePx : _textStyleH1Px;
-        uint16_t subPx = _logoSubtitleSizePx ? _logoSubtitleSizePx : (uint16_t)((titlePx * 3U) / 4U);
+        uint16_t titlePx = _typo.logoTitleSizePx ? _typo.logoTitleSizePx : _typo.h1Px;
+        uint16_t subPx = _typo.logoSubtitleSizePx ? _typo.logoSubtitleSizePx : (uint16_t)((titlePx * 3U) / 4U);
 
         int16_t titleW = 0;
         int16_t titleH = 0;
@@ -2280,8 +2280,8 @@ namespace pipgui
         if (hasSub)
             totalH = (int16_t)(titleH + spacing + subH);
 
-        int16_t topY = (_bootY != -1) ? _bootY : (_screenHeight - totalH) / 2;
-        int16_t cx = (_bootX != -1) ? _bootX : (int16_t)(_screenWidth / 2);
+        int16_t topY = (_boot.y != -1) ? _boot.y : (_render.screenHeight - totalH) / 2;
+        int16_t cx = (_boot.x != -1) ? _boot.x : (int16_t)(_render.screenWidth / 2);
 
         setPSDFFontSize(titlePx);
         uint16_t fg565Title = color888To565(cx, topY, fg);
@@ -2300,7 +2300,7 @@ namespace pipgui
 
     void GUI::invalidateRect(int16_t x, int16_t y, int16_t w, int16_t h)
     {
-        if (!_display || !_flags.spriteEnabled)
+        if (!_disp.display || !_flags.spriteEnabled)
             return;
         if (w <= 0 || h <= 0)
             return;
@@ -2324,10 +2324,10 @@ namespace pipgui
         if (w <= 0 || h <= 0)
             return;
 
-        if (x + w > (int16_t)_screenWidth)
-            w = (int16_t)_screenWidth - x;
-        if (y + h > (int16_t)_screenHeight)
-            h = (int16_t)_screenHeight - y;
+        if (x + w > (int16_t)_render.screenWidth)
+            w = (int16_t)_render.screenWidth - x;
+        if (y + h > (int16_t)_render.screenHeight)
+            h = (int16_t)_render.screenHeight - y;
 
         if (w <= 0 || h <= 0)
             return;
@@ -2354,20 +2354,20 @@ namespace pipgui
             a.h = (int16_t)(y2 - y1);
         };
 
-        for (uint8_t i = 0; i < _dirtyCount; ++i)
+        for (uint8_t i = 0; i < _dirty.count; ++i)
         {
-            if (intersects(_dirty[i], x, y, w, h))
+            if (intersects(_dirty.rects[i], x, y, w, h))
             {
-                mergeInto(_dirty[i], x, y, w, h);
-                for (uint8_t j = 0; j < _dirtyCount; ++j)
+                mergeInto(_dirty.rects[i], x, y, w, h);
+                for (uint8_t j = 0; j < _dirty.count; ++j)
                 {
                     if (j == i)
                         continue;
-                    if (intersects(_dirty[i], _dirty[j].x, _dirty[j].y, _dirty[j].w, _dirty[j].h))
+                    if (intersects(_dirty.rects[i], _dirty.rects[j].x, _dirty.rects[j].y, _dirty.rects[j].w, _dirty.rects[j].h))
                     {
-                        mergeInto(_dirty[i], _dirty[j].x, _dirty[j].y, _dirty[j].w, _dirty[j].h);
-                        _dirty[j] = _dirty[_dirtyCount - 1];
-                        --_dirtyCount;
+                        mergeInto(_dirty.rects[i], _dirty.rects[j].x, _dirty.rects[j].y, _dirty.rects[j].w, _dirty.rects[j].h);
+                        _dirty.rects[j] = _dirty.rects[_dirty.count - 1];
+                        --_dirty.count;
                         --j;
                     }
                 }
@@ -2375,42 +2375,42 @@ namespace pipgui
             }
         }
 
-        if (_dirtyCount < (uint8_t)(sizeof(_dirty) / sizeof(_dirty[0])))
+        if (_dirty.count < (uint8_t)(sizeof(_dirty.rects) / sizeof(_dirty.rects[0])))
         {
-            _dirty[_dirtyCount++] = {x, y, w, h};
+            _dirty.rects[_dirty.count++] = {x, y, w, h};
             return;
         }
 
-        if (_dirtyCount > 0)
+        if (_dirty.count > 0)
         {
-            mergeInto(_dirty[0], x, y, w, h);
-            for (uint8_t i = 1; i < _dirtyCount; ++i)
-                mergeInto(_dirty[0], _dirty[i].x, _dirty[i].y, _dirty[i].w, _dirty[i].h);
-            _dirtyCount = 1;
+            mergeInto(_dirty.rects[0], x, y, w, h);
+            for (uint8_t i = 1; i < _dirty.count; ++i)
+                mergeInto(_dirty.rects[0], _dirty.rects[i].x, _dirty.rects[i].y, _dirty.rects[i].w, _dirty.rects[i].h);
+            _dirty.count = 1;
         }
     }
 
     void GUI::flushDirty()
     {
-        if (_dirtyCount == 0)
+        if (_dirty.count == 0)
             return;
-        if (!_display || !_flags.spriteEnabled)
+        if (!_disp.display || !_flags.spriteEnabled)
         {
-            _dirtyCount = 0;
+            _dirty.count = 0;
             return;
         }
 
-        const int16_t sw = _sprite.width();
-        const int16_t sh = _sprite.height();
-        uint16_t *buf = (uint16_t *)_sprite.getBuffer();
+        const int16_t sw = _render.sprite.width();
+        const int16_t sh = _render.sprite.height();
+        uint16_t *buf = (uint16_t *)_render.sprite.getBuffer();
         const int32_t stride = sw;
 
         // Mark render start for CPU measurement
         Debug::beginRender();
 
-        for (uint8_t i = 0; i < _dirtyCount; ++i)
+        for (uint8_t i = 0; i < _dirty.count; ++i)
         {
-            DirtyRect r = _dirty[i];
+            DirtyRect r = _dirty.rects[i];
             if (r.w <= 0 || r.h <= 0)
                 continue;
 
@@ -2446,10 +2446,10 @@ namespace pipgui
             }
 
             // Always write to display
-            _sprite.writeToDisplay(*_display, x0, y0, w, h);
+            _render.sprite.writeToDisplay(*_disp.display, x0, y0, w, h);
         }
 
-        _dirtyCount = 0; // Reset dirty count after flush
+        _dirty.count = 0; // Reset dirty count after flush
         
         // Mark render end for CPU measurement
         Debug::endRender();

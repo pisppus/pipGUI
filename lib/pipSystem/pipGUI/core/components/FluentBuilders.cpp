@@ -1,4 +1,4 @@
-#include <pipGUI/core/api/pipGUI.hpp>
+﻿#include <pipGUI/core/api/pipGUI.hpp>
 
 namespace pipgui
 {
@@ -234,4 +234,61 @@ void ToastFluent::show()
     _consumed = true;
 }
 
+template <bool IsUpdate>
+void ToggleSwitchFluentT<IsUpdate>::draw()
+{
+    if (_consumed || !_gui || !_state)
+        return;
+    if (IsUpdate)
+        _gui->updateToggleSwitch(_x, _y, _w, _h, *_state, _activeColor, _inactiveColor, _knobColor);
+    else
+        _gui->drawToggleSwitch(_x, _y, _w, _h, *_state, _activeColor, _inactiveColor, _knobColor);
+    _consumed = true;
 }
+template void ToggleSwitchFluentT<false>::draw();
+template void ToggleSwitchFluentT<true>::draw();
+
+template <bool IsUpdate>
+void ButtonFluentT<IsUpdate>::draw()
+{
+    if (_consumed || !_gui || !_state)
+        return;
+    if (IsUpdate)
+        _gui->updateButton(_label, _iconBitmap, _iconW, _iconH, _x, _y, _w, _h, _baseColor, _radius, *_state);
+    else
+        _gui->drawButton(_label, _iconBitmap, _iconW, _iconH, _x, _y, _w, _h, _baseColor, _radius, *_state);
+    _consumed = true;
+}
+template void ButtonFluentT<false>::draw();
+template void ButtonFluentT<true>::draw();
+
+template <bool IsUpdate>
+void ProgressBarFluentT<IsUpdate>::draw()
+{
+    if (_consumed || !_gui)
+        return;
+    if (IsUpdate)
+        _gui->updateProgressBar(_x, _y, _w, _h, _value, _baseColor, _fillColor, _radius, _anim, _doFlush);
+    else
+        _gui->drawProgressBar(_x, _y, _w, _h, _value, _baseColor, _fillColor, _radius, _anim);
+    _consumed = true;
+}
+template void ProgressBarFluentT<false>::draw();
+template void ProgressBarFluentT<true>::draw();
+
+template <bool IsUpdate>
+void CircularProgressBarFluentT<IsUpdate>::draw()
+{
+    if (_consumed || !_gui)
+        return;
+    if (IsUpdate)
+        _gui->updateCircularProgressBar(_x, _y, _r, _thickness, _value, _baseColor, _fillColor, _anim, _doFlush);
+    else
+        _gui->drawCircularProgressBar(_x, _y, _r, _thickness, _value, _baseColor, _fillColor, _anim);
+    _consumed = true;
+}
+template void CircularProgressBarFluentT<false>::draw();
+template void CircularProgressBarFluentT<true>::draw();
+
+}
+

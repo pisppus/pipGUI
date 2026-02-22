@@ -1,4 +1,4 @@
-#include <pipGUI/core/api/pipGUI.hpp>
+﻿#include <pipGUI/core/api/pipGUI.hpp>
 #include <math.h>
 
 namespace pipgui
@@ -17,13 +17,13 @@ void GUI::drawGlowCircleImpl(int16_t x, int16_t y,
     if (r <= 0)
         return;
 
-    if (_flags.spriteEnabled && _display && !_flags.renderToSprite)
+    if (_flags.spriteEnabled && _disp.display && !_flags.renderToSprite)
     {
         updateGlowCircleImpl(x, y, r, fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
         return;
     }
 
-    uint32_t bg = (bgColor >= 0) ? static_cast<uint32_t>(bgColor) : _bgColor;
+    uint32_t bg = (bgColor >= 0) ? static_cast<uint32_t>(bgColor) : _render.bgColor;
     uint32_t glow = (glowColor >= 0) ? static_cast<uint32_t>(glowColor) : detail::blend888(fillColor, 0xFFFFFF, 80);
 
     int32_t outerR = (int32_t)r + (int32_t)glowSize;
@@ -82,14 +82,14 @@ void GUI::updateGlowCircleImpl(int16_t x, int16_t y,
                            GlowAnim anim,
                            uint16_t pulsePeriodMs)
 {
-    if (!_flags.spriteEnabled || !_display)
+    if (!_flags.spriteEnabled || !_disp.display)
     {
         bool prevRender = _flags.renderToSprite;
-        pipcore::Sprite *prevActive = _activeSprite;
+        pipcore::Sprite *prevActive = _render.activeSprite;
         _flags.renderToSprite = 0;
         drawGlowCircleImpl(x, y, r, fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
         _flags.renderToSprite = prevRender;
-        _activeSprite = prevActive;
+        _render.activeSprite = prevActive;
         return;
     }
 
@@ -110,13 +110,13 @@ void GUI::updateGlowCircleImpl(int16_t x, int16_t y,
     int16_t bw = (int16_t)(diam + pad * 2);
     int16_t bh = (int16_t)(diam + pad * 2);
 
-    uint32_t bg = (bgColor >= 0) ? static_cast<uint32_t>(bgColor) : _bgColor;
+    uint32_t bg = (bgColor >= 0) ? static_cast<uint32_t>(bgColor) : _render.bgColor;
 
     bool prevRender = _flags.renderToSprite;
-    pipcore::Sprite *prevActive = _activeSprite;
+    pipcore::Sprite *prevActive = _render.activeSprite;
 
     _flags.renderToSprite = 1;
-    _activeSprite = &_sprite;
+    _render.activeSprite = &_render.sprite;
 
     fillRect()
         .at(bx, by)
@@ -126,7 +126,7 @@ void GUI::updateGlowCircleImpl(int16_t x, int16_t y,
 
     drawGlowCircleImpl(x, y, r, fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
     _flags.renderToSprite = prevRender;
-    _activeSprite = prevActive;
+    _render.activeSprite = prevActive;
 
     invalidateRect(bx, by, bw, bh);
     flushDirty();
@@ -146,13 +146,13 @@ void GUI::drawGlowRoundRectImpl(int16_t x, int16_t y,
     if (w <= 0 || h <= 0)
         return;
 
-    if (_flags.spriteEnabled && _display && !_flags.renderToSprite)
+    if (_flags.spriteEnabled && _disp.display && !_flags.renderToSprite)
     {
         updateGlowRoundRectImpl(x, y, w, h, radius, fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
         return;
     }
 
-    uint32_t bg = (bgColor >= 0) ? static_cast<uint32_t>(bgColor) : _bgColor;
+    uint32_t bg = (bgColor >= 0) ? static_cast<uint32_t>(bgColor) : _render.bgColor;
     uint32_t glow = (glowColor >= 0) ? static_cast<uint32_t>(glowColor) : detail::blend888(fillColor, 0xFFFFFF, 80);
 
     if (x == center)
@@ -216,14 +216,14 @@ void GUI::drawGlowRoundRectCornersImpl(int16_t x, int16_t y,
     if (w <= 0 || h <= 0)
         return;
 
-    if (_flags.spriteEnabled && _display && !_flags.renderToSprite)
+    if (_flags.spriteEnabled && _disp.display && !_flags.renderToSprite)
     {
         updateGlowRoundRectCornersImpl(x, y, w, h, radiusTL, radiusTR, radiusBR, radiusBL,
                                        fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
         return;
     }
 
-    uint32_t bg = (bgColor >= 0) ? static_cast<uint32_t>(bgColor) : _bgColor;
+    uint32_t bg = (bgColor >= 0) ? static_cast<uint32_t>(bgColor) : _render.bgColor;
     uint32_t glow = (glowColor >= 0) ? static_cast<uint32_t>(glowColor) : detail::blend888(fillColor, 0xFFFFFF, 80);
 
     if (x == center)
@@ -293,14 +293,14 @@ void GUI::updateGlowRoundRectImpl(int16_t x, int16_t y,
                               GlowAnim anim,
                               uint16_t pulsePeriodMs)
 {
-    if (!_flags.spriteEnabled || !_display)
+    if (!_flags.spriteEnabled || !_disp.display)
     {
         bool prevRender = _flags.renderToSprite;
-        pipcore::Sprite *prevActive = _activeSprite;
+        pipcore::Sprite *prevActive = _render.activeSprite;
         _flags.renderToSprite = 0;
         drawGlowRoundRectImpl(x, y, w, h, radius, fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
         _flags.renderToSprite = prevRender;
-        _activeSprite = prevActive;
+        _render.activeSprite = prevActive;
         return;
     }
 
@@ -317,13 +317,13 @@ void GUI::updateGlowRoundRectImpl(int16_t x, int16_t y,
     int16_t bw = (int16_t)(w + (int16_t)glowSize * 2 + pad * 2);
     int16_t bh = (int16_t)(h + (int16_t)glowSize * 2 + pad * 2);
 
-    uint32_t bg = (bgColor >= 0) ? static_cast<uint32_t>(bgColor) : _bgColor;
+    uint32_t bg = (bgColor >= 0) ? static_cast<uint32_t>(bgColor) : _render.bgColor;
 
     bool prevRender = _flags.renderToSprite;
-    pipcore::Sprite *prevActive = _activeSprite;
+    pipcore::Sprite *prevActive = _render.activeSprite;
 
     _flags.renderToSprite = 1;
-    _activeSprite = &_sprite;
+    _render.activeSprite = &_render.sprite;
 
     fillRect()
         .at(bx, by)
@@ -333,7 +333,7 @@ void GUI::updateGlowRoundRectImpl(int16_t x, int16_t y,
 
     drawGlowRoundRectImpl(x, y, w, h, radius, fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
     _flags.renderToSprite = prevRender;
-    _activeSprite = prevActive;
+    _render.activeSprite = prevActive;
 
     invalidateRect(bx, by, bw, bh);
     flushDirty();
@@ -351,15 +351,15 @@ void GUI::updateGlowRoundRectCornersImpl(int16_t x, int16_t y,
                                      GlowAnim anim,
                                      uint16_t pulsePeriodMs)
 {
-    if (!_flags.spriteEnabled || !_display)
+    if (!_flags.spriteEnabled || !_disp.display)
     {
         bool prevRender = _flags.renderToSprite;
-        pipcore::Sprite *prevActive = _activeSprite;
+        pipcore::Sprite *prevActive = _render.activeSprite;
         _flags.renderToSprite = 0;
         drawGlowRoundRectCornersImpl(x, y, w, h, radiusTL, radiusTR, radiusBR, radiusBL,
                                      fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
         _flags.renderToSprite = prevRender;
-        _activeSprite = prevActive;
+        _render.activeSprite = prevActive;
         return;
     }
 
@@ -376,13 +376,13 @@ void GUI::updateGlowRoundRectCornersImpl(int16_t x, int16_t y,
     int16_t bw = (int16_t)(w + (int16_t)glowSize * 2 + pad * 2);
     int16_t bh = (int16_t)(h + (int16_t)glowSize * 2 + pad * 2);
 
-    uint32_t bg = (bgColor >= 0) ? static_cast<uint32_t>(bgColor) : _bgColor;
+    uint32_t bg = (bgColor >= 0) ? static_cast<uint32_t>(bgColor) : _render.bgColor;
 
     bool prevRender = _flags.renderToSprite;
-    pipcore::Sprite *prevActive = _activeSprite;
+    pipcore::Sprite *prevActive = _render.activeSprite;
 
     _flags.renderToSprite = 1;
-    _activeSprite = &_sprite;
+    _render.activeSprite = &_render.sprite;
 
     fillRect()
         .at(bx, by)
@@ -393,7 +393,7 @@ void GUI::updateGlowRoundRectCornersImpl(int16_t x, int16_t y,
     drawGlowRoundRectCornersImpl(x, y, w, h, radiusTL, radiusTR, radiusBR, radiusBL,
                                  fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
     _flags.renderToSprite = prevRender;
-    _activeSprite = prevActive;
+    _render.activeSprite = prevActive;
 
     invalidateRect(bx, by, bw, bh);
     flushDirty();
@@ -409,7 +409,7 @@ bool GUI::ensureBlurWorkBuffers(uint32_t smallLen, int16_t sw, int16_t sh) noexc
     const uint16_t needRow = (uint16_t)(sw + 1);
     const uint16_t needCol = (uint16_t)(sh + 1);
 
-    if (!_blurSmallIn || !_blurSmallTmp || _blurWorkLen < smallLen)
+    if (!_blur.smallIn || !_blur.smallTmp || _blur.workLen < smallLen)
     {
         uint16_t *newSmallIn = (uint16_t *)detail::guiAlloc(plat, (size_t)smallLen * sizeof(uint16_t), pipcore::GuiAllocCaps::PreferExternal);
         uint16_t *newSmallTmp = (uint16_t *)detail::guiAlloc(plat, (size_t)smallLen * sizeof(uint16_t), pipcore::GuiAllocCaps::PreferExternal);
@@ -423,15 +423,15 @@ bool GUI::ensureBlurWorkBuffers(uint32_t smallLen, int16_t sw, int16_t sh) noexc
             return false;
         }
 
-        detail::guiFree(plat, _blurSmallIn);
-        detail::guiFree(plat, _blurSmallTmp);
+        detail::guiFree(plat, _blur.smallIn);
+        detail::guiFree(plat, _blur.smallTmp);
 
-        _blurSmallIn = newSmallIn;
-        _blurSmallTmp = newSmallTmp;
-        _blurWorkLen = smallLen;
+        _blur.smallIn = newSmallIn;
+        _blur.smallTmp = newSmallTmp;
+        _blur.workLen = smallLen;
     }
 
-    if (_blurRowCap < needRow || !_blurRowR || !_blurRowG || !_blurRowB)
+    if (_blur.rowCap < needRow || !_blur.rowR || !_blur.rowG || !_blur.rowB)
     {
         uint32_t *newRowR = (uint32_t *)detail::guiAlloc(plat, (size_t)needRow * sizeof(uint32_t), pipcore::GuiAllocCaps::Default);
         uint32_t *newRowG = (uint32_t *)detail::guiAlloc(plat, (size_t)needRow * sizeof(uint32_t), pipcore::GuiAllocCaps::Default);
@@ -448,17 +448,17 @@ bool GUI::ensureBlurWorkBuffers(uint32_t smallLen, int16_t sw, int16_t sh) noexc
             return false;
         }
 
-        detail::guiFree(plat, _blurRowR);
-        detail::guiFree(plat, _blurRowG);
-        detail::guiFree(plat, _blurRowB);
+        detail::guiFree(plat, _blur.rowR);
+        detail::guiFree(plat, _blur.rowG);
+        detail::guiFree(plat, _blur.rowB);
 
-        _blurRowR = newRowR;
-        _blurRowG = newRowG;
-        _blurRowB = newRowB;
-        _blurRowCap = needRow;
+        _blur.rowR = newRowR;
+        _blur.rowG = newRowG;
+        _blur.rowB = newRowB;
+        _blur.rowCap = needRow;
     }
 
-    if (_blurColCap < needCol || !_blurColR || !_blurColG || !_blurColB)
+    if (_blur.colCap < needCol || !_blur.colR || !_blur.colG || !_blur.colB)
     {
         uint32_t *newColR = (uint32_t *)detail::guiAlloc(plat, (size_t)needCol * sizeof(uint32_t), pipcore::GuiAllocCaps::Default);
         uint32_t *newColG = (uint32_t *)detail::guiAlloc(plat, (size_t)needCol * sizeof(uint32_t), pipcore::GuiAllocCaps::Default);
@@ -475,19 +475,19 @@ bool GUI::ensureBlurWorkBuffers(uint32_t smallLen, int16_t sw, int16_t sh) noexc
             return false;
         }
 
-        detail::guiFree(plat, _blurColR);
-        detail::guiFree(plat, _blurColG);
-        detail::guiFree(plat, _blurColB);
+        detail::guiFree(plat, _blur.colR);
+        detail::guiFree(plat, _blur.colG);
+        detail::guiFree(plat, _blur.colB);
 
-        _blurColR = newColR;
-        _blurColG = newColG;
-        _blurColB = newColB;
-        _blurColCap = needCol;
+        _blur.colR = newColR;
+        _blur.colG = newColG;
+        _blur.colB = newColB;
+        _blur.colCap = needCol;
     }
 
-    return _blurSmallIn && _blurSmallTmp &&
-           _blurRowR && _blurRowG && _blurRowB &&
-           _blurColR && _blurColG && _blurColB;
+    return _blur.smallIn && _blur.smallTmp &&
+           _blur.rowR && _blur.rowG && _blur.rowB &&
+           _blur.colR && _blur.colG && _blur.colB;
 }
  
  void GUI::drawBlurStripImpl(int16_t x, int16_t y,
@@ -516,16 +516,16 @@ bool GUI::ensureBlurWorkBuffers(uint32_t smallLen, int16_t sw, int16_t sh) noexc
         h += y;
         y = 0;
     }
-    if (x + w > _screenWidth)
-        w = _screenWidth - x;
-    if (y + h > _screenHeight)
-        h = _screenHeight - y;
+    if (x + w > _render.screenWidth)
+        w = _render.screenWidth - x;
+    if (y + h > _render.screenHeight)
+        h = _render.screenHeight - y;
     if (w <= 0 || h <= 0)
         return;
 
     if (!(_flags.renderToSprite && _flags.spriteEnabled))
     {
-        if (_flags.spriteEnabled && _display && !_flags.renderToSprite)
+        if (_flags.spriteEnabled && _disp.display && !_flags.renderToSprite)
         {
             updateBlurStripImpl(x, y, w, h, radius, dir, gradient, materialStrength, noiseAmount, materialColor);
             return;
@@ -533,7 +533,7 @@ bool GUI::ensureBlurWorkBuffers(uint32_t smallLen, int16_t sw, int16_t sh) noexc
 
     }
 
-    pipcore::Sprite *spr = _activeSprite ? _activeSprite : &_sprite;
+    pipcore::Sprite *spr = _render.activeSprite ? _render.activeSprite : &_render.sprite;
     uint16_t *screenBuf = (uint16_t *)spr->getBuffer();
     if (!screenBuf)
         return;
@@ -581,14 +581,14 @@ bool GUI::ensureBlurWorkBuffers(uint32_t smallLen, int16_t sw, int16_t sh) noexc
     if (!ok)
         return;
 
-    uint16_t *smallIn = _blurSmallIn;
-    uint16_t *smallTmp = _blurSmallTmp;
-    uint32_t *rowR = _blurRowR;
-    uint32_t *rowG = _blurRowG;
-    uint32_t *rowB = _blurRowB;
-    uint32_t *colR = _blurColR;
-    uint32_t *colG = _blurColG;
-    uint32_t *colB = _blurColB;
+    uint16_t *smallIn = _blur.smallIn;
+    uint16_t *smallTmp = _blur.smallTmp;
+    uint32_t *rowR = _blur.rowR;
+    uint32_t *rowG = _blur.rowG;
+    uint32_t *rowB = _blur.rowB;
+    uint32_t *colR = _blur.colR;
+    uint32_t *colG = _blur.colG;
+    uint32_t *colB = _blur.colB;
     if (!smallIn || !smallTmp || !rowR || !rowG || !rowB || !colR || !colG || !colB)
         return;
 
@@ -631,7 +631,7 @@ bool GUI::ensureBlurWorkBuffers(uint32_t smallLen, int16_t sw, int16_t sh) noexc
         }
     }
 
-    uint32_t matColor = (materialColor >= 0) ? static_cast<uint32_t>(materialColor) : _bgColor;
+    uint32_t matColor = (materialColor >= 0) ? static_cast<uint32_t>(materialColor) : _render.bgColor;
 
     uint8_t radiusSmall = (uint8_t)((radius + scale - 1) / scale);
     if (radiusSmall < 1)
@@ -769,15 +769,15 @@ bool GUI::ensureBlurWorkBuffers(uint32_t smallLen, int16_t sw, int16_t sh) noexc
                 uint8_t mat = materialStrength;
                 if (gradient)
                     mat = (uint8_t)(((uint16_t)mat * alpha) / 255U);
-                uint32_t mat888 = (materialColor >= 0) ? static_cast<uint32_t>(materialColor) : _bgColor;
+                uint32_t mat888 = (materialColor >= 0) ? static_cast<uint32_t>(materialColor) : _render.bgColor;
                 mixed888 = detail::blend888(mixed888, mat888, mat);
             }
 
             Color888 cc{(uint8_t)((mixed888 >> 16) & 0xFF), (uint8_t)((mixed888 >> 8) & 0xFF), (uint8_t)(mixed888 & 0xFF)};
-            FrcProfile p = _frcProfile;
+            FrcProfile p = _frc.profile;
             if (cc.isBlack() || cc.isWhite())
                 p = FrcProfile::Off;
-            uint16_t out565 = detail::quantize565(cc, (int16_t)ix + x, (int16_t)iy + y, _frcSeed, p);
+            uint16_t out565 = detail::quantize565(cc, (int16_t)ix + x, (int16_t)iy + y, _frc.seed, p);
 
             write565(screenOffset + ix, out565);
         }
@@ -793,28 +793,30 @@ void GUI::updateBlurStripImpl(int16_t x, int16_t y,
                           uint8_t noiseAmount,
                           int32_t materialColor)
 {
-    if (!_flags.spriteEnabled || !_display)
+    if (!_flags.spriteEnabled || !_disp.display)
     {
         bool prevRender = _flags.renderToSprite;
-        pipcore::Sprite *prevActive = _activeSprite;
+        pipcore::Sprite *prevActive = _render.activeSprite;
         _flags.renderToSprite = 0;
         drawBlurStripImpl(x, y, w, h, radius, dir, gradient, materialStrength, noiseAmount, materialColor);
         _flags.renderToSprite = prevRender;
-        _activeSprite = prevActive;
+        _render.activeSprite = prevActive;
         return;
     }
 
     bool prevRender = _flags.renderToSprite;
-    pipcore::Sprite *prevActive = _activeSprite;
+    pipcore::Sprite *prevActive = _render.activeSprite;
 
     _flags.renderToSprite = 1;
-    _activeSprite = &_sprite;
+    _render.activeSprite = &_render.sprite;
     drawBlurStripImpl(x, y, w, h, radius, dir, gradient, materialStrength, noiseAmount, materialColor);
     _flags.renderToSprite = prevRender;
-    _activeSprite = prevActive;
+    _render.activeSprite = prevActive;
 
     invalidateRect(x, y, w, h);
     flushDirty();
 }
 
 }
+
+

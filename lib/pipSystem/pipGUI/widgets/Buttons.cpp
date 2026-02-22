@@ -1,4 +1,4 @@
-#include <pipGUI/core/api/pipGUI.hpp>
+﻿#include <pipGUI/core/api/pipGUI.hpp>
 
 namespace pipgui
 {
@@ -122,7 +122,7 @@ namespace pipgui
                          uint8_t radius,
                          const ButtonVisualState &state)
     {
-        if (_flags.spriteEnabled && _display && !_flags.renderToSprite)
+        if (_flags.spriteEnabled && _disp.display && !_flags.renderToSprite)
         {
             updateButton(label, iconBitmap, iconW, iconH, x, y, w, h, baseColor, radius, state);
             return;
@@ -134,9 +134,9 @@ namespace pipgui
         int16_t y0 = y;
 
         if (x0 == center)
-            x0 = (_screenWidth - w) / 2;
+            x0 = (_render.screenWidth - w) / 2;
         if (y0 == center)
-            y0 = (_screenHeight - h) / 2;
+            y0 = (_render.screenHeight - h) / 2;
 
         float sc = 1.0f - 0.05f * (state.pressLevel / 255.0f);
         if (sc < 0.85f)
@@ -296,15 +296,15 @@ namespace pipgui
                            uint8_t radius,
                            const ButtonVisualState &state)
     {
-        if (!_flags.spriteEnabled || !_display)
+        if (!_flags.spriteEnabled || !_disp.display)
         {
             bool prevRender = _flags.renderToSprite;
-            pipcore::Sprite *prevActive = _activeSprite;
+            pipcore::Sprite *prevActive = _render.activeSprite;
 
             _flags.renderToSprite = 0;
             drawButton(label, iconBitmap, iconW, iconH, x, y, w, h, baseColor, radius, state);
             _flags.renderToSprite = prevRender;
-            _activeSprite = prevActive;
+            _render.activeSprite = prevActive;
             return;
         }
 
@@ -312,27 +312,27 @@ namespace pipgui
         int16_t ry = y;
 
         if (rx == center)
-            rx = (int16_t)((_screenWidth - w) / 2);
+            rx = (int16_t)((_render.screenWidth - w) / 2);
         if (ry == center)
-            ry = (int16_t)((_screenHeight - h) / 2);
+            ry = (int16_t)((_render.screenHeight - h) / 2);
 
         int16_t pad = 2;
 
         bool prevRender = _flags.renderToSprite;
-        pipcore::Sprite *prevActive = _activeSprite;
+        pipcore::Sprite *prevActive = _render.activeSprite;
 
         _flags.renderToSprite = 1;
-        _activeSprite = &_sprite;
+        _render.activeSprite = &_render.sprite;
 
         fillRect()
             .at((int16_t)(rx - pad), (int16_t)(ry - pad))
             .size((int16_t)(w + pad * 2), (int16_t)(h + pad * 2))
-            .color(_bgColor)
+            .color(_render.bgColor)
             .draw();
         drawButton(label, iconBitmap, iconW, iconH, x, y, w, h, baseColor, radius, state);
 
         _flags.renderToSprite = prevRender;
-        _activeSprite = prevActive;
+        _render.activeSprite = prevActive;
 
         invalidateRect((int16_t)(rx - pad), (int16_t)(ry - pad), (int16_t)(w + pad * 2), (int16_t)(h + pad * 2));
         flushDirty();
@@ -347,3 +347,4 @@ namespace pipgui
         updateButton(label, nullptr, 0, 0, x, y, w, h, baseColor, radius, state);
     }
 }
+

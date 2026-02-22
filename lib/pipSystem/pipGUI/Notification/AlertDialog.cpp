@@ -1,4 +1,4 @@
-// Alert dialog overlay: modal with title, message and button (showNotification API).
+﻿// Alert dialog overlay: modal with title, message and button (showNotification API).
 
 #include <pipGUI/core/api/pipGUI.hpp>
 
@@ -42,35 +42,35 @@ namespace pipgui
 
     void GUI::showNotification(const String &t, const String &m, const String &btn, uint16_t delay, NotificationType type)
     {
-        _notifTitle = t;
-        _notifMessage = m;
-        _notifButtonText = btn;
-        _notifType = type;
+        _notif.title = t;
+        _notif.message = m;
+        _notif.buttonText = btn;
+        _notif.type = type;
         uint32_t now = nowMs();
         if (!_flags.notifActive)
         {
             _flags.notifButtonDown = 0;
             _flags.notifAwaitRelease = 1;
             _flags.notifClosing = 0;
-            _notifStartMs = now;
-            _notifAnimDurationMs = 350;
+            _notif.startMs = now;
+            _notif.animDurationMs = 350;
             _flags.notifActive = 1;
             bool enabledNow = (delay == 0);
-            _notifButtonState.enabled = enabledNow;
-            _notifButtonState.pressLevel = 0;
-            _notifButtonState.fadeLevel = enabledNow ? 255 : 0;
-            _notifButtonState.prevEnabled = enabledNow;
+            _notif.buttonState.enabled = enabledNow;
+            _notif.buttonState.pressLevel = 0;
+            _notif.buttonState.fadeLevel = enabledNow ? 255 : 0;
+            _notif.buttonState.prevEnabled = enabledNow;
         }
         else
             _flags.notifClosing = 0;
         _flags.notifDelayed = (delay > 0);
-        _notifUnlockMs = _flags.notifDelayed ? (now + delay * 1000UL) : 0;
+        _notif.unlockMs = _flags.notifDelayed ? (now + delay * 1000UL) : 0;
     }
 
     void GUI::setNotificationButtonDown(bool down)
     {
-        bool canConfirm = !_flags.notifDelayed || (nowMs() >= _notifUnlockMs);
-        _notifButtonState.enabled = canConfirm;
+        bool canConfirm = !_flags.notifDelayed || (nowMs() >= _notif.unlockMs);
+        _notif.buttonState.enabled = canConfirm;
         bool effectiveDown = canConfirm && down;
 
         if (_flags.notifAwaitRelease)
@@ -79,20 +79,20 @@ namespace pipgui
             {
                 _flags.notifAwaitRelease = 0;
                 _flags.notifButtonDown = 0;
-                updateButtonPress(_notifButtonState, false);
+                updateButtonPress(_notif.buttonState, false);
             }
             return;
         }
 
         bool was = _flags.notifButtonDown;
         _flags.notifButtonDown = effectiveDown;
-        updateButtonPress(_notifButtonState, effectiveDown);
+        updateButtonPress(_notif.buttonState, effectiveDown);
 
         if (_flags.notifActive && !_flags.notifClosing && was && !effectiveDown)
         {
             _flags.notifClosing = 1;
-            _notifStartMs = nowMs();
-            _notifAnimDurationMs = 300;
+            _notif.startMs = nowMs();
+            _notif.animDurationMs = 300;
         }
     }
 
@@ -103,8 +103,8 @@ namespace pipgui
         if (!_flags.notifActive)
             return;
 
-        uint32_t now = nowMs(), elapsed = now - _notifStartMs;
-        uint32_t dur = _notifAnimDurationMs ? _notifAnimDurationMs : 1;
+        uint32_t now = nowMs(), elapsed = now - _notif.startMs;
+        uint32_t dur = _notif.animDurationMs ? _notif.animDurationMs : 1;
         if (elapsed > dur)
             elapsed = dur;
 
@@ -126,10 +126,10 @@ namespace pipgui
                 df = 255;
             uint32_t factor = (uint32_t)(256.0f - df);
 
-            uint16_t *buf = (uint16_t *)_sprite.getBuffer();
+            uint16_t *buf = (uint16_t *)_render.sprite.getBuffer();
             if (buf)
             {
-                size_t len = _screenWidth * _screenHeight;
+                size_t len = _render.screenWidth * _render.screenHeight;
 
                 uint8_t lut5[32];
                 uint8_t lut6[64];
@@ -156,9 +156,9 @@ namespace pipgui
 
             uint32_t btnColor;
 
-            if (_notifType == Error)
+            if (_notif.type == Error)
                 btnColor = 0xFF0000;
-            else if (_notifType == NotificationTypeWarning)
+            else if (_notif.type == NotificationTypeWarning)
                 btnColor = 0xFF8C00;
             else
                 btnColor = 0x00D604;
@@ -166,7 +166,7 @@ namespace pipgui
             int16_t finalW = 148;
             int16_t finalH = 96;
 
-            // Apple‑style feel: alert \"ложится\" на экран с лёгким уменьшением
+            // AppleвЂ‘style feel: alert \"Р»РѕР¶РёС‚СЃСЏ\" РЅР° СЌРєСЂР°РЅ СЃ Р»С‘РіРєРёРј СѓРјРµРЅСЊС€РµРЅРёРµРј
             float scale;
             if (_flags.notifClosing)
             {
@@ -175,7 +175,7 @@ namespace pipgui
             }
             else
             {
-                // Open: start слегка увеличенной и мягко приземляется к 1.0
+                // Open: start СЃР»РµРіРєР° СѓРІРµР»РёС‡РµРЅРЅРѕР№ Рё РјСЏРіРєРѕ РїСЂРёР·РµРјР»СЏРµС‚СЃСЏ Рє 1.0
                 scale = 1.06f - 0.06f * p; // 1.06 -> 1.00
             }
 
@@ -184,19 +184,19 @@ namespace pipgui
             int16_t cardW = (int16_t)(cardWf + 0.5f);
             int16_t cardH = (int16_t)(cardHf + 0.5f);
 
-            float cardXf = (_screenWidth - cardWf) * 0.5f;
+            float cardXf = (_render.screenWidth - cardWf) * 0.5f;
 
             int16_t cTop = 0;
-            int16_t cH = (int16_t)_screenHeight;
+            int16_t cH = (int16_t)_render.screenHeight;
             int16_t sb = statusBarHeight();
-            if (_flags.statusBarEnabled && sb > 0 && _statusBarStyle == StatusBarStyleSolid)
+            if (_flags.statusBarEnabled && sb > 0 && _status.style == StatusBarStyleSolid)
             {
-                if (_statusBarPos == Top)
+                if (_status.pos == Top)
                 {
                     cTop += sb;
                     cH -= sb;
                 }
-                else if (_statusBarPos == Bottom)
+                else if (_status.pos == Bottom)
                 {
                     cH -= sb;
                 }
@@ -204,7 +204,7 @@ namespace pipgui
             if (cH <= 0)
             {
                 cTop = 0;
-                cH = (int16_t)_screenHeight;
+                cH = (int16_t)_render.screenHeight;
             }
 
             float contentHf = (float)cH;
@@ -237,43 +237,43 @@ namespace pipgui
             int16_t mH = 0;
 
             uint16_t prevW = psdfWeight();
-            setPSDFWeight(PSDF_WEIGHT_SEMIBOLD);
+            setPSDFWeight(Semibold);
             setPSDFFontSize(titleSz);
-            psdfMeasureText(_notifTitle, tW, tH);
+            psdfMeasureText(_notif.title, tW, tH);
 
-            setPSDFWeight(PSDF_WEIGHT_MEDIUM);
+            setPSDFWeight(Medium);
             setPSDFFontSize(msgSz);
-            psdfMeasureText(_notifMessage, mW, mH);
+            psdfMeasureText(_notif.message, mW, mH);
 
             int16_t gap = (int16_t)(11 * scale);
             int16_t blockH = tH + gap + mH;
             int16_t startY = cardCenterY - blockH / 2 - (int16_t)(20 * scale);
 
             bool prevRenderText = _flags.renderToSprite;
-            pipcore::Sprite *prevActiveText = _activeSprite;
+            pipcore::Sprite *prevActiveText = _render.activeSprite;
             _flags.renderToSprite = 1;
-            _activeSprite = &_sprite;
+            _render.activeSprite = &_render.sprite;
 
             uint16_t bg565Title = color888To565((int16_t)(cardX + (cardW - tW) / 2), startY, cardColor);
             uint16_t fg565Title = color888To565((int16_t)(cardX + (cardW - tW) / 2), startY, titleColor);
 
-            setPSDFWeight(PSDF_WEIGHT_SEMIBOLD);
+            setPSDFWeight(Semibold);
             setPSDFFontSize(titleSz);
-            psdfDrawTextInternal(_notifTitle,
+            psdfDrawTextInternal(_notif.title,
                                 cardX + (cardW - tW) / 2,
                                 startY,
                                 fg565Title,
                                 bg565Title,
                                 AlignLeft);
 
-            setPSDFWeight(PSDF_WEIGHT_MEDIUM);
+            setPSDFWeight(Medium);
             setPSDFFontSize(msgSz);
 
             int16_t msgX = (int16_t)(cardX + (cardW - mW) / 2);
             int16_t msgY = (int16_t)(startY + tH + gap);
             uint16_t bg565Msg = color888To565(msgX, msgY, cardColor);
             uint16_t fg565Msg = color888To565(msgX, msgY, msgColor);
-            psdfDrawTextInternal(_notifMessage,
+            psdfDrawTextInternal(_notif.message,
                                 msgX,
                                 msgY,
                                 fg565Msg,
@@ -282,7 +282,7 @@ namespace pipgui
 
             setPSDFWeight(prevW);
             _flags.renderToSprite = prevRenderText;
-            _activeSprite = prevActiveText;
+            _render.activeSprite = prevActiveText;
 
             int16_t btnBaseW = 123;
             int16_t btnBaseH = 22;
@@ -298,31 +298,16 @@ namespace pipgui
             int16_t btnX = cardX + (cardW - btnW) / 2;
             int16_t btnY = cardY + cardH - btnH - (int16_t)(marginBot * scale + 0.5f);
 
-            int16_t btnRadius = (int16_t)(7.0f * scale + 0.5f);
-            if (btnRadius < 3)
-                btnRadius = 3;
+            int16_t btnRadius = (int16_t)(10.0f * scale + 0.5f);
+            if (btnRadius < 4)
+                btnRadius = 4;
 
-            String label = _notifButtonText;
-            if (_flags.notifDelayed && now < _notifUnlockMs)
-            {
-                label += " (";
-                label += String((_notifUnlockMs - now + 999) / 1000);
-                if (!_flags.spriteEnabled || !_display)
-                {
-                    bool prevRenderText = _flags.renderToSprite;
-                    pipcore::Sprite *prevActiveText = _activeSprite;
-                    _flags.renderToSprite = 0;
-                    renderNotificationOverlay();
-                    _flags.renderToSprite = prevRenderText;
-                    _activeSprite = prevActiveText;
-                    return;
-                }
-            }
+            String label = _notif.buttonText.length() ? _notif.buttonText : String("OK");
 
             bool prevRender = _flags.renderToSprite;
-            pipcore::Sprite *prevActive = _activeSprite;
+            pipcore::Sprite *prevActive = _render.activeSprite;
             _flags.renderToSprite = 1;
-            _activeSprite = &_sprite;
+            _render.activeSprite = &_render.sprite;
 
             drawButton(label,
                        btnX,
@@ -331,13 +316,13 @@ namespace pipgui
                        btnH,
                        btnColor,
                        btnRadius,
-                       _notifButtonState);
+                       _notif.buttonState);
 
             _flags.renderToSprite = prevRender;
-            _activeSprite = prevActive;
+            _render.activeSprite = prevActive;
 
-            if (_display && _flags.spriteEnabled)
-                _sprite.writeToDisplay(*_display, 0, 0, (int16_t)_screenWidth, (int16_t)_screenHeight);
+            if (_disp.display && _flags.spriteEnabled)
+                _render.sprite.writeToDisplay(*_disp.display, 0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight);
         }
         else
         {

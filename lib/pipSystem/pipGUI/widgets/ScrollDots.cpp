@@ -1,4 +1,4 @@
-#include <pipGUI/core/api/pipGUI.hpp>
+﻿#include <pipGUI/core/api/pipGUI.hpp>
 #include <math.h>
 
 namespace pipgui
@@ -31,16 +31,16 @@ namespace pipgui
         if (count == 0)
             return;
 
-        if (!_flags.spriteEnabled || !_display)
+        if (!_flags.spriteEnabled || !_disp.display)
         {
             bool prevRender = _flags.renderToSprite;
-            pipcore::Sprite *prevActive = _activeSprite;
+            pipcore::Sprite *prevActive = _render.activeSprite;
 
             _flags.renderToSprite = 0;
             drawScrollDotsImpl(x, y, count, activeIndex, prevIndex, animProgress, animate, animDirection,
                            activeColor, inactiveColor, dotRadius, spacing, activeWidth);
             _flags.renderToSprite = prevRender;
-            _activeSprite = prevActive;
+            _render.activeSprite = prevActive;
             return;
         }
 
@@ -72,21 +72,21 @@ namespace pipgui
         int16_t rh = (int16_t)(h + pad * 2);
 
         bool prevRender = _flags.renderToSprite;
-        pipcore::Sprite *prevActive = _activeSprite;
+        pipcore::Sprite *prevActive = _render.activeSprite;
 
         _flags.renderToSprite = 1;
-        _activeSprite = &_sprite;
+        _render.activeSprite = &_render.sprite;
 
         fillRect()
             .at((int16_t)(rx - pad), (int16_t)(ry - pad))
             .size(rw, rh)
-            .color(_bgColor)
+            .color(_render.bgColor)
             .draw();
         drawScrollDotsImpl(left, top, count, activeIndex, prevIndex, animProgress, animate, animDirection,
                        activeColor, inactiveColor, dotRadius, spacing, activeWidth);
 
         _flags.renderToSprite = prevRender;
-        _activeSprite = prevActive;
+        _render.activeSprite = prevActive;
 
         invalidateRect((int16_t)(rx - pad), (int16_t)(ry - pad), rw, rh);
         flushDirty();
@@ -108,7 +108,7 @@ namespace pipgui
         if (count == 0)
             return;
 
-        if (_flags.spriteEnabled && _display && !_flags.renderToSprite)
+        if (_flags.spriteEnabled && _disp.display && !_flags.renderToSprite)
         {
             updateScrollDotsImpl(x, y, count, activeIndex, prevIndex, animProgress, animate, animDirection,
                              activeColor, inactiveColor, dotRadius, spacing, activeWidth);
@@ -170,7 +170,7 @@ namespace pipgui
         fillRect()
             .at(left, top)
             .size(totalW, h)
-            .color(_bgColor)
+            .color(_render.bgColor)
             .draw();
 
         if (taper)
@@ -195,7 +195,7 @@ namespace pipgui
                     r = 1;
                 uint32_t color = (i == (int)activeIndex)
                     ? activeColor
-                    : detail::blend888(_bgColor, inactiveColor, (uint8_t)(opacity * 255.0f + 0.5f));
+                    : detail::blend888(_render.bgColor, inactiveColor, (uint8_t)(opacity * 255.0f + 0.5f));
                 fillCircleFrc(cx, baseY, r, color);
             }
         }
@@ -288,3 +288,4 @@ namespace pipgui
         }
     }
 }
+
