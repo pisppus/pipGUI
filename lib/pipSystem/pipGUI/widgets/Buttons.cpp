@@ -27,6 +27,15 @@ namespace pipgui
         return (uint16_t)((r << 11) | (g << 5) | b);
     }
 
+    static uint16_t autoTextColor565Btn(uint16_t bg, uint8_t threshold = 140)
+    {
+        uint32_t r8 = ((bg >> 11) & 0x1F) * 255U / 31U;
+        uint32_t g8 = ((bg >> 5) & 0x3F) * 255U / 63U;
+        uint32_t b8 = (bg & 0x1F) * 255U / 31U;
+        uint32_t lum = (r8 * 54U + g8 * 183U + b8 * 18U) >> 8;
+        return (lum > threshold) ? (uint16_t)0x0000 : (uint16_t)0xFFFF;
+    }
+
     void GUI::updateButtonPress(ButtonVisualState &s, bool isDown)
     {
         uint32_t now = nowMs();
@@ -116,15 +125,14 @@ namespace pipgui
     }
 
     void GUI::drawButton(const String &label,
-                         const uint16_t *iconBitmap, uint8_t iconW, uint8_t iconH,
                          int16_t x, int16_t y, int16_t w, int16_t h,
-                         uint32_t baseColor,
+                         uint16_t baseColor,
                          uint8_t radius,
                          const ButtonVisualState &state)
     {
         if (_flags.spriteEnabled && _disp.display && !_flags.renderToSprite)
         {
-            updateButton(label, iconBitmap, iconW, iconH, x, y, w, h, baseColor, radius, state);
+            updateButton(label, x, y, w, h, baseColor, radius, state);
             return;
         }
 
@@ -151,14 +159,14 @@ namespace pipgui
         if (br < 1)
             br = 1;
 
-        uint32_t mainColor = baseColor;
-        uint32_t autoPressedBg = detail::blend888(mainColor, 0x000000, 56);
-        uint32_t autoDisabledBg = detail::blend888(mainColor, 0x7F7F7F, 160);
+        uint16_t mainColor = baseColor;
+        uint16_t autoPressedBg = (uint16_t)detail::blend565(mainColor, (uint16_t)0x0000, 56);
+        uint16_t autoDisabledBg = (uint16_t)detail::blend565(mainColor, (uint16_t)0x7BEF, 160);
 
-        uint32_t activeBg = (state.pressLevel > 0 ? autoPressedBg : mainColor);
-        uint32_t disabledBg = autoDisabledBg;
+        uint16_t activeBg = (state.pressLevel > 0 ? autoPressedBg : mainColor);
+        uint16_t disabledBg = autoDisabledBg;
 
-        uint32_t bg;
+        uint16_t bg;
 
         if (state.fadeLevel == 0)
         {
@@ -173,19 +181,19 @@ namespace pipgui
             float k = (float)state.fadeLevel / 255.0f;
             float eased = easeOutCubicBtn(k);
             uint8_t a = (uint8_t)(eased * 255.0f + 0.5f);
-            bg = detail::blend888(disabledBg, activeBg, a);
+            bg = (uint16_t)detail::blend565(disabledBg, activeBg, a);
         }
 
-        fillRoundRectFrc(bx, by, bw, bh, (uint8_t)br, bg);
+        fillRoundRect(bx, by, bw, bh, (uint8_t)br, bg);
 
         // Pick readable text color against current button background.
-        uint32_t fgActive = detail::autoTextColor888(bg, 140);
+        uint16_t fgActive = autoTextColor565Btn(bg, 140);
 
         bool disabledVis = !state.enabled || (state.fadeLevel < 40);
-        uint32_t fg;
+        uint16_t fg;
         if (disabledVis)
         {
-            fg = (fgActive == 0xFFFFFF) ? 0x808080 : 0x606060;
+            fg = (fgActive == 0xFFFF) ? (uint16_t)0x8410 : (uint16_t)0x630C;
         }
         else
         {
@@ -197,6 +205,8 @@ namespace pipgui
         {
             uint32_t now = nowMs();
             const uint32_t stepMs = 300U;
+            uint16_t fg565 = detail::color888To565(fg);
+            uint16_t bg565 = detail::color888To565(bg);
             uint8_t phase = (uint8_t)((now / stepMs) % 6U);
             uint8_t dots = (phase <= 3U) ? phase : (uint8_t)(6U - phase);
             for (uint8_t i = 0; i < dots; ++i)
@@ -205,21 +215,12 @@ namespace pipgui
             }
         }
 
-        bool hasIcon = (iconBitmap && iconW > 0 && iconH > 0);
-
         int16_t paddingX = 6;
         int16_t paddingY = 2;
         int16_t maxW = (bw - paddingX * 2) > 4 ? (int16_t)(bw - paddingX * 2) : 4;
         int16_t maxH = (bh - paddingY * 2) > 4 ? (int16_t)(bh - paddingY * 2) : 4;
 
         int16_t textMaxW = maxW;
-        int16_t iconGap = hasIcon ? 4 : 0;
-        if (hasIcon)
-        {
-            textMaxW = maxW - iconW - iconGap;
-            if (textMaxW < 4)
-                textMaxW = 4;
-        }
 
         uint16_t px = (bh * 0.55f) > 8 ? (uint16_t)(bh * 0.55f) : 8;
         uint16_t maxPx = (bh * 0.8f) > 8 ? (uint16_t)(bh * 0.8f) : 8;
@@ -249,50 +250,21 @@ namespace pipgui
         }
 
         int16_t contentW = tw;
-        int16_t iconGap2 = hasIcon ? iconGap : 0;
-        if (hasIcon)
-            contentW = (int16_t)(iconW + iconGap2 + tw);
-
         int16_t contentX = bx + (bw - contentW) / 2;
 
         int16_t tx = contentX;
-        int16_t iconX = contentX;
-        if (hasIcon)
-        {
-            iconX = contentX;
-            tx = iconX + iconW + iconGap2;
-        }
 
         int16_t ty = by + (bh - th) / 2;
         if (ty - 3 >= by)
             ty -= 3;
 
-        if (hasIcon)
-        {
-            int16_t ix = iconX;
-            int16_t iy = by + (bh - iconH) / 2;
-            blitImage565Frc(ix, iy, iconBitmap, iconW, iconH);
-        }
-
         setPSDFFontSize(px);
-        uint16_t fg565 = color888To565(tx, ty, fg);
-        uint16_t bg565 = color888To565(tx, ty, bg);
-        psdfDrawTextInternal(labelToDraw, tx, ty, fg565, bg565, AlignLeft);
-    }
-
-    void GUI::drawButton(const String &label,
-                         int16_t x, int16_t y, int16_t w, int16_t h,
-                         uint32_t baseColor,
-                         uint8_t radius,
-                         const ButtonVisualState &state)
-    {
-        drawButton(label, nullptr, 0, 0, x, y, w, h, baseColor, radius, state);
+        psdfDrawTextInternal(labelToDraw, tx, ty, fg, bg, AlignLeft);
     }
 
     void GUI::updateButton(const String &label,
-                           const uint16_t *iconBitmap, uint8_t iconW, uint8_t iconH,
                            int16_t x, int16_t y, int16_t w, int16_t h,
-                           uint32_t baseColor,
+                           uint16_t baseColor,
                            uint8_t radius,
                            const ButtonVisualState &state)
     {
@@ -302,7 +274,7 @@ namespace pipgui
             pipcore::Sprite *prevActive = _render.activeSprite;
 
             _flags.renderToSprite = 0;
-            drawButton(label, iconBitmap, iconW, iconH, x, y, w, h, baseColor, radius, state);
+            drawButton(label, x, y, w, h, baseColor, radius, state);
             _flags.renderToSprite = prevRender;
             _render.activeSprite = prevActive;
             return;
@@ -327,9 +299,9 @@ namespace pipgui
         fillRect()
             .at((int16_t)(rx - pad), (int16_t)(ry - pad))
             .size((int16_t)(w + pad * 2), (int16_t)(h + pad * 2))
-            .color(_render.bgColor)
+            .color(detail::color888To565(_render.bgColor))
             .draw();
-        drawButton(label, iconBitmap, iconW, iconH, x, y, w, h, baseColor, radius, state);
+        drawButton(label, x, y, w, h, baseColor, radius, state);
 
         _flags.renderToSprite = prevRender;
         _render.activeSprite = prevActive;
@@ -338,13 +310,5 @@ namespace pipgui
         flushDirty();
     }
 
-    void GUI::updateButton(const String &label,
-                           int16_t x, int16_t y, int16_t w, int16_t h,
-                           uint32_t baseColor,
-                           uint8_t radius,
-                           const ButtonVisualState &state)
-    {
-        updateButton(label, nullptr, 0, 0, x, y, w, h, baseColor, radius, state);
-    }
 }
 

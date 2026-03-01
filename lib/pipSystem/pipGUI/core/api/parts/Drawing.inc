@@ -8,15 +8,20 @@ pipcore::GuiDisplay &display()
     return *_disp.display;
 }
 
-uint32_t rgb(uint8_t r, uint8_t g, uint8_t b) const;
+uint16_t rgb(uint8_t r, uint8_t g, uint8_t b) const;
 uint16_t screenWidth() const;
 uint16_t screenHeight() const;
 
-void clear(uint32_t color = 0x000000);
+void clear(uint16_t color = 0x0000);
 
 FillRectFluent fillRect()
 {
     return FillRectFluent(this);
+}
+
+DrawRectFluent drawRect()
+{
+    return DrawRectFluent(this);
 }
 FillRectAlphaFluent fillRectAlpha()
 {
@@ -42,4 +47,5 @@ FillRectGradientRadialFluent fillRectGradientRadial()
 {
     return FillRectGradientRadialFluent(this);
 }
+
 

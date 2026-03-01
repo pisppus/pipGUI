@@ -126,17 +126,17 @@ namespace pipgui
         }
         int16_t boxY = (int16_t)((float)startY + (float)(endY - startY) * slideT + 0.5f);
 
-        uint32_t bgColor = 0x2D2D2D;
-        uint32_t borderColor = detail::blend888(bgColor, 0x000000, 40);
-        uint32_t fgColor = 0xFFFFFF;
+        uint16_t bgColor = rgb(45, 45, 45);
+        uint16_t borderColor = (uint16_t)detail::blend565(bgColor, (uint16_t)0x0000, 40);
+        uint16_t fgColor = 0xFFFF;
 
         bool prevRender = _flags.renderToSprite;
         pipcore::Sprite *prevActive = _render.activeSprite;
         _flags.renderToSprite = 1;
         _render.activeSprite = &_render.sprite;
 
-        fillRoundRectFrc(boxX, boxY, boxW, boxH, (uint8_t)radius, borderColor);
-        fillRoundRectFrc(boxX + 1, boxY + 1, boxW - 2, boxH - 2, (uint8_t)(radius > 2 ? radius - 2 : radius), bgColor);
+        fillRoundRect(boxX, boxY, boxW, boxH, (uint8_t)radius, borderColor);
+        fillRoundRect(boxX + 1, boxY + 1, boxW - 2, boxH - 2, (uint8_t)(radius > 2 ? radius - 2 : radius), bgColor);
 
         int16_t textX = boxX + (boxW - tw) / 2;
         int16_t textY = boxY + (boxH - th) / 2;
@@ -145,13 +145,17 @@ namespace pipgui
         {
             int16_t iconX = (int16_t)(boxX + padH);
             int16_t iconY = (int16_t)(boxY + (boxH - iconSide) / 2);
-            drawIcon(_toast.iconId, iconX, iconY, (uint16_t)iconSide, fgColor, bgColor);
+            drawIcon()
+                .at(iconX, iconY)
+                .size((uint16_t)iconSide)
+                .icon(_toast.iconId)
+                .color(0xFFFF)
+                .bgColor(0x2965)
+                .draw();
             textX = (int16_t)(iconX + iconSide + iconGap);
         }
 
-        uint16_t fg565 = color888To565(textX, textY, fgColor);
-        uint16_t bg565 = color888To565(textX, textY, bgColor);
-        psdfDrawTextInternal(_toast.text, textX, textY, fg565, bg565, AlignLeft);
+        psdfDrawTextInternal(_toast.text, textX, textY, fgColor, bgColor, AlignLeft);
 
         _flags.renderToSprite = prevRender;
         _render.activeSprite = prevActive;

@@ -124,3 +124,20 @@ static const Glyph Glyphs[GlyphCount] =
 
 }
 }
+
+#include <pipGUI/core/api/pipGUI.hpp>
+
+// Helper: register this font and return FontId
+static inline pipgui::FontId registerFont_KronaOne(pipgui::GUI &gui){
+    return gui.registerFont(
+        ::KronaOne,
+        pipgui::psdf_krona::AtlasWidth,
+        pipgui::psdf_krona::AtlasHeight,
+        pipgui::psdf_krona::DistanceRange,
+        pipgui::psdf_krona::NominalSizePx,
+        pipgui::psdf_krona::Ascender,
+        pipgui::psdf_krona::Descender,
+        pipgui::psdf_krona::LineHeight,
+        pipgui::psdf_krona::Glyphs,
+        pipgui::psdf_krona::GlyphCount);
+}

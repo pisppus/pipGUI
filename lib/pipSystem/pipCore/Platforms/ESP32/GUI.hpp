@@ -6,9 +6,11 @@
 #error "pipcore::ESP32Platform requires ESP32"
 #endif
 
+#define PIPCORE_PLATFORM_SELECTED
+
 #include <Arduino.h>
 #include <Preferences.h>
-#include <pipCore/Displays/ST7789/Display.hpp>
+#include <pipCore/Displays/DisplayFactory.hpp>
 #include <pipCore/Platforms/ESP32/Transports/St7789Spi.hpp>
 
 namespace pipcore
@@ -37,6 +39,8 @@ namespace pipcore
         bool guiBeginDisplay(uint8_t rotation) override;
         GuiDisplay *guiDisplay() override;
 
+        uint8_t readProgmemByte(const void *addr) override;
+
     private:
         Preferences _prefs;
         bool _prefsInited = false;
@@ -46,7 +50,6 @@ namespace pipcore
         uint8_t _backlightResolution = 12;
 
         Esp32St7789Spi *_transport = nullptr;
-        ST7789Display _display;
         bool _displayConfigured = false;
     };
 }

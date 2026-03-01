@@ -226,10 +226,15 @@ def _gen_icons_metrics_hpp(icon_names, icon_aliases, icon_boxes, atlas_w, atlas_
     out.append("using IconId = ::pipgui::psdf_icons::IconId;\n")
     for name, alias in zip(icon_names, icon_aliases):
         out.append(f"static constexpr IconId Icon{name} = ::pipgui::psdf_icons::Icon{name};\n")
-        out.append(f"static constexpr IconId {name} = ::pipgui::psdf_icons::Icon{name};\n")
-        out.append(f"static constexpr IconId {alias} = ::pipgui::psdf_icons::Icon{name};\n")
     out.append("}\n")
     out.append("\n")
+    
+    # Global aliases for direct use without pipgui:: prefix
+    for name, alias in zip(icon_names, icon_aliases):
+        out.append(f"constexpr pipgui::IconId {name} = ::pipgui::psdf_icons::Icon{name};\n")
+        if alias != name:
+            out.append(f"constexpr pipgui::IconId {alias} = ::pipgui::psdf_icons::Icon{name};\n")
+    
     return "".join(out)
 
 

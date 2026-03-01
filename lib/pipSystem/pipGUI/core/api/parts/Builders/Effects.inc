@@ -1,9 +1,9 @@
- #if !defined(PIPGUI_FLUENT_BUILDERS_INC)
- #error "Do not include this file directly. Include <pipGUI/core/api/pipGUI.hpp>"
- #endif
- 
- template <bool IsUpdate>
-struct BlurStripFluentT
+#if !defined(PIPGUI_FLUENT_BUILDERS_INC)
+#error "Do not include this file directly. Include <pipGUI/core/api/pipGUI.hpp>"
+#endif
+
+template <bool IsUpdate>
+struct BlurRegionFluentT
 {
     GUI *_gui;
     int16_t _x, _y, _w, _h;
@@ -14,62 +14,62 @@ struct BlurStripFluentT
     uint8_t _noiseAmount;
     int32_t _materialColor;
     bool _consumed;
-    BlurStripFluentT(GUI *g)
+    BlurRegionFluentT(GUI *g)
         : _gui(g), _x(0), _y(0), _w(0), _h(0), _radius(0), _dir(TopDown), _gradient(true), _materialStrength(32), _noiseAmount(8), _materialColor(-1), _consumed(false) {}
-    BlurStripFluentT &at(int16_t x, int16_t y)
+    BlurRegionFluentT &at(int16_t x, int16_t y)
     {
-        PIPGUI_FLUENT_GUARD(BlurStripFluentT<IsUpdate>);
+        PIPGUI_FLUENT_GUARD(BlurRegionFluentT<IsUpdate>);
         _x = x;
         _y = y;
         return *this;
     }
-    BlurStripFluentT &size(int16_t w, int16_t h)
+    BlurRegionFluentT &size(int16_t w, int16_t h)
     {
-        PIPGUI_FLUENT_GUARD(BlurStripFluentT<IsUpdate>);
+        PIPGUI_FLUENT_GUARD(BlurRegionFluentT<IsUpdate>);
         _w = w;
         _h = h;
         return *this;
     }
-    BlurStripFluentT &radius(uint8_t r)
+    BlurRegionFluentT &radius(uint8_t r)
     {
-        PIPGUI_FLUENT_GUARD(BlurStripFluentT<IsUpdate>);
+        PIPGUI_FLUENT_GUARD(BlurRegionFluentT<IsUpdate>);
         _radius = r;
         return *this;
     }
-    BlurStripFluentT &direction(BlurDirection d)
+    BlurRegionFluentT &direction(BlurDirection d)
     {
-        PIPGUI_FLUENT_GUARD(BlurStripFluentT<IsUpdate>);
+        PIPGUI_FLUENT_GUARD(BlurRegionFluentT<IsUpdate>);
         _dir = d;
         return *this;
     }
-    BlurStripFluentT &gradient(bool g)
+    BlurRegionFluentT &gradient(bool g)
     {
-        PIPGUI_FLUENT_GUARD(BlurStripFluentT<IsUpdate>);
+        PIPGUI_FLUENT_GUARD(BlurRegionFluentT<IsUpdate>);
         _gradient = g;
         return *this;
     }
-    BlurStripFluentT &materialStrength(uint8_t s)
+    BlurRegionFluentT &materialStrength(uint8_t s)
     {
-        PIPGUI_FLUENT_GUARD(BlurStripFluentT<IsUpdate>);
+        PIPGUI_FLUENT_GUARD(BlurRegionFluentT<IsUpdate>);
         _materialStrength = s;
         return *this;
     }
-    BlurStripFluentT &noiseAmount(uint8_t n)
+    BlurRegionFluentT &noiseAmount(uint8_t n)
     {
-        PIPGUI_FLUENT_GUARD(BlurStripFluentT<IsUpdate>);
+        PIPGUI_FLUENT_GUARD(BlurRegionFluentT<IsUpdate>);
         _noiseAmount = n;
         return *this;
     }
-    BlurStripFluentT &materialColor(int32_t c)
+    BlurRegionFluentT &materialColor(int32_t c)
     {
-        PIPGUI_FLUENT_GUARD(BlurStripFluentT<IsUpdate>);
+        PIPGUI_FLUENT_GUARD(BlurRegionFluentT<IsUpdate>);
         _materialColor = c;
         return *this;
     }
     void draw();
 };
-using DrawBlurStripFluent = BlurStripFluentT<false>;
-using UpdateBlurStripFluent = BlurStripFluentT<true>;
+using DrawBlurFluent = BlurRegionFluentT<false>;
+using UpdateBlurFluent = BlurRegionFluentT<true>;
 
 template <bool IsUpdate>
 struct GlowCircleFluentT
@@ -77,8 +77,8 @@ struct GlowCircleFluentT
     GUI *_gui;
     int16_t _x, _y;
     int16_t _r;
-    uint32_t _fillColor;
-    int32_t _bgColor, _glowColor;
+    uint16_t _fillColor;
+    int16_t _bgColor, _glowColor;
     uint8_t _glowSize, _glowStrength;
     GlowAnim _anim;
     uint16_t _pulsePeriodMs;
@@ -98,22 +98,34 @@ struct GlowCircleFluentT
         _r = r;
         return *this;
     }
-    GlowCircleFluentT &fillColor(uint32_t c)
+    GlowCircleFluentT &fillColor(uint16_t c)
     {
         PIPGUI_FLUENT_GUARD(GlowCircleFluentT<IsUpdate>);
         _fillColor = c;
         return *this;
     }
-    GlowCircleFluentT &bgColor(int32_t c)
+    GlowCircleFluentT &bgColor(int16_t c)
     {
         PIPGUI_FLUENT_GUARD(GlowCircleFluentT<IsUpdate>);
         _bgColor = c;
         return *this;
     }
-    GlowCircleFluentT &glowColor(int32_t c)
+    GlowCircleFluentT &bgColor(uint16_t c)
+    {
+        PIPGUI_FLUENT_GUARD(GlowCircleFluentT<IsUpdate>);
+        _bgColor = (int16_t)c;
+        return *this;
+    }
+    GlowCircleFluentT &glowColor(int16_t c)
     {
         PIPGUI_FLUENT_GUARD(GlowCircleFluentT<IsUpdate>);
         _glowColor = c;
+        return *this;
+    }
+    GlowCircleFluentT &glowColor(uint16_t c)
+    {
+        PIPGUI_FLUENT_GUARD(GlowCircleFluentT<IsUpdate>);
+        _glowColor = (int16_t)c;
         return *this;
     }
     GlowCircleFluentT &glowSize(uint8_t s)
@@ -146,49 +158,49 @@ using DrawGlowCircleFluent = GlowCircleFluentT<false>;
 using UpdateGlowCircleFluent = GlowCircleFluentT<true>;
 
 template <bool IsUpdate>
-struct GlowRoundRectFluentT
+struct GlowRectFluentT
 {
     GUI *_gui;
     int16_t _x, _y, _w, _h;
     uint8_t _radius;
     uint8_t _radiusTL, _radiusTR, _radiusBR, _radiusBL;
-    uint32_t _fillColor;
-    int32_t _bgColor, _glowColor;
+    uint16_t _fillColor;
+    int16_t _bgColor, _glowColor;
     uint8_t _glowSize, _glowStrength;
     GlowAnim _anim;
     uint16_t _pulsePeriodMs;
     bool _perCorner;
     bool _consumed;
-    GlowRoundRectFluentT(GUI *g)
+    GlowRectFluentT(GUI *g)
         : _gui(g), _x(0), _y(0), _w(0), _h(0), _radius(0),
           _radiusTL(0), _radiusTR(0), _radiusBR(0), _radiusBL(0),
           _fillColor(0), _bgColor(-1), _glowColor(-1),
           _glowSize(12), _glowStrength(220), _anim(None), _pulsePeriodMs(1000),
           _perCorner(false), _consumed(false) {}
-    GlowRoundRectFluentT &at(int16_t x, int16_t y)
+    GlowRectFluentT &at(int16_t x, int16_t y)
     {
-        PIPGUI_FLUENT_GUARD(GlowRoundRectFluentT<IsUpdate>);
+        PIPGUI_FLUENT_GUARD(GlowRectFluentT<IsUpdate>);
         _x = x;
         _y = y;
         return *this;
     }
-    GlowRoundRectFluentT &size(int16_t w, int16_t h)
+    GlowRectFluentT &size(int16_t w, int16_t h)
     {
-        PIPGUI_FLUENT_GUARD(GlowRoundRectFluentT<IsUpdate>);
+        PIPGUI_FLUENT_GUARD(GlowRectFluentT<IsUpdate>);
         _w = w;
         _h = h;
         return *this;
     }
-    GlowRoundRectFluentT &radius(uint8_t r)
+    GlowRectFluentT &radius(uint8_t r)
     {
-        PIPGUI_FLUENT_GUARD(GlowRoundRectFluentT<IsUpdate>);
+        PIPGUI_FLUENT_GUARD(GlowRectFluentT<IsUpdate>);
         _radius = r;
         _perCorner = false;
         return *this;
     }
-    GlowRoundRectFluentT &radius(uint8_t tl, uint8_t tr, uint8_t br, uint8_t bl)
+    GlowRectFluentT &radius(uint8_t tl, uint8_t tr, uint8_t br, uint8_t bl)
     {
-        PIPGUI_FLUENT_GUARD(GlowRoundRectFluentT<IsUpdate>);
+        PIPGUI_FLUENT_GUARD(GlowRectFluentT<IsUpdate>);
         _radiusTL = tl;
         _radiusTR = tr;
         _radiusBR = br;
@@ -196,49 +208,61 @@ struct GlowRoundRectFluentT
         _perCorner = true;
         return *this;
     }
-    GlowRoundRectFluentT &fillColor(uint32_t c)
+    GlowRectFluentT &fillColor(uint16_t c)
     {
-        PIPGUI_FLUENT_GUARD(GlowRoundRectFluentT<IsUpdate>);
+        PIPGUI_FLUENT_GUARD(GlowRectFluentT<IsUpdate>);
         _fillColor = c;
         return *this;
     }
-    GlowRoundRectFluentT &bgColor(int32_t c)
+    GlowRectFluentT &bgColor(int16_t c)
     {
-        PIPGUI_FLUENT_GUARD(GlowRoundRectFluentT<IsUpdate>);
+        PIPGUI_FLUENT_GUARD(GlowRectFluentT<IsUpdate>);
         _bgColor = c;
         return *this;
     }
-    GlowRoundRectFluentT &glowColor(int32_t c)
+    GlowRectFluentT &bgColor(uint16_t c)
     {
-        PIPGUI_FLUENT_GUARD(GlowRoundRectFluentT<IsUpdate>);
+        PIPGUI_FLUENT_GUARD(GlowRectFluentT<IsUpdate>);
+        _bgColor = (int16_t)c;
+        return *this;
+    }
+    GlowRectFluentT &glowColor(int16_t c)
+    {
+        PIPGUI_FLUENT_GUARD(GlowRectFluentT<IsUpdate>);
         _glowColor = c;
         return *this;
     }
-    GlowRoundRectFluentT &glowSize(uint8_t s)
+    GlowRectFluentT &glowColor(uint16_t c)
     {
-        PIPGUI_FLUENT_GUARD(GlowRoundRectFluentT<IsUpdate>);
+        PIPGUI_FLUENT_GUARD(GlowRectFluentT<IsUpdate>);
+        _glowColor = (int16_t)c;
+        return *this;
+    }
+    GlowRectFluentT &glowSize(uint8_t s)
+    {
+        PIPGUI_FLUENT_GUARD(GlowRectFluentT<IsUpdate>);
         _glowSize = s;
         return *this;
     }
-    GlowRoundRectFluentT &glowStrength(uint8_t s)
+    GlowRectFluentT &glowStrength(uint8_t s)
     {
-        PIPGUI_FLUENT_GUARD(GlowRoundRectFluentT<IsUpdate>);
+        PIPGUI_FLUENT_GUARD(GlowRectFluentT<IsUpdate>);
         _glowStrength = s;
         return *this;
     }
-    GlowRoundRectFluentT &anim(GlowAnim a)
+    GlowRectFluentT &anim(GlowAnim a)
     {
-        PIPGUI_FLUENT_GUARD(GlowRoundRectFluentT<IsUpdate>);
+        PIPGUI_FLUENT_GUARD(GlowRectFluentT<IsUpdate>);
         _anim = a;
         return *this;
     }
-    GlowRoundRectFluentT &pulsePeriodMs(uint16_t ms)
+    GlowRectFluentT &pulsePeriodMs(uint16_t ms)
     {
-        PIPGUI_FLUENT_GUARD(GlowRoundRectFluentT<IsUpdate>);
+        PIPGUI_FLUENT_GUARD(GlowRectFluentT<IsUpdate>);
         _pulsePeriodMs = ms;
         return *this;
     }
     void draw();
 };
-using DrawGlowRoundRectFluent = GlowRoundRectFluentT<false>;
-using UpdateGlowRoundRectFluent = GlowRoundRectFluentT<true>;
+using DrawGlowRectFluent = GlowRectFluentT<false>;
+using UpdateGlowRectFluent = GlowRectFluentT<true>;

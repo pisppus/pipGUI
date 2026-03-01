@@ -41,7 +41,7 @@ def _gen_atlas_def_cpp(hpp_filename: str, var_name: str, data: bytes) -> str:
     return "".join(out)
 
 
-def _gen_metrics_header(atlas: dict, font_ident: str) -> str:
+def _gen_metrics_header(atlas: dict, font_ident: str, font_folder: str) -> str:
     ns_name = "psdf_" + font_ident.lower().replace("made", "").replace("display", "").replace("one", "")
     if ns_name == "psdf_wix":
         ns_name = "psdf"
@@ -126,7 +126,56 @@ def _gen_metrics_header(atlas: dict, font_ident: str) -> str:
         )
     out.append("\n};\n")
     out.append("\n}\n}")
+    out.append("\n\n#include <pipGUI/core/api/pipGUI.hpp>")
+    out.append("\n\n// Helper: register this font and return FontId")
+    out.append("\nstatic inline pipgui::FontId registerFont_" + font_folder + "(pipgui::GUI &gui)")
+    out.append("{\n")
+    out.append("    return gui.registerFont(")
+    out.append(f"\n        ::{font_folder},")  # font data array
+    out.append(f"\n        pipgui::{ns_name}::AtlasWidth,")
+    out.append(f"\n        pipgui::{ns_name}::AtlasHeight,")
+    out.append(f"\n        pipgui::{ns_name}::DistanceRange,")
+    out.append(f"\n        pipgui::{ns_name}::NominalSizePx,")
+    out.append(f"\n        pipgui::{ns_name}::Ascender,")
+    out.append(f"\n        pipgui::{ns_name}::Descender,")
+    out.append(f"\n        pipgui::{ns_name}::LineHeight,")
+    out.append(f"\n        pipgui::{ns_name}::Glyphs,")
+    out.append(f"\n        pipgui::{ns_name}::GlyphCount);")
+    out.append("\n}")
     out.append("\n")
+    
+    return "".join(out)
+
+
+def _gen_fonts_metrics_hpp(font_names: list, font_idents: list) -> str:
+    """Generate central fonts/metrics.hpp with FontId enum and global aliases."""
+    out = []
+    out.append("#pragma once\n")
+    out.append("#include <cstdint>\n\n")
+    
+    # Namespace psdf_fonts with FontId enum
+    out.append("namespace pipgui\n{\n")
+    out.append("namespace psdf_fonts\n{\n")
+    out.append("enum FontId : uint16_t\n{\n")
+    for i, name in enumerate(font_idents):
+        comma = "," if i + 1 < len(font_idents) else ""
+        out.append(f"    Font{name} = {i}{comma}\n")
+    out.append("};\n")
+    out.append("\nstatic constexpr uint16_t FontCount = ")
+    out.append(f"{len(font_idents)};\n")
+    out.append("}\n}\n\n")
+    
+    # pipgui namespace aliases
+    out.append("namespace pipgui\n{\n")
+    out.append("using FontId = ::pipgui::psdf_fonts::FontId;\n")
+    for name in font_idents:
+        out.append(f"static constexpr FontId Font{name} = ::pipgui::psdf_fonts::Font{name};\n")
+    out.append("}\n\n")
+    
+    # Global aliases (no namespace prefix needed)
+    for name in font_idents:
+        out.append(f"constexpr pipgui::FontId {name} = ::pipgui::psdf_fonts::Font{name};\n")
+    
     return "".join(out)
 
 
@@ -160,6 +209,10 @@ def generate_all(project_dir: str) -> bool:
 
     ttf_files = [f for f in os.listdir(ttf_dir) if f.lower().endswith(".ttf")]
     ttf_files.sort()
+    
+    # Track font names for central metrics.hpp
+    font_names = []
+    font_idents = []
 
     for ttf_file in ttf_files:
         ttf_path = os.path.join(ttf_dir, ttf_file)
@@ -171,6 +224,9 @@ def generate_all(project_dir: str) -> bool:
         if font_base.lower() == "wixmadefordisplay":
             font_folder = "WixMadeForDisplay"
         font_ident = _safe_ident(font_folder)
+        
+        font_names.append(font_folder)
+        font_idents.append(font_ident)
 
         out_fonts_dir = os.path.join(project_dir, "lib", "pipSystem", "pipGUI", "fonts", font_folder)
         out_atlas_hpp = os.path.join(out_fonts_dir, f"{font_folder}.hpp")
@@ -207,7 +263,7 @@ def generate_all(project_dir: str) -> bool:
 
         if prev_stamp == stamp_in and os.path.isfile(json_path) and os.path.isfile(bin_path):
             atlas = _read_json(json_path)
-            metrics_h = _gen_metrics_header(atlas, font_ident)
+            metrics_h = _gen_metrics_header(atlas, font_ident, font_folder)
             _write_if_changed(out_metrics_hpp, metrics_h)
 
             with open(bin_path, "rb") as f:
@@ -255,7 +311,7 @@ def generate_all(project_dir: str) -> bool:
             raise
 
         atlas = _read_json(json_path)
-        metrics_h = _gen_metrics_header(atlas, font_ident)
+        metrics_h = _gen_metrics_header(atlas, font_ident, font_folder)
         _write_if_changed(out_metrics_hpp, metrics_h)
 
         with open(bin_path, "rb") as f:
@@ -282,6 +338,14 @@ def generate_all(project_dir: str) -> bool:
 
         with open(stamp_path, "w", encoding="utf-8") as f:
             f.write(stamp_in)
+
+    # Generate central fonts/metrics.hpp with FontId enum
+    if font_idents:
+        fonts_metrics_path = os.path.join(project_dir, "lib", "pipSystem", "pipGUI", "fonts", "metrics.hpp")
+        os.makedirs(os.path.dirname(fonts_metrics_path), exist_ok=True)
+        central_metrics = _gen_fonts_metrics_hpp(font_names, font_idents)
+        _write_if_changed(fonts_metrics_path, central_metrics)
+        print(f"[fonts] Central metrics.hpp generated with {len(font_idents)} fonts")
 
     return True
 

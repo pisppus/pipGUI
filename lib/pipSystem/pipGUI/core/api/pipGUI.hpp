@@ -3,14 +3,17 @@
 #include <Arduino.h>
 #include <cstdlib>
 #include <algorithm>
+#include <initializer_list>
 #include <utility>
 #include <pipCore/Platforms/GuiPlatform.hpp>
+#include <pipCore/Platforms/PlatformFactory.hpp>
 #include <pipCore/Graphics/Sprite.hpp>
 #include <pipCore/Input/Button.hpp>
-#include <pipGUI/core/components/FRC.hpp>
 #include <pipGUI/core/Debug.hpp>
+#include <pipGUI/core/utils/Colors.hpp>
 #include <pipGUI/icons/metrics.hpp>
 #include "UiLayout.hpp"
+
 namespace pipgui
 {
 
@@ -38,26 +41,22 @@ namespace pipgui
     {
         static inline void *guiAlloc(pipcore::GuiPlatform *plat, size_t bytes, pipcore::GuiAllocCaps caps) noexcept
         {
-            if (plat)
-            {
-                void *p = plat->guiAlloc(bytes, caps);
-                if (p)
-                    return p;
-                if (caps != pipcore::GuiAllocCaps::Default)
-                    return plat->guiAlloc(bytes, pipcore::GuiAllocCaps::Default);
-                return nullptr;
-            }
-            return malloc(bytes);
+            (void)plat;
+            pipcore::GuiPlatform *p = pipcore::GetPlatform();
+            void *ptr = p->guiAlloc(bytes, caps);
+            if (ptr)
+                return ptr;
+            if (caps != pipcore::GuiAllocCaps::Default)
+                return p->guiAlloc(bytes, pipcore::GuiAllocCaps::Default);
+            return nullptr;
         }
 
         static inline void guiFree(pipcore::GuiPlatform *plat, void *ptr) noexcept
         {
             if (!ptr)
                 return;
-            if (plat)
-                plat->guiFree(ptr);
-            else
-                free(ptr);
+            (void)plat;
+            pipcore::GetPlatform()->guiFree(ptr);
         }
 
         template <typename T>
@@ -159,12 +158,6 @@ namespace pipgui
         StatusBarLeft,
         StatusBarRight
     };
-    enum StatusBarIconPos : uint8_t
-    {
-        StatusBarIconLeft,
-        StatusBarIconCenter,
-        StatusBarIconRight
-    };
     enum StatusBarStyle : uint8_t
     {
         StatusBarStyleSolid,
@@ -222,29 +215,6 @@ namespace pipgui
     namespace detail
     {
 
-        static inline uint32_t blend888(uint32_t bg, uint32_t fg, uint32_t alpha)
-        {
-            uint32_t a = alpha + (alpha >> 7);
-            uint32_t invA = 256 - a;
-            uint32_t bg_rb = bg & 0x00FF00FF;
-            uint32_t fg_rb = fg & 0x00FF00FF;
-            uint32_t bg_g = bg & 0x0000FF00;
-            uint32_t fg_g = fg & 0x0000FF00;
-            uint32_t res_rb = ((bg_rb * invA) + (fg_rb * a)) >> 8;
-            uint32_t res_g = ((bg_g * invA) + (fg_g * a)) >> 8;
-            return (res_rb & 0x00FF00FF) | (res_g & 0x0000FF00);
-        }
-
-        static inline uint16_t blend565(uint32_t bg, uint32_t fg, uint32_t alpha)
-        {
-            uint32_t a = (alpha + 7) >> 3;
-            uint32_t invA = 32 - a;
-            uint32_t bg32 = (bg | (bg << 16)) & 0x07E0F81F;
-            uint32_t fg32 = (fg | (fg << 16)) & 0x07E0F81F;
-            uint32_t res = ((bg32 * invA) + (fg32 * a)) >> 5;
-            return (uint16_t)((res & 0xF81F) | ((res >> 16) & 0x07E0));
-        }
-
         struct AlignToken
         {
             enum Code : uint8_t
@@ -268,11 +238,6 @@ namespace pipgui
             constexpr operator StatusBarPosition() const
             {
                 return (code == TokLeft) ? StatusBarLeft : ((code == TokRight) ? StatusBarRight : ((code == TokBottom) ? StatusBarBottom : StatusBarTop));
-            }
-
-            constexpr operator StatusBarIconPos() const
-            {
-                return (code == TokCenter) ? StatusBarIconCenter : ((code == TokRight) ? StatusBarIconRight : StatusBarIconLeft);
             }
 
             constexpr operator UiAlign() const
@@ -357,13 +322,6 @@ namespace pipgui
         uint32_t lastUpdateMs;
     };
 
-    struct StatusIcon
-    {
-        const uint16_t *bitmap;
-        uint8_t w;
-        uint8_t h;
-    };
-
     struct GraphArea
     {
         int16_t x;
@@ -422,9 +380,6 @@ namespace pipgui
         const char *title;
         const char *subtitle;
         uint8_t targetScreen;
-        const uint16_t *iconBitmap;
-        uint8_t iconW;
-        uint8_t iconH;
     };
 
     struct TileLayoutCell
@@ -525,9 +480,6 @@ namespace pipgui
             String title;
             String subtitle;
             uint8_t targetScreen;
-            const uint16_t *iconBitmap;
-            uint8_t iconW;
-            uint8_t iconH;
         };
 
         bool configured;
@@ -649,6 +601,6 @@ namespace pipgui
     };
 
 #define PIPGUI_FLUENT_BUILDERS_INC 1
-#include "parts/FluentBuilders.inc"
+#include "parts/Builders.inc"
 #include "parts/Gui.inc"
 }

@@ -192,3 +192,20 @@ static const Glyph Glyphs[GlyphCount] =
 
 }
 }
+
+#include <pipGUI/core/api/pipGUI.hpp>
+
+// Helper: register this font and return FontId
+static inline pipgui::FontId registerFont_WixMadeForDisplay(pipgui::GUI &gui){
+    return gui.registerFont(
+        ::WixMadeForDisplay,
+        pipgui::psdf_wixfor::AtlasWidth,
+        pipgui::psdf_wixfor::AtlasHeight,
+        pipgui::psdf_wixfor::DistanceRange,
+        pipgui::psdf_wixfor::NominalSizePx,
+        pipgui::psdf_wixfor::Ascender,
+        pipgui::psdf_wixfor::Descender,
+        pipgui::psdf_wixfor::LineHeight,
+        pipgui::psdf_wixfor::Glyphs,
+        pipgui::psdf_wixfor::GlyphCount);
+}

@@ -8,7 +8,7 @@ struct ToggleSwitchFluentT
     GUI *_gui;
     int16_t _x, _y, _w, _h;
     ToggleSwitchState *_state;
-    uint32_t _activeColor;
+    uint16_t _activeColor;
     int32_t _inactiveColor;
     int32_t _knobColor;
     bool _consumed;
@@ -47,7 +47,7 @@ struct ToggleSwitchFluentT
         return *this;
     }
 
-    ToggleSwitchFluentT &activeColor(uint32_t c)
+    ToggleSwitchFluentT &activeColor(uint16_t c)
     {
         PIPGUI_FLUENT_GUARD(ToggleSwitchFluentT<IsUpdate>);
         _activeColor = c;
@@ -79,11 +79,8 @@ struct ButtonFluentT
 {
     GUI *_gui;
     String _label;
-    const uint16_t *_iconBitmap;
-    uint8_t _iconW;
-    uint8_t _iconH;
     int16_t _x, _y, _w, _h;
-    uint32_t _baseColor;
+    uint16_t _baseColor;
     uint8_t _radius;
     const ButtonVisualState *_state;
     bool _consumed;
@@ -91,7 +88,6 @@ struct ButtonFluentT
     ButtonFluentT(GUI *g)
         : _gui(g),
           _label(),
-          _iconBitmap(nullptr), _iconW(0), _iconH(0),
           _x(0), _y(0), _w(0), _h(0),
           _baseColor(0),
           _radius(6),
@@ -104,15 +100,6 @@ struct ButtonFluentT
     {
         PIPGUI_FLUENT_GUARD(ButtonFluentT<IsUpdate>);
         _label = t;
-        return *this;
-    }
-
-    ButtonFluentT &icon(const uint16_t *bitmap, uint8_t w, uint8_t h)
-    {
-        PIPGUI_FLUENT_GUARD(ButtonFluentT<IsUpdate>);
-        _iconBitmap = bitmap;
-        _iconW = w;
-        _iconH = h;
         return *this;
     }
 
@@ -132,7 +119,7 @@ struct ButtonFluentT
         return *this;
     }
 
-    ButtonFluentT &baseColor(uint32_t c)
+    ButtonFluentT &baseColor(uint16_t c)
     {
         PIPGUI_FLUENT_GUARD(ButtonFluentT<IsUpdate>);
         _baseColor = c;
@@ -165,8 +152,8 @@ struct ProgressBarFluentT
     GUI *_gui;
     int16_t _x, _y, _w, _h;
     uint8_t _value;
-    uint32_t _baseColor;
-    uint32_t _fillColor;
+    uint16_t _baseColor;
+    uint16_t _fillColor;
     uint8_t _radius;
     ProgressAnim _anim;
     bool _doFlush;
@@ -208,14 +195,14 @@ struct ProgressBarFluentT
         return *this;
     }
 
-    ProgressBarFluentT &baseColor(uint32_t c)
+    ProgressBarFluentT &baseColor(uint16_t c)
     {
         PIPGUI_FLUENT_GUARD(ProgressBarFluentT<IsUpdate>);
         _baseColor = c;
         return *this;
     }
 
-    ProgressBarFluentT &fillColor(uint32_t c)
+    ProgressBarFluentT &fillColor(uint16_t c)
     {
         PIPGUI_FLUENT_GUARD(ProgressBarFluentT<IsUpdate>);
         _fillColor = c;
@@ -257,8 +244,8 @@ struct CircularProgressBarFluentT
     int16_t _r;
     uint8_t _thickness;
     uint8_t _value;
-    uint32_t _baseColor;
-    uint32_t _fillColor;
+    uint16_t _baseColor;
+    uint16_t _fillColor;
     ProgressAnim _anim;
     bool _doFlush;
     bool _consumed;
@@ -306,14 +293,14 @@ struct CircularProgressBarFluentT
         return *this;
     }
 
-    CircularProgressBarFluentT &baseColor(uint32_t c)
+    CircularProgressBarFluentT &baseColor(uint16_t c)
     {
         PIPGUI_FLUENT_GUARD(CircularProgressBarFluentT<IsUpdate>);
         _baseColor = c;
         return *this;
     }
 
-    CircularProgressBarFluentT &fillColor(uint32_t c)
+    CircularProgressBarFluentT &fillColor(uint16_t c)
     {
         PIPGUI_FLUENT_GUARD(CircularProgressBarFluentT<IsUpdate>);
         _fillColor = c;
@@ -349,12 +336,12 @@ struct ScrollDotsFluentT
     float _animProgress;
     bool _animate;
     int8_t _animDirection;
-    uint32_t _activeColor, _inactiveColor;
+    uint16_t _activeColor, _inactiveColor;
     uint8_t _dotRadius, _spacing, _activeWidth;
     bool _consumed;
     ScrollDotsFluentT(GUI *g)
         : _gui(g), _x(0), _y(0), _count(0), _activeIndex(0), _prevIndex(0), _animProgress(0), _animate(false), _animDirection(0),
-          _activeColor(0xFFFFFF), _inactiveColor(0x7B817B), _dotRadius(3), _spacing(14), _activeWidth(18), _consumed(false) {}
+          _activeColor(0xFFFF), _inactiveColor(0x7BEF), _dotRadius(3), _spacing(14), _activeWidth(18), _consumed(false) {}
     ScrollDotsFluentT &at(int16_t x, int16_t y)
     {
         PIPGUI_FLUENT_GUARD(ScrollDotsFluentT<IsUpdate>);
@@ -398,13 +385,13 @@ struct ScrollDotsFluentT
         _animDirection = d;
         return *this;
     }
-    ScrollDotsFluentT &activeColor(uint32_t c)
+    ScrollDotsFluentT &activeColor(uint16_t c)
     {
         PIPGUI_FLUENT_GUARD(ScrollDotsFluentT<IsUpdate>);
         _activeColor = c;
         return *this;
     }
-    ScrollDotsFluentT &inactiveColor(uint32_t c)
+    ScrollDotsFluentT &inactiveColor(uint16_t c)
     {
         PIPGUI_FLUENT_GUARD(ScrollDotsFluentT<IsUpdate>);
         _inactiveColor = c;
@@ -482,4 +469,64 @@ struct ToastFluent
     }
 
     void show();
+};
+
+struct DrawIconFluent
+{
+    GUI *_gui;
+    int16_t _x, _y;
+    uint16_t _sizePx;
+    uint16_t _iconId;
+    uint16_t _fg565;
+    uint16_t _bg565;
+    bool _consumed;
+
+    DrawIconFluent(GUI *g)
+        : _gui(g),
+          _x(-1), _y(-1),
+          _sizePx(0),
+          _iconId(0),
+          _fg565(0xFFFF),
+          _bg565(0x0000),
+          _consumed(false)
+    {
+    }
+
+    DrawIconFluent &at(int16_t x, int16_t y)
+    {
+        PIPGUI_FLUENT_GUARD(DrawIconFluent);
+        _x = x;
+        _y = y;
+        return *this;
+    }
+
+    DrawIconFluent &size(uint16_t sizePx)
+    {
+        PIPGUI_FLUENT_GUARD(DrawIconFluent);
+        _sizePx = sizePx;
+        return *this;
+    }
+
+    DrawIconFluent &icon(uint16_t iconId)
+    {
+        PIPGUI_FLUENT_GUARD(DrawIconFluent);
+        _iconId = iconId;
+        return *this;
+    }
+
+    DrawIconFluent &color(uint16_t fg565)
+    {
+        PIPGUI_FLUENT_GUARD(DrawIconFluent);
+        _fg565 = fg565;
+        return *this;
+    }
+
+    DrawIconFluent &bgColor(uint16_t bg565)
+    {
+        PIPGUI_FLUENT_GUARD(DrawIconFluent);
+        _bg565 = bg565;
+        return *this;
+    }
+
+    void draw();
 };

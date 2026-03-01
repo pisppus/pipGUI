@@ -6,7 +6,7 @@
 {
     GUI *_gui;
     int16_t _x, _y, _w, _h;
-    uint32_t _color;
+    uint16_t _color;
     uint8_t _radius;
     uint8_t _radiusTL, _radiusTR, _radiusBR, _radiusBL;
     bool _perCorner;
@@ -31,27 +31,86 @@
         _h = h;
         return *this;
     }
-    FillRectFluent &color(uint32_t c)
+    FillRectFluent &color(uint16_t c)
     {
         PIPGUI_FLUENT_GUARD(FillRectFluent);
         _color = c;
         return *this;
     }
-    FillRectFluent &radius(uint8_t r)
+    FillRectFluent &radius(std::initializer_list<uint8_t> radii)
     {
         PIPGUI_FLUENT_GUARD(FillRectFluent);
-        _radius = r;
-        _perCorner = false;
+        if (radii.size() == 1)
+        {
+            _radius = *radii.begin();
+            _perCorner = false;
+        }
+        else if (radii.size() == 4)
+        {
+            auto it = radii.begin();
+            _radiusTL = *it++;
+            _radiusTR = *it++;
+            _radiusBR = *it++;
+            _radiusBL = *it++;
+            _perCorner = true;
+        }
         return *this;
     }
-    FillRectFluent &radius(uint8_t tl, uint8_t tr, uint8_t br, uint8_t bl)
+    void draw();
+};
+
+struct DrawRectFluent
+{
+    GUI *_gui;
+    int16_t _x, _y, _w, _h;
+    uint16_t _color;
+    uint8_t _radius;
+    uint8_t _radiusTL, _radiusTR, _radiusBR, _radiusBL;
+    bool _perCorner;
+    bool _consumed;
+    DrawRectFluent(GUI *g)
+        : _gui(g),
+          _x(0), _y(0), _w(0), _h(0),
+          _color(0),
+          _radius(0), _radiusTL(0), _radiusTR(0), _radiusBR(0), _radiusBL(0),
+          _perCorner(false), _consumed(false) {}
+    DrawRectFluent &at(int16_t x, int16_t y)
     {
-        PIPGUI_FLUENT_GUARD(FillRectFluent);
-        _radiusTL = tl;
-        _radiusTR = tr;
-        _radiusBR = br;
-        _radiusBL = bl;
-        _perCorner = true;
+        PIPGUI_FLUENT_GUARD(DrawRectFluent);
+        _x = x;
+        _y = y;
+        return *this;
+    }
+    DrawRectFluent &size(int16_t w, int16_t h)
+    {
+        PIPGUI_FLUENT_GUARD(DrawRectFluent);
+        _w = w;
+        _h = h;
+        return *this;
+    }
+    DrawRectFluent &color(uint16_t c)
+    {
+        PIPGUI_FLUENT_GUARD(DrawRectFluent);
+        _color = c;
+        return *this;
+    }
+    DrawRectFluent &radius(std::initializer_list<uint8_t> radii)
+    {
+        PIPGUI_FLUENT_GUARD(DrawRectFluent);
+        if (radii.size() == 1)
+        {
+            _radius = *radii.begin();
+            _perCorner = false;
+        }
+        else if (radii.size() == 4)
+        {
+            auto it = radii.begin();
+            _radiusTL = *it++;
+            _radiusTR = *it++;
+            _radiusBR = *it++;
+            _radiusBL = *it++;
+            _perCorner = true;
+        }
         return *this;
     }
     void draw();
@@ -61,7 +120,7 @@ struct FillRectAlphaFluent
 {
     GUI *_gui;
     int16_t _x, _y, _w, _h;
-    uint32_t _color;
+    uint16_t _color;
     uint8_t _alpha;
     bool _consumed;
     FillRectAlphaFluent(GUI *g) : _gui(g), _x(0), _y(0), _w(0), _h(0), _color(0), _alpha(255), _consumed(false) {}
@@ -79,7 +138,7 @@ struct FillRectAlphaFluent
         _h = h;
         return *this;
     }
-    FillRectAlphaFluent &color(uint32_t c)
+    FillRectAlphaFluent &color(uint16_t c)
     {
         PIPGUI_FLUENT_GUARD(FillRectAlphaFluent);
         _color = c;
@@ -121,10 +180,22 @@ struct FillRectGradientVerticalFluent
         _topColor = c;
         return *this;
     }
+    FillRectGradientVerticalFluent &topColor(uint16_t c565)
+    {
+        PIPGUI_FLUENT_GUARD(FillRectGradientVerticalFluent);
+        _topColor = detail::color565To888(c565);
+        return *this;
+    }
     FillRectGradientVerticalFluent &bottomColor(uint32_t c)
     {
         PIPGUI_FLUENT_GUARD(FillRectGradientVerticalFluent);
         _bottomColor = c;
+        return *this;
+    }
+    FillRectGradientVerticalFluent &bottomColor(uint16_t c565)
+    {
+        PIPGUI_FLUENT_GUARD(FillRectGradientVerticalFluent);
+        _bottomColor = detail::color565To888(c565);
         return *this;
     }
     void draw();
@@ -157,10 +228,22 @@ struct FillRectGradientHorizontalFluent
         _leftColor = c;
         return *this;
     }
+    FillRectGradientHorizontalFluent &leftColor(uint16_t c565)
+    {
+        PIPGUI_FLUENT_GUARD(FillRectGradientHorizontalFluent);
+        _leftColor = detail::color565To888(c565);
+        return *this;
+    }
     FillRectGradientHorizontalFluent &rightColor(uint32_t c)
     {
         PIPGUI_FLUENT_GUARD(FillRectGradientHorizontalFluent);
         _rightColor = c;
+        return *this;
+    }
+    FillRectGradientHorizontalFluent &rightColor(uint16_t c565)
+    {
+        PIPGUI_FLUENT_GUARD(FillRectGradientHorizontalFluent);
+        _rightColor = detail::color565To888(c565);
         return *this;
     }
     void draw();
@@ -193,10 +276,22 @@ struct FillRectGradient4Fluent
         _c00 = color;
         return *this;
     }
+    FillRectGradient4Fluent &topLeftColor(uint16_t color565)
+    {
+        PIPGUI_FLUENT_GUARD(FillRectGradient4Fluent);
+        _c00 = detail::color565To888(color565);
+        return *this;
+    }
     FillRectGradient4Fluent &topRightColor(uint32_t color)
     {
         PIPGUI_FLUENT_GUARD(FillRectGradient4Fluent);
         _c10 = color;
+        return *this;
+    }
+    FillRectGradient4Fluent &topRightColor(uint16_t color565)
+    {
+        PIPGUI_FLUENT_GUARD(FillRectGradient4Fluent);
+        _c10 = detail::color565To888(color565);
         return *this;
     }
     FillRectGradient4Fluent &bottomLeftColor(uint32_t color)
@@ -205,10 +300,22 @@ struct FillRectGradient4Fluent
         _c01 = color;
         return *this;
     }
+    FillRectGradient4Fluent &bottomLeftColor(uint16_t color565)
+    {
+        PIPGUI_FLUENT_GUARD(FillRectGradient4Fluent);
+        _c01 = detail::color565To888(color565);
+        return *this;
+    }
     FillRectGradient4Fluent &bottomRightColor(uint32_t color)
     {
         PIPGUI_FLUENT_GUARD(FillRectGradient4Fluent);
         _c11 = color;
+        return *this;
+    }
+    FillRectGradient4Fluent &bottomRightColor(uint16_t color565)
+    {
+        PIPGUI_FLUENT_GUARD(FillRectGradient4Fluent);
+        _c11 = detail::color565To888(color565);
         return *this;
     }
     void draw();
@@ -241,10 +348,22 @@ struct FillRectGradientDiagonalFluent
         _tlColor = c;
         return *this;
     }
+    FillRectGradientDiagonalFluent &topLeftColor(uint16_t c565)
+    {
+        PIPGUI_FLUENT_GUARD(FillRectGradientDiagonalFluent);
+        _tlColor = detail::color565To888(c565);
+        return *this;
+    }
     FillRectGradientDiagonalFluent &bottomRightColor(uint32_t c)
     {
         PIPGUI_FLUENT_GUARD(FillRectGradientDiagonalFluent);
         _brColor = c;
+        return *this;
+    }
+    FillRectGradientDiagonalFluent &bottomRightColor(uint16_t c565)
+    {
+        PIPGUI_FLUENT_GUARD(FillRectGradientDiagonalFluent);
+        _brColor = detail::color565To888(c565);
         return *this;
     }
     void draw();
@@ -292,10 +411,22 @@ struct FillRectGradientRadialFluent
         _innerColor = c;
         return *this;
     }
+    FillRectGradientRadialFluent &innerColor(uint16_t c565)
+    {
+        PIPGUI_FLUENT_GUARD(FillRectGradientRadialFluent);
+        _innerColor = detail::color565To888(c565);
+        return *this;
+    }
     FillRectGradientRadialFluent &outerColor(uint32_t c)
     {
         PIPGUI_FLUENT_GUARD(FillRectGradientRadialFluent);
         _outerColor = c;
+        return *this;
+    }
+    FillRectGradientRadialFluent &outerColor(uint16_t c565)
+    {
+        PIPGUI_FLUENT_GUARD(FillRectGradientRadialFluent);
+        _outerColor = detail::color565To888(c565);
         return *this;
     }
     void draw();
@@ -305,7 +436,7 @@ struct DrawLineFluent
 {
     GUI *_gui;
     int16_t _x0, _y0, _x1, _y1;
-    uint32_t _color;
+    uint16_t _color;
     bool _consumed;
     DrawLineFluent(GUI *g) : _gui(g), _x0(0), _y0(0), _x1(0), _y1(0), _color(0), _consumed(false) {}
     DrawLineFluent &from(int16_t x0, int16_t y0)
@@ -322,7 +453,7 @@ struct DrawLineFluent
         _y1 = y1;
         return *this;
     }
-    DrawLineFluent &color(uint32_t c)
+    DrawLineFluent &color(uint16_t c)
     {
         PIPGUI_FLUENT_GUARD(DrawLineFluent);
         _color = c;
@@ -336,7 +467,7 @@ struct DrawCircleFluent
     GUI *_gui;
     int16_t _cx, _cy;
     int16_t _r;
-    uint32_t _color;
+    uint16_t _color;
     bool _consumed;
     DrawCircleFluent(GUI *g) : _gui(g), _cx(0), _cy(0), _r(0), _color(0), _consumed(false) {}
     DrawCircleFluent &at(int16_t cx, int16_t cy)
@@ -352,7 +483,7 @@ struct DrawCircleFluent
         _r = r;
         return *this;
     }
-    DrawCircleFluent &color(uint32_t c)
+    DrawCircleFluent &color(uint16_t c)
     {
         PIPGUI_FLUENT_GUARD(DrawCircleFluent);
         _color = c;
@@ -366,7 +497,7 @@ struct FillCircleFluent
     GUI *_gui;
     int16_t _cx, _cy;
     int16_t _r;
-    uint32_t _color;
+    uint16_t _color;
     bool _consumed;
     FillCircleFluent(GUI *g) : _gui(g), _cx(0), _cy(0), _r(0), _color(0), _consumed(false) {}
     FillCircleFluent &at(int16_t cx, int16_t cy)
@@ -382,7 +513,7 @@ struct FillCircleFluent
         _r = r;
         return *this;
     }
-    FillCircleFluent &color(uint32_t c)
+    FillCircleFluent &color(uint16_t c)
     {
         PIPGUI_FLUENT_GUARD(FillCircleFluent);
         _color = c;
@@ -397,7 +528,7 @@ struct DrawArcFluent
     int16_t _cx, _cy;
     int16_t _r;
     float _startDeg, _endDeg;
-    uint32_t _color;
+    uint16_t _color;
     bool _consumed;
     DrawArcFluent(GUI *g) : _gui(g), _cx(0), _cy(0), _r(0), _startDeg(0), _endDeg(360), _color(0), _consumed(false) {}
     DrawArcFluent &at(int16_t cx, int16_t cy)
@@ -425,7 +556,7 @@ struct DrawArcFluent
         _endDeg = d;
         return *this;
     }
-    DrawArcFluent &color(uint32_t c)
+    DrawArcFluent &color(uint16_t c)
     {
         PIPGUI_FLUENT_GUARD(DrawArcFluent);
         _color = c;
@@ -438,7 +569,7 @@ struct DrawEllipseFluent
 {
     GUI *_gui;
     int16_t _cx, _cy, _rx, _ry;
-    uint32_t _color;
+    uint16_t _color;
     bool _consumed;
     DrawEllipseFluent(GUI *g) : _gui(g), _cx(0), _cy(0), _rx(0), _ry(0), _color(0), _consumed(false) {}
     DrawEllipseFluent &at(int16_t cx, int16_t cy)
@@ -460,7 +591,7 @@ struct DrawEllipseFluent
         _ry = ry;
         return *this;
     }
-    DrawEllipseFluent &color(uint32_t c)
+    DrawEllipseFluent &color(uint16_t c)
     {
         PIPGUI_FLUENT_GUARD(DrawEllipseFluent);
         _color = c;
@@ -473,7 +604,7 @@ struct FillEllipseFluent
 {
     GUI *_gui;
     int16_t _cx, _cy, _rx, _ry;
-    uint32_t _color;
+    uint16_t _color;
     bool _consumed;
     FillEllipseFluent(GUI *g) : _gui(g), _cx(0), _cy(0), _rx(0), _ry(0), _color(0), _consumed(false) {}
     FillEllipseFluent &at(int16_t cx, int16_t cy)
@@ -495,7 +626,7 @@ struct FillEllipseFluent
         _ry = ry;
         return *this;
     }
-    FillEllipseFluent &color(uint32_t c)
+    FillEllipseFluent &color(uint16_t c)
     {
         PIPGUI_FLUENT_GUARD(FillEllipseFluent);
         _color = c;
@@ -508,7 +639,7 @@ struct DrawTriangleFluent
 {
     GUI *_gui;
     int16_t _x0, _y0, _x1, _y1, _x2, _y2;
-    uint32_t _color;
+    uint16_t _color;
     uint8_t _radius;
     bool _consumed;
     DrawTriangleFluent(GUI *g) : _gui(g), _x0(0), _y0(0), _x1(0), _y1(0), _x2(0), _y2(0), _color(0), _radius(0), _consumed(false) {}
@@ -533,7 +664,7 @@ struct DrawTriangleFluent
         _y2 = y;
         return *this;
     }
-    DrawTriangleFluent &color(uint32_t c)
+    DrawTriangleFluent &color(uint16_t c)
     {
         PIPGUI_FLUENT_GUARD(DrawTriangleFluent);
         _color = c;
@@ -552,7 +683,7 @@ struct FillTriangleFluent
 {
     GUI *_gui;
     int16_t _x0, _y0, _x1, _y1, _x2, _y2;
-    uint32_t _color;
+    uint16_t _color;
     uint8_t _radius;
     bool _consumed;
     FillTriangleFluent(GUI *g) : _gui(g), _x0(0), _y0(0), _x1(0), _y1(0), _x2(0), _y2(0), _color(0), _radius(0), _consumed(false) {}
@@ -577,7 +708,7 @@ struct FillTriangleFluent
         _y2 = y;
         return *this;
     }
-    FillTriangleFluent &color(uint32_t c)
+    FillTriangleFluent &color(uint16_t c)
     {
         PIPGUI_FLUENT_GUARD(FillTriangleFluent);
         _color = c;
@@ -597,7 +728,7 @@ struct DrawSquircleFluent
     GUI *_gui;
     int16_t _cx, _cy;
     int16_t _r;
-    uint32_t _color;
+    uint16_t _color;
     bool _consumed;
     DrawSquircleFluent(GUI *g) : _gui(g), _cx(0), _cy(0), _r(0), _color(0), _consumed(false) {}
     DrawSquircleFluent &at(int16_t cx, int16_t cy)
@@ -613,7 +744,7 @@ struct DrawSquircleFluent
         _r = r;
         return *this;
     }
-    DrawSquircleFluent &color(uint32_t c)
+    DrawSquircleFluent &color(uint16_t c)
     {
         PIPGUI_FLUENT_GUARD(DrawSquircleFluent);
         _color = c;
@@ -627,7 +758,7 @@ struct FillSquircleFluent
     GUI *_gui;
     int16_t _cx, _cy;
     int16_t _r;
-    uint32_t _color;
+    uint16_t _color;
     bool _consumed;
     FillSquircleFluent(GUI *g) : _gui(g), _cx(0), _cy(0), _r(0), _color(0), _consumed(false) {}
     FillSquircleFluent &at(int16_t cx, int16_t cy)
@@ -643,7 +774,7 @@ struct FillSquircleFluent
         _r = r;
         return *this;
     }
-    FillSquircleFluent &color(uint32_t c)
+    FillSquircleFluent &color(uint16_t c)
     {
         PIPGUI_FLUENT_GUARD(FillSquircleFluent);
         _color = c;

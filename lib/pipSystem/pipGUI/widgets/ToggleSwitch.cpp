@@ -2,6 +2,39 @@
 
 namespace pipgui
 {
+
+    static uint16_t lerpColor565Sw(uint16_t c0, uint16_t c1, float t)
+    {
+        if (t <= 0.0f)
+            return c0;
+        if (t >= 1.0f)
+            return c1;
+
+        uint32_t r0 = (c0 >> 11) & 0x1F;
+        uint32_t g0 = (c0 >> 5) & 0x3F;
+        uint32_t b0 = c0 & 0x1F;
+        uint32_t r1 = (c1 >> 11) & 0x1F;
+        uint32_t g1 = (c1 >> 5) & 0x3F;
+        uint32_t b1 = c1 & 0x1F;
+
+        uint32_t r = (uint32_t)((float)r0 + ((float)r1 - (float)r0) * t + 0.5f);
+        uint32_t g = (uint32_t)((float)g0 + ((float)g1 - (float)g0) * t + 0.5f);
+        uint32_t b = (uint32_t)((float)b0 + ((float)b1 - (float)b0) * t + 0.5f);
+
+        if (r > 31U) r = 31U;
+        if (g > 63U) g = 63U;
+        if (b > 31U) b = 31U;
+        return (uint16_t)((r << 11) | (g << 5) | b);
+    }
+
+    static uint16_t autoTextColor565Sw(uint16_t bg, uint8_t threshold = 140)
+    {
+        uint32_t r8 = ((bg >> 11) & 0x1F) * 255U / 31U;
+        uint32_t g8 = ((bg >> 5) & 0x3F) * 255U / 63U;
+        uint32_t b8 = (bg & 0x1F) * 255U / 31U;
+        uint32_t lum = (r8 * 54U + g8 * 183U + b8 * 18U) >> 8;
+        return (lum > threshold) ? (uint16_t)0x0000 : (uint16_t)0xFFFF;
+    }
     static float cubicBezier1D(float t, float p1, float p2)
     {
         if (t <= 0.0f)
@@ -102,7 +135,7 @@ namespace pipgui
 
     void GUI::drawToggleSwitch(int16_t x, int16_t y, int16_t w, int16_t h,
                                ToggleSwitchState &state,
-                               uint32_t activeColor,
+                               uint16_t activeColor,
                                int32_t inactiveColor,
                                int32_t knobColor)
     {
@@ -165,17 +198,17 @@ namespace pipgui
 
         uint8_t r = (uint8_t)(h / 2);
 
-        uint32_t inactive;
+        uint16_t inactive;
         if (inactiveColor < 0)
-            inactive = lerpColor888Sw(activeColor, 0x7F7F7F, 0.75f);
+            inactive = lerpColor565Sw(activeColor, (uint16_t)0x7BEF, 0.75f);
         else
-            inactive = (uint32_t)inactiveColor;
+            inactive = (uint16_t)inactiveColor;
 
         float k = (float)state.pos / 255.0f;
         float eased = easeBezierSw(k);
 
-        uint32_t bg = lerpColor888Sw(inactive, activeColor, eased);
-        fillRoundRectFrc(x0, y0, w, h, r, bg);
+        uint16_t bg = lerpColor565Sw(inactive, activeColor, eased);
+        fillRoundRect(x0, y0, w, h, r, bg);
 
         int16_t pad = (int16_t)max((int16_t)3, (int16_t)(h / 8));
         int16_t knobR = (h / 2) - pad;
@@ -190,25 +223,25 @@ namespace pipgui
         int16_t cx = leftCx + (int16_t)((rightCx - leftCx) * eased + 0.5f);
         int16_t cy = y0 + h / 2;
 
-        uint32_t knob;
+        uint16_t knob;
         if (knobColor < 0)
-            knob = detail::autoTextColor888(bg, 140);
+            knob = autoTextColor565Sw(bg, 140);
         else
-            knob = (uint32_t)knobColor;
+            knob = (uint16_t)knobColor;
 
-        uint32_t border = lerpColor888Sw(knob, bg, 0.55f);
-        fillCircleFrc(cx, cy, knobR, border);
+        uint16_t border = lerpColor565Sw(knob, bg, 0.55f);
+        fillCircle(cx, cy, knobR, border);
         int16_t innerR = knobR - 2;
         if (innerR < 1)
             innerR = knobR - 1;
         if (innerR < 1)
             innerR = 1;
-        fillCircleFrc(cx, cy, innerR, knob);
+        fillCircle(cx, cy, innerR, knob);
     }
 
     void GUI::updateToggleSwitch(int16_t x, int16_t y, int16_t w, int16_t h,
                                  ToggleSwitchState &state,
-                                 uint32_t activeColor,
+                                 uint16_t activeColor,
                                  int32_t inactiveColor,
                                  int32_t knobColor)
     {
@@ -246,7 +279,7 @@ namespace pipgui
         fillRect()
             .at((int16_t)(rx - pad), (int16_t)(ry - pad))
             .size((int16_t)(w + pad * 2), (int16_t)(h + pad * 2))
-            .color(_render.bgColor)
+            .color((uint16_t)detail::color888To565(_render.bgColor))
             .draw();
         drawToggleSwitch(x, y, w, h, state, activeColor, inactiveColor, knobColor);
 

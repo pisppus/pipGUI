@@ -1,6 +1,7 @@
 #pragma once
 
 #include <pipCore/Platforms/GuiPlatform.hpp>
+#include <pipCore/Platforms/PlatformFactory.hpp>
 #include <cstdint>
 
 namespace pipcore
@@ -94,7 +95,7 @@ namespace pipcore
         PullMode pullMode() const { return _pull; }
 
     private:
-        GuiPlatform *platform() const { return _platform ? _platform : GuiPlatform::defaultPlatform(); }
+        GuiPlatform *platform() const { return _platform ? _platform : GetPlatform(); }
 
         void applyPullDefaults()
         {

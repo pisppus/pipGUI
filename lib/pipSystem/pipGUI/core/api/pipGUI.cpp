@@ -1,14 +1,13 @@
 #include <pipGUI/core/api/pipGUI.hpp>
 #include <pipGUI/core/Debug.hpp>
+#include <pipCore/Platforms/PlatformFactory.hpp>
 
 namespace pipgui
 {
 
-    static pipcore::GuiPlatform *g_sharedPlatform = nullptr;
-
     static void backlightPlatformCallback(uint16_t level)
     {
-        pipcore::GuiPlatform *p = pipgui::GUI::sharedPlatform();
+        pipcore::GuiPlatform *p = pipcore::GetPlatform();
         if (!p)
             return;
         if (level > 100)
@@ -22,14 +21,13 @@ namespace pipgui
 
     GUI::~GUI() noexcept
     {
-        pipcore::GuiPlatform *plat = platform();
+        pipcore::GuiPlatform *plat = pipcore::GetPlatform();
 
         freeBlurBuffers(plat);
         freeGraphAreas(plat);
         freeListMenus(plat);
         freeTileMenus(plat);
         freeErrors(plat);
-        freeStatusBarIcons(plat);
         freeScreenStorage(plat);
 
         _render.sprite.deleteSprite();
@@ -225,13 +223,6 @@ namespace pipgui
         safeFreeEntryArray(plat, _error.entries, _error.capacity, _error.count);
     }
 
-    void GUI::freeStatusBarIcons(pipcore::GuiPlatform *plat) noexcept
-    {
-        safeFreeEntryArray(plat, _status.iconsLeft, _status.iconLeftCapacity, _status.iconLeftCount);
-        safeFreeEntryArray(plat, _status.iconsCenter, _status.iconCenterCapacity, _status.iconCenterCount);
-        safeFreeEntryArray(plat, _status.iconsRight, _status.iconRightCapacity, _status.iconRightCount);
-    }
-
     ConfigureDisplayFluent GUI::configureDisplay()
     {
         return ConfigureDisplayFluent(this);
@@ -244,8 +235,8 @@ namespace pipgui
             _disp.cfg.hz = 80000000;
 
         _disp.cfgConfigured = true;
-        if (pipcore::GuiPlatform *plat = platform())
-            plat->guiConfigureDisplay(_disp.cfg);
+        pipcore::GuiPlatform *plat = pipcore::GetPlatform();
+        plat->guiConfigureDisplay(_disp.cfg);
     }
 
     void ConfigureDisplayFluent::apply()
@@ -260,7 +251,7 @@ namespace pipgui
 
     void GUI::begin(uint8_t rotation, uint16_t bgColor)
     {
-        pipcore::GuiPlatform *plat = platform();
+        pipcore::GuiPlatform *plat = pipcore::GetPlatform();
         if (!plat)
             return;
 
@@ -338,34 +329,26 @@ namespace pipgui
 
     uint32_t GUI::nowMs() const
     {
-        pipcore::GuiPlatform *plat = platform();
-        return plat ? plat->nowMs() : 0U;
+        return pipcore::GetPlatform()->nowMs();
     }
 
-    void GUI::setPlatform(pipcore::GuiPlatform *platform)
+    void GUI::setPlatform(pipcore::GuiPlatform *)
     {
-        _disp.platform = platform;
-        if (platform)
-            g_sharedPlatform = platform;
-
-        pipcore::GuiPlatform::setDefaultPlatform(platform);
     }
 
     pipcore::GuiPlatform *GUI::platform() const
     {
-        return _disp.platform ? _disp.platform : g_sharedPlatform;
+        return pipcore::GetPlatform();
     }
 
     pipcore::GuiPlatform *GUI::sharedPlatform()
     {
-        return g_sharedPlatform;
+        return pipcore::GetPlatform();
     }
 
     void GUI::setBacklightPin(uint8_t pin, uint8_t channel, uint32_t freqHz, uint8_t resolutionBits)
     {
-        pipcore::GuiPlatform *plat = platform();
-        if (!plat)
-            return;
+        pipcore::GuiPlatform *plat = pipcore::GetPlatform();
         plat->configureBacklightPin(pin, channel, freqHz, resolutionBits);
         setBacklightCallback(backlightPlatformCallback);
     }
@@ -375,21 +358,13 @@ namespace pipgui
         if (percent > 100)
             percent = 100;
         _disp.brightnessMax = percent;
-        if (pipcore::GuiPlatform *plat = platform())
-            plat->storeMaxBrightnessPercent(_disp.brightnessMax);
+        pipcore::GetPlatform()->storeMaxBrightnessPercent(_disp.brightnessMax);
     }
 
     void GUI::setScreenAnimation(ScreenAnim anim, uint32_t durationMs)
     {
         _screen.anim = anim;
         _screen.animDurationMs = durationMs;
-    }
-
-    void GUI::setFrcProfile(FrcProfile profile)
-    {
-        if (profile == FrcProfile::Off)
-            profile = FrcProfile::BlueNoise;
-        _frc.profile = profile;
     }
 
     void GUI::setDebugMetrics(bool enabled)

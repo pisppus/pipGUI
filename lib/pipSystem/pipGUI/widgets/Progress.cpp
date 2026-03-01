@@ -4,22 +4,11 @@
 
 namespace pipgui
 {
-    static uint32_t blendWhite(uint32_t color, uint8_t intensity)
+    static uint16_t blendWhite(uint16_t color, uint8_t intensity)
     {
         if (intensity == 0)
             return color;
-        if (intensity >= 255)
-            return 0xFFFFFF;
-
-        uint8_t r = (uint8_t)((color >> 16) & 0xFF);
-        uint8_t g = (uint8_t)((color >> 8) & 0xFF);
-        uint8_t b = (uint8_t)(color & 0xFF);
-
-        r = (uint8_t)(r + (((uint16_t)(255 - r) * intensity) >> 8));
-        g = (uint8_t)(g + (((uint16_t)(255 - g) * intensity) >> 8));
-        b = (uint8_t)(b + (((uint16_t)(255 - b) * intensity) >> 8));
-
-        return (uint32_t)((r << 16) | (g << 8) | b);
+        return (uint16_t)pipgui::detail::blend565(color, (uint16_t)0xFFFF, intensity);
     }
 
     template <typename ColorFunc>
@@ -67,7 +56,7 @@ namespace pipgui
                 a1 = endDeg;
 
             float mid = (a0 + a1) * 0.5f;
-            uint32_t col = colorAtAngle(mid);
+            uint16_t col = colorAtAngle(mid);
 
             const float g0 = 90.0f - a0;
             const float g1 = 90.0f - a1;
@@ -109,12 +98,8 @@ namespace pipgui
             float rad = (90.0f - deg) * 0.01745329252f;
             int16_t px = (int16_t)lroundf((float)cx + cosf(rad) * rMid);
             int16_t py = (int16_t)lroundf((float)cy + sinf(rad) * rMid);
-            uint32_t col = colorAtAngle(deg);
-            g.fillCircle()
-                .at(px, py)
-                .radius(capR)
-                .color(col)
-                .draw();
+            uint16_t col = colorAtAngle(deg);
+            g.fillCircle().at(px, py).radius(capR).color(col).draw();
         };
 
         drawCapAt(startDeg);
@@ -155,11 +140,19 @@ namespace pipgui
         }
     }
 
+    static inline uint16_t lighten565Progress(uint16_t c, uint8_t amount)
+    {
+        uint16_t a = (uint16_t)amount * 8U;
+        if (a > 255U)
+            a = 255U;
+        return (uint16_t)detail::blend565(c, (uint16_t)0xFFFF, (uint8_t)a);
+    }
+
     void GUI::drawProgressBar(int16_t x, int16_t y,
                               int16_t w, int16_t h,
                               uint8_t value,
-                              uint32_t baseColor,
-                              uint32_t fillColor,
+                              uint16_t baseColor,
+                              uint16_t fillColor,
                               uint8_t radius,
                               ProgressAnim anim)
     {
@@ -225,7 +218,7 @@ namespace pipgui
         if (r < 1)
             r = 0;
 
-        fillRoundRectFrc(x, y, w, h, r, baseColor);
+        fillRoundRect(x, y, w, h, r, baseColor);
 
         int16_t innerX = x;
         int16_t innerY = y;
@@ -261,7 +254,7 @@ namespace pipgui
             int16_t segW = segRight - segLeft;
 
             if (segW > 0)
-                fillRoundRectFrc(segLeft, innerY, segW, innerH, (uint8_t)fillR, fillColor);
+                fillRoundRect(segLeft, innerY, segW, innerH, (uint8_t)fillR, fillColor);
 
             return;
         }
@@ -275,7 +268,7 @@ namespace pipgui
         if (fillW > innerW)
             fillW = innerW;
 
-        fillRoundRectFrc(innerX, innerY, fillW, innerH, (uint8_t)fillR, fillColor);
+        fillRoundRect(innerX, innerY, fillW, innerH, (uint8_t)fillR, fillColor);
 
         if (anim == ProgressAnimNone)
             return;
@@ -345,16 +338,12 @@ namespace pipgui
 
                     if (intensity < 2)
                         continue;
-                    uint32_t col = blendWhite(fillColor, intensity);
+                    uint16_t col = blendWhite(fillColor, intensity);
 
                     int16_t offset = getCornerOffset(px);
                     int16_t lineH = innerH - (offset * 2);
                     if (lineH > 0)
-                        fillRect()
-                            .at(px, innerY + offset)
-                            .size(1, lineH)
-                            .color(col)
-                            .draw();
+                        fillRect(px, innerY + offset, 1, lineH, col);
                 }
             }
         }
@@ -427,8 +416,8 @@ namespace pipgui
             break;
         }
 
-        uint16_t bg565 = color888To565(tx, ty, bgColor);
-        uint16_t fg565 = color888To565(tx, ty, textColor);
+        uint16_t bg565 = detail::color888To565(bgColor);
+        uint16_t fg565 = detail::color888To565(textColor);
         psdfDrawTextInternal(text, tx, ty, fg565, bg565, AlignLeft);
 
         setPSDFFontSize(prevSize);
@@ -455,11 +444,11 @@ namespace pipgui
     void GUI::drawProgressBar(int16_t x, int16_t y,
                               int16_t w, int16_t h,
                               uint8_t value,
-                              uint32_t color,
+                              uint16_t color,
                               uint8_t radius,
                               ProgressAnim anim)
     {
-        uint32_t base = pipgui::detail::lighten888(color, 10);
+        uint16_t base = lighten565Progress(color, 10);
         drawProgressBar(x, y, w, h, value, base, color, radius, anim);
     }
 
@@ -467,8 +456,8 @@ namespace pipgui
                                       int16_t r,
                                       uint8_t thickness,
                                       uint8_t value,
-                                      uint32_t baseColor,
-                                      uint32_t fillColor,
+                                      uint16_t baseColor,
+                                      uint16_t fillColor,
                                       ProgressAnim anim)
     {
         if (r <= 0)
@@ -615,18 +604,18 @@ namespace pipgui
                                       int16_t r,
                                       uint8_t thickness,
                                       uint8_t value,
-                                      uint32_t color,
+                                      uint16_t color,
                                       ProgressAnim anim)
     {
-        uint32_t base = pipgui::detail::lighten888(color, 10);
+        uint16_t base = lighten565Progress(color, 10);
         drawCircularProgressBar(x, y, r, thickness, value, base, color, anim);
     }
 
     void GUI::updateProgressBar(int16_t x, int16_t y,
                                int16_t w, int16_t h,
                                uint8_t value,
-                               uint32_t baseColor,
-                               uint32_t fillColor,
+                               uint16_t baseColor,
+                               uint16_t fillColor,
                                uint8_t radius,
                                ProgressAnim anim,
                                bool doFlush)
@@ -661,7 +650,7 @@ namespace pipgui
         fillRect()
             .at((int16_t)(rx - pad), (int16_t)(ry - pad))
             .size((int16_t)(w + pad * 2), (int16_t)(h + pad * 2))
-            .color(_render.bgColor)
+            .color(detail::color888To565(_render.bgColor))
             .draw();
         drawProgressBar(x, y, w, h, value, baseColor, fillColor, radius, anim);
         _flags.renderToSprite = prevRender;
@@ -675,12 +664,12 @@ namespace pipgui
     void GUI::updateProgressBar(int16_t x, int16_t y,
                                int16_t w, int16_t h,
                                uint8_t value,
-                               uint32_t color,
+                               uint16_t color,
                                uint8_t radius,
                                ProgressAnim anim,
                                bool doFlush)
     {
-        uint32_t base = pipgui::detail::lighten888(color, 10);
+        uint16_t base = lighten565Progress(color, 10);
         updateProgressBar(x, y, w, h, value, base, color, radius, anim, doFlush);
     }
 
@@ -688,8 +677,8 @@ namespace pipgui
                                int16_t x, int16_t y,
                                int16_t w, int16_t h,
                                uint8_t value,
-                               uint32_t baseColor,
-                               uint32_t fillColor,
+                               uint16_t baseColor,
+                               uint16_t fillColor,
                                uint8_t radius,
                                ProgressAnim anim)
     {
@@ -734,7 +723,7 @@ namespace pipgui
             fillRect()
                 .at((int16_t)(rx - pad), (int16_t)(ry - pad))
                 .size((int16_t)(w + pad * 2), (int16_t)(h + pad * 2))
-                .color(_render.bgColor)
+                .color(detail::color888To565(_render.bgColor))
                 .draw();
             drawProgressBar(x, y, w, h, value, baseColor, fillColor, radius, anim);
             _flags.renderToSprite = prevRender;
@@ -791,7 +780,7 @@ namespace pipgui
         fillRect()
             .at(cx, (int16_t)(ry - pad))
             .size(cw, (int16_t)(h + pad * 2))
-            .color(_render.bgColor)
+            .color(detail::color888To565(_render.bgColor))
             .draw();
         drawProgressBar(x, y, w, h, value, baseColor, fillColor, radius, anim);
         _flags.renderToSprite = prevRender;
@@ -810,8 +799,8 @@ namespace pipgui
                                         int16_t r,
                                         uint8_t thickness,
                                         uint8_t value,
-                                        uint32_t baseColor,
-                                        uint32_t fillColor,
+                                        uint16_t baseColor,
+                                        uint16_t fillColor,
                                         ProgressAnim anim,
                                         bool doFlush)
     {
@@ -845,7 +834,7 @@ namespace pipgui
         fillRect()
             .at((int16_t)(cx - rr), (int16_t)(cy - rr))
             .size((int16_t)(rr * 2 + 1), (int16_t)(rr * 2 + 1))
-            .color(_render.bgColor)
+            .color(detail::color888To565(_render.bgColor))
             .draw();
         drawCircularProgressBar(x, y, r, thickness, value, baseColor, fillColor, anim);
         _flags.renderToSprite = prevRender;
@@ -860,11 +849,11 @@ namespace pipgui
                                         int16_t r,
                                         uint8_t thickness,
                                         uint8_t value,
-                                        uint32_t color,
+                                        uint16_t color,
                                         ProgressAnim anim,
                                         bool doFlush)
     {
-        uint32_t base = pipgui::detail::lighten888(color, 10);
+        uint16_t base = lighten565Progress(color, 10);
         updateCircularProgressBar(x, y, r, thickness, value, base, color, anim, doFlush);
     }
 }

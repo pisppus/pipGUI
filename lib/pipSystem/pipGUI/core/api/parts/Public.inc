@@ -2,6 +2,8 @@
 #error "Do not include this file directly. Include <pipGUI/core/api/pipGUI.hpp>"
 #endif
 
+#include <pipGUI/core/utils/Colors.hpp>
+
 DrawLineFluent drawLine() { return DrawLineFluent(this); }
 DrawCircleFluent drawCircle() { return DrawCircleFluent(this); }
 FillCircleFluent fillCircle() { return FillCircleFluent(this); }
@@ -13,14 +15,13 @@ FillTriangleFluent fillTriangle() { return FillTriangleFluent(this); }
 DrawSquircleFluent drawSquircle() { return DrawSquircleFluent(this); }
 FillSquircleFluent fillSquircle() { return FillSquircleFluent(this); }
 
-DrawBlurStripFluent drawBlurStrip() { return DrawBlurStripFluent(this); }
-UpdateBlurStripFluent updateBlurStrip() { return UpdateBlurStripFluent(this); }
+DrawBlurFluent drawBlur() { return DrawBlurFluent(this); }
+UpdateBlurFluent updateBlur() { return UpdateBlurFluent(this); }
 
 DrawGlowCircleFluent drawGlowCircle() { return DrawGlowCircleFluent(this); }
 UpdateGlowCircleFluent updateGlowCircle() { return UpdateGlowCircleFluent(this); }
-
-DrawGlowRoundRectFluent drawGlowRoundRect() { return DrawGlowRoundRectFluent(this); }
-UpdateGlowRoundRectFluent updateGlowRoundRect() { return UpdateGlowRoundRectFluent(this); }
+DrawGlowRectFluent drawGlowRect() { return DrawGlowRectFluent(this); }
+UpdateGlowRectFluent updateGlowRect() { return UpdateGlowRectFluent(this); }
 
 DrawScrollDotsFluent drawScrollDots() { return DrawScrollDotsFluent(this); }
 UpdateScrollDotsFluent updateScrollDots() { return UpdateScrollDotsFluent(this); }
@@ -43,13 +44,37 @@ void drawGraphGrid(int16_t x, int16_t y, int16_t w, int16_t h,
                    uint8_t radius, GraphDirection dir, uint32_t bgColor,
                    uint32_t gridColor, float speed = 1.0f);
 
+void drawGraphGrid(int16_t x, int16_t y, int16_t w, int16_t h,
+                   uint8_t radius, GraphDirection dir, uint16_t bgColor565,
+                   uint16_t gridColor565, float speed = 1.0f)
+{
+    drawGraphGrid(x, y, w, h, radius, dir, detail::color565To888(bgColor565), detail::color565To888(gridColor565), speed);
+}
+
 void updateGraphGrid(int16_t x, int16_t y, int16_t w, int16_t h,
                      uint8_t radius, GraphDirection dir, uint32_t bgColor, uint32_t gridColor,
                      float speed = 1.0f);
 
+void updateGraphGrid(int16_t x, int16_t y, int16_t w, int16_t h,
+                     uint8_t radius, GraphDirection dir, uint16_t bgColor565, uint16_t gridColor565,
+                     float speed = 1.0f)
+{
+    updateGraphGrid(x, y, w, h, radius, dir, detail::color565To888(bgColor565), detail::color565To888(gridColor565), speed);
+}
+
 void setGraphAutoScale(bool enabled);
 void drawGraphLine(uint8_t lineIndex, int16_t value, uint32_t color, int16_t valueMin, int16_t valueMax);
 void updateGraphLine(uint8_t lineIndex, int16_t value, uint32_t color, int16_t valueMin, int16_t valueMax);
+
+void drawGraphLine(uint8_t lineIndex, int16_t value, uint16_t color565, int16_t valueMin, int16_t valueMax)
+{
+    drawGraphLine(lineIndex, value, detail::color565To888(color565), valueMin, valueMax);
+}
+
+void updateGraphLine(uint8_t lineIndex, int16_t value, uint16_t color565, int16_t valueMin, int16_t valueMax)
+{
+    updateGraphLine(lineIndex, value, detail::color565To888(color565), valueMin, valueMax);
+}
 
 struct ProgressBarState
 {
@@ -63,45 +88,45 @@ struct ProgressBarState
 // Linear Progress Bar
 void drawProgressBar(
     int16_t x, int16_t y, int16_t w, int16_t h,
-    uint8_t value, uint32_t baseColor, uint32_t fillColor, uint8_t radius = 6,
+    uint8_t value, uint16_t baseColor, uint16_t fillColor, uint8_t radius = 6,
     ProgressAnim anim = None);
 
 void drawProgressBar(
     int16_t x, int16_t y, int16_t w, int16_t h,
-    uint8_t value, uint32_t color, uint8_t radius = 6, ProgressAnim anim = None);
+    uint8_t value, uint16_t color, uint8_t radius = 6, ProgressAnim anim = None);
 
 void updateProgressBar(
     int16_t x, int16_t y, int16_t w, int16_t h,
-    uint8_t value, uint32_t baseColor, uint32_t fillColor, uint8_t radius = 6,
+    uint8_t value, uint16_t baseColor, uint16_t fillColor, uint8_t radius = 6,
     ProgressAnim anim = None, bool doFlush = true);
 
 void updateProgressBar(
     int16_t x, int16_t y, int16_t w, int16_t h,
-    uint8_t value, uint32_t color, uint8_t radius = 6, ProgressAnim anim = None,
+    uint8_t value, uint16_t color, uint8_t radius = 6, ProgressAnim anim = None,
     bool doFlush = true);
 
 void updateProgressBar(
     ProgressBarState &s, int16_t x, int16_t y, int16_t w,
-    int16_t h, uint8_t value, uint32_t baseColor, uint32_t fillColor,
+    int16_t h, uint8_t value, uint16_t baseColor, uint16_t fillColor,
     uint8_t radius = 6, ProgressAnim anim = None);
 
 // Circular Progress Bar
 void drawCircularProgressBar(
     int16_t x, int16_t y, int16_t r, uint8_t thickness,
-    uint8_t value, uint32_t baseColor, uint32_t fillColor, ProgressAnim anim = None);
+    uint8_t value, uint16_t baseColor, uint16_t fillColor, ProgressAnim anim = None);
 
 void drawCircularProgressBar(
     int16_t x, int16_t y, int16_t r, uint8_t thickness,
-    uint8_t value, uint32_t color, ProgressAnim anim = None);
+    uint8_t value, uint16_t color, ProgressAnim anim = None);
 
 void updateCircularProgressBar(
     int16_t x, int16_t y, int16_t r, uint8_t thickness,
-    uint8_t value, uint32_t baseColor, uint32_t fillColor, ProgressAnim anim = None,
+    uint8_t value, uint16_t baseColor, uint16_t fillColor, ProgressAnim anim = None,
     bool doFlush = true);
 
 void updateCircularProgressBar(
     int16_t x, int16_t y, int16_t r, uint8_t thickness,
-    uint8_t value, uint32_t color, ProgressAnim anim = None,
+    uint8_t value, uint16_t color, ProgressAnim anim = None,
     bool doFlush = true);
 
 // Progress Helpers
@@ -111,30 +136,36 @@ void drawProgressText(
     uint32_t textColor = 0xFFFFFF, uint32_t bgColor = 0x000000,
     uint16_t fontPx = 0);
 
+void drawProgressText(
+    int16_t x, int16_t y, int16_t w, int16_t h,
+    const String &text, uint16_t textColor565, uint16_t bgColor565,
+    TextAlign align = AlignCenter, uint16_t fontPx = 0)
+{
+    drawProgressText(x, y, w, h, text, align, detail::color565To888(textColor565), detail::color565To888(bgColor565), fontPx);
+}
+
 void drawProgressPercent(
     int16_t x, int16_t y, int16_t w, int16_t h,
     uint8_t value, TextAlign align = AlignCenter,
     uint32_t textColor = 0xFFFFFF, uint32_t bgColor = 0x000000,
     uint16_t fontPx = 0);
 
+void drawProgressPercent(
+    int16_t x, int16_t y, int16_t w, int16_t h,
+    uint8_t value, uint16_t textColor565, uint16_t bgColor565,
+    TextAlign align = AlignCenter, uint16_t fontPx = 0)
+{
+    drawProgressPercent(x, y, w, h, value, align, detail::color565To888(textColor565), detail::color565To888(bgColor565), fontPx);
+}
+
 // Buttons
 void drawButton(
-    const String &label, const uint16_t *iconBitmap, uint8_t iconW, uint8_t iconH,
-    int16_t x, int16_t y, int16_t w, int16_t h,
-    uint32_t baseColor, uint8_t radius, const ButtonVisualState &state);
-
-void drawButton(
     const String &label, int16_t x, int16_t y, int16_t w,
-    int16_t h, uint32_t baseColor, uint8_t radius, const ButtonVisualState &state);
-
-void updateButton(
-    const String &label, const uint16_t *iconBitmap, uint8_t iconW, uint8_t iconH,
-    int16_t x, int16_t y, int16_t w, int16_t h,
-    uint32_t baseColor, uint8_t radius, const ButtonVisualState &state);
+    int16_t h, uint16_t baseColor, uint8_t radius, const ButtonVisualState &state);
 
 void updateButton(
     const String &label, int16_t x, int16_t y, int16_t w,
-    int16_t h, uint32_t baseColor, uint8_t radius, const ButtonVisualState &state);
+    int16_t h, uint16_t baseColor, uint8_t radius, const ButtonVisualState &state);
 
 void updateButtonPress(
     ButtonVisualState &s, bool isDown);
@@ -142,25 +173,20 @@ void updateButtonPress(
 // Toggle Switches
 void drawToggleSwitch(
     int16_t x, int16_t y, int16_t w, int16_t h,
-    ToggleSwitchState &state, uint32_t activeColor,
+    ToggleSwitchState &state, uint16_t activeColor,
     int32_t inactiveColor = -1, int32_t knobColor = -1);
 
 void updateToggleSwitch(
     int16_t x, int16_t y, int16_t w, int16_t h,
-    ToggleSwitchState &state, uint32_t activeColor,
+    ToggleSwitchState &state, uint16_t activeColor,
     int32_t inactiveColor = -1, int32_t knobColor = -1);
 
 bool updateToggleSwitch(ToggleSwitchState &s, bool pressed);
 
+DrawIconFluent drawIcon() { return DrawIconFluent(this); }
+DrawTextFluent drawText() { return DrawTextFluent(this); }
+
 // Other UI Elements
-void drawIcon(
-    uint16_t iconId, int16_t x, int16_t y, uint16_t sizePx,
-    uint32_t color, uint32_t bgColor);
-
-void updateIcon(
-    uint16_t iconId, int16_t x, int16_t y, uint16_t sizePx,
-    uint32_t color, uint32_t bgColor);
-
 void drawDrumRollHorizontal(
     int16_t x, int16_t y, int16_t w, int16_t h,
     const String *options, uint8_t count, uint8_t selectedIndex, uint8_t prevIndex,
@@ -176,7 +202,16 @@ void enablePSDF(bool enabled);
 bool psdfEnabled() const;
 bool psdfFontLoaded() const;
 
+// Font Registration (for custom fonts)
+FontId registerFont(const uint8_t *atlasData,
+                    uint16_t atlasWidth, uint16_t atlasHeight,
+                    float distanceRange, float nominalSizePx,
+                    float ascender, float descender, float lineHeight,
+                    const void *glyphs, uint16_t glyphCount);
+uint8_t getFontCount() const;
+
 void setPSDFFont(FontId fontId);
+FontId psdfFontId() const;
 void setPSDFFontSize(uint16_t px);
 uint16_t psdfFontSize() const;
 void setPSDFWeight(uint16_t weight);
@@ -193,13 +228,13 @@ void setTextStyle(TextStyle style);
 
 void drawPSDFText(
     const String &text, int16_t x,
-    int16_t y, uint32_t color,
-    uint32_t bgColor, TextAlign align = Left);
+    int16_t y, uint16_t fg565,
+    uint16_t bg565, TextAlign align = Left);
 
 void updatePSDFText(
     const String &text, int16_t x,
-    int16_t y, uint32_t color,
-    uint32_t bgColor, TextAlign align = Left);
+    int16_t y, uint16_t fg565,
+    uint16_t bg565, TextAlign align = Left);
 
 // List Menu
 void configureListMenu(
@@ -219,6 +254,22 @@ void setListMenuStyle(
     uint16_t subtitleFontPx = 0, uint16_t lineGapPx = 0,
     ListMenuMode mode = Cards);
 
+void setListMenuStyle(
+    uint8_t screenId, uint16_t cardColor565,
+    uint16_t cardActiveColor565, uint8_t spacing = 8,
+    uint8_t radius = 8, int16_t cardWidth = 0,
+    int16_t cardHeight = 0, uint16_t titleFontPx = 0,
+    uint16_t subtitleFontPx = 0, uint16_t lineGapPx = 0,
+    ListMenuMode mode = Cards)
+{
+    setListMenuStyle(screenId,
+                     detail::color565To888(cardColor565),
+                     detail::color565To888(cardActiveColor565),
+                     spacing, radius, cardWidth, cardHeight,
+                     titleFontPx, subtitleFontPx, lineGapPx,
+                     mode);
+}
+
 void renderListMenu(uint8_t screenId);
 
 void renderListMenu(
@@ -226,12 +277,28 @@ void renderListMenu(
     int16_t y, int16_t w,
     int16_t h, uint32_t bgColor);
 
+void renderListMenu(
+    uint8_t screenId, int16_t x,
+    int16_t y, int16_t w,
+    int16_t h, uint16_t bgColor565)
+{
+    renderListMenu(screenId, x, y, w, h, detail::color565To888(bgColor565));
+}
+
 bool updateListMenu(uint8_t screenId);
 
 bool updateListMenu(
     uint8_t screenId, int16_t x,
     int16_t y, int16_t w,
     int16_t h, uint32_t bgColor);
+
+bool updateListMenu(
+    uint8_t screenId, int16_t x,
+    int16_t y, int16_t w,
+    int16_t h, uint16_t bgColor565)
+{
+    return updateListMenu(screenId, x, y, w, h, detail::color565To888(bgColor565));
+}
 
 void handleListMenuInput(
     uint8_t screenId, bool nextPressed,
@@ -291,11 +358,8 @@ void nextScreen();
 void prevScreen();
 void loop();
 void loopWithInput(Button &next, Button &prev);
-
 void requestRedraw();
-
 void setScreenAnimation(ScreenAnim anim, uint32_t durationMs);
-
 void setClipWindow(
     int16_t x, int16_t y,
     int16_t w, int16_t h);
@@ -344,7 +408,6 @@ void showError(
 
 void nextError();
 bool errorActive() const;
-
 void setErrorButtonDown(bool down);
 
 // Status Bar
@@ -363,31 +426,11 @@ void setStatusBarText(
     const String &right);
 
 void setStatusBarBattery(int8_t levelPercent, BatteryStyle style);
-
-void addStatusBarIcon(
-    StatusBarIconPos pos, const uint16_t *bitmap,
-    uint8_t w, uint8_t h);
-
 void setStatusBarCustom(StatusBarCustomCallback cb);
 int16_t statusBarHeight() const;
 void updateStatusBar();
 void updateStatusBarBattery();
 void updateStatusBarCenter();
-
-void clearStatusBarIcons()
-{
-    _status.dirtyMask = StatusBarDirtyAll;
-    _status.iconLeftCount = 0;
-    _status.iconCenterCount = 0;
-    _status.iconRightCount = 0;
-
-    for (uint8_t i = 0; i < _status.iconLeftCapacity; ++i)
-        _status.iconsLeft[i] = {};
-    for (uint8_t i = 0; i < _status.iconCenterCapacity; ++i)
-        _status.iconsCenter[i] = {};
-    for (uint8_t i = 0; i < _status.iconRightCapacity; ++i)
-        _status.iconsRight[i] = {};
-}
 
 // Debug
 void setDebugShowDirtyRects(bool enabled) { Debug::setDirtyRectEnabled(enabled); }
@@ -406,52 +449,10 @@ void setDebugMetrics(bool enabled);
 
 bool debugStatusBarMetrics() const { return _flags.statusBarDebugMetrics; }
 
-void setFrcProfile(FrcProfile profile);
-
-FrcProfile frcProfile() const { return _frc.profile; }
-
-void setFrcSeed(uint32_t seed) { _frc.seed = seed; }
-
-uint32_t frcSeed() const { return _frc.seed; }
-
-void setFrcTemporalPeriodMs(uint16_t ms) { _frc.temporalPeriodMs = ms; }
-
-uint16_t frcTemporalPeriodMs() const { return _frc.temporalPeriodMs; }
-
 // Color Helpers
-static constexpr Color888 rgb888(
+static constexpr uint32_t rgb888(
     uint8_t r, uint8_t g,
     uint8_t b)
 {
-    return Color888{r, g, b};
+    return ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b;
 }
-
-uint16_t colorTo565(
-    Color888 c, int16_t x,
-    int16_t y) const
-{
-    if (c.isBlack() || c.isWhite())
-        return detail::quantize565(c, x, y, _frc.seed, FrcProfile::Off);
-    if (c.r == c.g && c.g == c.b)
-        return detail::quantize565(c, x, y, _frc.seed, FrcProfile::Off);
-    if (((c.r & 7U) == 0U) &&
-        ((c.g & 3U) == 0U) &&
-        ((c.b & 7U) == 0U))
-        return detail::quantize565(c, x, y, _frc.seed, FrcProfile::Off);
-    return detail::quantize565(c, x, y, _frc.seed, _frc.profile);
-}
-
-uint16_t rgb888To565Frc(
-    uint8_t r, uint8_t g,
-    uint8_t b, int16_t x,
-    int16_t y, FrcProfile profile) const;
-
-void clear888(
-    uint8_t r, uint8_t g,
-    uint8_t b, FrcProfile profile);
-
-void fillRect888(
-    int16_t x, int16_t y,
-    int16_t w, int16_t h,
-    uint8_t r, uint8_t g,
-    uint8_t b, FrcProfile profile);

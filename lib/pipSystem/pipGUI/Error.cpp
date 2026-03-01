@@ -179,7 +179,7 @@ namespace pipgui
         {
             if (!_flags.errorFlashState)
             {
-                clear(0xFF0000);
+                clear(rgb(255, 0, 0));
             }
             return;
         }
@@ -199,17 +199,16 @@ namespace pipgui
         }
 
         auto t = getDrawTarget();
-        clear(0x000000);
+        clear(rgb(0, 0, 0));
 
         int16_t sbh = statusBarHeight();
         renderStatusBar(_flags.spriteEnabled);
 
-        uint32_t accent888 = (_error.type == Warning) ? rgb(255, 98, 0) : rgb(255, 0, 72);
-        uint32_t accentColor = accent888;
-        uint32_t iconColor = accentColor;
+        uint16_t accentColor = (_error.type == Warning) ? rgb(255, 98, 0) : rgb(255, 0, 72);
+        uint16_t iconColor = accentColor;
         uint16_t iconSize = (uint16_t)max<int16_t>(32, _render.screenHeight / 6);
-        uint32_t dotsActiveColor = rgb(235, 235, 235);
-        uint32_t dotsInactiveColor = rgb(60, 60, 60);
+        uint16_t dotsActiveColor = rgb(235, 235, 235);
+        uint16_t dotsInactiveColor = rgb(60, 60, 60);
 
         const char *header = (_error.type == Warning) ? "WARNING" : "ERROR";
         uint16_t iconId = (_error.type == Warning) ? warning_layer0 : error_layer0;
@@ -224,7 +223,13 @@ namespace pipgui
         {
             int16_t ix = (int16_t)(_render.screenWidth / 2) - (int16_t)(iconSize / 2);
             int16_t iy = iconY - (int16_t)(iconSize / 2);
-            drawIcon(iconId, ix, iy, iconSize, iconColor, 0);
+            drawIcon()
+                .at(ix, iy)
+                .size(iconSize)
+                .icon(iconId)
+                .color(iconColor)
+                .bgColor(0)
+                .draw();
 
             uint16_t px = (uint16_t)max<int16_t>(18, _render.screenHeight / 12);
             int16_t hw = 0;
@@ -239,7 +244,7 @@ namespace pipgui
             if (ty < (int16_t)(contentTop + 2))
                 ty = (int16_t)(contentTop + 2);
 
-            uint16_t headerFg = color888To565((int16_t)(_render.screenWidth / 2), ty, 0xFFFFFF);
+            uint16_t headerFg = detail::color888To565(0xFFFFFF);
             psdfDrawTextInternal(String(header), (int16_t)(_render.screenWidth / 2), ty, headerFg, 0, AlignCenter);
             setPSDFWeight(prevW);
         }

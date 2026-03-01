@@ -9,23 +9,13 @@
 
 namespace pipgui
 {
-    static inline uint16_t to565(uint32_t c)
+    static inline uint16_t autoTextColor565List(uint16_t bg, uint8_t threshold = 140)
     {
-        uint8_t r = (uint8_t)((c >> 16) & 0xFF);
-        uint8_t g = (uint8_t)((c >> 8) & 0xFF);
-        uint8_t b = (uint8_t)(c & 0xFF);
-        return (uint16_t)((((uint16_t)(r >> 3)) << 11) | (((uint16_t)(g >> 2)) << 5) | ((uint16_t)(b >> 3)));
-    }
-
-    static inline uint32_t from565(uint16_t c)
-    {
-        uint8_t r5 = (uint8_t)((c >> 11) & 0x1F);
-        uint8_t g6 = (uint8_t)((c >> 5) & 0x3F);
-        uint8_t b5 = (uint8_t)(c & 0x1F);
-        uint8_t r8 = (uint8_t)((r5 * 255U) / 31U);
-        uint8_t g8 = (uint8_t)((g6 * 255U) / 63U);
-        uint8_t b8 = (uint8_t)((b5 * 255U) / 31U);
-        return (uint32_t)((r8 << 16) | (g8 << 8) | b8);
+        uint32_t r8 = ((bg >> 11) & 0x1F) * 255U / 31U;
+        uint32_t g8 = ((bg >> 5) & 0x3F) * 255U / 63U;
+        uint32_t b8 = (bg & 0x1F) * 255U / 31U;
+        uint32_t lum = (r8 * 54U + g8 * 183U + b8 * 18U) >> 8;
+        return (lum > threshold) ? (uint16_t)0x0000 : (uint16_t)0xFFFF;
     }
 
     static void clearListMenuCache(ListMenuState &m, pipcore::GuiPlatform *plat)
@@ -186,9 +176,10 @@ namespace pipgui
 
         if (m.style.cardColor == 0 && m.style.cardActiveColor == 0)
         {
-            uint16_t base = _render.bgColor ? (uint16_t)_render.bgColor : 0x0000;
-            m.style.cardColor = to565(pipgui::detail::lighten888(from565(base), 4));
-            m.style.cardActiveColor = to565(rgb(0, 130, 220));
+            uint32_t base888 = _render.bgColor ? _render.bgColor : 0x000000;
+            uint16_t base565 = detail::color888To565(base888);
+            m.style.cardColor = (uint16_t)detail::blend565(base565, (uint16_t)0xFFFF, 18);
+            m.style.cardActiveColor = rgb(0, 130, 220);
             m.style.radius = 10;
             m.style.spacing = 10;
         }
@@ -223,8 +214,8 @@ namespace pipgui
 
         clearListMenuCache(m, platform());
 
-        m.style.cardColor = to565(cardColor);
-        m.style.cardActiveColor = to565(cardActiveColor);
+        m.style.cardColor = detail::color888To565(cardColor);
+        m.style.cardActiveColor = detail::color888To565(cardActiveColor);
         m.style.spacing = spacing;
         m.style.radius = radius;
         m.style.cardWidth = cardWidth;
@@ -378,6 +369,8 @@ namespace pipgui
         if (w <= 0 || h <= 0)
             return;
 
+        const uint16_t bgColor565 = detail::color888To565(bgColor);
+
         auto t = getDrawTarget();
         uint32_t now = nowMs();
 
@@ -441,7 +434,7 @@ namespace pipgui
         int32_t bgW = bgR - bgL;
         int32_t bgH = bgB - bgT;
         if (bgW > 0 && bgH > 0)
-            t->fillRect((int16_t)bgL, (int16_t)bgT, (int16_t)bgW, (int16_t)bgH, (uint16_t)bgColor);
+            t->fillRect((int16_t)bgL, (int16_t)bgT, (int16_t)bgW, (int16_t)bgH, bgColor565);
 
         int16_t visibleHeight = bottom - contentTop;
         if (visibleHeight < cardH)
@@ -505,7 +498,7 @@ namespace pipgui
 
         pipcore::GuiPlatform *plat = platform();
 
-        bool useCache = (cardMode || plainMode) && (bgColor == (uint16_t)_render.bgColor);
+        bool useCache = (cardMode || plainMode) && (bgColor == _render.bgColor);
 
         if (!useCache && m.cacheValid)
         {
@@ -553,8 +546,17 @@ namespace pipgui
             const String &sub = m.items[index].subtitle;
             bool hasSub = sub.length() > 0;
 
-            spr.fillScreen(_render.bgColor);
-            fillRoundRectFrc(0, 0, m.cacheW, m.cacheH, r, from565(bg));
+            bool prevRender = _flags.renderToSprite;
+            pipcore::Sprite *prevActive = _render.activeSprite;
+            _flags.renderToSprite = 1;
+            _render.activeSprite = &spr;
+
+            fillRect()
+                .at(0, 0)
+                .size(m.cacheW, m.cacheH)
+                .color(bg)
+                .draw();
+            fillRoundRect(0, 0, m.cacheW, m.cacheH, r, bg);
 
             int16_t txLocal = 10;
 
@@ -606,11 +608,6 @@ namespace pipgui
 
             int16_t tyTitleLocal = baseY;
             int16_t tySubLocal = baseY + titleH + (hasSub ? gapPx : 0);
-
-            bool prevRender = _flags.renderToSprite;
-            pipcore::Sprite *prevActive = _render.activeSprite;
-            _flags.renderToSprite = 1;
-            _render.activeSprite = &spr;
 
             setPSDFFontSize(titlePx);
             psdfDrawTextInternal(title, txLocal, tyTitleLocal, txtCol, bg, AlignLeft);
@@ -671,18 +668,19 @@ namespace pipgui
 
             const String &title = m.items[index].title;
 
-            spr.fillScreen(_render.bgColor);
+            bool prevRender = _flags.renderToSprite;
+            pipcore::Sprite *prevActive = _render.activeSprite;
+            _flags.renderToSprite = 1;
+            _render.activeSprite = &spr;
+
+            fillRect()
+                .at(0, 0)
+                .size(m.cacheW, m.cacheH)
+                .color(bg)
+                .draw();
             if (activeState)
             {
-                fillRoundRectFrc(0, 0, m.cacheW, m.cacheH, r, from565(bg));
-            }
-            else
-            {
-                fillRect()
-                    .at(0, 0)
-                    .size(m.cacheW, m.cacheH)
-                    .color(from565(bg))
-                    .draw();
+                fillRoundRect(0, 0, m.cacheW, m.cacheH, r, bg);
             }
 
             int16_t txLocal = 12;
@@ -701,11 +699,6 @@ namespace pipgui
             baseY -= 4;
             if (baseY < 2)
                 baseY = 2;
-
-            bool prevRender = _flags.renderToSprite;
-            pipcore::Sprite *prevActive = _render.activeSprite;
-            _flags.renderToSprite = 1;
-            _render.activeSprite = &spr;
 
             setPSDFFontSize(titlePx);
             psdfDrawTextInternal(title, txLocal, baseY, txtCol, bg, AlignLeft);
@@ -741,11 +734,10 @@ namespace pipgui
 
             bool active = (i == m.selectedIndex);
 
-            uint16_t bg = active ? m.style.cardActiveColor : (cardMode ? m.style.cardColor : bgColor);
-            uint32_t bg888 = from565(bg);
-            uint16_t border = to565(pipgui::detail::lighten888(bg888, 4));
-            uint16_t txtCol = to565(pipgui::detail::autoTextColorForBg(bg888));
-            uint16_t subCol = to565(pipgui::detail::lighten888((txtCol == 0xFFFF ? from565(0xC618) : from565(0x8410)), 0));
+            uint16_t bg = active ? m.style.cardActiveColor : (cardMode ? m.style.cardColor : bgColor565);
+            uint16_t border = (uint16_t)detail::blend565(bg, (uint16_t)0xFFFF, 18);
+            uint16_t txtCol = autoTextColor565List(bg);
+            uint16_t subCol = (txtCol == 0xFFFF) ? (uint16_t)0xC618 : (uint16_t)0x8410;
 
             if (!cardMode)
             {
@@ -753,10 +745,9 @@ namespace pipgui
 
                 if (plainMode && useCache)
                 {
-                    uint16_t bg2 = active ? m.style.cardActiveColor : bgColor;
-                    uint32_t bg2_888 = from565(bg2);
-                    uint16_t border2 = to565(pipgui::detail::lighten888(bg2_888, 4));
-                    uint16_t txt2 = to565(pipgui::detail::autoTextColorForBg(bg2_888));
+                    uint16_t bg2 = active ? m.style.cardActiveColor : bgColor565;
+                    uint16_t border2 = (uint16_t)detail::blend565(bg2, (uint16_t)0xFFFF, 18);
+                    uint16_t txt2 = autoTextColor565List(bg2);
                     uint16_t *buf = renderPlainItemToCache(i, active, bg2, border2, txt2);
                     if (buf)
                     {
@@ -768,7 +759,7 @@ namespace pipgui
 
                 if (active)
                 {
-                    fillRoundRectFrc(cx, yy, cardW, cardH, r, from565(bg));
+                    fillRoundRect(cx, yy, cardW, cardH, r, bg);
                 }
 
                 int16_t tx = cx + 12;
@@ -805,7 +796,7 @@ namespace pipgui
                 }
             }
 
-            fillRoundRectFrc(cx, yy, cardW, cardH, r, from565(bg));
+            fillRoundRect(cx, yy, cardW, cardH, r, bg);
 
             int16_t tx = cx + 10;
             const String &title = m.items[i].title;
@@ -948,7 +939,7 @@ namespace pipgui
 
             uint16_t col = t->color565(v, v, v);
 
-            t->fillRoundRect(trX, thY, 3, thH, 1, col);
+            t->fillRect(trX, thY, 3, thH, col);
         }
     }
 
@@ -985,6 +976,8 @@ namespace pipgui
             return false;
         if (w <= 0 || h <= 0)
             return false;
+
+        const uint16_t bgColor565 = detail::color888To565(bgColor);
 
         if (!_flags.spriteEnabled || !_disp.display)
         {
@@ -1174,7 +1167,7 @@ namespace pipgui
                         shift = hh;
                     size_t rowsToCopy = (size_t)(hh - shift);
                     memmove(buf, buf + (size_t)shift * (size_t)ww, rowsToCopy * (size_t)ww * sizeof(uint16_t));
-                    vp->fillRect(0, (int16_t)(hh - shift), (int16_t)ww, (int16_t)shift, bgColor);
+                    vp->fillRect(0, (int16_t)(hh - shift), (int16_t)ww, (int16_t)shift, bgColor565);
                 }
                 else
                 {
@@ -1183,7 +1176,7 @@ namespace pipgui
                         d = hh;
                     size_t rowsToCopy = (size_t)(hh - d);
                     memmove(buf + (size_t)d * (size_t)ww, buf, rowsToCopy * (size_t)ww * sizeof(uint16_t));
-                    vp->fillRect(0, 0, (int16_t)ww, (int16_t)d, bgColor);
+                    vp->fillRect(0, 0, (int16_t)ww, (int16_t)d, bgColor565);
                 }
             };
 

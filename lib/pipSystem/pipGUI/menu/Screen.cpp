@@ -161,7 +161,16 @@ namespace pipgui
 
         int16_t fw = _render.screenFromSprite.width();
         int16_t fh = _render.screenFromSprite.height();
-        _render.screenFromSprite.fillScreen(color888To565(0, 0, _render.bgColor));
+        {
+            pipcore::Sprite *prev = _render.activeSprite;
+            _render.activeSprite = &_render.screenFromSprite;
+            fillRect()
+                .at(0, 0)
+                .size(fw, fh)
+                .color(detail::color888To565(_render.bgColor))
+                .draw();
+            _render.activeSprite = prev;
+        }
         drawScaledSprite(_render.screenFromSprite, _render.sprite, fw, fh, 0, 0);
 
         clear(_render.bgColor);
@@ -170,7 +179,16 @@ namespace pipgui
 
         int16_t tw = _render.screenToSprite.width();
         int16_t th = _render.screenToSprite.height();
-        _render.screenToSprite.fillScreen(color888To565(0, 0, _render.bgColor));
+        {
+            pipcore::Sprite *prev = _render.activeSprite;
+            _render.activeSprite = &_render.screenToSprite;
+            fillRect()
+                .at(0, 0)
+                .size(tw, th)
+                .color(detail::color888To565(_render.bgColor))
+                .draw();
+            _render.activeSprite = prev;
+        }
         drawScaledSprite(_render.screenToSprite, _render.sprite, tw, th, 0, 0);
 
         _render.activeSprite = prevActive;
@@ -281,17 +299,6 @@ namespace pipgui
         // Update debug metrics periodically
         Debug::update();
         tickDebugDirtyOverlay(now);
-
-        // Update FRC seed for temporal dithering (if enabled)
-        if (_frc.temporalPeriodMs)
-        {
-            if ((now - _frc.lastUpdateMs) >= _frc.temporalPeriodMs)
-            {
-                _frc.lastUpdateMs = now;
-                _frc.seed = (uint32_t)((uint64_t)_frc.seed * 1664525U + 1013904223U);
-                _flags.needRedraw = 1;
-            }
-        }
 
         if (_flags.bootActive)
         {

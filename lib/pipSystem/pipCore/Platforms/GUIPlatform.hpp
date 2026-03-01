@@ -3,7 +3,6 @@
 #include <pipCore/Platforms/GuiDisplay.hpp>
 #include <cstdint>
 #include <cstddef>
-#include <cstdlib>
 
 namespace pipcore
 {
@@ -33,9 +32,6 @@ namespace pipcore
     class GuiPlatform
     {
     public:
-        static void setDefaultPlatform(GuiPlatform *platform) { defaultPlatformRef() = platform; }
-        static GuiPlatform *defaultPlatform() { return defaultPlatformRef(); }
-
         virtual ~GuiPlatform() = default;
         virtual uint32_t nowMs() = 0;
 
@@ -47,16 +43,8 @@ namespace pipcore
         virtual void storeMaxBrightnessPercent(uint8_t) {}
         virtual void setBacklightPercent(uint8_t) {}
 
-        virtual void *guiAlloc(size_t bytes, GuiAllocCaps caps = GuiAllocCaps::Default)
-        {
-            (void)caps;
-            return malloc(bytes);
-        }
-
-        virtual void guiFree(void *ptr)
-        {
-            free(ptr);
-        }
+        virtual void *guiAlloc(size_t bytes, GuiAllocCaps caps = GuiAllocCaps::Default) = 0;
+        virtual void guiFree(void *ptr) = 0;
 
         virtual bool guiConfigureDisplay(const GuiDisplayConfig &)
         {
@@ -70,11 +58,6 @@ namespace pipcore
 
         virtual GuiDisplay *guiDisplay() { return nullptr; }
 
-    private:
-        static GuiPlatform *&defaultPlatformRef()
-        {
-            static GuiPlatform *p = nullptr;
-            return p;
-        }
+        virtual uint8_t readProgmemByte(const void *addr) { return *(const uint8_t *)addr; }
     };
 }

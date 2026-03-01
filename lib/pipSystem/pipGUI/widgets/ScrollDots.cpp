@@ -22,8 +22,8 @@ namespace pipgui
                                float animProgress,
                                bool animate,
                                int8_t animDirection,
-                               uint32_t activeColor,
-                               uint32_t inactiveColor,
+                               uint16_t activeColor,
+                               uint16_t inactiveColor,
                                uint8_t dotRadius,
                                uint8_t spacing,
                                uint8_t activeWidth)
@@ -80,7 +80,7 @@ namespace pipgui
         fillRect()
             .at((int16_t)(rx - pad), (int16_t)(ry - pad))
             .size(rw, rh)
-            .color(_render.bgColor)
+            .color(detail::color888To565(_render.bgColor))
             .draw();
         drawScrollDotsImpl(left, top, count, activeIndex, prevIndex, animProgress, animate, animDirection,
                        activeColor, inactiveColor, dotRadius, spacing, activeWidth);
@@ -99,8 +99,8 @@ namespace pipgui
                             float animProgress,
                             bool animate,
                             int8_t animDirection,
-                            uint32_t activeColor,
-                            uint32_t inactiveColor,
+                            uint16_t activeColor,
+                            uint16_t inactiveColor,
                             uint8_t dotRadius,
                             uint8_t spacing,
                             uint8_t activeWidth)
@@ -170,7 +170,7 @@ namespace pipgui
         fillRect()
             .at(left, top)
             .size(totalW, h)
-            .color(_render.bgColor)
+            .color(detail::color888To565(_render.bgColor))
             .draw();
 
         if (taper)
@@ -193,10 +193,14 @@ namespace pipgui
                 int16_t r = (int16_t)((float)dotRadius * radiusScale + 0.5f);
                 if (r < 1)
                     r = 1;
-                uint32_t color = (i == (int)activeIndex)
-                    ? activeColor
-                    : detail::blend888(_render.bgColor, inactiveColor, (uint8_t)(opacity * 255.0f + 0.5f));
-                fillCircleFrc(cx, baseY, r, color);
+                uint16_t color = activeColor;
+                if (i != (int)activeIndex)
+                {
+                    uint8_t a = (uint8_t)(opacity * 255.0f + 0.5f);
+                    uint16_t bg565 = detail::color888To565(_render.bgColor);
+                    color = (uint16_t)detail::blend565(bg565, inactiveColor, a);
+                }
+                fillCircle(cx, baseY, r, color);
             }
         }
         else
@@ -204,13 +208,13 @@ namespace pipgui
             for (uint8_t i = 0; i < count; i++)
             {
                 int16_t cx = (int16_t)(baseX0 + (int16_t)i * (int16_t)spacing);
-                fillCircleFrc(cx, baseY, (int16_t)dotRadius, inactiveColor);
+                fillCircle(cx, baseY, (int16_t)dotRadius, inactiveColor);
             }
         }
 
         if (count == 1)
         {
-            fillCircleFrc(baseX0, baseY, (int16_t)dotRadius, activeColor);
+            fillCircle(baseX0, baseY, (int16_t)dotRadius, activeColor);
             return;
         }
 
@@ -270,7 +274,7 @@ namespace pipgui
             if (gap <= (int16_t)(dotRadius * 2))
             {
                 int16_t cx = (int16_t)((lx + rx) / 2);
-                fillCircleFrc(cx, baseY, (int16_t)dotRadius, activeColor);
+                fillCircle(cx, baseY, (int16_t)dotRadius, activeColor);
             }
             else
             {
@@ -278,14 +282,13 @@ namespace pipgui
                 int16_t pillW = (int16_t)(gap + (int16_t)dotRadius * 2);
                 int16_t pillY = (int16_t)(baseY - (int16_t)dotRadius);
                 uint8_t rad = (uint8_t)(dotRadius < 255 ? dotRadius : 255);
-                fillRoundRectFrc(pillX, pillY, pillW, (int16_t)((int16_t)dotRadius * 2), rad, activeColor);
+                fillRoundRect(pillX, pillY, pillW, (int16_t)((int16_t)dotRadius * 2), rad, activeColor);
             }
         }
         else if (!taper)
         {
             int16_t cx = baseX0 + (int16_t)activeIndex * (int16_t)spacing;
-            fillCircleFrc(cx, baseY, (int16_t)dotRadius, activeColor);
+            fillCircle(cx, baseY, (int16_t)dotRadius, activeColor);
         }
     }
 }
-

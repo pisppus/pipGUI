@@ -4,6 +4,15 @@
 
 namespace pipgui
 {
+    static inline uint16_t autoTextColor565Tile(uint16_t bg, uint8_t threshold = 140)
+    {
+        uint32_t r8 = ((bg >> 11) & 0x1F) * 255U / 31U;
+        uint32_t g8 = ((bg >> 5) & 0x3F) * 255U / 63U;
+        uint32_t b8 = (bg & 0x1F) * 255U / 31U;
+        uint32_t lum = (r8 * 54U + g8 * 183U + b8 * 18U) >> 8;
+        return (lum > threshold) ? (uint16_t)0x0000 : (uint16_t)0xFFFF;
+    }
+
     static bool ensureTileCapacityInternal(GUI *self, TileMenuState &m, uint8_t need)
     {
         if (!pipgui::detail::ensureCapacity(self->platform(), m.layout, m.itemCapacity, need))
@@ -59,9 +68,6 @@ namespace pipgui
             m.items[i].title = items[i].title ? String(items[i].title) : String("");
             m.items[i].subtitle = items[i].subtitle ? String(items[i].subtitle) : String("");
             m.items[i].targetScreen = items[i].targetScreen;
-            m.items[i].iconBitmap = items[i].iconBitmap;
-            m.items[i].iconW = items[i].iconW;
-            m.items[i].iconH = items[i].iconH;
         }
         if (m.style.cardColor == 0 && m.style.cardActiveColor == 0)
         {
@@ -671,21 +677,22 @@ namespace pipgui
             if (tileH < 20)
                 tileH = 20;
 
-            uint32_t bg = (i == m.selectedIndex) ? m.style.cardActiveColor : m.style.cardColor;
-            if (bg == 0)
-                bg = _render.bgColor;
-            fillRoundRectFrc(x, y, tileW, tileH, r, bg);
-            uint32_t border = pipgui::detail::lighten888(bg, 4);
+            uint32_t bg888 = (i == m.selectedIndex) ? m.style.cardActiveColor : m.style.cardColor;
+            if (bg888 == 0)
+                bg888 = _render.bgColor;
 
-            uint32_t txtCol = pipgui::detail::autoTextColorForBg(bg);
-            uint32_t subCol = pipgui::detail::lighten888((txtCol == 0xFFFFFF ? 0xC0C0C0 : 0x808080), 0);
+            uint16_t bg = detail::color888To565(bg888);
+            fillRoundRect(x, y, tileW, tileH, r, bg);
+
+            uint16_t border = (uint16_t)detail::blend565(bg, (uint16_t)0xFFFF, 18);
+            uint16_t txtCol = autoTextColor565Tile(bg);
+            uint16_t subCol = (txtCol == 0xFFFF) ? (uint16_t)0xC618 : (uint16_t)0x8410;
 
             const TileMenuState::Item &it = m.items[i];
             const String &title = it.title;
             const String &sub = it.subtitle;
 
             bool hasSub = (m.style.contentMode == TextSubtitle && sub.length() > 0);
-            bool hasIcon = (it.iconBitmap && it.iconW > 0 && it.iconH > 0);
 
             int16_t centerX = x + tileW / 2;
 
@@ -733,28 +740,15 @@ namespace pipgui
                     maxTextW = subW;
             }
 
-            int16_t iconW = hasIcon ? it.iconW : 0;
-            int16_t iconH = hasIcon ? it.iconH : 0;
-            int16_t gapIconText = (hasIcon && totalTextH > 0) ? 6 : 0;
-
             int16_t blockH = totalTextH;
-            if (hasIcon)
-                blockH += iconH + gapIconText;
             if (blockH <= 0)
-                blockH = hasIcon ? iconH : 0;
+                blockH = 0;
 
             int16_t baseY = y + (int16_t)((tileH - blockH) / 2);
             if (baseY < y + 2)
                 baseY = (int16_t)(y + 2);
 
-            int16_t iconY = baseY;
-            int16_t textTopY = baseY + (hasIcon ? (iconH + gapIconText) : 0);
-
-            if (hasIcon)
-            {
-                int16_t iconX = centerX - iconW / 2;
-                t->pushImage(iconX, iconY, iconW, iconH, it.iconBitmap);
-            }
+            int16_t textTopY = baseY;
 
             {
                 int16_t tyTitle = textTopY;
@@ -765,18 +759,14 @@ namespace pipgui
 
                 setPSDFFontSize(titlePx);
                 {
-                    uint16_t bg565 = color888To565(titleX, tyTitle, bg);
-                    uint16_t fg565 = color888To565(titleX, tyTitle, txtCol);
-                    psdfDrawTextInternal(title, titleX, tyTitle, fg565, bg565, AlignLeft);
+                    psdfDrawTextInternal(title, titleX, tyTitle, txtCol, bg, AlignLeft);
                 }
 
                 if (hasSub && subPx > 0)
                 {
                     setPSDFFontSize(subPx);
                     {
-                        uint16_t bg565 = color888To565(subX, tySub, bg);
-                        uint16_t fg565 = color888To565(subX, tySub, subCol);
-                        psdfDrawTextInternal(sub, subX, tySub, fg565, bg565, AlignLeft);
+                        psdfDrawTextInternal(sub, subX, tySub, subCol, bg, AlignLeft);
                     }
                 }
 

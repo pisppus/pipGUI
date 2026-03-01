@@ -221,12 +221,13 @@ namespace pipgui
             if (cardRadius < 4)
                 cardRadius = 4;
 
-            uint32_t cardBorderColor = detail::blend888(cardColor, 0x000000, 31);
+            uint16_t cardBg565 = detail::color888To565(cardColor);
+            uint16_t cardBorder565 = (uint16_t)detail::blend565(cardBg565, (uint16_t)0x0000, 31);
 
-            fillRoundRectFrc(cardX, cardY, cardW, cardH, (uint8_t)cardRadius, cardBorderColor);
-            fillRoundRectFrc(cardX + 1, cardY + 1, cardW - 2, cardH - 2,
-                             (uint8_t)(cardRadius > 2 ? (cardRadius - 2) : cardRadius),
-                             cardColor);
+            fillRoundRect(cardX, cardY, cardW, cardH, (uint8_t)cardRadius, cardBorder565);
+            fillRoundRect(cardX + 1, cardY + 1, cardW - 2, cardH - 2,
+                          (uint8_t)(cardRadius > 2 ? (cardRadius - 2) : cardRadius),
+                          cardBg565);
 
             uint16_t titleSz = (uint16_t)max(9, (int)(19 * scale));
             uint16_t msgSz = (uint16_t)max(7, (int)(13 * scale));
@@ -254,8 +255,8 @@ namespace pipgui
             _flags.renderToSprite = 1;
             _render.activeSprite = &_render.sprite;
 
-            uint16_t bg565Title = color888To565((int16_t)(cardX + (cardW - tW) / 2), startY, cardColor);
-            uint16_t fg565Title = color888To565((int16_t)(cardX + (cardW - tW) / 2), startY, titleColor);
+            uint16_t bg565Title = detail::color888To565(cardColor);
+            uint16_t fg565Title = detail::color888To565(titleColor);
 
             setPSDFWeight(Semibold);
             setPSDFFontSize(titleSz);
@@ -271,8 +272,8 @@ namespace pipgui
 
             int16_t msgX = (int16_t)(cardX + (cardW - mW) / 2);
             int16_t msgY = (int16_t)(startY + tH + gap);
-            uint16_t bg565Msg = color888To565(msgX, msgY, cardColor);
-            uint16_t fg565Msg = color888To565(msgX, msgY, msgColor);
+            uint16_t bg565Msg = detail::color888To565(cardColor);
+            uint16_t fg565Msg = detail::color888To565(msgColor);
             psdfDrawTextInternal(_notif.message,
                                 msgX,
                                 msgY,

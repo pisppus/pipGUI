@@ -113,7 +113,8 @@ namespace pipcore
         _transport = new Esp32St7789Spi(
             cfg.mosi, cfg.sclk, cfg.cs, cfg.dc, cfg.rst, cfg.hz);
 
-        bool ok = _display.configure(_transport, cfg.width, cfg.height, cfg.order, cfg.invert, cfg.swap, cfg.xOffset, cfg.yOffset);
+        SelectedDisplay *disp = GetDisplayTyped();
+        bool ok = disp->configure(_transport, cfg.width, cfg.height, cfg.order, cfg.invert, cfg.swap, cfg.xOffset, cfg.yOffset);
         if (!ok)
         {
             delete _transport;
@@ -130,13 +131,18 @@ namespace pipcore
         if (!_displayConfigured)
             return false;
 
-        return _display.begin(rotation);
+        return GetDisplay()->begin(rotation);
     }
 
     GuiDisplay *ESP32Platform::guiDisplay()
     {
         if (!_displayConfigured)
             return nullptr;
-        return &_display;
+        return GetDisplay();
+    }
+
+    uint8_t ESP32Platform::readProgmemByte(const void *addr)
+    {
+        return pgm_read_byte(addr);
     }
 }

@@ -230,22 +230,9 @@ namespace pipgui
             DirtyRect newLeft = {};
 
             int16_t startX = bar.x + 2;
-            int16_t cursor = startX;
-            for (uint8_t i = 0; i < _status.iconLeftCount; ++i)
-            {
-                const StatusIcon &ic = _status.iconsLeft[i];
-                if (!ic.bitmap || ic.w == 0 || ic.h == 0)
-                    continue;
-                if (cursor + (int16_t)ic.w > bar.x + bar.w)
-                    break;
-                cursor = (int16_t)(cursor + ic.w + 2);
-            }
-
-            int16_t iconsSpanW = cursor - startX;
             int16_t tw = textWidth(_status.textLeft);
-            int16_t totalW = iconsSpanW + tw;
-            if (totalW > 0)
-                newLeft = {(int16_t)(startX - pad), (int16_t)(bar.y - pad), (int16_t)(totalW + pad * 2), (int16_t)(bar.h + pad * 2)};
+            if (tw > 0)
+                newLeft = {(int16_t)(startX - pad), (int16_t)(bar.y - pad), (int16_t)(tw + pad * 2), (int16_t)(bar.h + pad * 2)};
 
             DirtyRect merged = unionRect(newLeft, _status.lastLeft);
             dirtyLeft = merged;
@@ -292,26 +279,11 @@ namespace pipgui
         {
             DirtyRect newCenter = {};
 
-            int16_t iconsW = 0;
-            for (uint8_t i = 0; i < _status.iconCenterCount; ++i)
-            {
-                const StatusIcon &ic = _status.iconsCenter[i];
-                if (!ic.bitmap || ic.w == 0)
-                    continue;
-                if (iconsW > 0)
-                    iconsW += 2;
-                iconsW += ic.w;
-            }
-
             int16_t textW = textWidth(_status.textCenter);
-
-            int16_t gap = (iconsW > 0 && textW > 0) ? 4 : 0;
-            int16_t totalW = iconsW + gap + textW;
-
-            if (totalW > 0)
+            if (textW > 0)
             {
-                int16_t startX = bar.x + (bar.w - totalW) / 2;
-                newCenter = {(int16_t)(startX - pad), (int16_t)(bar.y - pad), (int16_t)(totalW + pad * 2), (int16_t)(bar.h + pad * 2)};
+                int16_t startX = bar.x + (bar.w - textW) / 2;
+                newCenter = {(int16_t)(startX - pad), (int16_t)(bar.y - pad), (int16_t)(textW + pad * 2), (int16_t)(bar.h + pad * 2)};
             }
 
             DirtyRect merged = unionRect(newCenter, _status.lastCenter);
@@ -331,26 +303,13 @@ namespace pipgui
             }
 
             int16_t rightBound = rightCursor;
-            int16_t cursor = rightCursor;
-            for (int i = (int)_status.iconRightCount - 1; i >= 0; --i)
-            {
-                const StatusIcon &ic = _status.iconsRight[i];
-                if (!ic.bitmap || ic.w == 0 || ic.h == 0)
-                    continue;
-                if (cursor - (int16_t)ic.w < bar.x + 2)
-                    break;
-                cursor = (int16_t)(cursor - ic.w - 2);
-            }
-
-            int16_t iconsSpanW = rightBound - cursor;
             int16_t tw = textWidth(_status.textRight);
-            int16_t totalW = iconsSpanW + tw;
-            if (totalW > 0)
+            if (tw > 0)
             {
-                int16_t startX = (int16_t)(rightBound - totalW);
+                int16_t startX = (int16_t)(rightBound - tw);
                 if (startX < bar.x)
                     startX = bar.x;
-                newRight = {(int16_t)(startX - pad), (int16_t)(bar.y - pad), (int16_t)(totalW + pad * 2), (int16_t)(bar.h + pad * 2)};
+                newRight = {(int16_t)(startX - pad), (int16_t)(bar.y - pad), (int16_t)(tw + pad * 2), (int16_t)(bar.h + pad * 2)};
             }
 
             DirtyRect merged = unionRect(newRight, _status.lastRight);
@@ -392,45 +351,6 @@ namespace pipgui
         _status.dirtyMask &= (uint8_t)~(mask);
     }
 
-    static void addStatusIcon(pipgui::StatusIcon *&arr, uint8_t &count, uint8_t &capacity,
-                              const uint16_t *bitmap, uint8_t w, uint8_t h)
-    {
-        if (!bitmap || w == 0 || h == 0)
-            return;
-        if (!pipgui::detail::ensureCapacity(GUI::sharedPlatform(), arr, capacity, (uint8_t)(count + 1)))
-            return;
-
-        arr[count].bitmap = bitmap;
-        arr[count].w = w;
-        arr[count].h = h;
-        ++count;
-    }
-
-    void GUI::addStatusBarIcon(StatusBarIconPos pos, const uint16_t *bitmap, uint8_t w, uint8_t h)
-    {
-        switch (pos)
-        {
-        case StatusBarIconLeft:
-            addStatusIcon(_status.iconsLeft, _status.iconLeftCount, _status.iconLeftCapacity, bitmap, w, h);
-            break;
-        case StatusBarIconCenter:
-            addStatusIcon(_status.iconsCenter, _status.iconCenterCount, _status.iconCenterCapacity, bitmap, w, h);
-            break;
-        case StatusBarIconRight:
-            addStatusIcon(_status.iconsRight, _status.iconRightCount, _status.iconRightCapacity, bitmap, w, h);
-            break;
-        default:
-            break;
-        }
-
-        if (pos == StatusBarIconLeft)
-            _status.dirtyMask |= StatusBarDirtyLeft;
-        else if (pos == StatusBarIconCenter)
-            _status.dirtyMask |= StatusBarDirtyCenter;
-        else if (pos == StatusBarIconRight)
-            _status.dirtyMask |= StatusBarDirtyRight;
-    }
-
     void GUI::setStatusBarCustom(StatusBarCustomCallback cb)
     {
         _status.custom = cb;
@@ -469,19 +389,8 @@ namespace pipgui
         if (!t)
             return;
 
-        auto expand565 = [](uint16_t c) -> uint32_t
-        {
-            uint8_t r5 = (uint8_t)((c >> 11) & 0x1F);
-            uint8_t g6 = (uint8_t)((c >> 5) & 0x3F);
-            uint8_t b5 = (uint8_t)(c & 0x1F);
-            uint8_t r8 = (uint8_t)((r5 * 255U) / 31U);
-            uint8_t g8 = (uint8_t)((g6 * 255U) / 63U);
-            uint8_t b8 = (uint8_t)((b5 * 255U) / 31U);
-            return (uint32_t)((r8 << 16) | (g8 << 8) | b8);
-        };
-
-        uint32_t bg888 = expand565(_status.bg);
-        uint32_t fg888 = expand565(_status.fg);
+        uint16_t bg565 = _status.bg;
+        uint16_t fg565 = _status.fg;
 
         int16_t x = 0;
         int16_t y = 0;
@@ -516,7 +425,7 @@ namespace pipgui
             fillRect()
                 .at(x, y)
                 .size(w, h)
-                .color(bg888)
+                .color(bg565)
                 .draw();
         }
         else if (_status.style == StatusBarStyleBlurGradient)
@@ -532,7 +441,7 @@ namespace pipgui
             uint8_t blurRadius = (uint8_t)(dim / 8);
             if (blurRadius < 1)
                 blurRadius = 1;
-            drawBlurStripImpl(x, y, w, h, blurRadius, dir, true, 0, 0, -1);
+            drawBlurRegion(x, y, w, h, blurRadius, dir, true, 0, 0, -1);
         }
 
         // If debug metrics mode is enabled, only render metrics and skip normal content
@@ -568,8 +477,6 @@ namespace pipgui
             {
                 if (!s.length())
                     return;
-                uint16_t fg565 = color888To565(tx, baseY, fg888);
-                uint16_t bg565 = color888To565(tx, baseY, bg888);
                 psdfDrawTextInternal(s, tx, baseY, fg565, bg565, AlignLeft);
             };
 
@@ -577,15 +484,15 @@ namespace pipgui
             Debug::formatStatusBar(metricsText, sizeof(metricsText));
             int16_t tw = measureText(String(metricsText));
             int16_t mx = x + (w - tw) / 2;
-            if (mx < x + 2) mx = x + 2;
+            if (mx < x + 2)
+                mx = x + 2;
             drawTextAt(String(metricsText), mx);
 
             _flags.renderToSprite = prevRender;
             _render.activeSprite = prevActive;
             return;
         }
-        
-        // Normal status bar rendering
+
         int16_t textH = 0;
 
         {
@@ -617,26 +524,10 @@ namespace pipgui
         {
             if (!s.length())
                 return;
-            uint16_t fg565 = color888To565(tx, baseY, fg888);
-            uint16_t bg565 = color888To565(tx, baseY, bg888);
             psdfDrawTextInternal(s, tx, baseY, fg565, bg565, AlignLeft);
         };
 
         int16_t leftX = x + 2;
-        for (uint8_t i = 0; i < _status.iconLeftCount; ++i)
-        {
-            const StatusIcon &ic = _status.iconsLeft[i];
-            if (!ic.bitmap || ic.w == 0 || ic.h == 0)
-                continue;
-            if (leftX + ic.w > x + w)
-                break;
-            int16_t iy = y + (h - ic.h) / 2;
-            if (iy < y)
-                iy = y;
-            blitImage565Frc(leftX, iy, ic.bitmap, ic.w, ic.h);
-            leftX += ic.w + 2;
-        }
-
         if (_status.textLeft.length() > 0)
         {
             int16_t lx = leftX;
@@ -674,36 +565,39 @@ namespace pipgui
             if (by < y)
                 by = y;
 
-            uint32_t frameColor = _status.fg;
-            uint32_t fillCol = (_status.batteryLevel <= 20) ? 0xFF0000 : 0x00D604;
+            uint16_t frameColor = _status.fg;
+            uint16_t fillCol = (_status.batteryLevel <= 20) ? 0xF800 : 0x07E0;
 
-            drawIcon(pipgui::battery_layer2, bx, by, (uint16_t)iconSize, fillCol, bg888);
+            drawIcon()
+                .at(bx, by)
+                .size((uint16_t)iconSize)
+                .icon(battery_layer2)
+                .color(fillCol)
+                .bgColor(bg565)
+                .draw();
             int16_t cutX = (int16_t)(bx + (int32_t)iconSize * _status.batteryLevel / 100);
             fillRect()
                 .at(cutX, by)
                 .size((int16_t)(bx + iconSize - cutX), (int16_t)iconSize)
-                .color(bg888)
+                .color(bg565)
                 .draw();
 
-            drawIcon(pipgui::battery_layer0, bx, by, (uint16_t)iconSize, frameColor, bg888);
-            drawIcon(pipgui::battery_layer1, bx, by, (uint16_t)iconSize, frameColor, bg888);
+            drawIcon()
+                .at(bx, by)
+                .size((uint16_t)iconSize)
+                .icon(battery_layer0)
+                .color(frameColor)
+                .bgColor(bg565)
+                .draw();
+            drawIcon()
+                .at(bx, by)
+                .size((uint16_t)iconSize)
+                .icon(battery_layer1)
+                .color(frameColor)
+                .bgColor(bg565)
+                .draw();
 
             rightCursor = bx - 4;
-        }
-
-        for (int i = (int)_status.iconRightCount - 1; i >= 0; --i)
-        {
-            const StatusIcon &ic = _status.iconsRight[i];
-            if (!ic.bitmap || ic.w == 0 || ic.h == 0)
-                continue;
-            if (rightCursor - (int16_t)ic.w < x + 2)
-                break;
-            int16_t ixr = rightCursor - ic.w;
-            int16_t iy = y + (h - ic.h) / 2;
-            if (iy < y)
-                iy = y;
-            blitImage565Frc(ixr, iy, ic.bitmap, ic.w, ic.h);
-            rightCursor = ixr - 2;
         }
 
         if (_status.textRight.length() > 0)
@@ -716,48 +610,17 @@ namespace pipgui
             rightCursor = rx - 4;
         }
 
-        if (_status.textCenter.length() > 0 || _status.iconCenterCount > 0)
+        if (_status.textCenter.length() > 0)
         {
-            int16_t iconsW = 0;
-            for (uint8_t i = 0; i < _status.iconCenterCount; ++i)
-            {
-                const StatusIcon &ic = _status.iconsCenter[i];
-                if (!ic.bitmap || ic.w == 0)
-                    continue;
-                if (iconsW > 0)
-                    iconsW += 2;
-                iconsW += ic.w;
-            }
-
             int16_t textW = measureText(_status.textCenter);
-            int16_t gap = (iconsW > 0 && textW > 0) ? 4 : 0;
-            int16_t totalW = iconsW + gap + textW;
-
-            if (totalW > 0)
+            if (textW > 0)
             {
-                int16_t startX = x + (w - totalW) / 2;
-                int16_t curX = startX;
-
-                for (uint8_t i = 0; i < _status.iconCenterCount; ++i)
-                {
-                    const StatusIcon &ic = _status.iconsCenter[i];
-                    if (!ic.bitmap || ic.w == 0 || ic.h == 0)
-                        continue;
-                    int16_t iy = y + (h - ic.h) / 2;
-                    if (iy < y)
-                        iy = y;
-                    blitImage565Frc(curX, iy, ic.bitmap, ic.w, ic.h);
-                    curX += ic.w + 2;
-                }
-
-                if (textW > 0)
-                {
-                    if (curX < x + 2)
-                        curX = x + 2;
-                    if (curX + textW > x + w - 2)
-                        curX = x + w - 2 - textW;
-                    drawTextAt(_status.textCenter, curX);
-                }
+                int16_t tx = x + (w - textW) / 2;
+                if (tx < x + 2)
+                    tx = x + 2;
+                if (tx + textW > x + w - 2)
+                    tx = x + w - 2 - textW;
+                drawTextAt(_status.textCenter, tx);
             }
         }
 

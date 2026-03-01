@@ -8,8 +8,6 @@
 
 struct spi_transaction_t;
 
-typedef void (*transaction_cb_t)(spi_transaction_t *trans);
-
 namespace pipcore
 {
     class Esp32St7789Spi final : public ISt7789Transport
@@ -32,6 +30,7 @@ namespace pipcore
         bool initSpi();
         void waitQueued();
         void flushQueued();
+        inline void setDcCached(int level);
 
         int8_t _pinMosi;
         int8_t _pinSclk;
@@ -47,6 +46,7 @@ namespace pipcore
         bool _transInFlight[2];
         int _dmaNext;
         int _dmaInflight;
+        int8_t _dcLevel;
         bool _initialized;
     };
 }

@@ -82,8 +82,8 @@ namespace pipgui
             tx -= (int16_t)(tw / 2);
             if (tx + tw < windowX || tx > windowX + windowW)
                 continue;
-            uint16_t fg565 = color888To565(tx, baseY, fgColor);
-            uint16_t bg565 = color888To565(tx, baseY, bgColor);
+            uint16_t fg565 = detail::color888To565(fgColor);
+            uint16_t bg565 = detail::color888To565(bgColor);
             if (alpha < 255)
                 fg565 = detail::blend565(bg565, fg565, alpha);
             psdfDrawTextInternal(options[i], tx, baseY, fg565, bg565, AlignLeft);
@@ -162,8 +162,8 @@ namespace pipgui
             ty -= (int16_t)(th / 2);
             if (ty + th < windowY || ty > windowY + windowH)
                 continue;
-            uint16_t fg565 = color888To565(baseX, ty, fgColor);
-            uint16_t bg565 = color888To565(baseX, ty, bgColor);
+            uint16_t fg565 = detail::color888To565(fgColor);
+            uint16_t bg565 = detail::color888To565(bgColor);
             if (alpha < 255)
                 fg565 = detail::blend565(bg565, fg565, alpha);
             psdfDrawTextInternal(options[i], baseX, ty, fg565, bg565, AlignCenter);

@@ -52,6 +52,8 @@ namespace pipgui
 
         auto draw = [&](uint32_t fg)
         {
+            const uint16_t fg565 = detail::color888To565(fg);
+            const uint16_t bg565 = detail::color888To565(_boot.bgColor);
             if (_flags.spriteEnabled)
             {
                 bool prevRender = _flags.renderToSprite;
@@ -59,7 +61,7 @@ namespace pipgui
 
                 _render.activeSprite = &_render.sprite;
                 _flags.renderToSprite = 1;
-                drawCenteredTitle(_boot.title, _boot.subtitle, fg, _boot.bgColor);
+                drawCenteredTitle(_boot.title, _boot.subtitle, fg565, bg565);
 
                 _flags.renderToSprite = prevRender;
                 _render.activeSprite = prevActive;
@@ -68,7 +70,7 @@ namespace pipgui
             }
             else
             {
-                drawCenteredTitle(_boot.title, _boot.subtitle, fg, _boot.bgColor);
+                drawCenteredTitle(_boot.title, _boot.subtitle, fg565, bg565);
             }
         }; 
 
@@ -112,7 +114,7 @@ namespace pipgui
                 _flags.renderToSprite = 1;
             }
 
-            clear(_boot.bgColor);
+            clear(detail::color888To565(_boot.bgColor));
 
             uint8_t alpha = (uint8_t)(fadeEase * 255.0f + 0.5f);
             uint32_t fgBlend = detail::blend888(_boot.bgColor, _boot.fgColor, alpha);
@@ -148,16 +150,16 @@ namespace pipgui
             int16_t topY = (_boot.y != -1) ? _boot.y : (int16_t)((_render.screenHeight - totalH) / 2);
             int16_t cx = (_boot.x != -1) ? _boot.x : (int16_t)(_render.screenWidth / 2);
 
-            uint16_t fgBlend565 = color888To565(cx, topY, fgBlend);
-            uint16_t bg565 = color888To565(cx, topY, _boot.bgColor);
+            uint16_t fgBlend565 = detail::color888To565(fgBlend);
+            uint16_t bg565 = detail::color888To565(_boot.bgColor);
             setPSDFFontSize(titlePx);
             psdfDrawTextInternal(_boot.title, cx, topY, fgBlend565, bg565, AlignCenter);
 
             if (hasSub)
             {
                 int16_t subY = topY + titleH + spacing;
-                uint16_t fgBlendSub = color888To565(cx, subY, fgBlend);
-                uint16_t bg565Sub = color888To565(cx, subY, _boot.bgColor);
+                uint16_t fgBlendSub = detail::color888To565(fgBlend);
+                uint16_t bg565Sub = detail::color888To565(_boot.bgColor);
                 setPSDFFontSize(subPx);
                 psdfDrawTextInternal(_boot.subtitle, cx, subY, fgBlendSub, bg565Sub, AlignCenter);
             }

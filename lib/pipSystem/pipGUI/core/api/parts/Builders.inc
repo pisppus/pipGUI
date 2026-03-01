@@ -12,3 +12,4 @@
 #include "Builders/Primitives.inc"
 #include "Builders/Effects.inc"
 #include "Builders/Widgets.inc"
+#include "Builders/Text.inc"

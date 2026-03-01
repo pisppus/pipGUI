@@ -1,15 +1,11 @@
 ﻿#include <Arduino.h>
 #include <SPIFFS.h>
 #include <math.h>
-#include <pipGUI/core/api/pipGUI.hpp>
-#include <pipGUI/icons/metrics.hpp>
-#include <pipCore/Platforms/ESP32/GUI.hpp>
-#include <pipCore/Displays/ST7789/Display.hpp>
+#include <pipSystem.hpp>
 
 using namespace pipgui;
 
 GUI ui;
-static pipcore::ESP32Platform g_platform;
 
 Button btnNext(2, Pullup);
 Button btnPrev(4, Pullup);
@@ -88,122 +84,148 @@ static void runBootAnimation(GUI &ui, Button &next, Button &prev, BootAnimation 
 void screenPrimitivesDemo(GUI &ui);
 void screenGradientsDemo(GUI &ui);
 void screenFontWeightDemo(GUI &ui);
+void screenCircleDemo(GUI &ui);
 
 void screenMain(GUI &ui)
 {
-  uint32_t bg = ui.rgb(0, 0, 0);
-  ui.clear(bg);
+  uint16_t bg565 = ui.rgb(0, 0, 0);
+  ui.clear(bg565);
 
   if (ui.psdfFontLoaded())
   {
     ui.setTextStyle(H1);
-    ui.drawPSDFText("Main menu", -1, -1, ui.rgb(255, 255, 255), bg, AlignCenter);
+    ui.drawPSDFText("Main menu", -1, -1, ui.rgb(255, 255, 255), bg565, AlignCenter);
   }
 
   const int16_t ix = 12;
   const int16_t iy = 12;
   const uint16_t is = 48;
   const uint8_t level = g_batteryLevel;
-  const uint32_t fillCol = (level <= 20) ? ui.rgb(255, 40, 40) : ui.rgb(80, 255, 120);
+  const uint16_t fill565 = (level <= 20) ? ui.rgb(255, 40, 40) : ui.rgb(80, 255, 120);
+  const uint32_t fill888 = rgb565(fill565);
+  const uint32_t bg888 = rgb565(bg565);
 
-  ui.drawIcon(pipgui::battery_layer2, ix, iy, is, fillCol, bg);
+  ui.drawIcon()
+      .at(ix, iy)
+      .size(is)
+      .icon(battery_layer2)
+      .color(fill565)
+      .bgColor(bg565)
+      .draw();
 
   const int16_t cutX = (int16_t)(ix + (int16_t)((uint32_t)is * (uint32_t)level) / 100u);
   ui.fillRect()
       .at(cutX, iy)
       .size((int16_t)(ix + (int16_t)is - cutX), (int16_t)is)
-      .color(bg)
+      .color(bg565)
       .draw();
 
-  ui.drawIcon(pipgui::battery_layer0, ix, iy, is, ui.rgb(255, 255, 255), bg);
-  ui.drawIcon(pipgui::battery_layer1, ix, iy, is, ui.rgb(255, 255, 255), bg);
-  ui.drawIcon(pipgui::warning_layer0, 70, 12, 48, ui.rgb(255, 200, 0), bg);
+  ui.drawIcon()
+      .at(ix, iy)
+      .size(is)
+      .icon(battery_layer0)
+      .color(0xFFFF)
+      .bgColor(bg565)
+      .draw();
+  ui.drawIcon()
+      .at(ix, iy)
+      .size(is)
+      .icon(battery_layer1)
+      .color(0xFFFF)
+      .bgColor(bg565)
+      .draw();
+  ui.drawIcon()
+      .at(70, 12)
+      .size(48)
+      .icon(warning_layer0)
+      .color(0xFF00)
+      .bgColor(bg565)
+      .draw();
 }
 
 void screenSettings(GUI &ui)
 {
-  uint32_t bg = ui.rgb(0, 31, 31);
-  ui.clear(bg);
+  uint16_t bg565 = ui.rgb(0, 31, 31);
+  ui.clear(bg565);
 
   if (ui.psdfFontLoaded())
   {
     ui.setTextStyle(H1);
-    ui.drawPSDFText("Settings menu", -1, 80, rgb565(0xFFFF), bg, AlignCenter);
+    ui.drawPSDFText("Settings menu", -1, 80, rgb565(0xFFFF), bg565, AlignCenter);
   }
 
   const String label = settingsBtnState.loading ? String("Saving") : String("Show modal");
 
   ui.drawButton()
       .label(label)
-      .icon(ICON_DOT_WHITE, 2, 2)
       .at(60, 20)
-      .size(200, 30)
-      .baseColor(ui.rgb(80, 150, 255))
-      .radius(7)
+      .size(120, 44)
+      .baseColor(ui.rgb(40, 150, 255))
+      .radius(10)
       .state(settingsBtnState)
       .draw();
 }
 
 void screenGlowDemo(GUI &ui)
 {
-  uint32_t bg = ui.rgb(10, 10, 10);
-  ui.clear(bg);
+  uint16_t bg565 = ui.rgb(10, 10, 10);
+  ui.clear(bg565);
 
   ui.drawGlowCircle()
-      .at(60, 90)
-      .radius(16)
+      .at(70, 95)
+      .radius(28)
       .fillColor(ui.rgb(255, 40, 40))
-      .bgColor(bg)
-      .glowSize(14)
+      .bgColor(bg565)
+      .glowSize(20)
       .glowStrength(240)
       .anim(Pulse)
       .pulsePeriodMs(900)
       .draw();
 
   ui.drawGlowCircle()
-      .at(60, 160)
-      .radius(12)
+      .at(70, 175)
+      .radius(22)
       .fillColor(ui.rgb(80, 255, 120))
-      .bgColor(bg)
-      .glowSize(10)
+      .bgColor(bg565)
+      .glowSize(18)
       .glowStrength(200)
       .draw();
 
-  ui.drawGlowRoundRect()
+  ui.drawGlowRect()
       .at(center, 70)
-      .size(110, 56)
-      .radius(14)
+      .size(150, 78)
+      .radius(18)
       .fillColor(ui.rgb(80, 150, 255))
-      .bgColor(bg)
-      .glowSize(12)
+      .bgColor(bg565)
+      .glowSize(18)
       .glowStrength(220)
       .anim(Pulse)
       .pulsePeriodMs(1400)
       .draw();
 
-  ui.drawGlowRoundRect()
-      .at(110, 150)
-      .size(110, 56)
-      .radius(14)
+  ui.drawGlowRect()
+      .at(140, 175)
+      .size(150, 78)
+      .radius(18)
       .fillColor(ui.rgb(255, 180, 0))
-      .bgColor(bg)
-      .glowSize(10)
+      .bgColor(bg565)
+      .glowSize(16)
       .glowStrength(180)
       .draw();
 
   if (ui.psdfFontLoaded())
   {
     ui.setTextStyle(H2);
-    ui.drawPSDFText("Glow demo", -1, 22, rgb565(0xFFFF), bg, AlignCenter);
+    ui.drawPSDFText("Glow demo", -1, 22, rgb565(0xFFFF), bg565, AlignCenter);
     ui.setTextStyle(Body);
-    ui.drawPSDFText("REC / shapes", -1, 44, ui.rgb(200, 200, 200), bg, AlignCenter);
+    ui.drawPSDFText("REC / shapes", -1, 44, ui.rgb(200, 200, 200), bg565, AlignCenter);
   }
 }
 
 void screenBlurDemo(GUI &ui)
 {
-  uint32_t bg = ui.rgb(10, 10, 10);
-  ui.clear(bg);
+  uint16_t bg565 = ui.rgb(10, 10, 10);
+  ui.clear(bg565);
 
   uint16_t w = ui.screenWidth();
   int16_t statusH = 20; // как в configureStatusBar
@@ -236,7 +258,7 @@ void screenBlurDemo(GUI &ui)
   }
 
   // Блюр-полоска сверху движущихся фигур
-  ui.drawBlurStrip()
+  ui.drawBlur()
       .at(0, bandY)
       .size((int16_t)w, bandH)
       .radius(10)
@@ -274,10 +296,10 @@ void screenBlurDemo(GUI &ui)
   if (ui.psdfFontLoaded())
   {
     ui.setTextStyle(H2);
-    ui.drawPSDFText("Blur strip", -1, (int16_t)(bandY + bandH + 60), rgb565(0xFFFF), bg, AlignCenter);
+    ui.drawPSDFText("Blur strip", -1, (int16_t)(bandY + bandH + 60), rgb565(0xFFFF), bg565, AlignCenter);
     ui.setTextStyle(Caption);
-    ui.drawPSDFText("Next: change screen", -1, (int16_t)(bandY + bandH + 80), ui.rgb(160, 160, 160), bg, AlignCenter);
-    ui.drawPSDFText("Prev: back / OK", -1, (int16_t)(bandY + bandH + 96), ui.rgb(160, 160, 160), bg, AlignCenter);
+    ui.drawPSDFText("Next: change screen", -1, (int16_t)(bandY + bandH + 80), ui.rgb(160, 160, 160), bg565, AlignCenter);
+    ui.drawPSDFText("Prev: back / OK", -1, (int16_t)(bandY + bandH + 96), ui.rgb(160, 160, 160), bg565, AlignCenter);
   }
 }
 
@@ -406,13 +428,13 @@ void screenProgressDemo(GUI &ui)
 
 void screenProgressTextDemo(GUI &ui)
 {
-  uint32_t bg = ui.rgb(10, 10, 10);
-  ui.clear(bg);
+  uint16_t bg565 = ui.rgb(10, 10, 10);
+  ui.clear(bg565);
 
   if (ui.psdfFontLoaded())
   {
     ui.setTextStyle(H2);
-    ui.drawPSDFText("Progress with text", -1, 24, ui.rgb(220, 220, 220), bg, AlignCenter);
+    ui.drawPSDFText("Progress with text", -1, 24, ui.rgb(220, 220, 220), bg565, AlignCenter);
   }
 
   uint32_t base = ui.rgb(20, 20, 20);
@@ -454,17 +476,17 @@ void screenProgressTextDemo(GUI &ui)
       .fillColor(fill1)
       .anim(None)
       .draw();
-  ui.drawProgressPercent((int16_t)(center - 30), 130, 60, 60, g_progressValue, AlignCenter, ui.rgb(255, 255, 255), bg, 0);
+  ui.drawProgressPercent((int16_t)(center - 30), 130, 60, 60, g_progressValue, AlignCenter, ui.rgb(255, 255, 255), bg565, 0);
 }
 
 void screenPrimitivesDemo(GUI &ui)
 {
-  uint32_t bg = ui.rgb(10, 10, 10);
-  ui.clear(bg);
+  uint16_t bg565 = ui.rgb(10, 10, 10);
+  ui.clear(bg565);
   uint32_t w = ui.screenWidth();
 
   ui.setTextStyle(Caption);
-  ui.drawPSDFText("Primitives", -1, 8, ui.rgb(220, 220, 220), bg, AlignCenter);
+  ui.drawPSDFText("Primitives", -1, 8, ui.rgb(220, 220, 220), bg565, AlignCenter);
 
   ui.fillCircle()
       .at(50, 55)
@@ -517,14 +539,14 @@ void screenPrimitivesDemo(GUI &ui)
   ui.fillRect()
       .at(210, 165)
       .size(80, 40)
-      .color(bg)
+      .color(bg565)
       .draw();
-  ui.drawGlowRoundRect()
+  ui.drawGlowRect()
       .at(250, 185)
       .size(80, 40)
       .radius(12)
       .fillColor(ui.rgb(40, 120, 255))
-      .bgColor(bg)
+      .bgColor(bg565)
       .glowSize(10)
       .glowStrength(180)
       .draw();
@@ -582,7 +604,7 @@ void screenPrimitivesDemo(GUI &ui)
       .at(10, 180)
       .size(80, 40)
       .color(ui.rgb(30, 30, 30))
-      .radius(16, 4, 16, 4)
+      .radius({16, 4, 16, 4})
       .draw();
 
   ui.drawLine()
@@ -591,15 +613,15 @@ void screenPrimitivesDemo(GUI &ui)
       .color(ui.rgb(200, 200, 200))
       .draw();
 
-  ui.drawPSDFText("Next: change screen", -1, 235, ui.rgb(160, 160, 160), bg, AlignCenter);
+  ui.drawPSDFText("Next: change screen", -1, 235, ui.rgb(160, 160, 160), bg565, AlignCenter);
 }
 
 void screenGradientsDemo(GUI &ui)
 {
-  uint32_t bg = ui.rgb(10, 10, 10);
-  ui.clear(bg);
+  uint16_t bg565 = ui.rgb(10, 10, 10);
+  ui.clear(bg565);
   ui.setTextStyle(Caption);
-  ui.drawPSDFText("Gradients / Alpha", -1, 8, ui.rgb(220, 220, 220), bg, AlignCenter);
+  ui.drawPSDFText("Gradients / Alpha", -1, 8, ui.rgb(220, 220, 220), bg565, AlignCenter);
 
   ui.fillRectGradientVertical()
       .at(10, 30)
@@ -607,12 +629,14 @@ void screenGradientsDemo(GUI &ui)
       .topColor(ui.rgb(255, 0, 72))
       .bottomColor(ui.rgb(0, 87, 250))
       .draw();
+
   ui.fillRectGradientHorizontal()
       .at(170, 30)
       .size(140, 60)
       .leftColor(ui.rgb(255, 128, 0))
       .rightColor(ui.rgb(80, 255, 120))
       .draw();
+
   ui.fillRectGradient4()
       .at(10, 100)
       .size(140, 60)
@@ -641,6 +665,7 @@ void screenGradientsDemo(GUI &ui)
       .topColor(ui.rgb(20, 20, 20))
       .bottomColor(ui.rgb(20, 20, 20))
       .draw();
+
   ui.fillRectAlpha()
       .at(170, 170)
       .size(140, 60)
@@ -648,7 +673,7 @@ void screenGradientsDemo(GUI &ui)
       .alpha(140)
       .draw();
 
-  ui.drawPSDFText("fillRectAlpha", 240, 192, ui.rgb(220, 220, 220), bg, AlignCenter);
+  ui.drawPSDFText("fillRectAlpha", 240, 192, ui.rgb(220, 220, 220), bg565, AlignCenter);
 }
 
 void screenListMenuDemo(GUI &ui)
@@ -680,8 +705,8 @@ void screenTileMenu4ColsDemo(GUI &ui)
 
 void screenToggleSwitchDemo(GUI &ui)
 {
-  uint32_t bg = ui.rgb(10, 10, 10);
-  ui.clear(bg);
+  uint16_t bg565 = ui.rgb(10, 10, 10);
+  ui.clear(bg565);
 
   ui.updateToggleSwitch()
       .at(center, 150)
@@ -693,31 +718,31 @@ void screenToggleSwitchDemo(GUI &ui)
   if (ui.psdfFontLoaded())
   {
     ui.setTextStyle(H2);
-    ui.drawPSDFText("ToggleSwitch", -1, 24, ui.rgb(220, 220, 220), bg, AlignCenter);
+    ui.drawPSDFText("ToggleSwitch", -1, 24, ui.rgb(220, 220, 220), bg565, AlignCenter);
   }
 }
 
 void screenScrollDotsDemo(GUI &ui)
 {
-  uint32_t bg = ui.rgb(8, 8, 8);
-  ui.clear(bg);
+  uint16_t bg565 = ui.rgb(8, 8, 8);
+  ui.clear(bg565);
   if (ui.psdfFontLoaded())
   {
     ui.setTextStyle(H2);
-    ui.drawPSDFText("Scroll dots", -1, 24, ui.rgb(220, 220, 220), bg, AlignCenter);
-    ui.drawPSDFText("15 dots (tapering)", -1, 48, ui.rgb(120, 120, 120), bg, AlignCenter);
+    ui.drawPSDFText("Scroll dots", -1, 24, ui.rgb(220, 220, 220), bg565, AlignCenter);
+    ui.drawPSDFText("15 dots (tapering)", -1, 48, ui.rgb(120, 120, 120), bg565, AlignCenter);
   }
 }
 
 void screenDrumRollDemo(GUI &ui)
 {
-  uint32_t bg = ui.rgb(8, 8, 8);
-  ui.clear(bg);
+  uint16_t bg565 = ui.rgb(8, 8, 8);
+  ui.clear(bg565);
   if (ui.psdfFontLoaded())
   {
     ui.setTextStyle(H2);
-    ui.drawPSDFText("Drum roll", -1, 24, ui.rgb(220, 220, 220), bg, AlignCenter);
-    ui.drawPSDFText("Next: H  Prev: V", -1, 48, ui.rgb(120, 120, 120), bg, AlignCenter);
+    ui.drawPSDFText("Drum roll", -1, 24, ui.rgb(220, 220, 220), bg565, AlignCenter);
+    ui.drawPSDFText("Next: H  Prev: V", -1, 48, ui.rgb(120, 120, 120), bg565, AlignCenter);
   }
 
   uint32_t now = millis();
@@ -781,12 +806,11 @@ void screenDitherCubesDemo(GUI &ui)
 
 void screenDitherCompareGradDemo(GUI &ui)
 {
-  // Left: direct 16-bit (RGB565). Right: 24-bit approximated with FRC
-  ui.setFrcProfile(FrcProfile::BlueNoise);
-  ui.setFrcTemporalPeriodMs(0); // keep static spatial FRC for this comparison
+  // Left: direct 16-bit (RGB565). Right: 24-bit approximated with BNSD
+  // BNSD is now always enabled
 
-  uint32_t bg = ui.rgb(10, 10, 10);
-  ui.clear(bg);
+  uint16_t bg565 = ui.rgb(10, 10, 10);
+  ui.clear(bg565);
 
   int16_t w = (int16_t)ui.screenWidth();
   int16_t h = (int16_t)ui.screenHeight();
@@ -842,8 +866,12 @@ void screenDitherCompareGradDemo(GUI &ui)
       .color(ui.rgb(r, g, b))
       .draw();
 
-  // Draw right: 24-bit approximated via FRC
-  ui.fillRect888(rightX, topY, cw, ch, r, g, b, FrcProfile::BlueNoise);
+  // Draw right: direct RGB565
+  ui.fillRect()
+      .at(rightX, topY)
+      .size(cw, ch)
+      .color(ui.rgb(r, g, b))
+      .draw();
 
   // Static sample square (for quick inspection) + status
   int16_t sampleX = (int16_t)(w - 64);
@@ -863,21 +891,21 @@ void screenDitherCompareGradDemo(GUI &ui)
   if (ui.psdfFontLoaded())
   {
     ui.setTextStyle(Caption);
-    ui.drawPSDFText(String(frozen ? "Frozen (PREV)" : "Live (PREV to freeze)"), (int16_t)(sampleX + 24), (int16_t)(sampleY + 56), ui.rgb(200, 200, 200), bg, AlignCenter);
-    ui.drawPSDFText("16-bit: RGB565", leftX + cw / 2, topY - 8, ui.rgb(200, 200, 200), bg, AlignCenter);
-    ui.drawPSDFText("24-bit: FRC BlueNoise+gamma", rightX + cw / 2, topY - 8, ui.rgb(200, 200, 200), bg, AlignCenter);
+    ui.drawPSDFText(String(frozen ? "Frozen (PREV)" : "Live (PREV to freeze)"), (int16_t)(sampleX + 24), (int16_t)(sampleY + 56), ui.rgb(200, 200, 200), bg565, AlignCenter);
+    ui.drawPSDFText("16-bit: RGB565", leftX + cw / 2, topY - 8, ui.rgb(200, 200, 200), bg565, AlignCenter);
+    ui.drawPSDFText("24-bit: FRC BlueNoise+gamma", rightX + cw / 2, topY - 8, ui.rgb(200, 200, 200), bg565, AlignCenter);
 
     char buf[64];
     snprintf(buf, sizeof(buf), "HEX: #%02X%02X%02X", r, g, b);
-    ui.drawPSDFText(String(buf), (int16_t)(w / 2), (int16_t)(topY + ch + 8), ui.rgb(160, 160, 160), bg, AlignCenter);
-    ui.drawPSDFText("RGB565 steps per channel: R=32 G=64 B=32", (int16_t)(w / 2), (int16_t)(topY + ch + 26), ui.rgb(160, 160, 160), bg, AlignCenter);
-    ui.drawPSDFText("24-bit per channel: 256 (visualized via FRC)", (int16_t)(w / 2), (int16_t)(topY + ch + 44), ui.rgb(160, 160, 160), bg, AlignCenter);
+    ui.drawPSDFText(String(buf), (int16_t)(w / 2), (int16_t)(topY + ch + 8), ui.rgb(160, 160, 160), bg565, AlignCenter);
+    ui.drawPSDFText("RGB565 steps per channel: R=32 G=64 B=32", (int16_t)(w / 2), (int16_t)(topY + ch + 26), ui.rgb(160, 160, 160), bg565, AlignCenter);
+    ui.drawPSDFText("24-bit per channel: 256 (visualized via FRC)", (int16_t)(w / 2), (int16_t)(topY + ch + 44), ui.rgb(160, 160, 160), bg565, AlignCenter);
 
     uint8_t r5 = (uint8_t)(r >> 3);
     uint8_t g6 = (uint8_t)(g >> 2);
     uint8_t b5 = (uint8_t)(b >> 3);
     snprintf(buf, sizeof(buf), "RGB565: R5=%02u G6=%02u B5=%02u", r5, g6, b5);
-    ui.drawPSDFText(String(buf), (int16_t)(w / 2), (int16_t)(topY + ch + 62), ui.rgb(160, 160, 160), bg, AlignCenter);
+    ui.drawPSDFText(String(buf), (int16_t)(w / 2), (int16_t)(topY + ch + 62), ui.rgb(160, 160, 160), bg565, AlignCenter);
   }
 }
 
@@ -905,8 +933,8 @@ void updateGraphDemo()
 
 void screenFontCompareDemo(GUI &ui)
 {
-  uint32_t bg = ui.rgb(10, 10, 10);
-  ui.clear(bg);
+  uint16_t bg565 = ui.rgb(10, 10, 10);
+  ui.clear(bg565);
 
   int16_t w = (int16_t)ui.screenWidth();
   int16_t h = (int16_t)ui.screenHeight();
@@ -914,7 +942,7 @@ void screenFontCompareDemo(GUI &ui)
   if (ui.psdfFontLoaded())
   {
     ui.setTextStyle(H2);
-    ui.drawPSDFText("PSDF font demo", (int16_t)(w / 2), 20, ui.rgb(220, 220, 220), bg, AlignCenter);
+    ui.drawPSDFText("PSDF font demo", (int16_t)(w / 2), 20, ui.rgb(220, 220, 220), bg565, AlignCenter);
   }
 
   const String sample = "The quick brown fox";
@@ -933,16 +961,16 @@ void screenFontCompareDemo(GUI &ui)
       ui.setPSDFFontSize(sizes[i]);
       int16_t ty = (int16_t)(y0 + i * spacing);
       // label + sample
-      ui.drawPSDFText(String("PSDF ") + String(sizes[i]) + "px", 8, ty, 0xFFFFFF, bg, AlignLeft);
-      ui.drawPSDFText(sample, 8, (int16_t)(ty + 18), ui.rgb(200, 200, 200), bg, AlignLeft);
+      ui.drawPSDFText(String("PSDF ") + String(sizes[i]) + "px", 8, ty, ui.rgb(255, 255, 255), bg565, AlignLeft);
+      ui.drawPSDFText(sample, 8, (int16_t)(ty + 18), ui.rgb(200, 200, 200), bg565, AlignLeft);
     }
   }
 }
 
 void screenFontWeightDemo(GUI &ui)
 {
-  uint32_t bg = ui.rgb(10, 10, 10);
-  ui.clear(bg);
+  uint16_t bg565 = ui.rgb(10, 10, 10);
+  ui.clear(bg565);
 
   int16_t w = (int16_t)ui.screenWidth();
 
@@ -952,7 +980,7 @@ void screenFontWeightDemo(GUI &ui)
     uint16_t prevWeight = ui.psdfWeight();
 
     ui.setPSDFFontSize(16);
-    ui.drawPSDFText("Font Weight Test", (int16_t)(w / 2), 10, ui.rgb(255, 255, 0), bg, AlignCenter);
+    ui.drawPSDFText("Font Weight Test", (int16_t)(w / 2), 10, ui.rgb(255, 255, 0), bg565, AlignCenter);
 
     const String sample = "The quick brown fox";
     const uint16_t weights[] = {100, 300, 400, 500, 600, 700, 900};
@@ -965,15 +993,113 @@ void screenFontWeightDemo(GUI &ui)
     {
       ui.setPSDFFontSize(12);
       ui.setPSDFWeight(400);
-      ui.drawPSDFText(String(labels[i]), 8, y, ui.rgb(150, 150, 150), bg, AlignLeft);
+      ui.drawPSDFText(String(labels[i]), 8, y, ui.rgb(150, 150, 150), bg565, AlignLeft);
 
       ui.setPSDFFontSize(20);
       ui.setPSDFWeight(weights[i]);
-      ui.drawPSDFText(sample, 8, (int16_t)(y + 14), ui.rgb(255, 255, 255), bg, AlignLeft);
+      ui.drawPSDFText(sample, 8, (int16_t)(y + 14), ui.rgb(255, 255, 255), bg565, AlignLeft);
 
       y += spacing;
     }
     ui.setPSDFWeight(prevWeight);
+  }
+}
+
+void screenCircleDemo(GUI &ui)
+{
+  uint16_t bg565 = ui.rgb(16, 16, 24);
+  ui.clear(bg565);
+
+  if (ui.psdfFontLoaded())
+  {
+    ui.setTextStyle(H2);
+    ui.drawPSDFText("Circle / RoundRect", -1, 8, ui.rgb(255, 255, 255), bg565, AlignCenter);
+    ui.setTextStyle(Caption);
+    ui.drawPSDFText("fillCircle + fillRoundRect", -1, 28, ui.rgb(160, 160, 200), bg565, AlignCenter);
+  }
+
+  // Top row: circle + 2 filled round-rects
+  ui.fillCircle()
+      .at(48, 78)
+      .radius(22)
+      .color(ui.rgb(0, 87, 250))
+      .draw();
+
+  ui.drawCircle()
+      .at(48, 78)
+      .radius(22)
+      .color(ui.rgb(255, 255, 255))
+      .draw();
+
+  ui.fillRect()
+      .at(88, 52)
+      .size(140, 44)
+      .color(ui.rgb(80, 255, 120))
+      .radius({12})
+      .draw();
+
+  ui.fillRect()
+      .at(88, 104)
+      .size(140, 44)
+      .color(ui.rgb(255, 128, 0))
+      .radius({20, 6, 20, 6})
+      .draw();
+
+  // Middle row: outlined round-rects (via drawRect fluent)
+  ui.drawRect()
+      .at(12, 160)
+      .size(100, 44)
+      .color(ui.rgb(255, 255, 255))
+      .radius({12})
+      .draw();
+
+  ui.drawRect()
+      .at(12, 214)
+      .size(100, 44)
+      .color(ui.rgb(255, 255, 255))
+      .radius({20, 6, 20, 6})
+      .draw();
+
+  // Right side: fillEllipse + drawArc + drawLine
+  ui.fillEllipse()
+      .at(175, 190)
+      .radiusX(46)
+      .radiusY(20)
+      .color(ui.rgb(255, 0, 72))
+      .draw();
+
+  ui.drawArc()
+      .at(175, 250)
+      .radius(24)
+      .startDeg(-90.0f)
+      .endDeg(180.0f)
+      .color(ui.rgb(255, 255, 255))
+      .draw();
+
+  ui.drawLine()
+      .from(120, 270)
+      .to(230, 300)
+      .color(ui.rgb(255, 255, 255))
+      .draw();
+
+  if (ui.psdfFontLoaded())
+  {
+    ui.setTextStyle(Caption);
+    ui.drawPSDFText("fillCircle", 48, 108, ui.rgb(180, 180, 200), bg565, AlignCenter);
+    ui.drawPSDFText("fillRoundRect r=12", 158, 46, ui.rgb(180, 180, 200), bg565, AlignCenter);
+    ui.drawPSDFText("fillRoundRect {20,6,20,6}", 158, 98, ui.rgb(180, 180, 200), bg565, AlignCenter);
+    ui.drawPSDFText("drawRoundRect r=12", 62, 154, ui.rgb(180, 180, 200), bg565, AlignCenter);
+    ui.drawPSDFText("drawRoundRect {20,6,20,6}", 62, 208, ui.rgb(180, 180, 200), bg565, AlignCenter);
+    ui.drawPSDFText("fillEllipse", 175, 216, ui.rgb(180, 180, 200), bg565, AlignCenter);
+    ui.drawPSDFText("drawArc", 175, 276, ui.rgb(180, 180, 200), bg565, AlignCenter);
+    ui.drawPSDFText("drawLine", 175, 304, ui.rgb(180, 180, 200), bg565, AlignCenter);
+  }
+
+  // Info text
+  if (ui.psdfFontLoaded())
+  {
+    ui.setTextStyle(Caption);
+    ui.drawPSDFText("Next/Prev: change screen", -1, 235, ui.rgb(120, 120, 140), bg565, AlignCenter);
   }
 }
 
@@ -982,7 +1108,6 @@ void setup()
   Serial.begin(115200);
   SPIFFS.begin(true);
 
-  ui.setPlatform(&g_platform);
   ui.configureDisplay()
       .pins({11, 12, 10, 9, 14})
       .hz(80000000)
@@ -995,10 +1120,6 @@ void setup()
   ui.setStatusBarStyle(StatusBarStyleBlurGradient);
   ui.setStatusBarText("pipGUI", "00:00", "");
   ui.setStatusBarBattery(100, Bar);
-  ui.clearStatusBarIcons();
-  ui.addStatusBarIcon(Left, ICON_DOT_WHITE, 2, 2);
-  ui.addStatusBarIcon(Center, ICON_DOT_GRAY, 2, 2);
-  ui.addStatusBarIcon(Right, ICON_DOT_WHITE, 2, 2);
   ui.setBacklightPin(4);
 
   btnNext.begin();
@@ -1042,6 +1163,7 @@ void setup()
   ui.regScreen(25, screenGradientsDemo);
   ui.regScreen(26, screenFontWeightDemo);
   ui.regScreen(27, screenDrumRollDemo);
+  ui.regScreen(29, screenCircleDemo);
 
   ui.configureListMenu(7, 0, {
                                  {"Main screen", "Простой экран", 0},
@@ -1072,6 +1194,7 @@ void setup()
                                  {"Font compare", "PSDF", 24},
                                  {"Font weights", "Test all weights", 26},
                                  {"Drum roll", "Horizontal + vertical picker", 27},
+                                 {"Circle AA", "Gupta-Sproull optimized", 29},
                              });
 
   ui.setListMenuStyle(
@@ -1198,7 +1321,7 @@ void loop()
     static const uint8_t toastCount = sizeof(toastMessages) / sizeof(toastMessages[0]);
     uint8_t idx = (uint8_t)((nowMs / toastIntervalMs) % (uint32_t)toastCount);
     bool fromTop = (idx & 1u) != 0;
-    IconId iconId = fromTop ? WarningLayer0 : ErrorLayer0;
+    IconId iconId = fromTop ? warning_layer0 : error_layer0;
 
     ui.showToast()
         .text(String(toastMessages[idx]))
@@ -1241,29 +1364,39 @@ void loop()
     if (nowMs - lastGlowRedrawMs >= 30)
     {
       lastGlowRedrawMs = nowMs;
-      uint32_t bg = ui.rgb(10, 10, 10);
+      uint16_t bg565 = ui.rgb(10, 10, 10);
 
       ui.updateGlowCircle()
-          .at(60, 90)
-          .radius(16)
+          .at(70, 95)
+          .radius(28)
           .fillColor(ui.rgb(255, 40, 40))
-          .bgColor(bg)
-          .glowSize(14)
+          .bgColor(bg565)
+          .glowSize(20)
           .glowStrength(240)
           .anim(Pulse)
           .pulsePeriodMs(900)
           .draw();
 
-      ui.updateGlowRoundRect()
+      ui.updateGlowRect()
           .at(center, 70)
-          .size(110, 56)
-          .radius(14)
+          .size(150, 78)
+          .radius(18)
           .fillColor(ui.rgb(80, 150, 255))
-          .bgColor(bg)
-          .glowSize(12)
+          .bgColor(bg565)
+          .glowSize(18)
           .glowStrength(220)
           .anim(Pulse)
           .pulsePeriodMs(1400)
+          .draw();
+
+      ui.updateGlowRect()
+          .at(140, 175)
+          .size(150, 78)
+          .radius(18)
+          .fillColor(ui.rgb(255, 180, 0))
+          .bgColor(bg565)
+          .glowSize(16)
+          .glowStrength(180)
           .draw();
     }
   }
@@ -1278,7 +1411,7 @@ void loop()
       if (g_blurPhase > 1000.0f)
         g_blurPhase -= 1000.0f;
 
-      uint32_t bg = ui.rgb(10, 10, 10);
+      uint16_t bg565 = ui.rgb(10, 10, 10);
       uint32_t w = ui.screenWidth();
       int16_t statusH = 20;
       int16_t bandY = statusH;
@@ -1287,7 +1420,7 @@ void loop()
       ui.fillRect()
           .at(0, bandY)
           .size((int16_t)w, bandH)
-          .color(bg)
+          .color(bg565)
           .draw();
 
       float t = g_blurPhase;
@@ -1326,7 +1459,7 @@ void loop()
           ui.fillRect()
               .at(s_row2PrevX[i], s_row2PrevY[i])
               .size(s_row2PrevW[i], s_row2PrevH[i])
-              .color(bg)
+              .color(bg565)
               .draw();
       }
 
@@ -1362,7 +1495,7 @@ void loop()
       }
       s_row2Inited = true;
 
-      ui.updateBlurStrip()
+      ui.updateBlur()
           .at(0, bandY)
           .size((int16_t)w, bandH)
           .radius(10)
@@ -1522,11 +1655,10 @@ void loop()
     const String label = settingsBtnState.loading ? String("Saving") : String("Show modal");
     ui.updateButton()
         .label(label)
-        .icon(ICON_DOT_WHITE, 2, 2)
         .at(60, 20)
-        .size(200, 30)
-        .baseColor(ui.rgb(80, 150, 255))
-        .radius(7)
+        .size(120, 44)
+        .baseColor(ui.rgb(40, 150, 255))
+        .radius(10)
         .state(settingsBtnState)
         .draw();
   }
@@ -1549,8 +1681,8 @@ void loop()
 
     if (changed)
     {
-      uint32_t bg = ui.rgb(10, 10, 10);
-      uint32_t active = ui.rgb(21, 180, 110);
+      uint16_t bg565 = ui.rgb(10, 10, 10);
+      uint16_t active = ui.rgb(21, 180, 110);
 
       ui.updateToggleSwitch()
           .at(center, 150)
@@ -1563,7 +1695,7 @@ void loop()
       {
         ui.setTextStyle(Body);
         const char *s = g_toggleState.value ? "ON" : "OFF";
-        ui.updatePSDFText(String(s), -1, 105, ui.rgb(200, 200, 200), bg, AlignCenter);
+        ui.updatePSDFText(String(s), -1, 105, ui.rgb(200, 200, 200), bg565, AlignCenter);
       }
     }
   }

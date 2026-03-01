@@ -1,13 +1,22 @@
 ﻿#include <pipGUI/core/api/pipGUI.hpp>
 namespace pipgui
 {
+
+    static inline uint16_t color888To565NoBnsd(uint32_t color888)
+    {
+        uint8_t r = (uint8_t)((color888 >> 16) & 0xFF);
+        uint8_t g = (uint8_t)((color888 >> 8) & 0xFF);
+        uint8_t b = (uint8_t)(color888 & 0xFF);
+        return pipcore::Sprite::color565(r, g, b);
+    }
     static pipcore::GuiPlatform *graphPlatform()
     {
         return pipgui::GUI::sharedPlatform();
     }
 
-    static void drawBoldGraphLine(pipcore::Sprite *t, int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint32_t color, uint32_t bg, uint32_t seed, FrcProfile profile)
+    static void drawBoldGraphLine(GUI &g, pipcore::Sprite *t, int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint32_t color, uint32_t bg)
     {
+        (void)g;
         bool steep = abs(y1 - y0) > abs(x1 - x0);
 
         if (steep)
@@ -43,21 +52,23 @@ namespace pipgui
             if (w2 > 255)
                 w2 = 255;
 
-            uint32_t b1 = pipgui::detail::blend888(bg, color, (uint8_t)w1);
-            uint32_t b2 = pipgui::detail::blend888(bg, color, (uint8_t)w2);
+            uint16_t bg565_1 = color888To565NoBnsd(bg);
+            uint16_t fg565_1 = color888To565NoBnsd(color);
+            uint16_t bg565_2 = bg565_1;
+            uint16_t fg565_2 = fg565_1;
 
-            Color888 c1{(uint8_t)((b1 >> 16) & 0xFF), (uint8_t)((b1 >> 8) & 0xFF), (uint8_t)(b1 & 0xFF)};
-            Color888 c2{(uint8_t)((b2 >> 16) & 0xFF), (uint8_t)((b2 >> 8) & 0xFF), (uint8_t)(b2 & 0xFF)};
+            uint16_t c1 = (uint16_t)pipgui::detail::blend565(bg565_1, fg565_1, (uint8_t)w1);
+            uint16_t c2 = (uint16_t)pipgui::detail::blend565(bg565_2, fg565_2, (uint8_t)w2);
 
             if (steep)
             {
-                t->drawPixel(yi, x, detail::quantize565(c1, yi, x, seed, profile));
-                t->drawPixel(yi + 1, x, detail::quantize565(c2, yi + 1, x, seed, profile));
+                t->drawPixel(yi, x, c1);
+                t->drawPixel(yi + 1, x, c2);
             }
             else
             {
-                t->drawPixel(x, yi, detail::quantize565(c1, x, yi, seed, profile));
-                t->drawPixel(x, yi + 1, detail::quantize565(c2, x, yi + 1, seed, profile));
+                t->drawPixel(x, yi, c1);
+                t->drawPixel(x, yi + 1, c2);
             }
             y += gradient;
         }
@@ -267,11 +278,13 @@ namespace pipgui
 
         uint8_t r = (radius < 1) ? 1 : radius;
 
-        fillRoundRectFrc(x, y, w, h, r, gridColor);
+        uint16_t grid565 = detail::color888To565(gridColor);
+        fillRoundRect(x, y, w, h, r, grid565);
         if (w > 4 && h > 4)
         {
             int16_t rInner = (r > 2) ? (r - 2) : (r > 0 ? r - 1 : 0);
-            fillRoundRectFrc(x + 2, y + 2, w - 4, h - 4, (uint8_t)rInner, bgColor);
+            uint16_t bg565 = detail::color888To565(bgColor);
+            fillRoundRect(x + 2, y + 2, w - 4, h - 4, (uint8_t)rInner, bg565);
         }
 
         int16_t innerX = x + 2;
@@ -321,13 +334,13 @@ namespace pipgui
         {
             int16_t gx = innerX + (int16_t)((int32_t)innerW * i / cellsX);
             for (int16_t yy = innerY; yy < innerY + innerH; ++yy)
-                t->drawPixel(gx, yy, color888To565(gx, yy, gridColor));
+                t->drawPixel(gx, yy, detail::color888To565(gridColor));
         }
         for (int16_t j = 1; j < cellsY; ++j)
         {
             int16_t gy = innerY + (int16_t)((int32_t)innerH * j / cellsY);
             for (int16_t xx = innerX; xx < innerX + innerW; ++xx)
-                t->drawPixel(xx, gy, color888To565(xx, gy, gridColor));
+                t->drawPixel(xx, gy, detail::color888To565(gridColor));
         }
     }
 
@@ -571,7 +584,8 @@ namespace pipgui
             uint8_t r = (area.radius < 1) ? 1 : area.radius;
             int16_t rInner = (r > 2) ? (r - 2) : (r > 0 ? r - 1 : 0);
 
-            fillRoundRectFrc(area.x + 2, area.y + 2, area.w - 4, area.h - 4, (uint8_t)rInner, area.bgColor);
+            uint16_t bg565 = detail::color888To565(area.bgColor);
+            fillRoundRect(area.x + 2, area.y + 2, area.w - 4, area.h - 4, (uint8_t)rInner, bg565);
 
             if (area.gridCellsX >= 2)
             {
@@ -579,7 +593,7 @@ namespace pipgui
                 {
                     int16_t gx = area.innerX + (int16_t)((int32_t)area.innerW * i / area.gridCellsX);
                     for (int16_t yy = area.innerY; yy < area.innerY + area.innerH; ++yy)
-                        t->drawPixel(gx, yy, color888To565(gx, yy, area.gridColor));
+                        t->drawPixel(gx, yy, detail::color888To565(area.gridColor));
                 }
             }
             if (area.gridCellsY >= 2)
@@ -588,7 +602,7 @@ namespace pipgui
                 {
                     int16_t gy = area.innerY + (int16_t)((int32_t)area.innerH * j / area.gridCellsY);
                     for (int16_t xx = area.innerX; xx < area.innerX + area.innerW; ++xx)
-                        t->drawPixel(xx, gy, color888To565(xx, gy, area.gridColor));
+                        t->drawPixel(xx, gy, detail::color888To565(area.gridColor));
                 }
             }
         }
@@ -625,7 +639,7 @@ namespace pipgui
                         int16_t gx = area.innerX + (int16_t)((int32_t)area.innerW * i / area.gridCellsX);
                         if (gx >= stripX && gx < (int16_t)(stripX + stripW))
                             for (int16_t yy = area.innerY; yy < area.innerY + area.innerH; ++yy)
-                                t->drawPixel(gx, yy, color888To565(gx, yy, area.gridColor));
+                                t->drawPixel(gx, yy, detail::color888To565(area.gridColor));
                     }
                 }
                 if (area.gridCellsY >= 2)
@@ -634,7 +648,7 @@ namespace pipgui
                     {
                         int16_t gy = area.innerY + (int16_t)((int32_t)area.innerH * j / area.gridCellsY);
                         for (int16_t xx = stripX; xx < stripX + stripW; ++xx)
-                            t->drawPixel(xx, gy, color888To565(xx, gy, area.gridColor));
+                            t->drawPixel(xx, gy, detail::color888To565(area.gridColor));
                     }
                 }
             }
@@ -682,7 +696,7 @@ namespace pipgui
 
                 if (!skipLine)
                 {
-                    drawBoldGraphLine(t, prevX, prevY, x, y, color, area.bgColor, _frc.seed, _frc.profile);
+                    drawBoldGraphLine(*this, t, prevX, prevY, x, y, color, area.bgColor);
                 }
             }
 
