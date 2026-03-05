@@ -6,6 +6,7 @@
 # PlatformIO
 .pio/
 .vscode/
+platformio.ini
 
 logs/
 
@@ -18,3 +19,8 @@ logs/
 *.bin
 *.elf
 *.hex
+
+
+# Project specific
+термометр/
+thermometer/

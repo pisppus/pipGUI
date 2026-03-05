@@ -1,7 +1,7 @@
-﻿#include <Arduino.h>
+#include <Arduino.h>
 #include <SPIFFS.h>
 #include <math.h>
-#include <pipSystem.hpp>
+#include <pipKit.hpp>
 
 using namespace pipgui;
 
@@ -91,11 +91,8 @@ void screenMain(GUI &ui)
   uint16_t bg565 = ui.rgb(0, 0, 0);
   ui.clear(bg565);
 
-  if (ui.psdfFontLoaded())
-  {
-    ui.setTextStyle(H1);
-    ui.drawPSDFText("Main menu", -1, -1, ui.rgb(255, 255, 255), bg565, AlignCenter);
-  }
+  ui.setTextStyle(H1);
+  ui.drawText("Main menu", -1, -1, ui.rgb(255, 255, 255), bg565, AlignCenter);
 
   const int16_t ix = 12;
   const int16_t iy = 12;
@@ -148,11 +145,8 @@ void screenSettings(GUI &ui)
   uint16_t bg565 = ui.rgb(0, 31, 31);
   ui.clear(bg565);
 
-  if (ui.psdfFontLoaded())
-  {
-    ui.setTextStyle(H1);
-    ui.drawPSDFText("Settings menu", -1, 80, rgb565(0xFFFF), bg565, AlignCenter);
-  }
+  ui.setTextStyle(H1);
+  ui.drawText("Settings menu", -1, 80, rgb565(0xFFFF), bg565, AlignCenter);
 
   const String label = settingsBtnState.loading ? String("Saving") : String("Show modal");
 
@@ -213,13 +207,10 @@ void screenGlowDemo(GUI &ui)
       .glowStrength(180)
       .draw();
 
-  if (ui.psdfFontLoaded())
-  {
-    ui.setTextStyle(H2);
-    ui.drawPSDFText("Glow demo", -1, 22, rgb565(0xFFFF), bg565, AlignCenter);
-    ui.setTextStyle(Body);
-    ui.drawPSDFText("REC / shapes", -1, 44, ui.rgb(200, 200, 200), bg565, AlignCenter);
-  }
+  ui.setTextStyle(H2);
+  ui.drawText("Glow demo", -1, 22, rgb565(0xFFFF), bg565, AlignCenter);
+  ui.setTextStyle(Body);
+  ui.drawText("REC / shapes", -1, 44, ui.rgb(200, 200, 200), bg565, AlignCenter);
 }
 
 void screenBlurDemo(GUI &ui)
@@ -293,14 +284,11 @@ void screenBlurDemo(GUI &ui)
         .draw();
   }
 
-  if (ui.psdfFontLoaded())
-  {
-    ui.setTextStyle(H2);
-    ui.drawPSDFText("Blur strip", -1, (int16_t)(bandY + bandH + 60), rgb565(0xFFFF), bg565, AlignCenter);
-    ui.setTextStyle(Caption);
-    ui.drawPSDFText("Next: change screen", -1, (int16_t)(bandY + bandH + 80), ui.rgb(160, 160, 160), bg565, AlignCenter);
-    ui.drawPSDFText("Prev: back / OK", -1, (int16_t)(bandY + bandH + 96), ui.rgb(160, 160, 160), bg565, AlignCenter);
-  }
+  ui.setTextStyle(H2);
+  ui.drawText("Blur strip", -1, (int16_t)(bandY + bandH + 60), rgb565(0xFFFF), bg565, AlignCenter);
+  ui.setTextStyle(Caption);
+  ui.drawText("Next: change screen", -1, (int16_t)(bandY + bandH + 80), ui.rgb(160, 160, 160), bg565, AlignCenter);
+  ui.drawText("Prev: back / OK", -1, (int16_t)(bandY + bandH + 96), ui.rgb(160, 160, 160), bg565, AlignCenter);
 }
 
 void screenGraph(GUI &ui)
@@ -431,11 +419,8 @@ void screenProgressTextDemo(GUI &ui)
   uint16_t bg565 = ui.rgb(10, 10, 10);
   ui.clear(bg565);
 
-  if (ui.psdfFontLoaded())
-  {
-    ui.setTextStyle(H2);
-    ui.drawPSDFText("Progress with text", -1, 24, ui.rgb(220, 220, 220), bg565, AlignCenter);
-  }
+  ui.setTextStyle(H2);
+  ui.drawText("Progress with text", -1, 24, ui.rgb(220, 220, 220), bg565, AlignCenter);
 
   uint32_t base = ui.rgb(20, 20, 20);
   uint32_t fill1 = ui.rgb(0, 122, 255);
@@ -486,7 +471,7 @@ void screenPrimitivesDemo(GUI &ui)
   uint32_t w = ui.screenWidth();
 
   ui.setTextStyle(Caption);
-  ui.drawPSDFText("Primitives", -1, 8, ui.rgb(220, 220, 220), bg565, AlignCenter);
+  ui.drawText("Primitives", -1, 8, ui.rgb(220, 220, 220), bg565, AlignCenter);
 
   ui.fillCircle()
       .at(50, 55)
@@ -613,7 +598,7 @@ void screenPrimitivesDemo(GUI &ui)
       .color(ui.rgb(200, 200, 200))
       .draw();
 
-  ui.drawPSDFText("Next: change screen", -1, 235, ui.rgb(160, 160, 160), bg565, AlignCenter);
+  ui.drawText("Next: change screen", -1, 235, ui.rgb(160, 160, 160), bg565, AlignCenter);
 }
 
 void screenGradientsDemo(GUI &ui)
@@ -621,23 +606,35 @@ void screenGradientsDemo(GUI &ui)
   uint16_t bg565 = ui.rgb(10, 10, 10);
   ui.clear(bg565);
   ui.setTextStyle(Caption);
-  ui.drawPSDFText("Gradients / Alpha", -1, 8, ui.rgb(220, 220, 220), bg565, AlignCenter);
+  ui.drawText("Gradients / Alpha", -1, 8, ui.rgb(220, 220, 220), bg565, AlignCenter);
 
-  ui.fillRectGradientVertical()
+  char buf[64];
+  uint32_t tStart, tElapsed;
+
+  tStart = micros();
+  ui.gradientVertical()
       .at(10, 30)
       .size(140, 60)
       .topColor(ui.rgb(255, 0, 72))
       .bottomColor(ui.rgb(0, 87, 250))
       .draw();
+  tElapsed = micros() - tStart;
+  snprintf(buf, sizeof(buf), "V:%luus", tElapsed);
+  ui.drawText(buf, 80, 65, ui.rgb(255, 255, 255), bg565, AlignCenter);
 
-  ui.fillRectGradientHorizontal()
+  tStart = micros();
+  ui.gradientHorizontal()
       .at(170, 30)
       .size(140, 60)
       .leftColor(ui.rgb(255, 128, 0))
       .rightColor(ui.rgb(80, 255, 120))
       .draw();
+  tElapsed = micros() - tStart;
+  snprintf(buf, sizeof(buf), "H:%luus", tElapsed);
+  ui.drawText(buf, 240, 65, ui.rgb(255, 255, 255), bg565, AlignCenter);
 
-  ui.fillRectGradient4()
+  tStart = micros();
+  ui.gradientCorners()
       .at(10, 100)
       .size(140, 60)
       .topLeftColor(ui.rgb(255, 0, 72))
@@ -645,13 +642,23 @@ void screenGradientsDemo(GUI &ui)
       .bottomLeftColor(ui.rgb(80, 255, 120))
       .bottomRightColor(ui.rgb(255, 128, 0))
       .draw();
-  ui.fillRectGradientDiagonal()
+  tElapsed = micros() - tStart;
+  snprintf(buf, sizeof(buf), "C4:%luus", tElapsed);
+  ui.drawText(buf, 80, 135, ui.rgb(255, 255, 255), bg565, AlignCenter);
+
+  tStart = micros();
+  ui.gradientDiagonal()
       .at(170, 100)
       .size(140, 60)
       .topLeftColor(ui.rgb(255, 255, 255))
       .bottomRightColor(ui.rgb(40, 40, 40))
       .draw();
-  ui.fillRectGradientRadial()
+  tElapsed = micros() - tStart;
+  snprintf(buf, sizeof(buf), "D:%luus", tElapsed);
+  ui.drawText(buf, 240, 135, ui.rgb(255, 255, 255), bg565, AlignCenter);
+
+  tStart = micros();
+  ui.gradientRadial()
       .at(10, 170)
       .size(140, 60)
       .center(80, 200)
@@ -659,21 +666,27 @@ void screenGradientsDemo(GUI &ui)
       .innerColor(ui.rgb(255, 255, 255))
       .outerColor(ui.rgb(0, 87, 250))
       .draw();
-  ui.fillRectGradientVertical()
+  tElapsed = micros() - tStart;
+  snprintf(buf, sizeof(buf), "R:%luus", tElapsed);
+  ui.drawText(buf, 80, 205, ui.rgb(255, 255, 255), bg565, AlignCenter);
+
+  tStart = micros();
+  ui.gradientVertical()
       .at(170, 170)
       .size(140, 60)
       .topColor(ui.rgb(20, 20, 20))
       .bottomColor(ui.rgb(20, 20, 20))
       .draw();
+  tElapsed = micros() - tStart;
 
-  ui.fillRectAlpha()
+  ui.gradientVertical()
       .at(170, 170)
       .size(140, 60)
-      .color(ui.rgb(0, 0, 0))
-      .alpha(140)
+      .topColor(ui.rgb(20, 20, 20))
+      .bottomColor(ui.rgb(60, 60, 60))
       .draw();
-
-  ui.drawPSDFText("fillRectAlpha", 240, 192, ui.rgb(220, 220, 220), bg565, AlignCenter);
+  snprintf(buf, sizeof(buf), "V2:%luus", micros() - tStart);
+  ui.drawText(buf, 240, 205, ui.rgb(255, 255, 255), bg565, AlignCenter);
 }
 
 void screenListMenuDemo(GUI &ui)
@@ -715,35 +728,26 @@ void screenToggleSwitchDemo(GUI &ui)
       .activeColor(ui.rgb(21, 180, 110))
       .draw();
 
-  if (ui.psdfFontLoaded())
-  {
-    ui.setTextStyle(H2);
-    ui.drawPSDFText("ToggleSwitch", -1, 24, ui.rgb(220, 220, 220), bg565, AlignCenter);
-  }
+  ui.setTextStyle(H2);
+  ui.drawText("ToggleSwitch", -1, 24, ui.rgb(220, 220, 220), bg565, AlignCenter);
 }
 
 void screenScrollDotsDemo(GUI &ui)
 {
   uint16_t bg565 = ui.rgb(8, 8, 8);
   ui.clear(bg565);
-  if (ui.psdfFontLoaded())
-  {
-    ui.setTextStyle(H2);
-    ui.drawPSDFText("Scroll dots", -1, 24, ui.rgb(220, 220, 220), bg565, AlignCenter);
-    ui.drawPSDFText("15 dots (tapering)", -1, 48, ui.rgb(120, 120, 120), bg565, AlignCenter);
-  }
+  ui.setTextStyle(H2);
+  ui.drawText("Scroll dots", -1, 24, ui.rgb(220, 220, 220), bg565, AlignCenter);
+  ui.drawText("15 dots (tapering)", -1, 48, ui.rgb(120, 120, 120), bg565, AlignCenter);
 }
 
 void screenDrumRollDemo(GUI &ui)
 {
   uint16_t bg565 = ui.rgb(8, 8, 8);
   ui.clear(bg565);
-  if (ui.psdfFontLoaded())
-  {
-    ui.setTextStyle(H2);
-    ui.drawPSDFText("Drum roll", -1, 24, ui.rgb(220, 220, 220), bg565, AlignCenter);
-    ui.drawPSDFText("Next: H  Prev: V", -1, 48, ui.rgb(120, 120, 120), bg565, AlignCenter);
-  }
+  ui.setTextStyle(H2);
+  ui.drawText("Drum roll", -1, 24, ui.rgb(220, 220, 220), bg565, AlignCenter);
+  ui.drawText("Next: H  Prev: V", -1, 48, ui.rgb(120, 120, 120), bg565, AlignCenter);
 
   uint32_t now = millis();
   if (g_drumAnimateH && now - g_drumAnimStartMs >= g_drumAnimDurMs)
@@ -888,25 +892,22 @@ void screenDitherCompareGradDemo(GUI &ui)
       .color(ui.rgb(r, g, b))
       .draw();
 
-  if (ui.psdfFontLoaded())
-  {
-    ui.setTextStyle(Caption);
-    ui.drawPSDFText(String(frozen ? "Frozen (PREV)" : "Live (PREV to freeze)"), (int16_t)(sampleX + 24), (int16_t)(sampleY + 56), ui.rgb(200, 200, 200), bg565, AlignCenter);
-    ui.drawPSDFText("16-bit: RGB565", leftX + cw / 2, topY - 8, ui.rgb(200, 200, 200), bg565, AlignCenter);
-    ui.drawPSDFText("24-bit: FRC BlueNoise+gamma", rightX + cw / 2, topY - 8, ui.rgb(200, 200, 200), bg565, AlignCenter);
+  ui.setTextStyle(Caption);
+  ui.drawText(String(frozen ? "Frozen (PREV)" : "Live (PREV to freeze)"), (int16_t)(sampleX + 24), (int16_t)(sampleY + 56), ui.rgb(200, 200, 200), bg565, AlignCenter);
+  ui.drawText("16-bit: RGB565", leftX + cw / 2, topY - 8, ui.rgb(200, 200, 200), bg565, AlignCenter);
+  ui.drawText("24-bit: FRC BlueNoise+gamma", rightX + cw / 2, topY - 8, ui.rgb(200, 200, 200), bg565, AlignCenter);
 
-    char buf[64];
-    snprintf(buf, sizeof(buf), "HEX: #%02X%02X%02X", r, g, b);
-    ui.drawPSDFText(String(buf), (int16_t)(w / 2), (int16_t)(topY + ch + 8), ui.rgb(160, 160, 160), bg565, AlignCenter);
-    ui.drawPSDFText("RGB565 steps per channel: R=32 G=64 B=32", (int16_t)(w / 2), (int16_t)(topY + ch + 26), ui.rgb(160, 160, 160), bg565, AlignCenter);
-    ui.drawPSDFText("24-bit per channel: 256 (visualized via FRC)", (int16_t)(w / 2), (int16_t)(topY + ch + 44), ui.rgb(160, 160, 160), bg565, AlignCenter);
+  char buf[64];
+  snprintf(buf, sizeof(buf), "HEX: #%02X%02X%02X", r, g, b);
+  ui.drawText(String(buf), (int16_t)(w / 2), (int16_t)(topY + ch + 8), ui.rgb(160, 160, 160), bg565, AlignCenter);
+  ui.drawText("RGB565 steps per channel: R=32 G=64 B=32", (int16_t)(w / 2), (int16_t)(topY + ch + 26), ui.rgb(160, 160, 160), bg565, AlignCenter);
+  ui.drawText("24-bit per channel: 256 (visualized via FRC)", (int16_t)(w / 2), (int16_t)(topY + ch + 44), ui.rgb(160, 160, 160), bg565, AlignCenter);
 
-    uint8_t r5 = (uint8_t)(r >> 3);
-    uint8_t g6 = (uint8_t)(g >> 2);
-    uint8_t b5 = (uint8_t)(b >> 3);
-    snprintf(buf, sizeof(buf), "RGB565: R5=%02u G6=%02u B5=%02u", r5, g6, b5);
-    ui.drawPSDFText(String(buf), (int16_t)(w / 2), (int16_t)(topY + ch + 62), ui.rgb(160, 160, 160), bg565, AlignCenter);
-  }
+  uint8_t r5 = (uint8_t)(r >> 3);
+  uint8_t g6 = (uint8_t)(g >> 2);
+  uint8_t b5 = (uint8_t)(b >> 3);
+  snprintf(buf, sizeof(buf), "RGB565: R5=%02u G6=%02u B5=%02u", r5, g6, b5);
+  ui.drawText(String(buf), (int16_t)(w / 2), (int16_t)(topY + ch + 62), ui.rgb(160, 160, 160), bg565, AlignCenter);
 }
 
 void updateGraphDemo()
@@ -939,31 +940,24 @@ void screenFontCompareDemo(GUI &ui)
   int16_t w = (int16_t)ui.screenWidth();
   int16_t h = (int16_t)ui.screenHeight();
 
-  if (ui.psdfFontLoaded())
-  {
-    ui.setTextStyle(H2);
-    ui.drawPSDFText("PSDF font demo", (int16_t)(w / 2), 20, ui.rgb(220, 220, 220), bg565, AlignCenter);
-  }
+  ui.setTextStyle(H2);
+  ui.drawText("PSDF font demo", (int16_t)(w / 2), 20, ui.rgb(220, 220, 220), bg565, AlignCenter);
 
   const String sample = "The quick brown fox";
 
   // Left: PSDF (size + weight variations)
-  if (ui.loadBuiltinPSDF())
-  {
-    ui.enablePSDF(true);
-    const uint16_t sizes[4] = {18, 24, 36, 48};
-    const uint16_t weights[4] = {400, 500, 600, 700};
-    int16_t y0 = 50;
-    int16_t spacing = 42;
+  const uint16_t sizes[4] = {18, 24, 36, 48};
+  const uint16_t weights[4] = {400, 500, 600, 700};
+  int16_t y0 = 50;
+  int16_t spacing = 42;
 
-    for (int i = 0; i < 4; ++i)
-    {
-      ui.setPSDFFontSize(sizes[i]);
-      int16_t ty = (int16_t)(y0 + i * spacing);
-      // label + sample
-      ui.drawPSDFText(String("PSDF ") + String(sizes[i]) + "px", 8, ty, ui.rgb(255, 255, 255), bg565, AlignLeft);
-      ui.drawPSDFText(sample, 8, (int16_t)(ty + 18), ui.rgb(200, 200, 200), bg565, AlignLeft);
-    }
+  for (int i = 0; i < 4; ++i)
+  {
+    ui.setFontSize(sizes[i]);
+    int16_t ty = (int16_t)(y0 + i * spacing);
+    // label + sample
+    ui.drawText(String("PSDF ") + String(sizes[i]) + "px", 8, ty, ui.rgb(255, 255, 255), bg565, AlignLeft);
+    ui.drawText(sample, 8, (int16_t)(ty + 18), ui.rgb(200, 200, 200), bg565, AlignLeft);
   }
 }
 
@@ -974,35 +968,509 @@ void screenFontWeightDemo(GUI &ui)
 
   int16_t w = (int16_t)ui.screenWidth();
 
-  if (ui.psdfFontLoaded())
+  ui.setTextStyle(H2);
+  ui.drawText("Font Weight Test", (int16_t)(w / 2), 10, ui.rgb(255, 255, 0), bg565, AlignCenter);
+
+  const String sample = "The quick brown fox";
+  const uint16_t weights[] = {100, 300, 400, 500, 600, 700, 900};
+  const char *labels[] = {"Thin 100", "Light 300", "Regular 400", "Medium 500", "SemiBold 600", "Bold 700", "Black 900"};
+
+  int16_t y = 35;
+  int16_t spacing = 38;
+
+  for (int i = 0; i < 7; ++i)
   {
-    ui.enablePSDF(true);
-    uint16_t prevWeight = ui.psdfWeight();
+    ui.setFontSize(12);
+    ui.setFontWeight(400);
+    ui.drawText(String(labels[i]), 8, y, ui.rgb(150, 150, 150), bg565, AlignLeft);
 
-    ui.setPSDFFontSize(16);
-    ui.drawPSDFText("Font Weight Test", (int16_t)(w / 2), 10, ui.rgb(255, 255, 0), bg565, AlignCenter);
+    ui.setFontSize(20);
+    ui.setFontWeight(weights[i]);
+    ui.drawText(sample, 8, (int16_t)(y + 14), ui.rgb(255, 255, 255), bg565, AlignLeft);
 
-    const String sample = "The quick brown fox";
-    const uint16_t weights[] = {100, 300, 400, 500, 600, 700, 900};
-    const char *labels[] = {"Thin 100", "Light 300", "Regular 400", "Medium 500", "SemiBold 600", "Bold 700", "Black 900"};
-
-    int16_t y = 35;
-    int16_t spacing = 38;
-
-    for (int i = 0; i < 7; ++i)
-    {
-      ui.setPSDFFontSize(12);
-      ui.setPSDFWeight(400);
-      ui.drawPSDFText(String(labels[i]), 8, y, ui.rgb(150, 150, 150), bg565, AlignLeft);
-
-      ui.setPSDFFontSize(20);
-      ui.setPSDFWeight(weights[i]);
-      ui.drawPSDFText(sample, 8, (int16_t)(y + 14), ui.rgb(255, 255, 255), bg565, AlignLeft);
-
-      y += spacing;
-    }
-    ui.setPSDFWeight(prevWeight);
+    y += spacing;
   }
+}
+
+// ===== DEDICATED PRIMITIVE TEST SCREENS =====
+
+void screenTestCircles(GUI &ui)
+{
+  uint16_t bg565 = ui.rgb(20, 20, 28);
+  ui.clear(bg565);
+
+  ui.setTextStyle(H2);
+  ui.drawText("Circle Test", -1, 6, ui.rgb(255, 255, 255), bg565, AlignCenter);
+  ui.setTextStyle(Caption);
+  ui.drawText("fillCircle + drawCircle (AA)", -1, 28, ui.rgb(180, 180, 200), bg565, AlignCenter);
+
+  // Row 1: Small circles (1px to 8px)
+  ui.drawText("r=1-4", 25, 45, ui.rgb(160, 160, 180), bg565, AlignCenter);
+
+  ui.fillCircle().at(25, 58).radius(1).color(ui.rgb(0, 87, 250)).draw();
+  ui.drawCircle().at(25, 58).radius(1).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.fillCircle().at(25, 65).radius(2).color(ui.rgb(0, 87, 250)).draw();
+  ui.drawCircle().at(25, 65).radius(2).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.fillCircle().at(25, 75).radius(3).color(ui.rgb(0, 87, 250)).draw();
+  ui.drawCircle().at(25, 75).radius(3).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.fillCircle().at(25, 88).radius(4).color(ui.rgb(0, 87, 250)).draw();
+  ui.drawCircle().at(25, 88).radius(4).color(ui.rgb(255, 255, 255)).draw();
+
+  // Row 2: Medium circles (6px to 15px)
+  ui.drawText("r=6-15", 80, 45, ui.rgb(160, 160, 180), bg565, AlignCenter);
+
+  ui.fillCircle().at(65, 70).radius(6).color(ui.rgb(255, 0, 72)).draw();
+  ui.drawCircle().at(65, 70).radius(6).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.fillCircle().at(95, 70).radius(9).color(ui.rgb(80, 255, 120)).draw();
+  ui.drawCircle().at(95, 70).radius(9).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.fillCircle().at(80, 105).radius(12).color(ui.rgb(255, 128, 0)).draw();
+  ui.drawCircle().at(80, 105).radius(12).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.fillCircle().at(80, 145).radius(15).color(ui.rgb(180, 80, 255)).draw();
+  ui.drawCircle().at(80, 145).radius(15).color(ui.rgb(255, 255, 255)).draw();
+
+  // Row 3: Large circles (18px to 35px)
+  ui.drawText("r=18-35", 155, 45, ui.rgb(160, 160, 180), bg565, AlignCenter);
+
+  ui.fillCircle().at(145, 75).radius(18).color(ui.rgb(0, 200, 200)).draw();
+  ui.drawCircle().at(145, 75).radius(18).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.fillCircle().at(195, 75).radius(22).color(ui.rgb(200, 200, 80)).draw();
+  ui.drawCircle().at(195, 75).radius(22).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.fillCircle().at(145, 130).radius(25).color(ui.rgb(255, 100, 100)).draw();
+  ui.drawCircle().at(145, 130).radius(25).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.fillCircle().at(195, 135).radius(30).color(ui.rgb(100, 150, 255)).draw();
+  ui.drawCircle().at(195, 135).radius(30).color(ui.rgb(255, 255, 255)).draw();
+
+  // Overlapping circles test (AA edge quality)
+  ui.fillCircle().at(40, 185).radius(18).color(ui.rgb(0, 87, 250)).draw();
+  ui.fillCircle().at(60, 195).radius(18).color(ui.rgb(255, 0, 72)).draw();
+  ui.fillCircle().at(50, 175).radius(18).color(ui.rgb(80, 255, 120)).draw();
+
+  // Draw-only circles (outlines)
+  ui.drawCircle().at(110, 185).radius(15).color(ui.rgb(255, 255, 255)).draw();
+  ui.drawCircle().at(110, 185).radius(12).color(ui.rgb(200, 200, 200)).draw();
+  ui.drawCircle().at(110, 185).radius(8).color(ui.rgb(150, 150, 150)).draw();
+
+  ui.drawCircle().at(160, 195).radius(20).color(ui.rgb(255, 128, 0)).draw();
+  ui.drawCircle().at(210, 185).radius(25).color(ui.rgb(0, 200, 200)).draw();
+
+  ui.drawText("Check AA edges on overlaps!", -1, 240, ui.rgb(200, 200, 100), bg565, AlignCenter);
+}
+
+void screenTestRoundRects(GUI &ui)
+{
+  uint16_t bg565 = ui.rgb(20, 28, 20);
+  ui.clear(bg565);
+
+  ui.setTextStyle(H2);
+  ui.drawText("RoundRect Test", -1, 6, ui.rgb(255, 255, 255), bg565, AlignCenter);
+  ui.setTextStyle(Caption);
+  ui.drawText("fill/draw RoundRect (1 & 4 radius)", -1, 28, ui.rgb(180, 200, 180), bg565, AlignCenter);
+
+  // Single radius variants
+  ui.drawText("Single radius:", 60, 45, ui.rgb(180, 220, 180), bg565, AlignCenter);
+
+  ui.fillRect().at(15, 58).size(40, 30).radius({4}).color(ui.rgb(0, 87, 250)).draw();
+  ui.drawRect().at(15, 58).size(40, 30).radius({4}).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.fillRect().at(65, 58).size(50, 35).radius({8}).color(ui.rgb(255, 0, 72)).draw();
+  ui.drawRect().at(65, 58).size(50, 35).radius({8}).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.fillRect().at(125, 58).size(60, 40).radius({12}).color(ui.rgb(80, 255, 120)).draw();
+  ui.drawRect().at(125, 58).size(60, 40).radius({12}).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.fillRect().at(195, 58).size(50, 45).radius({15}).color(ui.rgb(255, 128, 0)).draw();
+  ui.drawRect().at(195, 58).size(50, 45).radius({15}).color(ui.rgb(255, 255, 255)).draw();
+
+  // 4-radius variants (asymmetric corners)
+  ui.drawText("4-corner radii:", 60, 110, ui.rgb(220, 180, 180), bg565, AlignCenter);
+
+  // TL=2, TR=8, BR=2, BL=8
+  ui.fillRect().at(15, 125).size(50, 40).radius({2, 8, 2, 8}).color(ui.rgb(180, 80, 255)).draw();
+  ui.drawRect().at(15, 125).size(50, 40).radius({2, 8, 2, 8}).color(ui.rgb(255, 255, 255)).draw();
+
+  // TL=12, TR=4, BR=12, BL=4
+  ui.fillRect().at(75, 125).size(60, 45).radius({12, 4, 12, 4}).color(ui.rgb(0, 200, 200)).draw();
+  ui.drawRect().at(75, 125).size(60, 45).radius({12, 4, 12, 4}).color(ui.rgb(255, 255, 255)).draw();
+
+  // TL=3, TR=10, BR=18, BL=6
+  ui.fillRect().at(145, 125).size(70, 50).radius({3, 10, 18, 6}).color(ui.rgb(200, 200, 80)).draw();
+  ui.drawRect().at(145, 125).size(70, 50).radius({3, 10, 18, 6}).color(ui.rgb(255, 255, 255)).draw();
+
+  // Draw-only round rects
+  ui.drawText("drawRoundRect only:", 70, 185, ui.rgb(200, 200, 200), bg565, AlignCenter);
+
+  ui.drawRect().at(20, 200).size(45, 35).radius({6}).color(ui.rgb(255, 255, 255)).draw();
+  ui.drawRect().at(75, 205).size(50, 40).radius({10}).color(ui.rgb(0, 255, 255)).draw();
+  ui.drawRect().at(135, 200).size(55, 45).radius({5, 15, 5, 15}).color(ui.rgb(255, 200, 0)).draw();
+  ui.drawRect().at(200, 205).size(50, 40).radius({15, 5, 15, 5}).color(ui.rgb(255, 100, 200)).draw();
+
+  ui.drawText("Check corner AA quality!", -1, 260, ui.rgb(200, 200, 100), bg565, AlignCenter);
+}
+
+void screenTestEllipses(GUI &ui)
+{
+  uint16_t bg565 = ui.rgb(28, 20, 20);
+  ui.clear(bg565);
+
+  ui.setTextStyle(H2);
+  ui.drawText("Ellipse Test", -1, 6, ui.rgb(255, 255, 255), bg565, AlignCenter);
+  ui.setTextStyle(Caption);
+  ui.drawText("fillEllipse + drawEllipse (Wu-style AA)", -1, 28, ui.rgb(200, 180, 180), bg565, AlignCenter);
+
+  // Various aspect ratios
+  ui.drawText("rx > ry (wide):", 70, 45, ui.rgb(200, 180, 180), bg565, AlignCenter);
+
+  ui.fillEllipse().at(40, 70).radiusX(15).radiusY(8).color(ui.rgb(0, 87, 250)).draw();
+  ui.drawEllipse().at(40, 70).radiusX(15).radiusY(8).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.fillEllipse().at(100, 70).radiusX(25).radiusY(10).color(ui.rgb(255, 0, 72)).draw();
+  ui.drawEllipse().at(100, 70).radiusX(25).radiusY(10).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.fillEllipse().at(170, 70).radiusX(35).radiusY(12).color(ui.rgb(80, 255, 120)).draw();
+  ui.drawEllipse().at(170, 70).radiusX(35).radiusY(12).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.drawText("rx < ry (tall):", 70, 95, ui.rgb(200, 180, 180), bg565, AlignCenter);
+
+  ui.fillEllipse().at(40, 120).radiusX(8).radiusY(15).color(ui.rgb(255, 128, 0)).draw();
+  ui.drawEllipse().at(40, 120).radiusX(8).radiusY(15).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.fillEllipse().at(100, 120).radiusX(10).radiusY(25).color(ui.rgb(180, 80, 255)).draw();
+  ui.drawEllipse().at(100, 120).radiusX(10).radiusY(25).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.fillEllipse().at(170, 120).radiusX(12).radiusY(35).color(ui.rgb(0, 200, 200)).draw();
+  ui.drawEllipse().at(170, 120).radiusX(12).radiusY(35).color(ui.rgb(255, 255, 255)).draw();
+
+  // Near-circular
+  ui.drawText("Near-circular:", 70, 165, ui.rgb(200, 180, 180), bg565, AlignCenter);
+
+  ui.fillEllipse().at(50, 190).radiusX(18).radiusY(16).color(ui.rgb(200, 200, 80)).draw();
+  ui.drawEllipse().at(50, 190).radiusX(18).radiusY(16).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.fillEllipse().at(120, 190).radiusX(22).radiusY(20).color(ui.rgb(100, 255, 100)).draw();
+  ui.drawEllipse().at(120, 190).radiusX(22).radiusY(20).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.fillEllipse().at(190, 190).radiusX(28).radiusY(25).color(ui.rgb(255, 100, 100)).draw();
+  ui.drawEllipse().at(190, 190).radiusX(28).radiusY(25).color(ui.rgb(255, 255, 255)).draw();
+
+  // Small ellipses (edge case test)
+  ui.fillEllipse().at(30, 235).radiusX(3).radiusY(5).color(ui.rgb(255, 200, 0)).draw();
+  ui.drawEllipse().at(30, 235).radiusX(3).radiusY(5).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.fillEllipse().at(50, 235).radiusX(5).radiusY(3).color(ui.rgb(0, 255, 200)).draw();
+  ui.drawEllipse().at(50, 235).radiusX(5).radiusY(3).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.fillEllipse().at(70, 235).radiusX(4).radiusY(4).color(ui.rgb(255, 100, 200)).draw();
+  ui.drawEllipse().at(70, 235).radiusX(4).radiusY(4).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.drawText("Check Wu-style AA on edges!", -1, 260, ui.rgb(200, 200, 100), bg565, AlignCenter);
+}
+
+void screenTestTriangles(GUI &ui)
+{
+  uint16_t bg565 = ui.rgb(20, 24, 28);
+  ui.clear(bg565);
+
+  ui.setTextStyle(H2);
+  ui.drawText("Triangle Test", -1, 6, ui.rgb(255, 255, 255), bg565, AlignCenter);
+  ui.setTextStyle(Caption);
+  ui.drawText("fillTriangle (4x subpixel AA)", -1, 28, ui.rgb(180, 200, 220), bg565, AlignCenter);
+
+  // Small triangles (5-15px height)
+  ui.drawText("Small (5-15px):", 70, 45, ui.rgb(180, 200, 220), bg565, AlignCenter);
+
+  ui.fillTriangle().point0(25, 50).point1(35, 65).point2(15, 65).radius(0).color(ui.rgb(0, 87, 250)).draw();
+  ui.drawTriangle().point0(25, 50).point1(35, 65).point2(15, 65).radius(0).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.fillTriangle().point0(55, 55).point1(70, 75).point2(40, 75).radius(0).color(ui.rgb(255, 0, 72)).draw();
+  ui.drawTriangle().point0(55, 55).point1(70, 75).point2(40, 75).radius(0).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.fillTriangle().point0(95, 50).point1(115, 80).point2(75, 80).radius(0).color(ui.rgb(80, 255, 120)).draw();
+  ui.drawTriangle().point0(95, 50).point1(115, 80).point2(75, 80).radius(0).color(ui.rgb(255, 255, 255)).draw();
+
+  // Medium triangles
+  ui.drawText("Medium (20-40px):", 80, 95, ui.rgb(180, 200, 220), bg565, AlignCenter);
+
+  ui.fillTriangle().point0(35, 110).point1(60, 150).point2(10, 150).radius(0).color(ui.rgb(255, 128, 0)).draw();
+  ui.drawTriangle().point0(35, 110).point1(60, 150).point2(10, 150).radius(0).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.fillTriangle().point0(90, 105).point1(125, 155).point2(55, 155).radius(0).color(ui.rgb(180, 80, 255)).draw();
+  ui.drawTriangle().point0(90, 105).point1(125, 155).point2(55, 155).radius(0).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.fillTriangle().point0(170, 100).point1(210, 160).point2(130, 160).radius(0).color(ui.rgb(0, 200, 200)).draw();
+  ui.drawTriangle().point0(170, 100).point1(210, 160).point2(130, 160).radius(0).color(ui.rgb(255, 255, 255)).draw();
+
+  // Flat/thin triangles (stress test for AA)
+  ui.drawText("Flat/thin (AA stress):", 90, 170, ui.rgb(220, 180, 180), bg565, AlignCenter);
+
+  // Very flat triangle
+  ui.fillTriangle().point0(20, 190).point1(100, 195).point2(60, 185).radius(0).color(ui.rgb(255, 100, 100)).draw();
+  ui.drawTriangle().point0(20, 190).point1(100, 195).point2(60, 185).radius(0).color(ui.rgb(255, 255, 255)).draw();
+
+  // Thin triangle
+  ui.fillTriangle().point0(120, 180).point1(130, 220).point2(110, 220).radius(0).color(ui.rgb(100, 255, 100)).draw();
+  ui.drawTriangle().point0(120, 180).point1(130, 220).point2(110, 220).radius(0).color(ui.rgb(255, 255, 255)).draw();
+
+  // Long thin triangle
+  ui.fillTriangle().point0(150, 185).point1(220, 200).point2(150, 205).radius(0).color(ui.rgb(100, 100, 255)).draw();
+  ui.drawTriangle().point0(150, 185).point1(220, 200).point2(150, 205).radius(0).color(ui.rgb(255, 255, 255)).draw();
+
+  // Overlapping triangles (check blend quality)
+  ui.fillTriangle().point0(30, 235).point1(60, 275).point2(0, 275).radius(0).color(ui.rgb(0, 87, 250)).draw();
+  ui.fillTriangle().point0(45, 250).point1(75, 290).point2(15, 290).radius(0).color(ui.rgb(255, 0, 72)).draw();
+  ui.fillTriangle().point0(15, 250).point1(45, 290).point2(-15, 290).radius(0).color(ui.rgb(80, 255, 120)).draw();
+
+  ui.drawText("Check coverage-based AA edges!", -1, 305, ui.rgb(200, 200, 100), bg565, AlignCenter);
+}
+
+void screenTestRoundTriangles(GUI &ui)
+{
+  uint16_t bg565 = ui.rgb(24, 20, 28);
+  ui.clear(bg565);
+
+  ui.setTextStyle(H2);
+  ui.drawText("RoundTriangle Test", -1, 6, ui.rgb(255, 255, 255), bg565, AlignCenter);
+  ui.setTextStyle(Caption);
+  ui.drawText("fill/draw RoundTriangle (SDF AA)", -1, 28, ui.rgb(200, 180, 220), bg565, AlignCenter);
+
+  // Small rounded triangles (radius 3-6)
+  ui.drawText("Small (r=3-6):", 70, 45, ui.rgb(180, 200, 220), bg565, AlignCenter);
+
+  ui.fillTriangle().point0(25, 50).point1(35, 65).point2(15, 65).radius(3).color(ui.rgb(0, 87, 250)).draw();
+  ui.drawTriangle().point0(25, 50).point1(35, 65).point2(15, 65).radius(3).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.fillTriangle().point0(55, 55).point1(70, 75).point2(40, 75).radius(4).color(ui.rgb(255, 0, 72)).draw();
+  ui.drawTriangle().point0(55, 55).point1(70, 75).point2(40, 75).radius(4).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.fillTriangle().point0(95, 50).point1(115, 80).point2(75, 80).radius(6).color(ui.rgb(80, 255, 120)).draw();
+  ui.drawTriangle().point0(95, 50).point1(115, 80).point2(75, 80).radius(6).color(ui.rgb(255, 255, 255)).draw();
+
+  // Medium rounded triangles (radius 8-12)
+  ui.drawText("Medium (r=8-12):", 80, 95, ui.rgb(180, 200, 220), bg565, AlignCenter);
+
+  ui.fillTriangle().point0(35, 110).point1(60, 150).point2(10, 150).radius(8).color(ui.rgb(255, 128, 0)).draw();
+  ui.drawTriangle().point0(35, 110).point1(60, 150).point2(10, 150).radius(8).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.fillTriangle().point0(90, 105).point1(125, 155).point2(55, 155).radius(10).color(ui.rgb(180, 80, 255)).draw();
+  ui.drawTriangle().point0(90, 105).point1(125, 155).point2(55, 155).radius(10).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.fillTriangle().point0(170, 100).point1(210, 160).point2(130, 160).radius(12).color(ui.rgb(0, 200, 200)).draw();
+  ui.drawTriangle().point0(170, 100).point1(210, 160).point2(130, 160).radius(12).color(ui.rgb(255, 255, 255)).draw();
+
+  // Different triangle shapes with rounding
+  ui.drawText("Various shapes (r=10):", 90, 170, ui.rgb(220, 180, 180), bg565, AlignCenter);
+
+  // Equilateral-ish
+  ui.fillTriangle().point0(40, 190).point1(70, 240).point2(10, 240).radius(10).color(ui.rgb(255, 100, 100)).draw();
+  ui.drawTriangle().point0(40, 190).point1(70, 240).point2(10, 240).radius(10).color(ui.rgb(255, 255, 255)).draw();
+
+  // Wide flat
+  ui.fillTriangle().point0(100, 195).point1(160, 235).point2(40, 235).radius(10).color(ui.rgb(100, 255, 100)).draw();
+  ui.drawTriangle().point0(100, 195).point1(160, 235).point2(40, 235).radius(10).color(ui.rgb(255, 255, 255)).draw();
+
+  // Tall narrow
+  ui.fillTriangle().point0(190, 185).point1(210, 255).point2(170, 255).radius(10).color(ui.rgb(100, 100, 255)).draw();
+  ui.drawTriangle().point0(190, 185).point1(210, 255).point2(170, 255).radius(10).color(ui.rgb(255, 255, 255)).draw();
+
+  // Overlapping rounded triangles (blend test)
+  ui.fillTriangle().point0(30, 270).point1(60, 310).point2(0, 310).radius(8).color(ui.rgb(0, 87, 250)).draw();
+  ui.fillTriangle().point0(45, 280).point1(75, 320).point2(15, 320).radius(8).color(ui.rgb(255, 0, 72)).draw();
+  ui.fillTriangle().point0(15, 280).point1(45, 320).point2(-15, 320).radius(8).color(ui.rgb(80, 255, 120)).draw();
+
+  ui.drawText("Check SDF AA on rounded corners!", -1, 335, ui.rgb(200, 200, 100), bg565, AlignCenter);
+}
+
+void screenTestSquircles(GUI &ui)
+{
+  uint16_t bg565 = ui.rgb(18, 18, 24);
+  ui.clear(bg565);
+
+  ui.setTextStyle(H2);
+  ui.drawText("Squircle Test", -1, 6, ui.rgb(255, 255, 255), bg565, AlignCenter);
+  ui.setTextStyle(Caption);
+  ui.drawText("fillSquircle + drawSquircle (AA + aaGamma)", -1, 28, ui.rgb(200, 200, 220), bg565, AlignCenter);
+
+  ui.fillSquircle().at(50, 80).radius(18).color(ui.rgb(0, 87, 250)).draw();
+  ui.drawSquircle().at(50, 80).radius(18).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.fillSquircle().at(120, 80).radius(26).color(ui.rgb(255, 0, 72)).draw();
+  ui.drawSquircle().at(120, 80).radius(26).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.fillSquircle().at(200, 80).radius(34).color(ui.rgb(80, 255, 120)).draw();
+  ui.drawSquircle().at(200, 80).radius(34).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.drawText("Small r=6..10 (edge case):", 95, 128, ui.rgb(200, 180, 160), bg565, AlignCenter);
+  ui.fillSquircle().at(30, 150).radius(6).color(ui.rgb(255, 128, 0)).draw();
+  ui.drawSquircle().at(30, 150).radius(6).color(ui.rgb(255, 255, 255)).draw();
+  ui.fillSquircle().at(55, 150).radius(8).color(ui.rgb(180, 80, 255)).draw();
+  ui.drawSquircle().at(55, 150).radius(8).color(ui.rgb(255, 255, 255)).draw();
+  ui.fillSquircle().at(85, 150).radius(10).color(ui.rgb(0, 200, 200)).draw();
+  ui.drawSquircle().at(85, 150).radius(10).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.drawText("Overlay check (blending):", 170, 128, ui.rgb(200, 180, 160), bg565, AlignCenter);
+  ui.fillSquircle().at(160, 160).radius(24).color(ui.rgb(0, 87, 250)).draw();
+  ui.fillSquircle().at(182, 170).radius(24).color(ui.rgb(255, 0, 72)).draw();
+  ui.fillSquircle().at(140, 170).radius(24).color(ui.rgb(80, 255, 120)).draw();
+
+  ui.drawSquircle().at(160, 160).radius(24).color(ui.rgb(255, 255, 255)).draw();
+  ui.drawSquircle().at(182, 170).radius(24).color(ui.rgb(255, 255, 255)).draw();
+  ui.drawSquircle().at(140, 170).radius(24).color(ui.rgb(255, 255, 255)).draw();
+
+  ui.drawText("Check AA edges (no dark halos)", -1, 305, ui.rgb(200, 200, 100), bg565, AlignCenter);
+}
+
+void screenTestArcsAndLines(GUI &ui)
+{
+  uint16_t bg565 = ui.rgb(28, 24, 20);
+  ui.clear(bg565);
+
+  ui.setTextStyle(H2);
+  ui.drawText("Arc & Line Test", -1, 6, ui.rgb(255, 255, 255), bg565, AlignCenter);
+  ui.setTextStyle(Caption);
+  ui.drawText("drawArc + drawLine (AA)", -1, 28, ui.rgb(220, 200, 180), bg565, AlignCenter);
+
+  // Arcs with different angles
+  ui.drawText("Arcs (various angles):", 85, 45, ui.rgb(220, 200, 180), bg565, AlignCenter);
+
+  // Quarter arcs
+  ui.drawArc().at(40, 75).radius(18).startDeg(-90).endDeg(0).color(ui.rgb(0, 87, 250)).draw();
+  ui.drawArc().at(80, 75).radius(18).startDeg(0).endDeg(90).color(ui.rgb(255, 0, 72)).draw();
+  ui.drawArc().at(120, 75).radius(18).startDeg(90).endDeg(180).color(ui.rgb(80, 255, 120)).draw();
+  ui.drawArc().at(160, 75).radius(18).startDeg(180).endDeg(270).color(ui.rgb(255, 128, 0)).draw();
+
+  // Half arcs
+  ui.drawArc().at(70, 125).radius(22).startDeg(-90).endDeg(90).color(ui.rgb(180, 80, 255)).draw();
+  ui.drawArc().at(130, 125).radius(22).startDeg(90).endDeg(270).color(ui.rgb(0, 200, 200)).draw();
+
+  // Full circle arc (outline)
+  ui.drawArc().at(180, 125).radius(20).startDeg(0).endDeg(360).color(ui.rgb(200, 200, 80)).draw();
+
+  // Small arcs
+  ui.drawArc().at(200, 75).radius(8).startDeg(45).endDeg(135).color(ui.rgb(255, 100, 100)).draw();
+  ui.drawArc().at(215, 75).radius(6).startDeg(200).endDeg(340).color(ui.rgb(100, 255, 200)).draw();
+
+  // Lines at various angles
+  ui.drawText("Lines (AA quality):", 80, 155, ui.rgb(220, 200, 180), bg565, AlignCenter);
+
+  // Horizontal/Vertical
+  ui.drawLine().from(20, 175).to(80, 175).color(ui.rgb(255, 255, 255)).draw();
+  ui.drawLine().from(50, 165).to(50, 185).color(ui.rgb(200, 200, 200)).draw();
+
+  // 45-degree diagonals
+  ui.drawLine().from(100, 170).to(140, 210).color(ui.rgb(255, 100, 100)).draw();
+  ui.drawLine().from(140, 170).to(100, 210).color(ui.rgb(100, 255, 100)).draw();
+
+  // Steep angles
+  ui.drawLine().from(160, 170).to(165, 220).color(ui.rgb(100, 100, 255)).draw();
+  ui.drawLine().from(180, 170).to(200, 190).color(ui.rgb(255, 200, 100)).draw();
+
+  // Long diagonal
+  ui.drawLine().from(20, 230).to(100, 280).color(ui.rgb(0, 200, 255)).draw();
+
+  // Line thickness test via overlapping
+  ui.drawLine().from(140, 240).to(220, 300).color(ui.rgb(255, 255, 255)).draw();
+
+  // Arc pie-slices
+  ui.drawText("Pie arcs:", 200, 155, ui.rgb(220, 200, 180), bg565, AlignCenter);
+  ui.drawArc().at(200, 200).radius(25).startDeg(-30).endDeg(30).color(ui.rgb(255, 128, 0)).draw();
+  ui.drawArc().at(200, 200).radius(20).startDeg(60).endDeg(120).color(ui.rgb(0, 255, 128)).draw();
+  ui.drawArc().at(200, 200).radius(15).startDeg(150).endDeg(210).color(ui.rgb(255, 0, 255)).draw();
+
+  ui.drawText("Check sqrt_fraction AA!", -1, 305, ui.rgb(200, 200, 100), bg565, AlignCenter);
+}
+
+void screenTestAllPrimitivesGrid(GUI &ui)
+{
+  uint16_t bg565 = ui.rgb(16, 16, 16);
+  ui.clear(bg565);
+
+  ui.setTextStyle(H2);
+  ui.drawText("All Primitives Grid", -1, 4, ui.rgb(255, 255, 255), bg565, AlignCenter);
+
+  // Grid of all primitives for quick comparison - using fluent API
+  const int16_t cols = 4;
+  const int16_t rows = 5;
+  const int16_t cellW = 60;
+  const int16_t cellH = 58;
+  const int16_t startX = 0;
+  const int16_t startY = 28;
+
+  uint16_t colors[] = {
+    ui.rgb(0, 87, 250),    // blue
+    ui.rgb(255, 0, 72),    // red
+    ui.rgb(80, 255, 120),  // green
+    ui.rgb(255, 128, 0),   // orange
+    ui.rgb(180, 80, 255),  // purple
+    ui.rgb(0, 200, 200),   // cyan
+    ui.rgb(200, 200, 80),  // yellow
+    ui.rgb(255, 100, 100), // pink
+  };
+
+  int colorIdx = 0;
+
+  for (int row = 0; row < rows; row++)
+  {
+    for (int col = 0; col < cols; col++)
+    {
+      int16_t x = startX + col * cellW + cellW / 2;
+      int16_t y = startY + row * cellH + cellH / 2;
+      uint16_t c = colors[colorIdx % 8];
+      uint16_t white = ui.rgb(255, 255, 255);
+      colorIdx++;
+
+      int type = (row * cols + col) % 8;
+
+      if (type == 0) // filled circle
+      {
+        ui.fillCircle().at(x, y).radius(14).color(c).draw();
+        ui.drawCircle().at(x, y).radius(14).color(white).draw();
+      }
+      else if (type == 1) // round rect
+      {
+        ui.fillRect().at(x - 18, y - 12).size(36, 24).radius({6}).color(c).draw();
+        ui.drawRect().at(x - 18, y - 12).size(36, 24).radius({6}).color(white).draw();
+      }
+      else if (type == 2) // ellipse
+      {
+        ui.fillEllipse().at(x, y).radiusX(16).radiusY(10).color(c).draw();
+        ui.drawEllipse().at(x, y).radiusX(16).radiusY(10).color(white).draw();
+      }
+      else if (type == 3) // triangle
+      {
+        ui.fillTriangle().point0(x, y - 12).point1(x + 14, y + 10).point2(x - 14, y + 10).radius(0).color(c).draw();
+        ui.drawTriangle().point0(x, y - 12).point1(x + 14, y + 10).point2(x - 14, y + 10).radius(0).color(white).draw();
+      }
+      else if (type == 4) // arc
+      {
+        ui.drawArc().at(x, y).radius(14).startDeg(0).endDeg(270).color(c).draw();
+      }
+      else if (type == 5) // 4-radius round rect
+      {
+        ui.fillRect().at(x - 18, y - 12).size(36, 24).radius({8, 3, 8, 3}).color(c).draw();
+        ui.drawRect().at(x - 18, y - 12).size(36, 24).radius({8, 3, 8, 3}).color(white).draw();
+      }
+      else if (type == 6) // tall ellipse
+      {
+        ui.fillEllipse().at(x, y).radiusX(8).radiusY(16).color(c).draw();
+        ui.drawEllipse().at(x, y).radiusX(8).radiusY(16).color(white).draw();
+      }
+      else if (type == 7) // flat triangle
+      {
+        ui.fillTriangle().point0(x - 16, y - 4).point1(x + 16, y + 4).point2(x - 16, y + 8).radius(0).color(c).draw();
+        ui.drawTriangle().point0(x - 16, y - 4).point1(x + 16, y + 4).point2(x - 16, y + 8).radius(0).color(white).draw();
+      }
+    }
+  }
+
+  ui.drawText("All primitives with AA comparison", -1, 318, ui.rgb(200, 200, 100), bg565, AlignCenter);
 }
 
 void screenCircleDemo(GUI &ui)
@@ -1010,13 +1478,10 @@ void screenCircleDemo(GUI &ui)
   uint16_t bg565 = ui.rgb(16, 16, 24);
   ui.clear(bg565);
 
-  if (ui.psdfFontLoaded())
-  {
-    ui.setTextStyle(H2);
-    ui.drawPSDFText("Circle / RoundRect", -1, 8, ui.rgb(255, 255, 255), bg565, AlignCenter);
-    ui.setTextStyle(Caption);
-    ui.drawPSDFText("fillCircle + fillRoundRect", -1, 28, ui.rgb(160, 160, 200), bg565, AlignCenter);
-  }
+  ui.setTextStyle(H2);
+  ui.drawText("Circle / RoundRect", -1, 8, ui.rgb(255, 255, 255), bg565, AlignCenter);
+  ui.setTextStyle(Caption);
+  ui.drawText("fillCircle + fillRoundRect", -1, 28, ui.rgb(160, 160, 200), bg565, AlignCenter);
 
   // Top row: circle + 2 filled round-rects
   ui.fillCircle()
@@ -1082,25 +1547,77 @@ void screenCircleDemo(GUI &ui)
       .color(ui.rgb(255, 255, 255))
       .draw();
 
-  if (ui.psdfFontLoaded())
-  {
-    ui.setTextStyle(Caption);
-    ui.drawPSDFText("fillCircle", 48, 108, ui.rgb(180, 180, 200), bg565, AlignCenter);
-    ui.drawPSDFText("fillRoundRect r=12", 158, 46, ui.rgb(180, 180, 200), bg565, AlignCenter);
-    ui.drawPSDFText("fillRoundRect {20,6,20,6}", 158, 98, ui.rgb(180, 180, 200), bg565, AlignCenter);
-    ui.drawPSDFText("drawRoundRect r=12", 62, 154, ui.rgb(180, 180, 200), bg565, AlignCenter);
-    ui.drawPSDFText("drawRoundRect {20,6,20,6}", 62, 208, ui.rgb(180, 180, 200), bg565, AlignCenter);
-    ui.drawPSDFText("fillEllipse", 175, 216, ui.rgb(180, 180, 200), bg565, AlignCenter);
-    ui.drawPSDFText("drawArc", 175, 276, ui.rgb(180, 180, 200), bg565, AlignCenter);
-    ui.drawPSDFText("drawLine", 175, 304, ui.rgb(180, 180, 200), bg565, AlignCenter);
-  }
+  ui.setTextStyle(Caption);
+  ui.drawText("fillCircle", 48, 108, ui.rgb(180, 180, 200), bg565, AlignCenter);
+  ui.drawText("fillRoundRect r=12", 158, 46, ui.rgb(180, 180, 200), bg565, AlignCenter);
+  ui.drawText("fillRoundRect {20,6,20,6}", 158, 98, ui.rgb(180, 180, 200), bg565, AlignCenter);
+  ui.drawText("drawRoundRect r=12", 62, 154, ui.rgb(180, 180, 200), bg565, AlignCenter);
+  ui.drawText("drawRoundRect {20,6,20,6}", 62, 208, ui.rgb(180, 180, 200), bg565, AlignCenter);
+  ui.drawText("fillEllipse", 175, 216, ui.rgb(180, 180, 200), bg565, AlignCenter);
+  ui.drawText("drawArc", 175, 276, ui.rgb(180, 180, 200), bg565, AlignCenter);
+  ui.drawText("drawLine", 175, 304, ui.rgb(180, 180, 200), bg565, AlignCenter);
 
   // Info text
-  if (ui.psdfFontLoaded())
+  ui.setTextStyle(Caption);
+  ui.drawText("Next/Prev: change screen", -1, 235, ui.rgb(120, 120, 140), bg565, AlignCenter);
+}
+
+void screenAutoTextColorDemo(GUI &ui)
+{
+  uint16_t bg565 = ui.rgb(32, 32, 32);
+  ui.clear(bg565);
+
+  ui.setTextStyle(H2);
+  ui.drawText("Auto Text Color Test", -1, 4, ui.rgb(255, 255, 255), bg565, AlignCenter);
+
+  // Test colors with different brightness
+  uint16_t testColors[] = {
+    ui.rgb(255, 255, 255),  // white - should get black text
+    ui.rgb(200, 200, 200),  // light gray
+    ui.rgb(128, 128, 128),  // mid gray
+    ui.rgb(64, 64, 64),     // dark gray
+    ui.rgb(0, 0, 0),        // black - should get white text
+    ui.rgb(255, 0, 0),      // red
+    ui.rgb(0, 255, 0),      // green
+    ui.rgb(0, 0, 255),      // blue
+    ui.rgb(255, 255, 0),    // yellow
+    ui.rgb(0, 255, 255),    // cyan
+    ui.rgb(255, 0, 255),    // magenta
+    ui.rgb(255, 128, 0),   // orange
+  };
+
+  const char *labels[] = {
+    "White", "Light", "Mid", "Dark", "Black",
+    "Red", "Green", "Blue", "Yellow", "Cyan", "Magenta", "Orange"
+  };
+
+  int cols = 3;
+  int rows = 4;
+  int16_t cellW = 76;
+  int16_t cellH = 70;
+  int16_t startX = 6;
+  int16_t startY = 32;
+
+  for (int i = 0; i < 12; i++)
   {
-    ui.setTextStyle(Caption);
-    ui.drawPSDFText("Next/Prev: change screen", -1, 235, ui.rgb(120, 120, 140), bg565, AlignCenter);
+    int col = i % cols;
+    int row = i / cols;
+    int16_t x = startX + col * cellW;
+    int16_t y = startY + row * cellH;
+
+    uint16_t bg = testColors[i];
+    uint16_t fg = detail::autoTextColor(bg, 128);
+
+    // Fill background
+    ui.fillRect().at(x, y).size(cellW - 4, cellH - 4).color(bg).draw();
+
+    // Draw text with auto-selected color
+    ui.setTextStyle(Body);
+    ui.drawText(labels[i], x + (cellW - 4) / 2, y + (cellH - 4) / 2 - 6, fg, bg, AlignCenter);
   }
+
+  ui.setTextStyle(Caption);
+  ui.drawText("Text color auto-selected based on bg", -1, 310, ui.rgb(180, 180, 180), bg565, AlignCenter);
 }
 
 void setup()
@@ -1129,10 +1646,6 @@ void setup()
   ui.logoSizesPx(36, 24);
 
   runBootAnimation(ui, btnNext, btnPrev, FadeIn, 900, "PISPPUS", "Fade in");
-
-  // Enable PSDF as primary font if available
-  ui.loadBuiltinPSDF();
-  ui.enablePSDF(true);
 
   ui.regScreen(0, screenMain);
   ui.regScreen(1, screenSettings);
@@ -1165,6 +1678,17 @@ void setup()
   ui.regScreen(27, screenDrumRollDemo);
   ui.regScreen(29, screenCircleDemo);
 
+  // New detailed primitive test screens
+  ui.regScreen(30, screenTestCircles);
+  ui.regScreen(31, screenTestRoundRects);
+  ui.regScreen(32, screenTestEllipses);
+  ui.regScreen(33, screenTestTriangles);
+  ui.regScreen(34, screenTestArcsAndLines);
+  ui.regScreen(35, screenTestAllPrimitivesGrid);
+  ui.regScreen(36, screenTestRoundTriangles);
+  ui.regScreen(37, screenTestSquircles);
+  ui.regScreen(38, screenAutoTextColorDemo);
+
   ui.configureListMenu(7, 0, {
                                  {"Main screen", "Простой экран", 0},
                                  {"Settings", "Кнопка и уведомление", 1},
@@ -1190,12 +1714,21 @@ void setup()
                                  {"Dither Cubes", "Two cubes + avg (16/24)", 21},
                                  {"Dither Compare", "Compare 16-bit vs 24-bit", 22},
                                  {"Primitives", "Circle / Arc / Ellipse / Triangle / Squircle", 23},
-                                 {"Gradients", "Gradients + fillRectAlpha", 25},
+                                 {"Gradients", "All gradient types", 25},
                                  {"Font compare", "PSDF", 24},
                                  {"Font weights", "Test all weights", 26},
                                  {"Drum roll", "Horizontal + vertical picker", 27},
                                  {"Circle AA", "Gupta-Sproull optimized", 29},
-                             });
+                                 {"Test: Circles", "fillCircle + drawCircle", 30},
+                                 {"Test: RoundRects", "1 & 4 radius variants", 31},
+                                 {"Test: Ellipses", "Wu-style AA ellipses", 32},
+                                 {"Test: Triangles", "4x subpixel AA triangles", 33},
+                                 {"Test: Arcs+Lines", "sqrt_fraction AA", 34},
+                                 {"Test: All Grid", "All primitives comparison", 35},
+                                 {"Test: RoundTriangles", "SDF AA rounded triangles", 36},
+                               {"Test: Squircles", "fill/draw squircle AA", 37},
+    {"Auto text color", "BT.709 luminance test", 38},
+});
 
   ui.setListMenuStyle(
       7, ui.rgb(8, 8, 8),
@@ -1302,7 +1835,7 @@ void loop()
     snprintf(buf, sizeof(buf), "%02u:%02u", (unsigned)h, (unsigned)m);
     ui.setStatusBarText("pipGUI", String(buf), "");
     if (!ui.notificationActive())
-      ui.updateStatusBarCenter();
+      ui.updateStatusBar();
   }
 
   // Demo: show a toast notification at intervals (cycles through messages, with icon)
@@ -1351,7 +1884,7 @@ void loop()
     }
     ui.setStatusBarBattery(g_batteryLevel, Bar);
     if (!ui.notificationActive())
-      ui.updateStatusBarBattery();
+      ui.updateStatusBar();
   }
 
   bool nextPressed = btnNext.wasPressed();
@@ -1691,11 +2224,11 @@ void loop()
           .activeColor(active)
           .draw();
 
-      if (prevVal != g_toggleState.value && ui.psdfFontLoaded())
+      if (prevVal != g_toggleState.value)
       {
         ui.setTextStyle(Body);
         const char *s = g_toggleState.value ? "ON" : "OFF";
-        ui.updatePSDFText(String(s), -1, 105, ui.rgb(200, 200, 200), bg565, AlignCenter);
+        ui.updateText(String(s), -1, 105, ui.rgb(200, 200, 200), bg565, AlignCenter);
       }
     }
   }

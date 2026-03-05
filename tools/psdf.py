@@ -1,6 +1,3 @@
-"""
-PSDF generation utilities shared across fonts and icons.
-"""
 import hashlib
 import json
 import os
