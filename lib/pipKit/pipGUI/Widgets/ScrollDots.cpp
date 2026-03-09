@@ -1,4 +1,4 @@
-#include <pipGUI/core/api/pipGUI.hpp>
+#include <pipGUI/Core/API/pipGUI.hpp>
 #include <math.h>
 
 namespace pipgui
@@ -33,14 +33,8 @@ namespace pipgui
 
         if (!_flags.spriteEnabled || !_disp.display)
         {
-            bool prevRender = _flags.renderToSprite;
-            pipcore::Sprite *prevActive = _render.activeSprite;
-
-            _flags.renderToSprite = 0;
             drawScrollDotsImpl(x, y, count, activeIndex, prevIndex, animProgress, animate, animDirection,
                            activeColor, inactiveColor, dotRadius, spacing, activeWidth);
-            _flags.renderToSprite = prevRender;
-            _render.activeSprite = prevActive;
             return;
         }
 
@@ -71,10 +65,10 @@ namespace pipgui
         int16_t rw = (int16_t)(totalW + pad * 2);
         int16_t rh = (int16_t)(h + pad * 2);
 
-        bool prevRender = _flags.renderToSprite;
+        bool prevRender = _flags.inSpritePass;
         pipcore::Sprite *prevActive = _render.activeSprite;
 
-        _flags.renderToSprite = 1;
+        _flags.inSpritePass = 1;
         _render.activeSprite = &_render.sprite;
 
         fillRect()
@@ -85,11 +79,14 @@ namespace pipgui
         drawScrollDotsImpl(left, top, count, activeIndex, prevIndex, animProgress, animate, animDirection,
                        activeColor, inactiveColor, dotRadius, spacing, activeWidth);
 
-        _flags.renderToSprite = prevRender;
+        _flags.inSpritePass = prevRender;
         _render.activeSprite = prevActive;
 
-        invalidateRect((int16_t)(rx - pad), (int16_t)(ry - pad), rw, rh);
-        flushDirty();
+        if (!prevRender)
+        {
+            invalidateRect((int16_t)(rx - pad), (int16_t)(ry - pad), rw, rh);
+            flushDirty();
+        }
     }
 
     void GUI::drawScrollDotsImpl(int16_t x, int16_t y,
@@ -108,7 +105,7 @@ namespace pipgui
         if (count == 0)
             return;
 
-        if (_flags.spriteEnabled && _disp.display && !_flags.renderToSprite)
+        if (_flags.spriteEnabled && _disp.display && !_flags.inSpritePass)
         {
             updateScrollDotsImpl(x, y, count, activeIndex, prevIndex, animProgress, animate, animDirection,
                              activeColor, inactiveColor, dotRadius, spacing, activeWidth);

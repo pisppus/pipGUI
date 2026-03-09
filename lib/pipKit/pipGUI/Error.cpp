@@ -1,5 +1,5 @@
-#include <pipGUI/core/api/pipGUI.hpp>
-#include <pipGUI/icons/metrics.hpp>
+#include <pipGUI/Core/API/pipGUI.hpp>
+#include <pipGUI/Icons/metrics.hpp>
 
 namespace pipgui
 {
@@ -160,19 +160,11 @@ namespace pipgui
             return;
         }
 
-        bool prevRenderFrame = _flags.renderToSprite;
+        bool prevRenderFrame = _flags.inSpritePass;
         pipcore::Sprite *prevActiveFrame = _render.activeSprite;
 
-        if (_flags.spriteEnabled)
-        {
-            _flags.renderToSprite = 1;
-            _render.activeSprite = &_render.sprite;
-        }
-        else
-        {
-            _flags.renderToSprite = 0;
-            _render.activeSprite = nullptr;
-        }
+        _flags.inSpritePass = 1;
+        _render.activeSprite = &_render.sprite;
 
         clear(rgb(0, 0, 0));
 
@@ -294,24 +286,16 @@ namespace pipgui
             uint32_t btnColor = accentColor;
             uint8_t radius = 10;
 
-            bool prevRenderBtn = _flags.renderToSprite;
+            bool prevRenderBtn = _flags.inSpritePass;
             pipcore::Sprite *prevActiveBtn = _render.activeSprite;
 
-            if (_flags.spriteEnabled)
-            {
-                _flags.renderToSprite = 1;
-                _render.activeSprite = &_render.sprite;
-            }
-            else
-            {
-                _flags.renderToSprite = 0;
-                _render.activeSprite = nullptr;
-            }
+            _flags.inSpritePass = 1;
+            _render.activeSprite = &_render.sprite;
 
             String label = _error.buttonText.length() ? _error.buttonText : String("OK");
             drawButton(label, btnX, btnY, btnW, btnH, btnColor, radius, _error.buttonState);
 
-            _flags.renderToSprite = prevRenderBtn;
+            _flags.inSpritePass = prevRenderBtn;
             _render.activeSprite = prevActiveBtn;
         }
 
@@ -339,7 +323,7 @@ namespace pipgui
         if (_flags.spriteEnabled && _disp.display)
             _render.sprite.writeToDisplay(*_disp.display, 0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight);
 
-        _flags.renderToSprite = prevRenderFrame;
+        _flags.inSpritePass = prevRenderFrame;
         _render.activeSprite = prevActiveFrame;
     }
 

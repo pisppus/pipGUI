@@ -1,8 +1,8 @@
-#include <pipGUI/core/api/pipGUI.hpp>
-#include <pipGUI/core/utils/Colors.hpp>
-#include <pipGUI/core/Render/Draw/Blend.hpp>
-#include <pipGUI/icons/icons.hpp>
-#include <pipGUI/icons/metrics.hpp>
+#include <pipGUI/Core/API/pipGUI.hpp>
+#include <pipGUI/Core/Utils/Colors.hpp>
+#include <pipGUI/Core/Render/Draw/Blend.hpp>
+#include <pipGUI/Icons/icons.hpp>
+#include <pipGUI/Icons/metrics.hpp>
 
 namespace pipgui
 {
@@ -74,9 +74,9 @@ namespace pipgui
             iy1 = maxH;
 
         const float distanceScale = (float)psdf_icons::DistanceRange * ((float)renderSizePx / (float)psdf_icons::NominalSizePx);
-        const float weightBias = _typo.psdfWeightBias;
+        constexpr float iconBias = 0.0f;
         const float kScale = distanceScale * (1.f / 255.f);
-        const float kOffset = 0.5f - distanceScale * 0.5f + weightBias;
+        const float kOffset = 0.5f - distanceScale * 0.5f + iconBias;
 
         float dthr = (0.f - kOffset) / kScale;
         uint8_t s8Min = (dthr > 0.f && dthr < 255.f) ? (uint8_t)dthr : 0;
@@ -133,19 +133,22 @@ namespace pipgui
         const int16_t ry = (y == -1) ? AutoY((int32_t)sizePx) : y;
         constexpr int16_t pad = 2;
 
-        bool prevRender = _flags.renderToSprite;
+        bool prevRender = _flags.inSpritePass;
         pipcore::Sprite *prevActive = _render.activeSprite;
-        _flags.renderToSprite = 1;
+        _flags.inSpritePass = 1;
         _render.activeSprite = &_render.sprite;
 
         fillRect().pos(rx - pad, ry - pad).size(sizePx + pad * 2, sizePx + pad * 2).color(bg565).draw();
         drawIconInternal(iconId, rx, ry, sizePx, fg565);
 
-        _flags.renderToSprite = prevRender;
+        _flags.inSpritePass = prevRender;
         _render.activeSprite = prevActive;
 
-        invalidateRect(rx - pad, ry - pad, sizePx + pad * 2, sizePx + pad * 2);
-        flushDirty();
+        if (!prevRender)
+        {
+            invalidateRect(rx - pad, ry - pad, sizePx + pad * 2, sizePx + pad * 2);
+            flushDirty();
+        }
     }
 
     void DrawIconFluent::draw()
@@ -154,7 +157,7 @@ namespace pipgui
             return;
         _consumed = true;
 
-        if (_gui->_flags.spriteEnabled && _gui->_disp.display && !_gui->_flags.renderToSprite)
+        if (_gui->_flags.spriteEnabled && _gui->_disp.display && !_gui->_flags.inSpritePass)
             _gui->updateIconInternal(_iconId, _x, _y, _sizePx, _fg565, _bg565);
         else
             _gui->drawIconInternal(_iconId, _x, _y, _sizePx, _fg565);

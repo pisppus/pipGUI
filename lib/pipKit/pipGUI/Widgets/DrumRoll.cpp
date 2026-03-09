@@ -1,4 +1,4 @@
-#include <pipGUI/core/api/pipGUI.hpp>
+#include <pipGUI/Core/API/pipGUI.hpp>
 #include <math.h>
 
 namespace pipgui

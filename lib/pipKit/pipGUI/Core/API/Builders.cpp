@@ -1,4 +1,4 @@
-﻿#include <pipGUI/core/api/pipGUI.hpp>
+#include <pipGUI/Core/API/pipGUI.hpp>
 
 namespace pipgui
 {
@@ -249,6 +249,14 @@ namespace pipgui
         if (_consumed || !_gui)
             return;
         _gui->showToastInternal(_text, _durationMs, _fromTop, _iconId, _iconSizePx);
+        _consumed = true;
+    }
+
+    void NotificationFluent::show()
+    {
+        if (_consumed || !_gui)
+            return;
+        _gui->showNotificationInternal(_title, _message, _buttonText, _delaySeconds, _type, _iconId);
         _consumed = true;
     }
 

@@ -1,6 +1,6 @@
-#include <pipGUI/core/api/pipGUI.hpp>
-#include <pipGUI/core/Debug.hpp>
-#include <pipGUI/core/utils/Colors.hpp>
+#include <pipGUI/Core/API/pipGUI.hpp>
+#include <pipGUI/Core/Debug.hpp>
+#include <pipGUI/Core/Utils/Colors.hpp>
 #include <pipCore/Graphics/Sprite.hpp>
 #include "Blend.hpp"
 
@@ -31,7 +31,7 @@ namespace pipgui
 
     pipcore::Sprite *GUI::getDrawTarget()
     {
-        pipcore::Sprite *spr = (_flags.renderToSprite && _flags.spriteEnabled)
+        pipcore::Sprite *spr = (_flags.inSpritePass && _flags.spriteEnabled)
                                    ? (_render.activeSprite ? _render.activeSprite : &_render.sprite)
                                    : &_render.sprite;
         applyClip(spr, _clip.enabled, _clip.x, _clip.y, _clip.w, _clip.h);
@@ -85,33 +85,23 @@ namespace pipgui
             return;
 
         pipcore::Sprite *spr = getDrawTarget();
-        if (!spr)
+        if (!spr || !spr->getBuffer())
             return;
 
-        uint16_t *buf = (uint16_t *)spr->getBuffer();
-        if (!buf)
-            return;
-
-        const int16_t w = spr->width();
-        const int16_t h = spr->height();
-        if (w <= 0 || h <= 0)
-            return;
-
-        int32_t clipX = 0, clipY = 0, clipW = w, clipH = h;
+        int32_t clipX = 0;
+        int32_t clipY = 0;
+        int32_t clipW = 0;
+        int32_t clipH = 0;
         spr->getClipRect(&clipX, &clipY, &clipW, &clipH);
         if (clipW <= 0 || clipH <= 0)
             return;
 
-        const uint16_t v = pipcore::Sprite::swap16(color);
-        for (int32_t yy = 0; yy < clipH; ++yy)
-        {
-            const int32_t row = (int32_t)(clipY + yy) * (int32_t)w;
-            uint16_t *p = buf + row + clipX;
-            for (int32_t xx = 0; xx < clipW; ++xx)
-                p[xx] = v;
-        }
+        if (clipX == 0 && clipY == 0 && clipW == spr->width() && clipH == spr->height())
+            spr->fillScreen(color);
+        else
+            spr->fillRect((int16_t)clipX, (int16_t)clipY, (int16_t)clipW, (int16_t)clipH, color);
 
-        if (_disp.display && _flags.spriteEnabled && !_flags.renderToSprite)
+        if (_disp.display && !_flags.inSpritePass)
             invalidateRect((int16_t)clipX, (int16_t)clipY, (int16_t)clipW, (int16_t)clipH);
     }
 
@@ -223,6 +213,12 @@ namespace pipgui
     {
         if (_dirty.count == 0)
             return;
+        if (_flags.screenTransition)
+        {
+            _dirty.count = 0;
+            Debug::clearRects();
+            return;
+        }
         if (!_disp.display || !_flags.spriteEnabled)
         {
             _dirty.count = 0;

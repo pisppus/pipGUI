@@ -1,6 +1,6 @@
-#include <pipGUI/core/api/pipGUI.hpp>
-#include <pipGUI/core/utils/BNSD.hpp>
-#include <pipGUI/core/utils/Colors.hpp>
+#include <pipGUI/Core/API/pipGUI.hpp>
+#include <pipGUI/Core/Utils/BNSD.hpp>
+#include <pipGUI/Core/Utils/Colors.hpp>
 #include <pipCore/Graphics/Sprite.hpp>
 #include "Blend.hpp"
 
@@ -77,7 +77,7 @@ namespace pipgui
                 row[px] = pipcore::Sprite::swap16(detail::quantize565(c888, px, py));
         }
 
-        if (_disp.display && _flags.spriteEnabled && !_flags.renderToSprite)
+        if (_disp.display && _flags.spriteEnabled && !_flags.inSpritePass)
             invalidateRect(x0, y0, x1 - x0, y1 - y0);
     }
 
@@ -132,7 +132,7 @@ namespace pipgui
             }
         }
 
-        if (_disp.display && _flags.spriteEnabled && !_flags.renderToSprite)
+        if (_disp.display && _flags.spriteEnabled && !_flags.inSpritePass)
             invalidateRect(x0, y0, x1 - x0, y1 - y0);
     }
 
@@ -205,7 +205,7 @@ namespace pipgui
             cbR += dbR;
         }
 
-        if (_disp.display && _flags.spriteEnabled && !_flags.renderToSprite)
+        if (_disp.display && _flags.spriteEnabled && !_flags.inSpritePass)
             invalidateRect(x0, y0, (int16_t)(x1 - x0), (int16_t)(y1 - y0));
     }
 
@@ -261,7 +261,7 @@ namespace pipgui
             }
         }
 
-        if (_disp.display && _flags.spriteEnabled && !_flags.renderToSprite)
+        if (_disp.display && _flags.spriteEnabled && !_flags.inSpritePass)
             invalidateRect(x0, y0, (int16_t)(x1 - x0), (int16_t)(y1 - y0));
     }
 
@@ -335,7 +335,7 @@ namespace pipgui
             }
         }
 
-        if (_disp.display && _flags.spriteEnabled && !_flags.renderToSprite)
+        if (_disp.display && _flags.spriteEnabled && !_flags.inSpritePass)
             invalidateRect(x0, y0, (int16_t)(x1 - x0), (int16_t)(y1 - y0));
     }
 }

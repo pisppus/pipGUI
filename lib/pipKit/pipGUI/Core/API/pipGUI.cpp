@@ -1,5 +1,5 @@
-#include <pipGUI/core/api/pipGUI.hpp>
-#include <pipGUI/core/Debug.hpp>
+#include <pipGUI/Core/API/pipGUI.hpp>
+#include <pipGUI/Core/Debug.hpp>
 #include <pipCore/Platforms/PlatformFactory.hpp>
 
 namespace pipgui
@@ -26,15 +26,12 @@ namespace pipgui
         freeBlurBuffers(plat);
         freeGraphAreas(plat);
         freeLists(plat);
-        freeTileMenus(plat);
+        freeTiles(plat);
         freeErrors(plat);
         freeScreenState(plat);
 
         _render.sprite.deleteSprite();
-        _render.screenFromSprite.deleteSprite();
-        _render.screenToSprite.deleteSprite();
         _flags.spriteEnabled = 0;
-        _flags.screenSpritesEnabled = 0;
     }
 
     template <typename T>
@@ -95,7 +92,6 @@ namespace pipgui
 
     void GUI::freeBlurBuffers(pipcore::GuiPlatform *plat) noexcept
     {
-        safeFree(plat, _blur.prevOrig);
         safeFree(plat, _blur.smallIn);
         safeFree(plat, _blur.smallTmp);
         safeFree(plat, _blur.rowR);
@@ -104,6 +100,9 @@ namespace pipgui
         safeFree(plat, _blur.colR);
         safeFree(plat, _blur.colG);
         safeFree(plat, _blur.colB);
+        _blur.workLen = 0;
+        _blur.rowCap = 0;
+        _blur.colCap = 0;
     }
 
     void GUI::freeGraphAreas(pipcore::GuiPlatform *plat) noexcept
@@ -144,14 +143,6 @@ namespace pipgui
             if (!m)
                 continue;
 
-            if (m->viewportSprite)
-            {
-                m->viewportSprite->deleteSprite();
-                m->viewportSprite->~Sprite();
-                detail::guiFree(plat, m->viewportSprite);
-                m->viewportSprite = nullptr;
-            }
-
             safeFreeArray(plat, m->items, m->capacity);
 
             ObjectGuard<ListState> guard(plat, m);
@@ -159,26 +150,22 @@ namespace pipgui
         }
     }
 
-    void GUI::freeTileMenus(pipcore::GuiPlatform *plat) noexcept
+    void GUI::freeTiles(pipcore::GuiPlatform *plat) noexcept
     {
-        if (!_screen.tileMenus)
+        if (!_screen.tiles)
             return;
 
         for (uint16_t i = 0; i < _screen.capacity; ++i)
         {
-            TileMenuState *t = _screen.tileMenus[i];
+            TileState *t = _screen.tiles[i];
             if (!t)
                 continue;
 
-            const uint8_t cap = t->itemCapacity;
-
-            safeFreeArray(plat, t->items, cap);
-            safeFreeArray(plat, t->layout, cap);
-
+            safeFreeArray(plat, t->items, t->itemCapacity);
             t->itemCapacity = 0;
 
-            ObjectGuard<TileMenuState> guard(plat, t);
-            _screen.tileMenus[i] = nullptr;
+            ObjectGuard<TileState> guard(plat, t);
+            _screen.tiles[i] = nullptr;
         }
     }
 
@@ -186,18 +173,20 @@ namespace pipgui
     {
         freeGraphAreas(plat);
         freeLists(plat);
-        freeTileMenus(plat);
+        freeTiles(plat);
 
         detail::guiFree(plat, _screen.callbacks);
         detail::guiFree(plat, _screen.graphAreas);
         detail::guiFree(plat, _screen.lists);
-        detail::guiFree(plat, _screen.tileMenus);
+        detail::guiFree(plat, _screen.tiles);
 
         _screen.callbacks = nullptr;
         _screen.graphAreas = nullptr;
         _screen.lists = nullptr;
-        _screen.tileMenus = nullptr;
+        _screen.tiles = nullptr;
         _screen.capacity = 0;
+        _screen.current = INVALID_SCREEN_ID;
+        _screen.registrySynced = false;
     }
 
     void GUI::freeErrors(pipcore::GuiPlatform *plat) noexcept
@@ -238,7 +227,7 @@ namespace pipgui
         _consumed = true;
         if (!_gui)
             return;
-        _gui->handleListInput(_screenId, _nextPressed, _prevPressed, _nextDown, _prevDown);
+        _gui->handleListInput(_screenId, _nextDown, _prevDown);
     }
 
     void GUI::begin(uint8_t rotation, uint16_t bgColor)
@@ -272,41 +261,24 @@ namespace pipgui
         _render.screenWidth = _disp.display->width();
         _render.screenHeight = _disp.display->height();
         _render.bgColor = bgColor;
-
-        _disp.display->fillScreen565(_render.bgColor);
+        _render.bgColor565 = bgColor;
 
         _render.sprite.deleteSprite();
-        _render.screenFromSprite.deleteSprite();
-        _render.screenToSprite.deleteSprite();
 
         _flags.spriteEnabled = _render.sprite.createSprite((int16_t)_render.screenWidth, (int16_t)_render.screenHeight);
         _render.activeSprite = _flags.spriteEnabled ? &_render.sprite : nullptr;
 
-        bool fromOk = _render.screenFromSprite.createSprite((int16_t)_render.screenWidth, (int16_t)_render.screenHeight);
-        bool toOk = fromOk && _render.screenToSprite.createSprite((int16_t)_render.screenWidth, (int16_t)_render.screenHeight);
-
-        if (!(fromOk && toOk))
+        if (_flags.spriteEnabled)
         {
-            _render.screenFromSprite.deleteSprite();
-            _render.screenToSprite.deleteSprite();
-
-            int16_t halfW = (int16_t)(_render.screenWidth / 2);
-            int16_t halfH = (int16_t)(_render.screenHeight / 2);
-
-            if (halfW > 0 && halfH > 0 && _flags.spriteEnabled)
-            {
-                fromOk = _render.screenFromSprite.createSprite(halfW, halfH);
-                toOk = fromOk && _render.screenToSprite.createSprite(halfW, halfH);
-
-                if (!(fromOk && toOk))
-                {
-                    _render.screenFromSprite.deleteSprite();
-                    _render.screenToSprite.deleteSprite();
-                }
-            }
+            const bool prevRender = _flags.inSpritePass;
+            _flags.inSpritePass = 1;
+            clear(bgColor);
+            _flags.inSpritePass = prevRender;
+            _render.sprite.writeToDisplay(*_disp.display, 0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight);
+            _dirty.count = 0;
         }
 
-        _flags.screenSpritesEnabled = fromOk && toOk;
+        syncRegisteredScreens();
 
         _disp.brightnessMax = plat->loadMaxBrightnessPercent();
 

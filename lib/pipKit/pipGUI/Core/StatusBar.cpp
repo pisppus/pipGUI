@@ -1,6 +1,6 @@
-#include <pipGUI/core/api/pipGUI.hpp>
-#include <pipGUI/core/Debug.hpp>
-#include <pipGUI/icons/metrics.hpp>
+#include <pipGUI/Core/API/pipGUI.hpp>
+#include <pipGUI/Core/Debug.hpp>
+#include <pipGUI/Icons/metrics.hpp>
 
 namespace pipgui
 {
@@ -346,16 +346,16 @@ namespace pipgui
         if (!_flags.statusBarEnabled || _status.height == 0)
             return;
 
-        bool prevRender = _flags.renderToSprite;
+        bool prevRender = _flags.inSpritePass;
         pipcore::Sprite *prevActive = _render.activeSprite;
 
-        _flags.renderToSprite = 1;
+        _flags.inSpritePass = 1;
         _render.activeSprite = &_render.sprite;
 
         auto t = getDrawTarget();
         if (!t)
         {
-            _flags.renderToSprite = prevRender;
+            _flags.inSpritePass = prevRender;
             _render.activeSprite = prevActive;
             return;
         }
@@ -373,7 +373,7 @@ namespace pipgui
 
         if (w <= 0 || h <= 0)
         {
-            _flags.renderToSprite = prevRender;
+            _flags.inSpritePass = prevRender;
             _render.activeSprite = prevActive;
             return;
         }
@@ -440,7 +440,7 @@ namespace pipgui
                 mx = x + 2;
             drawTextAt(String(metricsText), mx);
 
-            _flags.renderToSprite = prevRender;
+            _flags.inSpritePass = prevRender;
             _render.activeSprite = prevActive;
             return;
         }
@@ -564,7 +564,7 @@ namespace pipgui
         if (_status.custom)
             _status.custom(*this, x, y, w, h);
 
-        _flags.renderToSprite = prevRender;
+        _flags.inSpritePass = prevRender;
         _render.activeSprite = prevActive;
     }
 }

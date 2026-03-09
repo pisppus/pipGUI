@@ -1,10 +1,6 @@
-﻿#include <pipGUI/core/api/pipGUI.hpp>
-#include <pipGUI/core/utils/Colors.hpp>
+﻿#include <pipGUI/Core/API/pipGUI.hpp>
+#include <pipGUI/Core/Utils/Colors.hpp>
 #include <math.h>
-#include <new>
-#include <utility>
-#include <cstring>
-
 namespace pipgui
 {
 
@@ -23,61 +19,23 @@ namespace pipgui
         menu.nextLongFired = menu.prevLongFired = false;
         menu.lastNextDown = menu.lastPrevDown = false;
         menu.scrollbarAlpha = 0;
+        menu.marqueeStartMs = 0;
         menu.lastScrollActivityMs = menu.lastUpdateMs = 0;
     }
 
     static bool initListItem(ListState::Item &item, const ListItemDef &def)
     {
-        item.title = def.title ? String(def.title) : String();
-        item.subtitle = def.subtitle ? String(def.subtitle) : String();
+        if (!detail::assignString(item.title, def.title) || !detail::assignString(item.subtitle, def.subtitle))
+            return false;
+
         item.targetScreen = def.targetScreen;
         item.iconId = def.iconId;
         resetListItemCache(item);
-
-        return (!def.title || item.title.length() > 0 || strlen(def.title) == 0) &&
-               (!def.subtitle || item.subtitle.length() > 0 || strlen(def.subtitle) == 0);
-    }
-
-    static pipcore::Sprite *ensureListViewport(ListState &menu,
-                                               pipcore::GuiPlatform *plat,
-                                               int16_t w,
-                                               int16_t h)
-    {
-        if (!menu.viewportSprite)
-        {
-            void *mem = detail::guiAlloc(plat, sizeof(pipcore::Sprite), pipcore::GuiAllocCaps::Default);
-            if (mem)
-                menu.viewportSprite = new (mem) pipcore::Sprite();
-        }
-
-        pipcore::Sprite *viewport = menu.viewportSprite;
-        if (!viewport)
-            return nullptr;
-
-        if (viewport->getBuffer() && viewport->width() == w && viewport->height() == h)
-            return viewport;
-
-        viewport->deleteSprite();
-        if (viewport->createSprite(w, h))
-            return viewport;
-
-        viewport->deleteSprite();
-        viewport->~Sprite();
-        detail::guiFree(plat, viewport);
-        menu.viewportSprite = nullptr;
-        return nullptr;
+        return true;
     }
 
     static void destroyList(ListState &menu, pipcore::GuiPlatform *plat)
     {
-        if (menu.viewportSprite)
-        {
-            menu.viewportSprite->deleteSprite();
-            menu.viewportSprite->~Sprite();
-            detail::guiFree(plat, menu.viewportSprite);
-            menu.viewportSprite = nullptr;
-        }
-
         if (menu.items)
         {
             for (uint8_t i = 0; i < menu.capacity; ++i)
@@ -96,42 +54,12 @@ namespace pipgui
             return true;
         }
 
-        if (menu.capacity >= newCapacity && menu.items)
-            return true;
-
-        const size_t itemSize = sizeof(ListState::Item);
-        if ((size_t)newCapacity > SIZE_MAX / itemSize)
-            return false;
-
-        ListState::Item *newItems = (ListState::Item *)detail::guiAlloc(plat, itemSize * newCapacity, pipcore::GuiAllocCaps::Default);
-        if (!newItems)
-            return false;
-
-        for (uint8_t i = 0; i < newCapacity; ++i)
-            new (&newItems[i]) ListState::Item();
-
-        uint8_t toCopy = 0;
-        if (menu.items && menu.itemCount > 0)
-            toCopy = (menu.itemCount < newCapacity) ? menu.itemCount : newCapacity;
-
-        for (uint8_t i = 0; i < toCopy; ++i)
-            newItems[i] = std::move(menu.items[i]);
-
-        if (menu.items)
-        {
-            for (uint8_t i = 0; i < menu.capacity; ++i)
-                menu.items[i].~Item();
-            detail::guiFree(plat, menu.items);
-        }
-
-        menu.items = newItems;
-        menu.capacity = newCapacity;
-        return true;
+        return detail::ensureCapacity(plat, menu.items, menu.capacity, newCapacity);
     }
 
     void ConfigureListFluent::apply()
     {
-        if (_consumed || !_items || _itemCount == 0)
+        if (_consumed || !_gui || !_items || _itemCount == 0)
             return;
         _consumed = true;
 
@@ -171,7 +99,7 @@ namespace pipgui
         }
     }
 
-    void GUI::handleListInput(uint8_t screenId, bool, bool, bool nextDown, bool prevDown)
+    void GUI::handleListInput(uint8_t screenId, bool nextDown, bool prevDown)
     {
         ListState *menuPtr = getList(screenId);
         if (!menuPtr)
@@ -197,7 +125,7 @@ namespace pipgui
                 {
                     uint8_t target = menu.items[menu.selectedIndex].targetScreen;
                     if (target != INVALID_SCREEN_ID)
-                        setScreen(target);
+                        activateScreenId(target, 1);
                 }
                 menu.nextLongFired = true;
             }
@@ -227,7 +155,7 @@ namespace pipgui
             else if (!menu.prevLongFired && menu.prevHoldStartMs && (now - menu.prevHoldStartMs) >= holdMs)
             {
                 if (menu.parentScreen != INVALID_SCREEN_ID)
-                    setScreen(menu.parentScreen);
+                    activateScreenId(menu.parentScreen, -1);
                 menu.prevLongFired = true;
             }
         }
@@ -253,12 +181,16 @@ namespace pipgui
         {
             menu.scrollbarAlpha = 255;
             menu.lastScrollActivityMs = now;
+            menu.marqueeStartMs = now;
             requestRedraw();
         }
     }
 
     bool GUI::updateList(uint8_t screenId)
     {
+        if (screenId == INVALID_SCREEN_ID)
+            return false;
+
         int16_t top = 0;
         int16_t height = (int16_t)_render.screenHeight;
         if (_flags.statusBarEnabled && _status.height > 0)
@@ -269,11 +201,11 @@ namespace pipgui
                 height -= _status.height;
         }
 
-        if (_render.screenWidth <= 0 || height <= top)
+        const int16_t contentHeight = (int16_t)(height - top);
+        if (_render.screenWidth <= 0 || contentHeight <= 0)
             return false;
 
-        return updateList(screenId, 0, top, (int16_t)_render.screenWidth,
-                          (int16_t)(height - top), _render.bgColor565);
+        return updateList(screenId, 0, top, (int16_t)_render.screenWidth, contentHeight, _render.bgColor565);
     }
 
     bool GUI::updateList(uint8_t screenId, int16_t x, int16_t y, int16_t w, int16_t h, uint16_t bgColor565)
@@ -287,6 +219,8 @@ namespace pipgui
         {
             auto *target = getDrawTarget();
             const uint32_t now = nowMs();
+            if (menu.marqueeStartMs == 0)
+                menu.marqueeStartMs = now;
 
             uint32_t dtMs = 0;
             if (menu.lastUpdateMs != 0)
@@ -295,9 +229,8 @@ namespace pipgui
             if (dtMs > 100)
                 dtMs = 100;
 
-            const bool isViewportTarget = (menu.viewportSprite && target == menu.viewportSprite);
-            const int16_t left = isViewportTarget ? 0 : x;
-            const int16_t top = isViewportTarget ? 0 : y;
+            const int16_t left = x;
+            const int16_t top = y;
             const int16_t right = left + w;
             const int16_t bottom = top + h;
             const int16_t padY = (int16_t)menu.style.spacing;
@@ -324,16 +257,7 @@ namespace pipgui
 
             int32_t clipX = 0, clipY = 0, clipW = 0, clipH = 0;
             target->getClipRect(&clipX, &clipY, &clipW, &clipH);
-
-            if (isViewportTarget)
-            {
-                target->setClipRect(0, 0, w, h);
-                target->fillRect(0, 0, w, h, bgColor565);
-            }
-            else
-            {
-                target->setClipRect(left, top, w, h);
-            }
+            target->setClipRect(left, top, w, h);
 
             int32_t bgL = left;
             int32_t bgT = top;
@@ -357,7 +281,7 @@ namespace pipgui
 
             const int32_t bgW = bgR - bgL;
             const int32_t bgH = bgB - bgT;
-            if (!isViewportTarget && bgW > 0 && bgH > 0)
+            if (bgW > 0 && bgH > 0)
                 target->fillRect((int16_t)bgL, (int16_t)bgT, (int16_t)bgW, (int16_t)bgH, bgColor565);
 
             target->setClipRect(left, contentTop, w, contentBottom - contentTop);
@@ -550,6 +474,25 @@ namespace pipgui
 
             constexpr uint16_t TITLE_WEIGHT = 600;
             constexpr uint16_t SUBTITLE_WEIGHT = 500;
+            const MarqueeTextOptions marqueeOpts(28, 700, menu.marqueeStartMs);
+            const auto drawTextLine = [&](const String &text,
+                                          int16_t textX,
+                                          int16_t textY,
+                                          int16_t textMaxWidth,
+                                          uint16_t fg,
+                                          uint16_t bg,
+                                          bool active)
+            {
+                if (active)
+                {
+                    if (!drawTextMarquee(text, textX, textY, textMaxWidth, fg, AlignLeft, marqueeOpts))
+                        drawTextAligned(text, textX, textY, fg, bg, AlignLeft);
+                    return;
+                }
+
+                if (!drawTextEllipsized(text, textX, textY, textMaxWidth, fg, AlignLeft))
+                    drawTextAligned(text, textX, textY, fg, bg, AlignLeft);
+            };
 
             for (int16_t itemIndex = startIndex; itemIndex <= endIndex; ++itemIndex)
             {
@@ -575,21 +518,33 @@ namespace pipgui
                                                              active ? textColor : detail::autoTextColor(bgColor565),
                                                              active ? bg : bgColor565, false);
                     const int16_t textX = cardX + 12 + textOffsetX;
+                    const int16_t textMaxWidth = (cardX + cardW - textX - 10 > 4) ? (cardX + cardW - textX - 10) : 4;
                     uint16_t titlePx = menu.style.titleFontPx;
                     if (titlePx == 0)
                         titlePx = 18;
 
                     ensureTextMetrics(item, titlePx, TITLE_WEIGHT, false, 0, 0);
 
-                    int16_t baseY = itemY + (int16_t)((cardH - item.titleH) / 2);
-                    if (baseY < itemY + 2)
-                        baseY = (int16_t)(itemY + 2);
+                    const int16_t itemClipY = itemY + 2;
+                    const int16_t itemClipH = cardH - 4;
+                    if (itemClipH <= 0 || item.titleH > itemClipH)
+                        continue;
+
+                    int16_t baseY = itemClipY + (itemClipH - item.titleH) / 2;
+                    if (baseY < itemClipY)
+                        baseY = itemClipY;
 
                     if (baseY + item.titleH <= contentTop || baseY >= contentBottom)
                         continue;
 
+                    int32_t prevItemClipX = 0, prevItemClipY = 0, prevItemClipW = 0, prevItemClipH = 0;
+                    target->getClipRect(&prevItemClipX, &prevItemClipY, &prevItemClipW, &prevItemClipH);
+                    target->setClipRect(cardX + 6, itemClipY, cardW - 12, itemClipH);
+
                     setTextFont(TITLE_WEIGHT, titlePx);
-                    drawTextAligned(item.title, textX, baseY, textColor, bg, AlignLeft);
+                    drawTextLine(item.title, textX, baseY, textMaxWidth, textColor, bg, active);
+
+                    target->setClipRect(prevItemClipX, prevItemClipY, prevItemClipW, prevItemClipH);
 
                     continue;
                 }
@@ -602,6 +557,10 @@ namespace pipgui
                 const int16_t textOffsetX = drawItemIcon(item.iconId, cardX + 10, itemY, (cardH > 40) ? 20 : 18, 8,
                                                          textColor, bg, true);
                 const int16_t textX = cardX + 10 + textOffsetX;
+                const int16_t textMaxWidth = (cardX + cardW - textX - 10 > 4) ? (cardX + cardW - textX - 10) : 4;
+                const bool autoTitlePx = (menu.style.titleFontPx == 0);
+                const bool autoSubPx = (menu.style.subtitleFontPx == 0);
+                const bool autoGapPx = (menu.style.lineGapPx == 0);
                 uint16_t titlePx = menu.style.titleFontPx;
                 uint16_t subPx = menu.style.subtitleFontPx;
                 uint16_t gapPx = menu.style.lineGapPx;
@@ -621,27 +580,64 @@ namespace pipgui
                     gapPx = 0;
                 }
 
+                // Small 16:9 displays need a more compact default stack so the subtitle
+                // does not get dropped when card height is tight.
+                if (hasSub && cardH <= 52)
+                {
+                    if (autoTitlePx)
+                        titlePx = 15;
+                    if (autoSubPx)
+                        subPx = 10;
+                    if (autoGapPx)
+                        gapPx = 1;
+                }
+                else if (hasSub && cardH <= 58)
+                {
+                    if (autoTitlePx)
+                        titlePx = 16;
+                    if (autoSubPx)
+                        subPx = 11;
+                    if (autoGapPx)
+                        gapPx = 2;
+                }
+
                 ensureTextMetrics(item, titlePx, TITLE_WEIGHT, hasSub, subPx, SUBTITLE_WEIGHT);
 
-                int16_t totalH = item.titleH;
-                if (hasSub && item.subH > 0)
-                    totalH += gapPx + item.subH;
+                const int16_t itemClipY = itemY + 4;
+                const int16_t itemClipH = cardH - 8;
+                if (itemClipH <= 0 || item.titleH > itemClipH)
+                    continue;
 
-                int16_t baseY = itemY + (int16_t)((cardH - totalH) / 2);
-                if (baseY < itemY + 2)
-                    baseY = (int16_t)(itemY + 2);
+                bool showSub = hasSub && subPx > 0 && item.subH > 0;
+                int16_t totalH = item.titleH;
+                if (showSub)
+                    totalH += gapPx + item.subH;
+                if (showSub && totalH > itemClipH)
+                {
+                    showSub = false;
+                    totalH = item.titleH;
+                }
+
+                int16_t baseY = itemClipY + (itemClipH - totalH) / 2;
+                if (baseY < itemClipY)
+                    baseY = itemClipY;
 
                 const int16_t titleY = baseY;
-                const int16_t subY = baseY + item.titleH + (hasSub ? gapPx : 0);
+                const int16_t subY = baseY + item.titleH + (showSub ? gapPx : 0);
+                int32_t prevItemClipX = 0, prevItemClipY = 0, prevItemClipW = 0, prevItemClipH = 0;
+                target->getClipRect(&prevItemClipX, &prevItemClipY, &prevItemClipW, &prevItemClipH);
+                target->setClipRect(cardX + 6, itemClipY, cardW - 12, itemClipH);
 
                 setTextFont(TITLE_WEIGHT, titlePx);
-                drawTextAligned(item.title, textX, titleY, textColor, bg, AlignLeft);
+                drawTextLine(item.title, textX, titleY, textMaxWidth, textColor, bg, active);
 
-                if (hasSub && subPx > 0)
+                if (showSub)
                 {
                     setTextFont(SUBTITLE_WEIGHT, subPx);
-                    drawTextAligned(subtitle, textX, subY, subColor, bg, AlignLeft);
+                    drawTextLine(subtitle, textX, subY, textMaxWidth, subColor, bg, active);
                 }
+
+                target->setClipRect(prevItemClipX, prevItemClipY, prevItemClipW, prevItemClipH);
             }
 
             constexpr uint32_t SHOW_MS = 700;
@@ -736,23 +732,20 @@ namespace pipgui
             target->setClipRect(clipX, clipY, clipW, clipH);
         };
 
-        pipcore::Sprite *viewport = ensureListViewport(menu, platform(), w, h);
-        const bool useViewport = (viewport && viewport->getBuffer());
-
-        bool prevRender = _flags.renderToSprite;
+        bool prevRender = _flags.inSpritePass;
         pipcore::Sprite *prevActive = _render.activeSprite;
 
-        _flags.renderToSprite = 1;
-        _render.activeSprite = useViewport ? viewport : &_render.sprite;
+        _flags.inSpritePass = 1;
+        _render.activeSprite = &_render.sprite;
         drawList();
-        _flags.renderToSprite = prevRender;
+        _flags.inSpritePass = prevRender;
         _render.activeSprite = prevActive;
 
-        if (useViewport)
-            viewport->pushSprite(&_render.sprite, x, y);
-
-        invalidateRect(x, y, w, h);
-        flushDirty();
+        if (!prevRender)
+        {
+            invalidateRect(x, y, w, h);
+            flushDirty();
+        }
         return true;
     }
 }

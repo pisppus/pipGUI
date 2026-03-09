@@ -1,5 +1,5 @@
-#include <pipGUI/core/api/pipGUI.hpp>
-#include <pipGUI/core/utils/Colors.hpp>
+#include <pipGUI/Core/API/pipGUI.hpp>
+#include <pipGUI/Core/Utils/Colors.hpp>
 #include <math.h>
 
 namespace pipgui
@@ -161,7 +161,7 @@ namespace pipgui
         if (value > 100)
             value = 100;
 
-        if (_flags.spriteEnabled && _disp.display && !_flags.renderToSprite)
+        if (_flags.spriteEnabled && _disp.display && !_flags.inSpritePass)
         {
             updateProgressBar(x, y, w, h, value, baseColor, fillColor, radius, anim);
             return;
@@ -349,16 +349,16 @@ namespace pipgui
             return;
 
         // Route through sprite update path when rendering to display
-        if (_flags.spriteEnabled && _disp.display && !_flags.renderToSprite)
+        if (_flags.spriteEnabled && _disp.display && !_flags.inSpritePass)
         {
-            bool prevRender = _flags.renderToSprite;
+            bool prevRender = _flags.inSpritePass;
             pipcore::Sprite *prevActive = _render.activeSprite;
-            _flags.renderToSprite = 1;
+            _flags.inSpritePass = 1;
             _render.activeSprite = &_render.sprite;
 
             drawProgressText(x, y, w, h, text, align, textColor, bgColor, fontPx);
 
-            _flags.renderToSprite = prevRender;
+            _flags.inSpritePass = prevRender;
             _render.activeSprite = prevActive;
             flushDirty();
             return;
@@ -453,7 +453,7 @@ namespace pipgui
         if (thickness < 1)
             thickness = 1;
 
-        if (_flags.spriteEnabled && _disp.display && !_flags.renderToSprite)
+        if (_flags.spriteEnabled && _disp.display && !_flags.inSpritePass)
         {
             updateCircularProgressBar(x, y, r, thickness, value, baseColor, fillColor, anim);
             return;
@@ -594,13 +594,7 @@ namespace pipgui
     {
         if (!_flags.spriteEnabled || !_disp.display)
         {
-            bool prevRender = _flags.renderToSprite;
-            pipcore::Sprite *prevActive = _render.activeSprite;
-
-            _flags.renderToSprite = 0;
             drawProgressBar(x, y, w, h, value, baseColor, fillColor, radius, anim);
-            _flags.renderToSprite = prevRender;
-            _render.activeSprite = prevActive;
             return;
         }
 
@@ -613,10 +607,10 @@ namespace pipgui
 
         int16_t pad = 2;
 
-        bool prevRender = _flags.renderToSprite;
+        bool prevRender = _flags.inSpritePass;
         pipcore::Sprite *prevActive = _render.activeSprite;
 
-        _flags.renderToSprite = 1;
+        _flags.inSpritePass = 1;
         _render.activeSprite = &_render.sprite;
 
         fillRect()
@@ -625,12 +619,15 @@ namespace pipgui
             .color(detail::color888To565(_render.bgColor))
             .draw();
         drawProgressBar(x, y, w, h, value, baseColor, fillColor, radius, anim);
-        _flags.renderToSprite = prevRender;
+        _flags.inSpritePass = prevRender;
         _render.activeSprite = prevActive;
 
-        invalidateRect((int16_t)(rx - pad), (int16_t)(ry - pad), (int16_t)(w + pad * 2), (int16_t)(h + pad * 2));
-        if (doFlush)
-            flushDirty();
+        if (!prevRender)
+        {
+            invalidateRect((int16_t)(rx - pad), (int16_t)(ry - pad), (int16_t)(w + pad * 2), (int16_t)(h + pad * 2));
+            if (doFlush)
+                flushDirty();
+        }
     }
 
     void GUI::updateProgressBar(int16_t x, int16_t y,
@@ -659,13 +656,7 @@ namespace pipgui
 
         if (!_flags.spriteEnabled || !_disp.display)
         {
-            bool prevRender = _flags.renderToSprite;
-            pipcore::Sprite *prevActive = _render.activeSprite;
-
-            _flags.renderToSprite = 0;
             drawProgressBar(x, y, w, h, value, baseColor, fillColor, radius, anim);
-            _flags.renderToSprite = prevRender;
-            _render.activeSprite = prevActive;
             return;
         }
 
@@ -686,10 +677,10 @@ namespace pipgui
             needFull = true;
         if (needFull)
         {
-            bool prevRender = _flags.renderToSprite;
+            bool prevRender = _flags.inSpritePass;
             pipcore::Sprite *prevActive = _render.activeSprite;
 
-            _flags.renderToSprite = 1;
+            _flags.inSpritePass = 1;
             _render.activeSprite = &_render.sprite;
 
             fillRect()
@@ -698,11 +689,14 @@ namespace pipgui
                 .color(detail::color888To565(_render.bgColor))
                 .draw();
             drawProgressBar(x, y, w, h, value, baseColor, fillColor, radius, anim);
-            _flags.renderToSprite = prevRender;
+            _flags.inSpritePass = prevRender;
             _render.activeSprite = prevActive;
 
-            invalidateRect((int16_t)(rx - pad), (int16_t)(ry - pad), (int16_t)(w + pad * 2), (int16_t)(h + pad * 2));
-            flushDirty();
+            if (!prevRender)
+            {
+                invalidateRect((int16_t)(rx - pad), (int16_t)(ry - pad), (int16_t)(w + pad * 2), (int16_t)(h + pad * 2));
+                flushDirty();
+            }
 
             s.inited = true;
             s.value = value;
@@ -743,10 +737,10 @@ namespace pipgui
         _render.sprite.getClipRect(&clipX, &clipY, &clipW, &clipH);
         _render.sprite.setClipRect(cx, (int16_t)(ry - pad), cw, (int16_t)(h + pad * 2));
 
-        bool prevRender = _flags.renderToSprite;
+        bool prevRender = _flags.inSpritePass;
         pipcore::Sprite *prevActive = _render.activeSprite;
 
-        _flags.renderToSprite = 1;
+        _flags.inSpritePass = 1;
         _render.activeSprite = &_render.sprite;
 
         fillRect()
@@ -755,13 +749,16 @@ namespace pipgui
             .color(detail::color888To565(_render.bgColor))
             .draw();
         drawProgressBar(x, y, w, h, value, baseColor, fillColor, radius, anim);
-        _flags.renderToSprite = prevRender;
+        _flags.inSpritePass = prevRender;
         _render.activeSprite = prevActive;
 
         _render.sprite.setClipRect(clipX, clipY, clipW, clipH);
 
-        invalidateRect(cx, (int16_t)(ry - pad), cw, (int16_t)(h + pad * 2));
-        flushDirty();
+        if (!prevRender)
+        {
+            invalidateRect(cx, (int16_t)(ry - pad), cw, (int16_t)(h + pad * 2));
+            flushDirty();
+        }
 
         s.value = value;
         s.anim = anim;
@@ -778,20 +775,14 @@ namespace pipgui
     {
         if (!_flags.spriteEnabled || !_disp.display)
         {
-            bool prevRender = _flags.renderToSprite;
-            pipcore::Sprite *prevActive = _render.activeSprite;
-
-            _flags.renderToSprite = 0;
             drawCircularProgressBar(x, y, r, thickness, value, baseColor, fillColor, anim);
-            _flags.renderToSprite = prevRender;
-            _render.activeSprite = prevActive;
             return;
         }
 
-        bool prevRender = _flags.renderToSprite;
+        bool prevRender = _flags.inSpritePass;
         pipcore::Sprite *prevActive = _render.activeSprite;
 
-        _flags.renderToSprite = 1;
+        _flags.inSpritePass = 1;
         _render.activeSprite = &_render.sprite;
 
         int16_t cx = x;
@@ -809,12 +800,15 @@ namespace pipgui
             .color(detail::color888To565(_render.bgColor))
             .draw();
         drawCircularProgressBar(x, y, r, thickness, value, baseColor, fillColor, anim);
-        _flags.renderToSprite = prevRender;
+        _flags.inSpritePass = prevRender;
         _render.activeSprite = prevActive;
 
-        invalidateRect((int16_t)(cx - rr), (int16_t)(cy - rr), (int16_t)(rr * 2 + 1), (int16_t)(rr * 2 + 1));
-        if (doFlush)
-            flushDirty();
+        if (!prevRender)
+        {
+            invalidateRect((int16_t)(cx - rr), (int16_t)(cy - rr), (int16_t)(rr * 2 + 1), (int16_t)(rr * 2 + 1));
+            if (doFlush)
+                flushDirty();
+        }
     }
 
     void GUI::updateCircularProgressBar(int16_t x, int16_t y,
@@ -829,4 +823,3 @@ namespace pipgui
         updateCircularProgressBar(x, y, r, thickness, value, base, color, anim, doFlush);
     }
 }
-

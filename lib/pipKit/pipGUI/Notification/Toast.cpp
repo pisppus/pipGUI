@@ -1,7 +1,7 @@
 // Toast notification: short-lived message sliding in from top or bottom with Bezier easing.
 // Renders on top of all content (including alert dialog if any).
 
-#include <pipGUI/core/api/pipGUI.hpp>
+#include <pipGUI/Core/API/pipGUI.hpp>
 
 namespace pipgui
 {
@@ -35,6 +35,11 @@ namespace pipgui
                                 uint16_t iconSizePx)
     {
         _toast.text = text;
+        if (_toast.text.length() == 0)
+        {
+            _flags.toastActive = 0;
+            return;
+        }
         _toast.displayMs = (durationMs != 0) ? durationMs : 2500;
         _toast.fromTop = fromTop;
         _toast.iconId = iconId;
@@ -44,12 +49,17 @@ namespace pipgui
         _flags.toastActive = 1;
     }
 
-    bool GUI::toastActive() const { return _flags.toastActive; }
+    bool GUI::toastActive() const { return _flags.toastActive && _toast.text.length() > 0; }
 
     void GUI::renderToastOverlay()
     {
-        if (!_flags.toastActive || _toast.text.length() == 0)
+        if (!_flags.toastActive)
             return;
+        if (_toast.text.length() == 0)
+        {
+            _flags.toastActive = 0;
+            return;
+        }
 
         if (!_flags.spriteEnabled || !_disp.display)
             return;
@@ -125,13 +135,13 @@ namespace pipgui
         }
         int16_t boxY = (int16_t)((float)startY + (float)(endY - startY) * slideT + 0.5f);
 
-        uint16_t bgColor = rgb(45, 45, 45);
+        const uint16_t bgColor = 0x2965;
         uint16_t borderColor = (uint16_t)detail::blend565(bgColor, (uint16_t)0x0000, 40);
         uint16_t fgColor = 0xFFFF;
 
-        bool prevRender = _flags.renderToSprite;
+        bool prevRender = _flags.inSpritePass;
         pipcore::Sprite *prevActive = _render.activeSprite;
-        _flags.renderToSprite = 1;
+        _flags.inSpritePass = 1;
         _render.activeSprite = &_render.sprite;
 
         fillRoundRect(boxX, boxY, boxW, boxH, (uint8_t)radius, borderColor);
@@ -156,7 +166,7 @@ namespace pipgui
 
         drawTextAligned(_toast.text, textX, textY, fgColor, bgColor, AlignLeft);
 
-        _flags.renderToSprite = prevRender;
+        _flags.inSpritePass = prevRender;
         _render.activeSprite = prevActive;
 
         _render.sprite.writeToDisplay(*_disp.display, 0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight);

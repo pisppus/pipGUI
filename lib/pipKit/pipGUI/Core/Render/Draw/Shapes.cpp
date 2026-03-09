@@ -1,4 +1,4 @@
-#include <pipGUI/core/api/pipGUI.hpp>
+#include <pipGUI/Core/API/pipGUI.hpp>
 #include <pipCore/Graphics/Sprite.hpp>
 #include <math.h>
 #include "Blend.hpp"
@@ -33,6 +33,147 @@ namespace pipgui
         return (uint16_t)((rb >> 5) | rb | g);
     }
 
+    struct Surface565
+    {
+        uint16_t *buf;
+        int32_t stride;
+        int32_t clipX;
+        int32_t clipY;
+        int32_t clipR;
+        int32_t clipB;
+    };
+
+    struct Color565
+    {
+        uint16_t fg;
+        uint32_t fg32;
+        uint32_t fg_rb;
+        uint32_t fg_g;
+    };
+
+    static __attribute__((always_inline)) inline Color565 makeColor565(uint16_t color565)
+    {
+        const uint16_t fg = pipcore::Sprite::swap16(color565);
+        return {fg,
+                ((uint32_t)fg << 16) | fg,
+                ((color565 & 0xF800u) << 5) | (color565 & 0x001Fu),
+                color565 & 0x07E0u};
+    }
+
+    static __attribute__((always_inline)) inline bool getSurface565(pipcore::Sprite *spr, Surface565 &s)
+    {
+        if (!spr)
+            return false;
+        s.buf = (uint16_t *)spr->getBuffer();
+        s.stride = spr->width();
+        const int32_t maxH = spr->height();
+        if (!s.buf || s.stride <= 0 || maxH <= 0)
+            return false;
+        int32_t clipW = s.stride;
+        int32_t clipH = maxH;
+        s.clipX = 0;
+        s.clipY = 0;
+        spr->getClipRect(&s.clipX, &s.clipY, &clipW, &clipH);
+        if (clipW <= 0 || clipH <= 0)
+            return false;
+        s.clipR = s.clipX + clipW - 1;
+        s.clipB = s.clipY + clipH - 1;
+        return true;
+    }
+
+    static inline const uint8_t *gammaTable()
+    {
+        static uint8_t table[256];
+        static bool ready = false;
+        if (!ready)
+        {
+            for (uint32_t i = 0; i < 256; ++i)
+                table[i] = gammaAA((uint8_t)i);
+            ready = true;
+        }
+        return table;
+    }
+
+    static __attribute__((always_inline)) inline void blendStore(uint16_t *ptr, const Color565 &c, uint8_t alpha)
+    {
+        if (alpha == 0)
+            return;
+        if (alpha == 255)
+        {
+            *ptr = c.fg;
+            return;
+        }
+        *ptr = pipcore::Sprite::swap16(
+            blendRGB565(c.fg_rb, c.fg_g, pipcore::Sprite::swap16(*ptr), alpha));
+    }
+
+    static __attribute__((always_inline)) inline void blendStoreGamma(uint16_t *ptr, const Color565 &c,
+                                                                      const uint8_t *gamma, uint8_t alpha)
+    {
+        blendStore(ptr, c, gamma[alpha]);
+    }
+
+    static __attribute__((always_inline)) inline void plotBlendClip(const Surface565 &s, const Color565 &c,
+                                                                    int32_t px, int32_t py, uint8_t alpha)
+    {
+        if (px < s.clipX || px > s.clipR || py < s.clipY || py > s.clipB)
+            return;
+        blendStore(s.buf + py * s.stride + px, c, alpha);
+    }
+
+    static __attribute__((always_inline)) inline void plotBlendClipGamma(const Surface565 &s, const Color565 &c,
+                                                                         const uint8_t *gamma,
+                                                                         int32_t px, int32_t py, uint8_t alpha)
+    {
+        if (px < s.clipX || px > s.clipR || py < s.clipY || py > s.clipB)
+            return;
+        blendStoreGamma(s.buf + py * s.stride + px, c, gamma, alpha);
+    }
+
+    static __attribute__((always_inline)) inline void fillSpanFast(const Surface565 &s, int32_t py,
+                                                                   int32_t x0, int32_t x1, const Color565 &c)
+    {
+        if (x0 <= x1)
+            spanFill(s.buf + py * s.stride + x0, (int16_t)(x1 - x0 + 1), c.fg, c.fg32);
+    }
+
+    static __attribute__((always_inline)) inline void fillSpanClip(const Surface565 &s, int32_t py,
+                                                                   int32_t x0, int32_t x1, const Color565 &c)
+    {
+        if (py < s.clipY || py > s.clipB)
+            return;
+        if (x0 < s.clipX)
+            x0 = s.clipX;
+        if (x1 > s.clipR)
+            x1 = s.clipR;
+        fillSpanFast(s, py, x0, x1, c);
+    }
+
+    static __attribute__((always_inline)) inline void fillVLineFast(const Surface565 &s, int32_t px,
+                                                                    int32_t py0, int32_t py1, uint16_t fg)
+    {
+        if (py0 > py1)
+            return;
+        uint16_t *dst = s.buf + py0 * s.stride + px;
+        for (int32_t c = py1 - py0 + 1; c--;)
+        {
+            *dst = fg;
+            dst += s.stride;
+        }
+    }
+
+    static __attribute__((always_inline)) inline void fillVLineClip(const Surface565 &s, int32_t px,
+                                                                    int32_t py0, int32_t py1, uint16_t fg)
+    {
+        if (px < s.clipX || px > s.clipR)
+            return;
+        if (py0 < s.clipY)
+            py0 = s.clipY;
+        if (py1 > s.clipB)
+            py1 = s.clipB;
+        fillVLineFast(s, px, py0, py1, fg);
+    }
+
     static __attribute__((always_inline)) inline uint8_t calcAlphaSDF(float dist)
     {
         if (dist <= -0.5f)
@@ -53,72 +194,44 @@ namespace pipgui
             return;
 
         auto spr = getDrawTarget();
-        if (!spr)
+        if (!spr || !spr->getBuffer())
             return;
 
-        uint16_t *buf = (uint16_t *)spr->getBuffer();
-        if (!buf)
-            return;
-
-        const int16_t stride = spr->width();
-        const int16_t maxH = spr->height();
-        if (stride <= 0 || maxH <= 0)
-            return;
-
-        int32_t clipX, clipY, clipW, clipH;
+        int32_t clipX = 0;
+        int32_t clipY = 0;
+        int32_t clipW = 0;
+        int32_t clipH = 0;
         spr->getClipRect(&clipX, &clipY, &clipW, &clipH);
         if (clipW <= 0 || clipH <= 0)
             return;
 
-        if (x < 0)
-        {
-            w += x;
-            x = 0;
-        }
-        if (y < 0)
-        {
-            h += y;
-            y = 0;
-        }
+        int32_t x0 = x;
+        int32_t y0 = y;
+        int32_t x1 = x0 + w;
+        int32_t y1 = y0 + h;
+        const int32_t clipR = clipX + clipW;
+        const int32_t clipB = clipY + clipH;
 
-        if (x + w > stride)
-            w = (int16_t)(stride - x);
-        if (y + h > maxH)
-            h = (int16_t)(maxH - y);
-
-        const int16_t cx0 = (int16_t)clipX;
-        const int16_t cy0 = (int16_t)clipY;
-        const int16_t cx1 = (int16_t)(clipX + clipW);
-        const int16_t cy1 = (int16_t)(clipY + clipH);
-
-        if (x < cx0)
-        {
-            w -= (cx0 - x);
-            x = cx0;
-        }
-        if (y < cy0)
-        {
-            h -= (cy0 - y);
-            y = cy0;
-        }
-
-        if (x + w > cx1)
-            w = (int16_t)(cx1 - x);
-        if (y + h > cy1)
-            h = (int16_t)(cy1 - y);
-
-        if (w <= 0 || h <= 0)
+        if (x0 < clipX)
+            x0 = clipX;
+        if (y0 < clipY)
+            y0 = clipY;
+        if (x1 > clipR)
+            x1 = clipR;
+        if (y1 > clipB)
+            y1 = clipB;
+        if (x0 >= x1 || y0 >= y1)
             return;
 
-        const uint16_t v = pipcore::Sprite::swap16(color);
-        const uint32_t v32 = ((uint32_t)v << 16) | v;
+        const int16_t drawX = (int16_t)x0;
+        const int16_t drawY = (int16_t)y0;
+        const int16_t drawW = (int16_t)(x1 - x0);
+        const int16_t drawH = (int16_t)(y1 - y0);
 
-        const int32_t baseOffset = (int32_t)y * stride + x;
-        for (int16_t yy = 0; yy < h; ++yy)
-            spanFill(buf + baseOffset + (int32_t)yy * stride, w, v, v32);
+        spr->fillRect(drawX, drawY, drawW, drawH, color);
 
-        if (_disp.display && _flags.spriteEnabled && !_flags.renderToSprite)
-            invalidateRect(x, y, w, h);
+        if (_disp.display && _flags.spriteEnabled && !_flags.inSpritePass)
+            invalidateRect(drawX, drawY, drawW, drawH);
     }
 
     void GUI::fillCircle(int16_t cx, int16_t cy, int16_t r, uint16_t color565)
@@ -126,51 +239,18 @@ namespace pipgui
         auto spr = getDrawTarget();
         if (!_flags.spriteEnabled || r <= 0 || !spr)
             return;
-        uint16_t *buf = (uint16_t *)spr->getBuffer();
-        int32_t stride = spr->width(), maxH = spr->height();
-        if (!buf || stride <= 0 || maxH <= 0)
+        Surface565 s;
+        if (!getSurface565(spr, s))
             return;
-
-        int32_t cX = 0, cY = 0, cW = stride, cH = maxH;
-        spr->getClipRect(&cX, &cY, &cW, &cH);
-        int32_t cR = cX + cW - 1, cB = cY + cH - 1;
-
-        if (cx - r > cR || cx + r < cX || cy - r > cB || cy + r < cY)
+        if (cx - r > s.clipR || cx + r < s.clipX || cy - r > s.clipB || cy + r < s.clipY)
             return;
+        const Color565 c = makeColor565(color565);
+        const bool noClip = (cx - r >= s.clipX && cx + r <= s.clipR && cy - r >= s.clipY && cy + r <= s.clipB);
 
-        const uint16_t fg = pipcore::Sprite::swap16(color565);
-        const uint32_t fg32 = ((uint32_t)fg << 16) | fg;
-        const uint32_t fg_rb = ((color565 & 0xF800u) << 5) | (color565 & 0x001Fu);
-        const uint32_t fg_g = color565 & 0x07E0u;
-
-        auto drawSpan = [&](int16_t py, int16_t x0, int16_t x1) __attribute__((always_inline))
-        {
-            if (py < cY || py > cB)
-                return;
-            if (x0 < cX)
-                x0 = cX;
-            if (x1 > cR)
-                x1 = cR;
-            if (x0 > x1)
-                return;
-            spanFill(buf + (int32_t)py * stride + x0, (int16_t)(x1 - x0 + 1), fg, fg32);
-        };
-
-        auto plotAA = [&](int16_t px, int16_t py, uint8_t alpha) __attribute__((always_inline))
-        {
-            if (px < cX || px > cR || py < cY || py > cB)
-                return;
-            int32_t idx = (int32_t)py * stride + px;
-            if (alpha == 255)
-            {
-                buf[idx] = fg;
-                return;
-            }
-            buf[idx] = pipcore::Sprite::swap16(
-                blendRGB565(fg_rb, fg_g, pipcore::Sprite::swap16(buf[idx]), alpha));
-        };
-
-        drawSpan(cy, cx - r, cx + r);
+        if (noClip)
+            fillSpanFast(s, cy, cx - r, cx + r, c);
+        else
+            fillSpanClip(s, cy, cx - r, cx + r, c);
 
         int32_t xs = 1;
         int32_t cx_i = 0;
@@ -178,47 +258,92 @@ namespace pipgui
         const int32_t rp = (int32_t)r + 1;
         const int32_t r2 = rp * rp;
 
-        for (int32_t cy_i = rp - 1; cy_i > 0; cy_i--)
+        if (noClip)
         {
-            const int32_t dy = rp - cy_i;
-            const int32_t dy2 = dy * dy;
-
-            for (cx_i = xs; cx_i < rp; cx_i++)
+            for (int32_t cy_i = rp - 1; cy_i > 0; cy_i--)
             {
-                const int32_t dx = rp - cx_i;
-                const int32_t hyp2 = dx * dx + dy2;
-                if (hyp2 <= r1)
-                    break;
-                if (hyp2 >= r2)
-                    continue;
+                const int32_t dy = rp - cy_i;
+                const int32_t dy2 = dy * dy;
 
-                const uint8_t alpha = (uint8_t)~sqrtU8((uint32_t)hyp2);
-                if (alpha > 246)
-                    break;
-                xs = cx_i;
-                if (alpha < 9)
-                    continue;
+                for (cx_i = xs; cx_i < rp; cx_i++)
+                {
+                    const int32_t dx = rp - cx_i;
+                    const int32_t hyp2 = dx * dx + dy2;
+                    if (hyp2 <= r1)
+                        break;
+                    if (hyp2 >= r2)
+                        continue;
 
-                const int16_t x0 = (int16_t)(cx + cx_i - rp);
-                const int16_t x1 = (int16_t)(cx - cx_i + rp);
-                const int16_t y0 = (int16_t)(cy + cy_i - rp);
-                const int16_t y1 = (int16_t)(cy - cy_i + rp);
+                    const uint8_t alpha = (uint8_t)~sqrtU8((uint32_t)hyp2);
+                    if (alpha > 246)
+                        break;
+                    xs = cx_i;
+                    if (alpha < 9)
+                        continue;
 
-                plotAA(x0, y0, alpha);
-                plotAA(x1, y0, alpha);
-                plotAA(x1, y1, alpha);
-                plotAA(x0, y1, alpha);
+                    const int16_t x0 = (int16_t)(cx + cx_i - rp);
+                    const int16_t x1 = (int16_t)(cx - cx_i + rp);
+                    const int16_t y0 = (int16_t)(cy + cy_i - rp);
+                    const int16_t y1 = (int16_t)(cy - cy_i + rp);
+
+                    blendStore(s.buf + (int32_t)y0 * s.stride + x0, c, alpha);
+                    blendStore(s.buf + (int32_t)y0 * s.stride + x1, c, alpha);
+                    blendStore(s.buf + (int32_t)y1 * s.stride + x1, c, alpha);
+                    blendStore(s.buf + (int32_t)y1 * s.stride + x0, c, alpha);
+                }
+
+                const int16_t span_x0 = (int16_t)(cx + cx_i - rp);
+                const int16_t span_x1 = (int16_t)(cx + (rp - cx_i));
+                const int16_t py0 = (int16_t)(cy + cy_i - rp);
+                const int16_t py1 = (int16_t)(cy - cy_i + rp);
+                fillSpanFast(s, py0, span_x0, span_x1, c);
+                fillSpanFast(s, py1, span_x0, span_x1, c);
             }
+        }
+        else
+        {
+            for (int32_t cy_i = rp - 1; cy_i > 0; cy_i--)
+            {
+                const int32_t dy = rp - cy_i;
+                const int32_t dy2 = dy * dy;
 
-            const int16_t span_x0 = (int16_t)(cx + cx_i - rp);
-            const int16_t span_x1 = (int16_t)(cx + (rp - cx_i));
-            const int16_t py0 = (int16_t)(cy + cy_i - rp);
-            const int16_t py1 = (int16_t)(cy - cy_i + rp);
-            drawSpan(py0, span_x0, span_x1);
-            drawSpan(py1, span_x0, span_x1);
+                for (cx_i = xs; cx_i < rp; cx_i++)
+                {
+                    const int32_t dx = rp - cx_i;
+                    const int32_t hyp2 = dx * dx + dy2;
+                    if (hyp2 <= r1)
+                        break;
+                    if (hyp2 >= r2)
+                        continue;
+
+                    const uint8_t alpha = (uint8_t)~sqrtU8((uint32_t)hyp2);
+                    if (alpha > 246)
+                        break;
+                    xs = cx_i;
+                    if (alpha < 9)
+                        continue;
+
+                    const int16_t x0 = (int16_t)(cx + cx_i - rp);
+                    const int16_t x1 = (int16_t)(cx - cx_i + rp);
+                    const int16_t y0 = (int16_t)(cy + cy_i - rp);
+                    const int16_t y1 = (int16_t)(cy - cy_i + rp);
+
+                    plotBlendClip(s, c, x0, y0, alpha);
+                    plotBlendClip(s, c, x1, y0, alpha);
+                    plotBlendClip(s, c, x1, y1, alpha);
+                    plotBlendClip(s, c, x0, y1, alpha);
+                }
+
+                const int16_t span_x0 = (int16_t)(cx + cx_i - rp);
+                const int16_t span_x1 = (int16_t)(cx + (rp - cx_i));
+                const int16_t py0 = (int16_t)(cy + cy_i - rp);
+                const int16_t py1 = (int16_t)(cy - cy_i + rp);
+                fillSpanClip(s, py0, span_x0, span_x1, c);
+                fillSpanClip(s, py1, span_x0, span_x1, c);
+            }
         }
 
-        if (_disp.display && _flags.spriteEnabled && !_flags.renderToSprite)
+        if (_disp.display && _flags.spriteEnabled && !_flags.inSpritePass)
             invalidateRect((int16_t)(cx - r), (int16_t)(cy - r),
                            (int16_t)(r * 2 + 1), (int16_t)(r * 2 + 1));
     }
@@ -227,8 +352,8 @@ namespace pipgui
     {
         if (r <= 0)
             return;
-        uint8_t rr = (r > 255) ? 255 : (uint8_t)r;
-        int16_t d = (int16_t)(rr * 2 + 1);
+        const uint8_t rr = (r > 255) ? (uint8_t)255 : (uint8_t)r;
+        const int16_t d = (int16_t)(rr * 2 + 1);
         drawRoundRect((int16_t)(cx - rr), (int16_t)(cy - rr), d, d, rr, color);
     }
 
@@ -252,43 +377,16 @@ namespace pipgui
         }
 
         auto spr = getDrawTarget();
-        if (!spr)
+        Surface565 s;
+        if (!getSurface565(spr, s))
             return;
-        uint16_t *buf = (uint16_t *)spr->getBuffer();
-        if (!buf)
+        if (x > s.clipR || x + w - 1 < s.clipX || y > s.clipB || y + h - 1 < s.clipY)
             return;
+        const bool noClip = (x >= s.clipX && y >= s.clipY && x + w - 1 <= s.clipR && y + h - 1 <= s.clipB);
+        const Color565 c = makeColor565(color565);
+        const uint8_t *gamma = gammaTable();
 
-        const int16_t stride = spr->width();
-        const int16_t maxH = spr->height();
-        if (stride <= 0 || maxH <= 0)
-            return;
-
-        int32_t clipX = 0, clipY = 0, clipW = stride, clipH = maxH;
-        spr->getClipRect(&clipX, &clipY, &clipW, &clipH);
-        const int32_t clipR = clipX + clipW - 1;
-        const int32_t clipB = clipY + clipH - 1;
-
-        if (x > clipR || x + w - 1 < clipX || y > clipB || y + h - 1 < clipY)
-            return;
-
-        const uint16_t fg = pipcore::Sprite::swap16(color565);
-        const uint32_t fg32 = ((uint32_t)fg << 16) | fg;
-        const uint32_t fg_rb = ((color565 & 0xF800u) << 5) | (color565 & 0x001Fu);
-        const uint32_t fg_g = color565 & 0x07E0u;
-
-        auto fillSpan = [&](int16_t py, int16_t x0, int16_t x1) __attribute__((always_inline))
-        {
-            if (py < clipY || py > clipB)
-                return;
-            if (x0 < clipX)
-                x0 = (int16_t)clipX;
-            if (x1 > clipR)
-                x1 = (int16_t)clipR;
-            if (x0 <= x1)
-                spanFill(buf + py * stride + x0, (int16_t)(x1 - x0 + 1), fg, fg32);
-        };
-
-        if (rTL == rTR && rTR == rBR && rBR == rBL)
+        if (rTL == rTR && rTR == rBR && rBR == rBL && h > (int16_t)(rTL * 2))
         {
             int32_t rr = (int32_t)rTL;
             if (rr > w / 2)
@@ -299,7 +397,7 @@ namespace pipgui
             const int16_t yy = (int16_t)(y + rr);
             const int16_t hh = (int16_t)(h - 2 * rr);
             if (hh > 0)
-                fillRect(x, yy, w, hh, color565);
+                spr->fillRect(x, yy, w, hh, color565);
 
             int32_t xs = 0, cx_i = 0;
             const int32_t r1 = rr * rr;
@@ -309,56 +407,89 @@ namespace pipgui
             const int32_t xx = x + rr;
             const int32_t ww = (w - 2 * rr - 1 > 0) ? w - 2 * rr - 1 : 0;
 
-            for (int32_t cy_i = rp - 1; cy_i > 0; cy_i--)
+            if (noClip)
             {
-                const int32_t dy = rp - cy_i;
-                const int32_t dy2 = dy * dy;
-
-                for (cx_i = xs; cx_i < rp; cx_i++)
+                for (int32_t cy_i = rp - 1; cy_i > 0; cy_i--)
                 {
-                    const int32_t dx = rp - cx_i;
-                    const int32_t hyp2 = dx * dx + dy2;
-                    if (hyp2 <= r1)
-                        break;
-                    if (hyp2 >= r2)
-                        continue;
+                    const int32_t dy = rp - cy_i;
+                    const int32_t dy2 = dy * dy;
 
-                    const uint8_t alpha = (uint8_t)~sqrtU8((uint32_t)hyp2);
-                    if (alpha > 246)
-                        break;
-                    xs = cx_i;
-                    if (alpha < 9)
-                        continue;
+                    for (cx_i = xs; cx_i < rp; cx_i++)
+                    {
+                        const int32_t dx = rp - cx_i;
+                        const int32_t hyp2 = dx * dx + dy2;
+                        if (hyp2 <= r1)
+                            break;
+                        if (hyp2 >= r2)
+                            continue;
 
-                    const int16_t px0 = (int16_t)(xx + cx_i - rp);
-                    const int16_t px1 = (int16_t)(xx - cx_i + rp + ww);
+                        const uint8_t alpha = (uint8_t)~sqrtU8((uint32_t)hyp2);
+                        if (alpha > 246)
+                            break;
+                        xs = cx_i;
+                        if (alpha < 9)
+                            continue;
+
+                        const int16_t px0 = (int16_t)(xx + cx_i - rp);
+                        const int16_t px1 = (int16_t)(xx - cx_i + rp + ww);
+                        const int16_t py0 = (int16_t)(yy + cy_i - rp);
+                        const int16_t py1 = (int16_t)(yy - cy_i + rp + hx);
+
+                        blendStore(s.buf + (int32_t)py0 * s.stride + px0, c, alpha);
+                        blendStore(s.buf + (int32_t)py0 * s.stride + px1, c, alpha);
+                        blendStore(s.buf + (int32_t)py1 * s.stride + px1, c, alpha);
+                        blendStore(s.buf + (int32_t)py1 * s.stride + px0, c, alpha);
+                    }
+
+                    const int16_t span_x0 = (int16_t)(xx + cx_i - rp);
+                    const int16_t span_x1 = (int16_t)(xx + (rp - cx_i) + ww);
                     const int16_t py0 = (int16_t)(yy + cy_i - rp);
                     const int16_t py1 = (int16_t)(yy - cy_i + rp + hx);
-
-                    auto plot = [&](int16_t px, int16_t py) __attribute__((always_inline))
-                    {
-                        if (px < clipX || px > clipR || py < clipY || py > clipB)
-                            return;
-                        int32_t idx = (int32_t)py * stride + px;
-                        if (alpha == 255)
-                            buf[idx] = fg;
-                        else
-                            buf[idx] = pipcore::Sprite::swap16(
-                                blendRGB565(fg_rb, fg_g, pipcore::Sprite::swap16(buf[idx]), alpha));
-                    };
-
-                    plot(px0, py0);
-                    plot(px1, py0);
-                    plot(px1, py1);
-                    plot(px0, py1);
+                    fillSpanFast(s, py0, span_x0, span_x1, c);
+                    fillSpanFast(s, py1, span_x0, span_x1, c);
                 }
+            }
+            else
+            {
+                for (int32_t cy_i = rp - 1; cy_i > 0; cy_i--)
+                {
+                    const int32_t dy = rp - cy_i;
+                    const int32_t dy2 = dy * dy;
 
-                const int16_t span_x0 = (int16_t)(xx + cx_i - rp);
-                const int16_t span_x1 = (int16_t)(xx + (rp - cx_i) + ww);
-                const int16_t py0 = (int16_t)(yy + cy_i - rp);
-                const int16_t py1 = (int16_t)(yy - cy_i + rp + hx);
-                fillSpan(py0, span_x0, span_x1);
-                fillSpan(py1, span_x0, span_x1);
+                    for (cx_i = xs; cx_i < rp; cx_i++)
+                    {
+                        const int32_t dx = rp - cx_i;
+                        const int32_t hyp2 = dx * dx + dy2;
+                        if (hyp2 <= r1)
+                            break;
+                        if (hyp2 >= r2)
+                            continue;
+
+                        const uint8_t alpha = (uint8_t)~sqrtU8((uint32_t)hyp2);
+                        if (alpha > 246)
+                            break;
+                        xs = cx_i;
+                        if (alpha < 9)
+                            continue;
+
+                        const int16_t px0 = (int16_t)(xx + cx_i - rp);
+                        const int16_t px1 = (int16_t)(xx - cx_i + rp + ww);
+                        const int16_t py0 = (int16_t)(yy + cy_i - rp);
+                        const int16_t py1 = (int16_t)(yy - cy_i + rp + hx);
+
+                        plotBlendClip(s, c, px0, py0, alpha);
+                        plotBlendClip(s, c, px1, py0, alpha);
+                        plotBlendClip(s, c, px1, py1, alpha);
+                        plotBlendClip(s, c, px0, py1, alpha);
+                    }
+
+                    const int16_t span_x0 = (int16_t)(xx + cx_i - rp);
+                    const int16_t span_x1 = (int16_t)(xx + (rp - cx_i) + ww);
+                    const int16_t py0 = (int16_t)(yy + cy_i - rp);
+                    const int16_t py1 = (int16_t)(yy - cy_i + rp + hx);
+                    fillSpanClip(s, py0, span_x0, span_x1, c);
+                    fillSpanClip(s, py1, span_x0, span_x1, c);
+                }
             }
         }
         else
@@ -375,8 +506,9 @@ namespace pipgui
 
             for (int16_t py = y; py < y + h; ++py)
             {
-                if (py < clipY || py > clipB)
+                if (py < s.clipY || py > s.clipB)
                     continue;
+                uint16_t *row = s.buf + (int32_t)py * s.stride;
 
                 int16_t solid_x0 = x, solid_x1 = x + w - 1;
 
@@ -410,14 +542,8 @@ namespace pipgui
                     {
                         const uint8_t a = calcAlpha((r2 - ((float)(dx * dx) + dy2)) * inv_2r);
                         const int16_t px = cxL - dx;
-                        if (px >= clipX && px <= clipR)
-                        {
-                            if (a == 255)
-                                buf[py * stride + px] = fg;
-                            else if (a > 0)
-                                buf[py * stride + px] = pipcore::Sprite::swap16(
-                                    blendRGB565(fg_rb, fg_g, pipcore::Sprite::swap16(buf[py * stride + px]), gammaAA(a)));
-                        }
+                        if (px >= s.clipX && px <= s.clipR)
+                            blendStoreGamma(row + px, c, gamma, a);
                     }
                 }
 
@@ -451,22 +577,16 @@ namespace pipgui
                     {
                         const uint8_t a = calcAlpha((r2 - ((float)(dx * dx) + dy2)) * inv_2r);
                         const int16_t px = cxR + dx;
-                        if (px >= clipX && px <= clipR)
-                        {
-                            if (a == 255)
-                                buf[py * stride + px] = fg;
-                            else if (a > 0)
-                                buf[py * stride + px] = pipcore::Sprite::swap16(
-                                    blendRGB565(fg_rb, fg_g, pipcore::Sprite::swap16(buf[py * stride + px]), gammaAA(a)));
-                        }
+                        if (px >= s.clipX && px <= s.clipR)
+                            blendStoreGamma(row + px, c, gamma, a);
                     }
                 }
 
-                fillSpan(py, solid_x0, solid_x1);
+                fillSpanClip(s, py, solid_x0, solid_x1, c);
             }
         }
 
-        if (_disp.display && !_flags.renderToSprite)
+        if (_disp.display && !_flags.inSpritePass)
             invalidateRect(x, y, w, h);
     }
 
@@ -489,24 +609,12 @@ namespace pipgui
         }
 
         auto spr = getDrawTarget();
-        if (!spr)
+        Surface565 s;
+        if (!getSurface565(spr, s))
             return;
-        uint16_t *buf = (uint16_t *)spr->getBuffer();
-        if (!buf)
+        if (x > s.clipR || x + w - 1 < s.clipX || y > s.clipB || y + h - 1 < s.clipY)
             return;
-
-        const int16_t stride = spr->width();
-        const int16_t maxH = spr->height();
-        if (stride <= 0 || maxH <= 0)
-            return;
-
-        int32_t clipX = 0, clipY = 0, clipW = stride, clipH = maxH;
-        spr->getClipRect(&clipX, &clipY, &clipW, &clipH);
-        const int32_t clipR = clipX + clipW - 1;
-        const int32_t clipB = clipY + clipH - 1;
-
-        if (x > clipR || x + w - 1 < clipX || y > clipB || y + h - 1 < clipY)
-            return;
+        const bool noClip = (x >= s.clipX && y >= s.clipY && x + w - 1 <= s.clipR && y + h - 1 <= s.clipB);
 
         const int16_t maxR = (w < h ? w : h) / 2;
         const uint8_t rTL = (radiusTL > maxR) ? (uint8_t)maxR : radiusTL;
@@ -514,55 +622,42 @@ namespace pipgui
         const uint8_t rBR = (radiusBR > maxR) ? (uint8_t)maxR : radiusBR;
         const uint8_t rBL = (radiusBL > maxR) ? (uint8_t)maxR : radiusBL;
 
-        const uint16_t fg = pipcore::Sprite::swap16(color565);
-        const uint32_t fg32 = ((uint32_t)fg << 16) | fg;
-        const uint32_t fg_rb = ((color565 & 0xF800u) << 5) | (color565 & 0x001Fu);
-        const uint32_t fg_g = color565 & 0x07E0u;
-
-        auto fillHLine = [&](int16_t py, int16_t px1, int16_t px2) __attribute__((always_inline))
-        {
-            if (py < clipY || py > clipB)
-                return;
-            if (px1 < clipX)
-                px1 = (int16_t)clipX;
-            if (px2 > clipR)
-                px2 = (int16_t)clipR;
-            if (px1 > px2)
-                return;
-            spanFill(buf + py * stride + px1, (int16_t)(px2 - px1 + 1), fg, fg32);
-        };
-
-        auto fillVLine = [&](int16_t px, int16_t py1, int16_t py2) __attribute__((always_inline))
-        {
-            if (px < clipX || px > clipR)
-                return;
-            if (py1 < clipY)
-                py1 = (int16_t)clipY;
-            if (py2 > clipB)
-                py2 = (int16_t)clipB;
-            if (py1 > py2)
-                return;
-            uint16_t *dst = buf + py1 * stride + px;
-            for (int16_t c = py2 - py1 + 1; c--;)
-            {
-                *dst = fg;
-                dst += stride;
-            }
-        };
+        const Color565 c = makeColor565(color565);
+        const uint8_t *gamma = gammaTable();
 
         const int16_t top_x1 = x + rTL, top_x2 = x + w - rTR - 1;
         const int16_t bot_x1 = x + rBL, bot_x2 = x + w - rBR - 1;
         if (top_x1 <= top_x2)
-            fillHLine(y, top_x1, top_x2);
+        {
+            if (noClip)
+                fillSpanFast(s, y, top_x1, top_x2, c);
+            else
+                fillSpanClip(s, y, top_x1, top_x2, c);
+        }
         if (bot_x1 <= bot_x2)
-            fillHLine(y + h - 1, bot_x1, bot_x2);
+        {
+            if (noClip)
+                fillSpanFast(s, y + h - 1, bot_x1, bot_x2, c);
+            else
+                fillSpanClip(s, y + h - 1, bot_x1, bot_x2, c);
+        }
 
         const int16_t left_y1 = y + (rTL > 0 ? rTL : 1), left_y2 = y + h - (rBL > 0 ? rBL : 1) - 1;
         const int16_t right_y1 = y + (rTR > 0 ? rTR : 1), right_y2 = y + h - (rBR > 0 ? rBR : 1) - 1;
         if (left_y1 <= left_y2)
-            fillVLine(x, left_y1, left_y2);
+        {
+            if (noClip)
+                fillVLineFast(s, x, left_y1, left_y2, c.fg);
+            else
+                fillVLineClip(s, x, left_y1, left_y2, c.fg);
+        }
         if (right_y1 <= right_y2)
-            fillVLine(x + w - 1, right_y1, right_y2);
+        {
+            if (noClip)
+                fillVLineFast(s, x + w - 1, right_y1, right_y2, c.fg);
+            else
+                fillVLineClip(s, x + w - 1, right_y1, right_y2, c.fg);
+        }
 
         if (rTL == rTR && rTR == rBL && rBL == rBR && rTL > 0)
         {
@@ -583,79 +678,131 @@ namespace pipgui
                 ir--;
             const int32_t r4 = (ir > 0) ? (ir * ir) : 0;
 
-            for (int32_t cy_i = r - 1; cy_i > 0; cy_i--)
+            if (noClip)
             {
-                int32_t len = 0, lxst = 0, rxst = 0;
-                const int32_t dy = r - cy_i;
-                const int32_t dy2 = dy * dy;
-
-                while ((r - xs) * (r - xs) + dy2 >= r1)
-                    xs++;
-
-                for (cx_i = xs; cx_i < r; cx_i++)
+                for (int32_t cy_i = r - 1; cy_i > 0; cy_i--)
                 {
-                    const int32_t dx = r - cx_i;
-                    const int32_t hyp = dx * dx + dy2;
-                    uint8_t alpha = 0;
+                    int32_t len = 0, lxst = 0, rxst = 0;
+                    const int32_t dy = r - cy_i;
+                    const int32_t dy2 = dy * dy;
 
-                    if (hyp > r2)
+                    while ((r - xs) * (r - xs) + dy2 >= r1)
+                        xs++;
+
+                    for (cx_i = xs; cx_i < r; cx_i++)
                     {
-                        alpha = (uint8_t)~sqrtU8((uint32_t)hyp);
+                        const int32_t dx = r - cx_i;
+                        const int32_t hyp = dx * dx + dy2;
+                        uint8_t alpha = 0;
+
+                        if (hyp > r2)
+                            alpha = (uint8_t)~sqrtU8((uint32_t)hyp);
+                        else if (hyp >= r3)
+                        {
+                            rxst = cx_i;
+                            len++;
+                            continue;
+                        }
+                        else
+                        {
+                            if (hyp <= r4)
+                                break;
+                            alpha = sqrtU8((uint32_t)hyp);
+                        }
+
+                        if (alpha < 16)
+                            continue;
+
+                        const uint8_t ag = gamma[alpha];
+                        blendStore(s.buf + (y0 - cy_i + r + hh) * s.stride + (x0 + cx_i - r), c, ag);
+                        blendStore(s.buf + (y0 + cy_i - r) * s.stride + (x0 + cx_i - r), c, ag);
+                        blendStore(s.buf + (y0 + cy_i - r) * s.stride + (x0 - cx_i + r + ww), c, ag);
+                        blendStore(s.buf + (y0 - cy_i + r + hh) * s.stride + (x0 - cx_i + r + ww), c, ag);
                     }
-                    else if (hyp >= r3)
+
+                    lxst = rxst - len + 1;
+                    if (len > 0)
                     {
-                        rxst = cx_i;
-                        len++;
-                        continue;
+                        fillSpanFast(s, y0 - cy_i + r + hh, x0 + lxst - r, x0 + rxst - r, c);
+                        fillSpanFast(s, y0 + cy_i - r, x0 + lxst - r, x0 + rxst - r, c);
+                        fillSpanFast(s, y0 + cy_i - r, x0 - rxst + r + ww, x0 - lxst + r + ww, c);
+                        fillSpanFast(s, y0 - cy_i + r + hh, x0 - rxst + r + ww, x0 - lxst + r + ww, c);
                     }
-                    else
-                    {
-                        if (hyp <= r4)
-                            break;
-                        alpha = sqrtU8((uint32_t)hyp);
-                    }
-
-                    if (alpha < 16)
-                        continue;
-
-                    auto plotAA = [&](int32_t px, int32_t py) __attribute__((always_inline))
-                    {
-                        if (px < clipX || px > clipR || py < clipY || py > clipB)
-                            return;
-                        int32_t idx = py * stride + px;
-                        buf[idx] = pipcore::Sprite::swap16(
-                            blendRGB565(fg_rb, fg_g, pipcore::Sprite::swap16(buf[idx]), gammaAA(alpha)));
-                    };
-
-                    plotAA(x0 + cx_i - r, y0 - cy_i + r + hh);
-                    plotAA(x0 + cx_i - r, y0 + cy_i - r);
-                    plotAA(x0 - cx_i + r + ww, y0 + cy_i - r);
-                    plotAA(x0 - cx_i + r + ww, y0 - cy_i + r + hh);
                 }
 
-                lxst = rxst - len + 1;
-                if (len > 0)
+                for (int16_t i = 0; i < (int16_t)t; ++i)
                 {
-                    fillHLine((int16_t)(y0 - cy_i + r + hh), (int16_t)(x0 + lxst - r), (int16_t)(x0 + rxst - r));
-                    fillHLine((int16_t)(y0 + cy_i - r), (int16_t)(x0 + lxst - r), (int16_t)(x0 + rxst - r));
-                    fillHLine((int16_t)(y0 + cy_i - r), (int16_t)(x0 - rxst + r + ww), (int16_t)(x0 - lxst + r + ww));
-                    fillHLine((int16_t)(y0 - cy_i + r + hh), (int16_t)(x0 - rxst + r + ww), (int16_t)(x0 - lxst + r + ww));
+                    fillSpanFast(s, y0 + r - (int32_t)t + i + hh, x0, x0 + ww, c);
+                    fillSpanFast(s, y0 - r + 1 + i, x0, x0 + ww, c);
+                    fillVLineFast(s, x0 - r + 1 + i, y0, y0 + hh, c.fg);
+                    fillVLineFast(s, x0 + r - (int32_t)t + i + ww, y0, y0 + hh, c.fg);
                 }
             }
-
-            for (int16_t i = 0; i < (int16_t)t; ++i)
+            else
             {
-                fillHLine((int16_t)(y0 + r - (int32_t)t + i + hh), (int16_t)x0, (int16_t)(x0 + ww));
-                fillHLine((int16_t)(y0 - r + 1 + i), (int16_t)x0, (int16_t)(x0 + ww));
-                fillVLine((int16_t)(x0 - r + 1 + i), (int16_t)y0, (int16_t)(y0 + hh));
-                fillVLine((int16_t)(x0 + r - (int32_t)t + i + ww), (int16_t)y0, (int16_t)(y0 + hh));
+                for (int32_t cy_i = r - 1; cy_i > 0; cy_i--)
+                {
+                    int32_t len = 0, lxst = 0, rxst = 0;
+                    const int32_t dy = r - cy_i;
+                    const int32_t dy2 = dy * dy;
+
+                    while ((r - xs) * (r - xs) + dy2 >= r1)
+                        xs++;
+
+                    for (cx_i = xs; cx_i < r; cx_i++)
+                    {
+                        const int32_t dx = r - cx_i;
+                        const int32_t hyp = dx * dx + dy2;
+                        uint8_t alpha = 0;
+
+                        if (hyp > r2)
+                            alpha = (uint8_t)~sqrtU8((uint32_t)hyp);
+                        else if (hyp >= r3)
+                        {
+                            rxst = cx_i;
+                            len++;
+                            continue;
+                        }
+                        else
+                        {
+                            if (hyp <= r4)
+                                break;
+                            alpha = sqrtU8((uint32_t)hyp);
+                        }
+
+                        if (alpha < 16)
+                            continue;
+
+                        plotBlendClipGamma(s, c, gamma, x0 + cx_i - r, y0 - cy_i + r + hh, alpha);
+                        plotBlendClipGamma(s, c, gamma, x0 + cx_i - r, y0 + cy_i - r, alpha);
+                        plotBlendClipGamma(s, c, gamma, x0 - cx_i + r + ww, y0 + cy_i - r, alpha);
+                        plotBlendClipGamma(s, c, gamma, x0 - cx_i + r + ww, y0 - cy_i + r + hh, alpha);
+                    }
+
+                    lxst = rxst - len + 1;
+                    if (len > 0)
+                    {
+                        fillSpanClip(s, y0 - cy_i + r + hh, x0 + lxst - r, x0 + rxst - r, c);
+                        fillSpanClip(s, y0 + cy_i - r, x0 + lxst - r, x0 + rxst - r, c);
+                        fillSpanClip(s, y0 + cy_i - r, x0 - rxst + r + ww, x0 - lxst + r + ww, c);
+                        fillSpanClip(s, y0 - cy_i + r + hh, x0 - rxst + r + ww, x0 - lxst + r + ww, c);
+                    }
+                }
+
+                for (int16_t i = 0; i < (int16_t)t; ++i)
+                {
+                    fillSpanClip(s, y0 + r - (int32_t)t + i + hh, x0, x0 + ww, c);
+                    fillSpanClip(s, y0 - r + 1 + i, x0, x0 + ww, c);
+                    fillVLineClip(s, x0 - r + 1 + i, y0, y0 + hh, c.fg);
+                    fillVLineClip(s, x0 + r - (int32_t)t + i + ww, y0, y0 + hh, c.fg);
+                }
             }
         }
         else
         {
-            auto drawCorner = [&](int16_t ccx, int16_t ccy,
-                                  int16_t px_s, int16_t px_e,
-                                  int16_t py_s, int16_t py_e, uint8_t r)
+            auto drawCornerClip = [&](int16_t ccx, int16_t ccy,
+                                      int16_t px_s, int16_t px_e,
+                                      int16_t py_s, int16_t py_e, uint8_t r)
             {
                 if (r == 0)
                     return;
@@ -665,13 +812,14 @@ namespace pipgui
 
                 for (int16_t py = py_s; py <= py_e; ++py)
                 {
-                    if (py < clipY || py > clipB)
+                    if (py < s.clipY || py > s.clipB)
                         continue;
+                    uint16_t *row = s.buf + (int32_t)py * s.stride;
                     const float dy2 = (float)((ccy - py) * (ccy - py));
 
                     for (int16_t px = px_s; px <= px_e; ++px)
                     {
-                        if (px < clipX || px > clipR)
+                        if (px < s.clipX || px > s.clipR)
                             continue;
                         const float dx = (float)(ccx - px);
                         const float S = dx * dx + dy2;
@@ -708,24 +856,89 @@ namespace pipgui
 
                         const uint8_t alpha = (a_out > a_in) ? (a_out - a_in) : 0;
                         if (alpha == 255)
-                            buf[py * stride + px] = fg;
+                            row[px] = c.fg;
                         else if (alpha > 0)
-                        {
-                            int32_t idx = py * stride + px;
-                            buf[idx] = pipcore::Sprite::swap16(
-                                blendRGB565(fg_rb, fg_g, pipcore::Sprite::swap16(buf[idx]), gammaAA(alpha)));
-                        }
+                            blendStore(row + px, c, gamma[alpha]);
                     }
                 }
             };
 
-            drawCorner(x + rTL, y + rTL, x, x + rTL - 1, y, y + rTL - 1, rTL);
-            drawCorner(x + w - rTR - 1, y + rTR, x + w - rTR, x + w - 1, y, y + rTR - 1, rTR);
-            drawCorner(x + rBL, y + h - rBL - 1, x, x + rBL - 1, y + h - rBL, y + h - 1, rBL);
-            drawCorner(x + w - rBR - 1, y + h - rBR - 1, x + w - rBR, x + w - 1, y + h - rBR, y + h - 1, rBR);
+            if (noClip)
+            {
+                auto drawCornerFast = [&](int16_t ccx, int16_t ccy,
+                                          int16_t px_s, int16_t px_e,
+                                          int16_t py_s, int16_t py_e, uint8_t r)
+                {
+                    if (r == 0)
+                        return;
+                    const float fr = (float)r;
+                    const float r_out2 = (fr + 0.5f) * (fr + 0.5f), inv_2r_out = 0.5f / (fr + 0.5f);
+                    const float r_in2 = (fr - 0.5f) * (fr - 0.5f), inv_2r_in = 0.5f / (fr - 0.5f);
+
+                    for (int16_t py = py_s; py <= py_e; ++py)
+                    {
+                        uint16_t *row = s.buf + (int32_t)py * s.stride;
+                        const float dy2 = (float)((ccy - py) * (ccy - py));
+
+                        for (int16_t px = px_s; px <= px_e; ++px)
+                        {
+                            const float dx = (float)(ccx - px);
+                            const float S = dx * dx + dy2;
+                            const float d_out = (r_out2 - S) * inv_2r_out;
+                            const float d_in = (r_in2 - S) * inv_2r_in;
+
+                            if (px_s <= ccx)
+                            {
+                                if (d_out <= -0.5f)
+                                    continue;
+                                if (d_in >= 0.5f)
+                                    break;
+                            }
+                            else
+                            {
+                                if (d_in >= 0.5f)
+                                    continue;
+                                if (d_out <= -0.5f)
+                                    break;
+                            }
+
+                            uint8_t a_out = 255;
+                            if (d_out < 0.5f)
+                            {
+                                const float t = d_out + 0.5f;
+                                a_out = (uint8_t)(t * t * (765.0f - 510.0f * t));
+                            }
+                            uint8_t a_in = 0;
+                            if (d_in > -0.5f)
+                            {
+                                const float t = d_in + 0.5f;
+                                a_in = (uint8_t)(t * t * (765.0f - 510.0f * t));
+                            }
+
+                            const uint8_t alpha = (a_out > a_in) ? (a_out - a_in) : 0;
+                            if (alpha == 255)
+                                row[px] = c.fg;
+                            else if (alpha > 0)
+                                blendStore(row + px, c, gamma[alpha]);
+                        }
+                    }
+                };
+
+                drawCornerFast(x + rTL, y + rTL, x, x + rTL - 1, y, y + rTL - 1, rTL);
+                drawCornerFast(x + w - rTR - 1, y + rTR, x + w - rTR, x + w - 1, y, y + rTR - 1, rTR);
+                drawCornerFast(x + rBL, y + h - rBL - 1, x, x + rBL - 1, y + h - rBL, y + h - 1, rBL);
+                drawCornerFast(x + w - rBR - 1, y + h - rBR - 1, x + w - rBR, x + w - 1, y + h - rBR, y + h - 1, rBR);
+            }
+            else
+            {
+                drawCornerClip(x + rTL, y + rTL, x, x + rTL - 1, y, y + rTL - 1, rTL);
+                drawCornerClip(x + w - rTR - 1, y + rTR, x + w - rTR, x + w - 1, y, y + rTR - 1, rTR);
+                drawCornerClip(x + rBL, y + h - rBL - 1, x, x + rBL - 1, y + h - rBL, y + h - 1, rBL);
+                drawCornerClip(x + w - rBR - 1, y + h - rBR - 1, x + w - rBR, x + w - 1, y + h - rBR, y + h - 1, rBR);
+            }
         }
 
-        if (_disp.display && !_flags.renderToSprite)
+        if (_disp.display && !_flags.inSpritePass)
             invalidateRect(x, y, w, h);
     }
 
@@ -764,22 +977,28 @@ namespace pipgui
             return;
         }
 
-        uint16_t *buf = (uint16_t *)spr->getBuffer();
+        auto *buf = (uint16_t *)spr->getBuffer();
         if (!buf)
             return;
         const int16_t stride = spr->width();
-        const int16_t maxH = spr->height();
-        if (stride <= 0 || maxH <= 0)
+        if (stride <= 0 || spr->height() <= 0)
             return;
 
-        int32_t clipX = 0, clipY = 0, clipW = stride, clipH = maxH;
+        int32_t clipX = 0;
+        int32_t clipY = 0;
+        int32_t clipW = stride;
+        int32_t clipH = spr->height();
         spr->getClipRect(&clipX, &clipY, &clipW, &clipH);
         if (clipW <= 0 || clipH <= 0)
             return;
         const int32_t clipR = clipX + clipW - 1;
         const int32_t clipB = clipY + clipH - 1;
 
-        const bool steep = abs(y1 - y0) > abs(x1 - x0);
+        const int dx0 = x1 - x0;
+        const int dy0 = y1 - y0;
+        const int adx0 = abs(dx0);
+        const int ady0 = abs(dy0);
+        const bool steep = ady0 > adx0;
         if (steep)
         {
             if (y0 > y1)
@@ -797,7 +1016,10 @@ namespace pipgui
             }
         }
 
-        const int dx = x1 - x0, dy = y1 - y0;
+        const int dx = x1 - x0;
+        const int dy = y1 - y0;
+        const int adx = abs(dx);
+        const int ady = abs(dy);
         const float len = sqrtf((float)(dx * dx) + (float)(dy * dy));
         if (len <= 0.0f)
             return;
@@ -809,13 +1031,12 @@ namespace pipgui
 
         const bool noClip = (minX >= clipX + 1 && maxX <= clipR - 1 && minY >= clipY + 1 && maxY <= clipB - 1);
 
-        const uint32_t fg_rb = ((color & 0xF800u) << 5) | (color & 0x001Fu);
-        const uint32_t fg_g = color & 0x07E0u;
+        const Color565 c = makeColor565(color);
+        const uint8_t *gamma = gammaTable();
 
         auto blendFastPtr = [&](uint16_t *ptr, uint8_t alpha) __attribute__((always_inline))
         {
-            *ptr = pipcore::Sprite::swap16(
-                blendRGB565(fg_rb, fg_g, pipcore::Sprite::swap16(*ptr), alpha));
+            blendStore(ptr, c, alpha);
         };
 
         auto blendFastClip = [&](int px, int py, uint8_t alpha) __attribute__((always_inline))
@@ -832,105 +1053,91 @@ namespace pipgui
             return (uint8_t)(255.0f - d * d * (765.0f - 510.0f * d));
         };
 
+        auto drawShallow = [&](bool useClip) __attribute__((always_inline))
+        {
+            const float W = (float)adx / len;
+            const float dy_dx = (float)dy / (float)adx;
+            float y = (float)y0;
+            for (int x = x0; x <= x1; ++x)
+            {
+                const int yi = (int)(y + 65536.5f) - 65536;
+                const float dist0 = (y - (float)yi) * W;
+                const uint8_t a0 = calcAlpha(dist0);
+                const uint8_t am = calcAlpha(dist0 + W);
+                const uint8_t ap = calcAlpha(dist0 - W);
+                if (useClip)
+                {
+                    if (a0)
+                        blendFastClip(x, yi, gamma[a0]);
+                    if (am)
+                        blendFastClip(x, yi - 1, gamma[am]);
+                    if (ap)
+                        blendFastClip(x, yi + 1, gamma[ap]);
+                }
+                else
+                {
+                    if (a0)
+                        blendFastPtr(buf + (int32_t)yi * stride + x, gamma[a0]);
+                    if (am)
+                        blendFastPtr(buf + (int32_t)(yi - 1) * stride + x, gamma[am]);
+                    if (ap)
+                        blendFastPtr(buf + (int32_t)(yi + 1) * stride + x, gamma[ap]);
+                }
+                y += dy_dx;
+            }
+        };
+
+        auto drawSteep = [&](bool useClip) __attribute__((always_inline))
+        {
+            const float W = (float)ady / len;
+            const float dx_dy = (float)dx / (float)ady;
+            float x = (float)x0;
+            for (int y = y0; y <= y1; ++y)
+            {
+                const int xi = (int)(x + 65536.5f) - 65536;
+                const float dist0 = (x - (float)xi) * W;
+                const uint8_t a0 = calcAlpha(dist0);
+                const uint8_t am = calcAlpha(dist0 + W);
+                const uint8_t ap = calcAlpha(dist0 - W);
+                if (useClip)
+                {
+                    if (a0)
+                        blendFastClip(xi, y, gamma[a0]);
+                    if (am)
+                        blendFastClip(xi - 1, y, gamma[am]);
+                    if (ap)
+                        blendFastClip(xi + 1, y, gamma[ap]);
+                }
+                else
+                {
+                    const int32_t row = (int32_t)y * stride;
+                    if (a0)
+                        blendFastPtr(buf + row + xi, gamma[a0]);
+                    if (am)
+                        blendFastPtr(buf + row + xi - 1, gamma[am]);
+                    if (ap)
+                        blendFastPtr(buf + row + xi + 1, gamma[ap]);
+                }
+                x += dx_dy;
+            }
+        };
+
         if (noClip)
         {
-            if (!steep)
-            {
-                const float W = (float)abs(dx) / len;
-                const float dy_dx = (float)dy / (float)abs(dx);
-                float y = (float)y0;
-                for (int x = x0; x <= x1; ++x)
-                {
-                    int yi = (int)(y + 65536.5f) - 65536;
-                    float dist0 = (y - (float)yi) * W;
-                    uint8_t a0 = calcAlpha(dist0);
-                    if (a0)
-                        blendFastPtr(buf + yi * stride + x, gammaAA(a0));
-                    uint8_t am = calcAlpha(dist0 + W);
-                    if (am)
-                        blendFastPtr(buf + (yi - 1) * stride + x, gammaAA(am));
-                    uint8_t ap = calcAlpha(dist0 - W);
-                    if (ap)
-                        blendFastPtr(buf + (yi + 1) * stride + x, gammaAA(ap));
-                    y += dy_dx;
-                }
-            }
+            if (steep)
+                drawSteep(false);
             else
-            {
-                const float W = (float)abs(dy) / len;
-                const float dx_dy = (float)dx / (float)abs(dy);
-                float x = (float)x0;
-                for (int y = y0; y <= y1; ++y)
-                {
-                    int xi = (int)(x + 65536.5f) - 65536;
-                    float dist0 = (x - (float)xi) * W;
-                    uint32_t row = y * stride;
-                    uint8_t a0 = calcAlpha(dist0);
-                    if (a0)
-                        blendFastPtr(buf + row + xi, gammaAA(a0));
-                    uint8_t am = calcAlpha(dist0 + W);
-                    if (am)
-                        blendFastPtr(buf + row + xi - 1, gammaAA(am));
-                    uint8_t ap = calcAlpha(dist0 - W);
-                    if (ap)
-                        blendFastPtr(buf + row + xi + 1, gammaAA(ap));
-                    x += dx_dy;
-                }
-            }
+                drawShallow(false);
         }
         else
         {
-            if (!steep)
-            {
-                const float W = (float)abs(dx) / len;
-                const float dy_dx = (float)dy / (float)abs(dx);
-                float y = (float)y0;
-                for (int x = x0; x <= x1; ++x)
-                {
-                    if (x >= clipX && x <= clipR)
-                    {
-                        int yi = (int)(y + 65536.5f) - 65536;
-                        float dist0 = (y - (float)yi) * W;
-                        uint8_t a0 = calcAlpha(dist0);
-                        if (a0)
-                            blendFastClip(x, yi, gammaAA(a0));
-                        uint8_t am = calcAlpha(dist0 + W);
-                        if (am)
-                            blendFastClip(x, yi - 1, gammaAA(am));
-                        uint8_t ap = calcAlpha(dist0 - W);
-                        if (ap)
-                            blendFastClip(x, yi + 1, gammaAA(ap));
-                    }
-                    y += dy_dx;
-                }
-            }
+            if (steep)
+                drawSteep(true);
             else
-            {
-                const float W = (float)abs(dy) / len;
-                const float dx_dy = (float)dx / (float)abs(dy);
-                float x = (float)x0;
-                for (int y = y0; y <= y1; ++y)
-                {
-                    if (y >= clipY && y <= clipB)
-                    {
-                        int xi = (int)(x + 65536.5f) - 65536;
-                        float dist0 = (x - (float)xi) * W;
-                        uint8_t a0 = calcAlpha(dist0);
-                        if (a0)
-                            blendFastClip(xi, y, gammaAA(a0));
-                        uint8_t am = calcAlpha(dist0 + W);
-                        if (am)
-                            blendFastClip(xi - 1, y, gammaAA(am));
-                        uint8_t ap = calcAlpha(dist0 - W);
-                        if (ap)
-                            blendFastClip(xi + 1, y, gammaAA(ap));
-                    }
-                    x += dx_dy;
-                }
-            }
+                drawShallow(true);
         }
 
-        if (_disp.display && _flags.spriteEnabled && !_flags.renderToSprite)
+        if (_disp.display && _flags.spriteEnabled && !_flags.inSpritePass)
             invalidateRect(std::min(x0, x1), std::min(y0, y1),
                            std::abs(x1 - x0) + 1, std::abs(y1 - y0) + 1);
     }
@@ -970,17 +1177,14 @@ namespace pipgui
         if (cx - r > clipR || cx + r < clipX || cy - r > clipB || cy + r < clipY)
             return;
 
-        const uint16_t fg = pipcore::Sprite::swap16(color);
-        const uint32_t fg_rb = ((color & 0xF800u) << 5) | (color & 0x001Fu);
-        const uint32_t fg_g = color & 0x07E0u;
+        const Color565 c = makeColor565(color);
+        const uint8_t *gamma = gammaTable();
 
         auto blendPixel = [&](int32_t px, int32_t py, uint8_t alpha) __attribute__((always_inline))
         {
             if (px < clipX || px > clipR || py < clipY || py > clipB)
                 return;
-            int32_t idx = py * stride + px;
-            buf[idx] = pipcore::Sprite::swap16(
-                blendRGB565(fg_rb, fg_g, pipcore::Sprite::swap16(buf[idx]), alpha));
+            blendStore(buf + py * stride + px, c, alpha);
         };
 
         auto drawHLine = [&](int32_t px, int32_t py, int32_t len) __attribute__((always_inline))
@@ -996,9 +1200,7 @@ namespace pipgui
                 len = clipR - px + 1;
             if (len <= 0)
                 return;
-            uint16_t *dst = buf + py * stride + px;
-            while (len--)
-                *dst++ = fg;
+            spanFill(buf + py * stride + px, (int16_t)len, c.fg, c.fg32);
         };
 
         int16_t ir = r - 1;
@@ -1109,13 +1311,13 @@ namespace pipgui
                     continue;
                 slope = ((uint32_t)(r - y) << 16) / (uint32_t)(r - x);
                 if (slope <= startSlope[0] && slope >= endSlope[0])
-                    blendPixel(cx + x - r, cy - y + r, gammaAA(alpha));
+                    blendPixel(cx + x - r, cy - y + r, gamma[alpha]);
                 if (slope >= startSlope[1] && slope <= endSlope[1])
-                    blendPixel(cx + x - r, cy + y - r, gammaAA(alpha));
+                    blendPixel(cx + x - r, cy + y - r, gamma[alpha]);
                 if (slope <= startSlope[2] && slope >= endSlope[2])
-                    blendPixel(cx - x + r, cy + y - r, gammaAA(alpha));
+                    blendPixel(cx - x + r, cy + y - r, gamma[alpha]);
                 if (slope <= endSlope[3] && slope >= startSlope[3])
-                    blendPixel(cx - x + r, cy - y + r, gammaAA(alpha));
+                    blendPixel(cx - x + r, cy - y + r, gamma[alpha]);
             }
 
             if (len[0])
@@ -1131,21 +1333,21 @@ namespace pipgui
         if (startAngle == 0 || endAngle == 360)
             for (int16_t i = 0; i < w; i++)
                 if (cy + r - w + i >= clipY && cy + r - w + i <= clipB)
-                    buf[(cy + r - w + i) * stride + cx] = fg;
+                    buf[(cy + r - w + i) * stride + cx] = c.fg;
         if (startAngle <= 90 && endAngle >= 90)
             for (int16_t i = 0; i < w; i++)
                 if (cx - r + 1 + i >= clipX && cx - r + 1 + i <= clipR)
-                    buf[cy * stride + (cx - r + 1 + i)] = fg;
+                    buf[cy * stride + (cx - r + 1 + i)] = c.fg;
         if (startAngle <= 180 && endAngle >= 180)
             for (int16_t i = 0; i < w; i++)
                 if (cy - r + 1 + i >= clipY && cy - r + 1 + i <= clipB)
-                    buf[(cy - r + 1 + i) * stride + cx] = fg;
+                    buf[(cy - r + 1 + i) * stride + cx] = c.fg;
         if (startAngle <= 270 && endAngle >= 270)
             for (int16_t i = 0; i < w; i++)
                 if (cx + r - w + i >= clipX && cx + r - w + i <= clipR)
-                    buf[cy * stride + (cx + r - w + i)] = fg;
+                    buf[cy * stride + (cx + r - w + i)] = c.fg;
 
-        if (_disp.display && !_flags.renderToSprite)
+        if (_disp.display && !_flags.inSpritePass)
             invalidateRect(cx - r, cy - r, r * 2 + 1, r * 2 + 1);
     }
 
@@ -1175,17 +1377,14 @@ namespace pipgui
         const float fa = (float)rx;
         const float fb2 = (float)(ry * ry);
 
-        const uint16_t fg = pipcore::Sprite::swap16(color);
-        const uint32_t fg32 = ((uint32_t)fg << 16) | fg;
-        const uint32_t fg_rb = ((color & 0xF800u) << 5) | (color & 0x001Fu);
-        const uint32_t fg_g = color & 0x07E0u;
+        const Color565 c = makeColor565(color);
+        const uint8_t *gamma = gammaTable();
 
         auto blendPixel = [&](int32_t px, int32_t py, uint8_t alpha) __attribute__((always_inline))
         {
             if (alpha == 0 || px < clipX || px > clipR || py < clipY || py > clipB)
                 return;
-            uint16_t *ptr = buf + py * stride + px;
-            *ptr = pipcore::Sprite::swap16(blendRGB565(fg_rb, fg_g, pipcore::Sprite::swap16(*ptr), alpha));
+            blendStore(buf + py * stride + px, c, alpha);
         };
 
         auto drawHLine = [&](int32_t px, int32_t py, int32_t len) __attribute__((always_inline))
@@ -1201,7 +1400,7 @@ namespace pipgui
                 len = clipR - px + 1;
             if (len <= 0)
                 return;
-            spanFill(buf + py * stride + px, (int16_t)len, fg, fg32);
+            spanFill(buf + py * stride + px, (int16_t)len, c.fg, c.fg32);
         };
 
         for (int16_t dy = 0; dy <= ry; ++dy)
@@ -1227,7 +1426,7 @@ namespace pipgui
                 const uint8_t a = (uint8_t)(frac * 255.0f);
                 if (a)
                 {
-                    uint8_t ag = gammaAA(a);
+                    const uint8_t ag = gamma[a];
                     blendPixel(cx + xi + 1, py0, ag);
                     blendPixel(cx - xi - 1, py0, ag);
                 }
@@ -1238,14 +1437,14 @@ namespace pipgui
                 const uint8_t a = (uint8_t)(frac * 255.0f);
                 if (a)
                 {
-                    uint8_t ag = gammaAA(a);
+                    const uint8_t ag = gamma[a];
                     blendPixel(cx + xi + 1, py1, ag);
                     blendPixel(cx - xi - 1, py1, ag);
                 }
             }
         }
 
-        if (_disp.display && !_flags.renderToSprite)
+        if (_disp.display && !_flags.inSpritePass)
             invalidateRect(cx - rx, cy - ry, rx * 2 + 1, ry * 2 + 1);
     }
 
@@ -1275,15 +1474,14 @@ namespace pipgui
         const float fa = (float)rx, fa2 = fa * fa;
         const float fb = (float)ry, fb2 = fb * fb;
 
-        const uint32_t fg_rb = ((color & 0xF800u) << 5) | (color & 0x001Fu);
-        const uint32_t fg_g = color & 0x07E0u;
+        const Color565 c = makeColor565(color);
+        const uint8_t *gamma = gammaTable();
 
         auto blendPixel = [&](int32_t px, int32_t py, uint8_t alpha) __attribute__((always_inline))
         {
             if (alpha == 0 || px < clipX || px > clipR || py < clipY || py > clipB)
                 return;
-            uint16_t *ptr = buf + py * stride + px;
-            *ptr = pipcore::Sprite::swap16(blendRGB565(fg_rb, fg_g, pipcore::Sprite::swap16(*ptr), alpha));
+            blendStore(buf + py * stride + px, c, alpha);
         };
 
         auto plot4 = [&](int16_t dx, int16_t dy, uint8_t a0, uint8_t a1) __attribute__((always_inline))
@@ -1307,8 +1505,8 @@ namespace pipgui
             const float y = fb * sqrtf(1.0f - (x * x) / fa2);
             const int16_t yi = (int16_t)y;
             const float frac = y - (float)yi;
-            plot4(dx, yi, gammaAA((uint8_t)((1.0f - frac) * 255.0f)),
-                  gammaAA((uint8_t)(frac * 255.0f)));
+            plot4(dx, yi, gamma[(uint8_t)((1.0f - frac) * 255.0f)],
+                  gamma[(uint8_t)(frac * 255.0f)]);
         }
 
         const int16_t qy = (int16_t)((fb2) / sqrtf(fa2 + fb2) + 0.5f);
@@ -1318,8 +1516,8 @@ namespace pipgui
             const float x = fa * sqrtf(1.0f - (y * y) / fb2);
             const int16_t xi = (int16_t)x;
             const float frac = x - (float)xi;
-            const uint8_t a0 = gammaAA((uint8_t)((1.0f - frac) * 255.0f));
-            const uint8_t a1 = gammaAA((uint8_t)(frac * 255.0f));
+            const uint8_t a0 = gamma[(uint8_t)((1.0f - frac) * 255.0f)];
+            const uint8_t a1 = gamma[(uint8_t)(frac * 255.0f)];
             const int32_t px0 = cx + xi, px1 = cx - xi;
             const int32_t py0 = cy + dy, py1 = cy - dy;
             blendPixel(px0, py0, a0);
@@ -1332,7 +1530,7 @@ namespace pipgui
             blendPixel(px1 - 1, py1, a1);
         }
 
-        if (_disp.display && !_flags.renderToSprite)
+        if (_disp.display && !_flags.inSpritePass)
             invalidateRect(cx - rx - 1, cy - ry - 1, rx * 2 + 3, ry * 2 + 3);
     }
 
@@ -1413,14 +1611,12 @@ namespace pipgui
         if (minX > maxX || minY > maxY)
             return;
 
-        const uint16_t fg = pipcore::Sprite::swap16(color);
-        const uint32_t fg_rb = ((color & 0xF800u) << 5) | (color & 0x001Fu);
-        const uint32_t fg_g = color & 0x07E0u;
+        const Color565 c = makeColor565(color);
+        const uint8_t *gamma = gammaTable();
 
         auto blendPixel = [&](int16_t px, int16_t py, uint8_t alpha) __attribute__((always_inline))
         {
-            uint16_t *ptr = buf + py * stride + px;
-            *ptr = pipcore::Sprite::swap16(blendRGB565(fg_rb, fg_g, pipcore::Sprite::swap16(*ptr), alpha));
+            blendStore(buf + py * stride + px, c, alpha);
         };
 
         static const int32_t ox[4] = {-(SUB_SCALE >> 2), (SUB_SCALE >> 2), -(SUB_SCALE >> 2), (SUB_SCALE >> 2)};
@@ -1448,9 +1644,9 @@ namespace pipgui
                 if (inside_count == 0)
                     continue;
                 if (inside_count == 4)
-                    buf[row + px] = fg;
+                    buf[row + px] = c.fg;
                 else
-                    blendPixel(px, py, gammaAA((uint8_t)((inside_count * 255) >> 2)));
+                    blendPixel(px, py, gamma[(uint8_t)((inside_count * 255) >> 2)]);
             }
         }
     }
@@ -1476,9 +1672,9 @@ namespace pipgui
             return;
 
         const int16_t stride = spr->width();
-        int16_t clipX, clipY, clipW, clipH;
-        spr->getClipRect((int32_t *)&clipX, (int32_t *)&clipY, (int32_t *)&clipW, (int32_t *)&clipH);
-        const int16_t clipR = clipX + clipW - 1, clipB = clipY + clipH - 1;
+        int32_t clipX = 0, clipY = 0, clipW = stride, clipH = spr->height();
+        spr->getClipRect(&clipX, &clipY, &clipW, &clipH);
+        const int32_t clipR = clipX + clipW - 1, clipB = clipY + clipH - 1;
 
         const int16_t minX = std::min({x0, x1, x2}) - radius - 2;
         const int16_t maxX = std::max({x0, x1, x2}) + radius + 2;
@@ -1493,17 +1689,13 @@ namespace pipgui
         const float e2x = v0x - v2x, e2y = v0y - v2y, inv_len2 = 1.0f / (e2x * e2x + e2y * e2y);
         const float sign = (e0x * (v2y - v0y) - e0y * (v2x - v0x) < 0.0f) ? -1.0f : 1.0f;
 
-        const uint16_t fg = pipcore::Sprite::swap16(color);
-        const uint32_t fg_rb = ((color & 0xF800u) << 5) | (color & 0x001Fu);
-        const uint32_t fg_g = color & 0x07E0u;
+        const Color565 c = makeColor565(color);
+        const uint8_t *gamma = gammaTable();
 
         auto blendPixel = [&](int16_t px, int16_t py, uint8_t alpha) __attribute__((always_inline))
         {
             if (px >= clipX && px <= clipR && py >= clipY && py <= clipB)
-            {
-                uint16_t *ptr = buf + py * stride + px;
-                *ptr = pipcore::Sprite::swap16(blendRGB565(fg_rb, fg_g, pipcore::Sprite::swap16(*ptr), alpha));
-            }
+                blendStore(buf + py * stride + px, c, alpha);
         };
 
         for (int16_t py = minY; py <= maxY; ++py)
@@ -1550,11 +1742,11 @@ namespace pipgui
                 {
                     const uint8_t aa = calcAlphaSDF(fabsf(edge_dist) - 0.5f);
                     if (aa > 0)
-                        blendPixel(px, py, gammaAA(aa));
+                        blendPixel(px, py, gamma[aa]);
                 }
             }
         }
-        if (_disp.display && !_flags.renderToSprite)
+        if (_disp.display && !_flags.inSpritePass)
             invalidateRect(minX, minY, maxX - minX + 1, maxY - minY + 1);
     }
 
@@ -1596,13 +1788,12 @@ namespace pipgui
         const float e2x = v0x - v2x, e2y = v0y - v2y, inv_len2 = 1.0f / (e2x * e2x + e2y * e2y);
         const float sign = (e0x * (v2y - v0y) - e0y * (v2x - v0x) < 0.0f) ? -1.0f : 1.0f;
 
-        const uint16_t fg = pipcore::Sprite::swap16(color);
-        const uint32_t fg_rb = ((color & 0xF800u) << 5) | (color & 0x001Fu);
-        const uint32_t fg_g = color & 0x07E0u;
+        const Color565 c = makeColor565(color);
+        const uint8_t *gamma = gammaTable();
 
         auto blendFast = [&](uint16_t *ptr, uint8_t alpha) __attribute__((always_inline))
         {
-            *ptr = pipcore::Sprite::swap16(blendRGB565(fg_rb, fg_g, pipcore::Sprite::swap16(*ptr), alpha));
+            blendStore(ptr, c, alpha);
         };
 
         for (int16_t py = minY; py <= maxY; ++py)
@@ -1626,7 +1817,7 @@ namespace pipgui
 
                 if ((c0 * sign >= 0) && (c1 * sign >= 0) && (c2 * sign >= 0))
                 {
-                    buf[row_offset + px] = fg;
+                    buf[row_offset + px] = c.fg;
                     continue;
                 }
 
@@ -1655,12 +1846,12 @@ namespace pipgui
 
                 const uint8_t a = calcAlphaSDF(sqrtf(d_sq) - radius);
                 if (a == 255)
-                    buf[row_offset + px] = fg;
+                    buf[row_offset + px] = c.fg;
                 else if (a > 0)
-                    blendFast(buf + row_offset + px, gammaAA(a));
+                    blendFast(buf + row_offset + px, gamma[a]);
             }
         }
-        if (_disp.display && !_flags.renderToSprite)
+        if (_disp.display && !_flags.inSpritePass)
             invalidateRect(minX, minY, maxX - minX + 1, maxY - minY + 1);
     }
 
@@ -1688,16 +1879,14 @@ namespace pipgui
         const float fr = (float)r;
         const float r4 = fr * fr * fr * fr;
 
-        const uint16_t fg = pipcore::Sprite::swap16(color);
-        const uint32_t fg_rb = ((color & 0xF800u) << 5) | (color & 0x001Fu);
-        const uint32_t fg_g = color & 0x07E0u;
+        const Color565 c = makeColor565(color);
+        const uint8_t *gamma = gammaTable();
 
         auto blendPixel = [&](int16_t px, int16_t py, uint8_t alpha) __attribute__((always_inline))
         {
             if (px < clipX || px > clipR || py < clipY || py > clipB)
                 return;
-            uint16_t *ptr = buf + py * stride + px;
-            *ptr = pipcore::Sprite::swap16(blendRGB565(fg_rb, fg_g, pipcore::Sprite::swap16(*ptr), alpha));
+            blendStore(buf + py * stride + px, c, alpha);
         };
 
         int16_t x_start = cx - r, x_end = cx + r;
@@ -1726,14 +1915,14 @@ namespace pipgui
             uint16_t *row = buf + y_top * stride + px;
             for (int16_t py = y_top; py <= y_bot; ++py)
             {
-                *row = fg;
+                *row = c.fg;
                 row += stride;
             }
 
             const uint8_t alpha = (uint8_t)(frac * 255.0f);
             if (alpha > 0 && alpha < 255)
             {
-                const uint8_t ag = gammaAA(alpha);
+                const uint8_t ag = gamma[alpha];
                 int16_t py_out = cy - yi - 1;
                 if (py_out >= clipY && py_out <= clipB)
                     blendPixel(px, py_out, ag);
@@ -1763,7 +1952,7 @@ namespace pipgui
             const uint8_t alpha = (uint8_t)(frac * 255.0f);
             if (alpha > 0 && alpha < 255)
             {
-                const uint8_t ag = gammaAA(alpha);
+                const uint8_t ag = gamma[alpha];
                 int16_t px_out = cx - xi - 1;
                 if (px_out >= clipX && px_out <= clipR)
                     blendPixel(px_out, py, ag);
@@ -1773,7 +1962,7 @@ namespace pipgui
             }
         }
 
-        if (_disp.display && !_flags.renderToSprite)
+        if (_disp.display && !_flags.inSpritePass)
             invalidateRect(cx - r - 1, cy - r - 1, r * 2 + 3, r * 2 + 3);
     }
 
@@ -1804,15 +1993,14 @@ namespace pipgui
         const float r2 = fr * fr;
         const float strokeWidth = 1.0f;
 
-        const uint32_t fg_rb = ((color & 0xF800u) << 5) | (color & 0x001Fu);
-        const uint32_t fg_g = color & 0x07E0u;
+        const Color565 c = makeColor565(color);
+        const uint8_t *gamma = gammaTable();
 
         auto blendPixel = [&](int16_t px, int16_t py, uint8_t alpha) __attribute__((always_inline))
         {
             if (px < clipX || px > clipR || py < clipY || py > clipB)
                 return;
-            uint16_t *ptr = buf + py * stride + px;
-            *ptr = pipcore::Sprite::swap16(blendRGB565(fg_rb, fg_g, pipcore::Sprite::swap16(*ptr), alpha));
+            blendStore(buf + py * stride + px, c, alpha);
         };
 
         int16_t x0 = cx - r - 2, x1 = cx + r + 2;
@@ -1856,12 +2044,12 @@ namespace pipgui
                         alpha_f = 1.0f;
                     const uint8_t alpha = (uint8_t)(alpha_f * 255.0f);
                     if (alpha > 0)
-                        blendPixel(px, py, gammaAA(alpha));
+                        blendPixel(px, py, gamma[alpha]);
                 }
             }
         }
 
-        if (_disp.display && !_flags.renderToSprite)
+        if (_disp.display && !_flags.inSpritePass)
             invalidateRect(cx - r - 2, cy - r - 2, r * 2 + 5, r * 2 + 5);
     }
 

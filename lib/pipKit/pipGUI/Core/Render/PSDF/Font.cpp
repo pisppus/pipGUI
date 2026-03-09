@@ -1,14 +1,73 @@
+#include <algorithm>
 #include <math.h>
-#include <pipGUI/core/api/pipGUI.hpp>
-#include <pipGUI/core/utils/Colors.hpp>
-#include <pipGUI/core/Render/Draw/Blend.hpp>
-#include <pipGUI/fonts/WixMadeForDisplay/WixMadeForDisplay.hpp>
-#include <pipGUI/fonts/WixMadeForDisplay/metrics.hpp>
-#include <pipGUI/fonts/KronaOne/KronaOne.hpp>
-#include <pipGUI/fonts/KronaOne/metrics.hpp>
+#include <pipGUI/Core/API/pipGUI.hpp>
+#include <pipGUI/Core/Utils/Colors.hpp>
+#include <pipGUI/Core/Render/Draw/Blend.hpp>
+#include <pipGUI/Fonts/WixMadeForDisplay/WixMadeForDisplay.hpp>
+#include <pipGUI/Fonts/WixMadeForDisplay/metrics.hpp>
+#include <pipGUI/Fonts/KronaOne/KronaOne.hpp>
+#include <pipGUI/Fonts/KronaOne/metrics.hpp>
 
 namespace pipgui
 {
+    namespace
+    {
+        constexpr uint16_t kMarqueeGapPx = 18;
+        constexpr uint8_t kMarqueeEdgeFadePx = 10;
+
+        static inline uint16_t clampFontWeight(uint16_t weight)
+        {
+            return std::min<uint16_t>(900, std::max<uint16_t>(100, weight));
+        }
+
+        static inline float normalizedWeightDelta(uint16_t weight)
+        {
+            return ((float)clampFontWeight(weight) - 400.0f) / 500.0f;
+        }
+
+        static inline float weightStrokePxFor(uint16_t weight, float sizePx)
+        {
+            const float delta = normalizedWeightDelta(weight);
+            const float magnitude = fabsf(delta);
+            const float baseStrokePx = sizePx * 0.105f + 0.12f;
+
+            if (delta >= 0.0f)
+                return delta * baseStrokePx * (1.0f + 0.50f * magnitude);
+            return delta * baseStrokePx * 0.85f * (1.0f + 0.25f * magnitude);
+        }
+
+        static inline float weightCoverageGammaFor(uint16_t weight)
+        {
+            const float delta = normalizedWeightDelta(weight);
+            if (delta >= 0.0f)
+                return 1.0f - 0.20f * delta;
+            return 1.0f + 0.28f * -delta;
+        }
+
+        static inline float weightMeasureExpandXPx(uint16_t weight, float sizePx)
+        {
+            return std::max(0.0f, weightStrokePxFor(weight, sizePx) * 0.85f);
+        }
+
+        static inline float weightMeasureExpandYPx(uint16_t weight, float sizePx)
+        {
+            return std::max(0.0f, weightStrokePxFor(weight, sizePx) * 0.32f);
+        }
+
+        static size_t prevUtf8Boundary(const String &text, size_t len)
+        {
+            if (len == 0)
+                return 0;
+
+            const char *buf = text.c_str();
+            size_t pos = len - 1;
+            while (pos > 0 && (((uint8_t)buf[pos] & 0xC0U) == 0x80U))
+                --pos;
+            return pos;
+        }
+
+    }
+
     struct Glyph
     {
         uint32_t codepoint;
@@ -66,6 +125,14 @@ namespace pipgui
         uint16_t glyphCount;
     };
 
+    static inline float weightBiasFor(uint16_t weight, float sizePx, const PSDFFontData *font)
+    {
+        const float distanceScale = font->distanceRange * (sizePx / font->nominalSizePx);
+        if (distanceScale <= 0.0001f)
+            return 0.0f;
+        return weightStrokePxFor(weight, sizePx) / distanceScale;
+    }
+
     static const PSDFFontData fontWixMadeForDisplay = {
         ::WixMadeForDisplay,
         psdf_wixfor::AtlasWidth, psdf_wixfor::AtlasHeight,
@@ -87,6 +154,39 @@ namespace pipgui
         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
     static uint8_t g_fontCount = 2;
     static const PSDFFontData *g_currentFont = g_fontRegistry[0];
+
+    namespace detail
+    {
+        struct TextFontGuard
+        {
+            GUI *gui;
+            FontId prevId;
+            uint16_t prevSz;
+            uint16_t prevWeight;
+            bool hasPrev;
+
+            explicit TextFontGuard(GUI *g) : gui(g), prevSz(g->fontSize()), prevWeight(g->fontWeight()), hasPrev(false)
+            {
+                for (uint16_t i = 0; i < g_fontCount; ++i)
+                {
+                    if (g_fontRegistry[i] == g_currentFont)
+                    {
+                        prevId = (FontId)i;
+                        hasPrev = true;
+                        break;
+                    }
+                }
+            }
+
+            ~TextFontGuard()
+            {
+                if (hasPrev)
+                    gui->setFont(prevId);
+                gui->setFontSize(prevSz);
+                gui->setFontWeight(prevWeight);
+            }
+        };
+    } // namespace detail
 
     FontId GUI::registerFont(const uint8_t *atlasData,
                              uint16_t atlasWidth, uint16_t atlasHeight,
@@ -186,22 +286,6 @@ namespace pipgui
         return (s_cached = g ? g->unpackAdvance() * 0.5f : 0.30f);
     }
 
-    static inline uint8_t sampleBilinear(pipcore::GuiPlatform *plat,
-                                         const PSDFFontData *font,
-                                         float u, float v)
-    {
-        const int32_t u16 = (int32_t)(u * 65536.f);
-        const int32_t v16 = (int32_t)(v * 65536.f);
-        const int aw = (int)font->atlasWidth, ah = (int)font->atlasHeight;
-        auto rd = [&](int x, int y) -> int32_t
-        {
-            if ((unsigned)x >= (unsigned)aw || (unsigned)y >= (unsigned)ah)
-                return 0;
-            return (int32_t)plat->readProgmemByte(&font->atlasData[(uint32_t)y * aw + x]);
-        };
-        return sampleBilinearSDF(rd, u16, v16, aw, ah);
-    }
-
     bool GUI::setFont(FontId fontId)
     {
         uint16_t id = (uint16_t)fontId;
@@ -238,18 +322,7 @@ namespace pipgui
 
     void GUI::setFontWeight(uint16_t weight)
     {
-        _typo.psdfWeight = weight;
-        int w = (int)weight;
-        if (w < 100)
-            w = 100;
-        else if (w > 900)
-            w = 900;
-        float bias = (float)(w - 400) / 300.f * 0.25f;
-        if (bias < -0.20f)
-            bias = -0.20f;
-        else if (bias > 0.30f)
-            bias = 0.30f;
-        _typo.psdfWeightBias = bias;
+        _typo.psdfWeight = clampFontWeight(weight);
     }
     uint16_t GUI::fontWeight() const { return _typo.psdfWeight; }
 
@@ -350,26 +423,54 @@ namespace pipgui
             maxX = curX;
         outW = (int16_t)ceilf(maxX);
         outH = (int16_t)ceilf((float)lines * g_currentFont->lineHeight * sizePx);
+
+        const int16_t weightExpandX = (int16_t)ceilf(weightMeasureExpandXPx(_typo.psdfWeight, sizePx));
+        const int16_t weightExpandY = (int16_t)ceilf(weightMeasureExpandYPx(_typo.psdfWeight, sizePx));
+        if (weightExpandX > 0)
+            outW = (int16_t)(outW + weightExpandX * 2);
+        if (weightExpandY > 0)
+        {
+            outH = (int16_t)(outH + weightExpandY * 2);
+        }
         return true;
     }
 
-    static inline uint8_t sampleBilinear(pipcore::GuiPlatform *plat,
-                                         const PSDFFontData *font,
-                                         int32_t u16, int32_t v16)
+    static inline uint8_t sampleGlyphBilinear(pipcore::GuiPlatform *plat,
+                                              const PSDFFontData *font,
+                                              const Glyph &glyph,
+                                              int32_t u16, int32_t v16)
     {
-        const int aw = (int)font->atlasWidth, ah = (int)font->atlasHeight;
+        const int aw = (int)font->atlasWidth;
+        const int glyphL = (int)glyph.atlasLeft;
+        const int glyphB = (int)glyph.atlasBottom;
+        const int glyphR = std::max(glyphL, (int)glyph.atlasRight - 1);
+        const int glyphT = std::max(glyphB, (int)glyph.atlasTop - 1);
         auto rd = [&](int x, int y) -> int32_t
         {
-            if ((unsigned)x >= (unsigned)aw || (unsigned)y >= (unsigned)ah)
-                return 0;
+            if (x < glyphL)
+                x = glyphL;
+            else if (x > glyphR)
+                x = glyphR;
+            if (y < glyphB)
+                y = glyphB;
+            else if (y > glyphT)
+                y = glyphT;
             return (int32_t)plat->readProgmemByte(&font->atlasData[(uint32_t)y * aw + x]);
         };
-        return sampleBilinearSDF(rd, u16, v16, aw, ah);
+        return sampleBilinearSDF(rd, u16, v16, font->atlasWidth, font->atlasHeight);
     }
 
     void GUI::drawTextImmediate(const String &text, int16_t rx, int16_t ry,
-                                int16_t, int16_t,
-                                uint16_t fg565, uint16_t, TextAlign)
+                                int16_t tw, int16_t th,
+                                uint16_t fg565, uint16_t bg565, TextAlign align)
+    {
+        drawTextImmediateMasked(text, rx, ry, tw, th, fg565, bg565, align, 0, 0, 0);
+    }
+
+    void GUI::drawTextImmediateMasked(const String &text, int16_t rx, int16_t ry,
+                                      int16_t, int16_t,
+                                      uint16_t fg565, uint16_t, TextAlign,
+                                      int16_t fadeBoxX, int16_t fadeBoxW, uint8_t fadePx)
     {
         if (!_typo.psdfSizePx)
             return;
@@ -383,10 +484,24 @@ namespace pipgui
         if (stride <= 0 || maxH <= 0)
             return;
 
+        int32_t clipX = 0, clipY = 0, clipW = stride, clipH = maxH;
+        spr->getClipRect(&clipX, &clipY, &clipW, &clipH);
+        if (clipW <= 0 || clipH <= 0)
+            return;
+        const int32_t clipR = clipX + clipW;
+        const int32_t clipB = clipY + clipH;
+        const int32_t fadeBoxR = (int32_t)fadeBoxX + fadeBoxW;
+        const int32_t fadePxClamped = (fadePx > 0 && fadeBoxW > 2)
+                                          ? std::min<int32_t>((int32_t)fadePx, std::max<int32_t>(1, fadeBoxW / 3))
+                                          : 0;
+        const bool useFade = (fadePxClamped > 0 && fadeBoxW > 0);
+
         const PSDFFontData *font = g_currentFont;
         const float sizePx = (float)_typo.psdfSizePx;
         const float distanceScale = font->distanceRange * (sizePx / font->nominalSizePx);
-        const float biasOffset = 0.5f + _typo.psdfWeightBias;
+        const float weightBias = weightBiasFor(_typo.psdfWeight, sizePx, font);
+        const float coverageGamma = weightCoverageGammaFor(_typo.psdfWeight);
+        const float biasOffset = 0.5f + weightBias;
         const float kScale = distanceScale * (1.f / 255.f);
         const float kOffset = biasOffset - distanceScale * 0.5f;
         const uint16_t fgNative = pipcore::Sprite::swap16(fg565);
@@ -410,16 +525,16 @@ namespace pipgui
                          int iy0 = (int)floorf(absPenY - g->unpackPadTop() * sizePx);
                          int iy1 = (int)ceilf(absPenY - g->unpackPadBottom() * sizePx);
 
-                         if (ix1 <= 0 || iy1 <= 0 || ix0 >= stride || iy0 >= maxH)
+                         if (ix1 <= clipX || iy1 <= clipY || ix0 >= clipR || iy0 >= clipB)
                              return true;
-                         if (ix0 < 0)
-                             ix0 = 0;
-                         if (iy0 < 0)
-                             iy0 = 0;
-                         if (ix1 > stride)
-                             ix1 = stride;
-                         if (iy1 > maxH)
-                             iy1 = maxH;
+                         if (ix0 < clipX)
+                             ix0 = clipX;
+                         if (iy0 < clipY)
+                             iy0 = clipY;
+                         if (ix1 > clipR)
+                             ix1 = clipR;
+                         if (iy1 > clipB)
+                             iy1 = clipB;
                          if (ix0 >= ix1 || iy0 >= iy1)
                              return true;
 
@@ -430,13 +545,13 @@ namespace pipgui
                          const float invW = (gw != 0.f) ? 1.f / gw : 0.f;
                          const float invH = (gh != 0.f) ? 1.f / gh : 0.f;
 
-                         const float atlasW = g->unpackAtlasRight() - g->unpackAtlasLeft();
-                         const float atlasH = g->unpackAtlasTop() - g->unpackAtlasBottom();
+                         const float atlasW = (float)(g->atlasRight - g->atlasLeft);
+                         const float atlasH = (float)(g->atlasTop - g->atlasBottom);
 
                          const int32_t atlasDu = (int32_t)(atlasW * invW * 65536.f);
                          const int32_t atlasDv = (int32_t)(atlasH * invH * 65536.f);
-                         const int32_t atlasU0 = (int32_t)((g->unpackAtlasLeft() + atlasW * ((float)ix0 + 0.5f - gx0) * invW) * 65536.f);
-                         const int32_t atlasV0 = (int32_t)((g->unpackAtlasBottom() + atlasH * ((float)iy0 + 0.5f - gy0) * invH) * 65536.f);
+                         const int32_t atlasU0 = (int32_t)(((float)g->atlasLeft + atlasW * ((float)ix0 + 0.5f - gx0) * invW) * 65536.f);
+                         const int32_t atlasV0 = (int32_t)(((float)g->atlasBottom + atlasH * ((float)iy0 + 0.5f - gy0) * invH) * 65536.f);
 
                          int32_t atlasV = atlasV0;
                          for (int py = iy0; py < iy1; ++py, atlasV += atlasDv)
@@ -446,21 +561,43 @@ namespace pipgui
 
                              for (int px = ix0; px < ix1; ++px, atlasU += atlasDu)
                              {
-                                 uint8_t s8 = sampleBilinear(plat, font, atlasU, atlasV);
+                                 const uint8_t edgeAlpha = useFade ? detail::fadeEdgeAlpha(px, fadeBoxX, fadeBoxR, fadePxClamped) : 255;
+                                 if (edgeAlpha == 0)
+                                     continue;
+
+                                 uint8_t s8 = sampleGlyphBilinear(plat, font, *g, atlasU, atlasV);
                                  if (s8 <= s8Min)
                                      continue;
 
                                  const float a = (float)s8 * kScale + kOffset;
+                                 float aa = a;
+                                 if (aa > 0.0f && aa < 1.0f && coverageGamma != 1.0f)
+                                     aa = powf(aa, coverageGamma);
+
+                                 uint16_t alpha = 0;
+                                 if (aa >= 1.f)
+                                     alpha = 255;
+                                 else if (aa > 0.f)
+                                     alpha = (uint16_t)(aa * 255.f + 0.5f);
+                                 if (alpha == 0)
+                                     continue;
+
+                                 if (edgeAlpha < 255)
+                                 {
+                                     alpha = (uint16_t)((alpha * edgeAlpha + 127U) / 255U);
+                                     if (alpha == 0)
+                                         continue;
+                                 }
+
                                  const int32_t idx = row + px;
-                                 if (a >= 1.f)
+                                 if (alpha >= 255)
                                  {
                                      buf[idx] = fgNative;
                                  }
                                  else
                                  {
-                                     const uint8_t alpha = (uint8_t)(a * 255.f + 0.5f);
                                      const uint16_t dst = pipcore::Sprite::swap16(buf[idx]);
-                                     buf[idx] = pipcore::Sprite::swap16(detail::blend565(dst, fg565, alpha));
+                                     buf[idx] = pipcore::Sprite::swap16(detail::blend565(dst, fg565, (uint8_t)alpha));
                                  }
                              }
                          }
@@ -482,15 +619,163 @@ namespace pipgui
             rx -= tw;
 
         int16_t ry = (y == -1) ? AutoY((int32_t)th) : y;
+        const int16_t weightExpandX = (int16_t)ceilf(weightMeasureExpandXPx(_typo.psdfWeight, (float)_typo.psdfSizePx));
+        const int16_t weightExpandY = (int16_t)ceilf(weightMeasureExpandYPx(_typo.psdfWeight, (float)_typo.psdfSizePx));
+        if (weightExpandX > 0 || weightExpandY > 0)
+        {
+            rx += weightExpandX;
+            ry += weightExpandY;
+        }
         drawTextImmediate(text, rx, ry, tw, th, fg565, bg565, align);
     }
 
     void GUI::drawText(const String &text, int16_t x, int16_t y,
                        uint16_t fg565, uint16_t bg565, TextAlign align)
     {
-        if (!_flags.spriteEnabled || _flags.renderToSprite || !_disp.display)
+        if (!_flags.spriteEnabled || _flags.inSpritePass || !_disp.display)
             return drawTextAligned(text, x, y, fg565, bg565, align);
         updateText(text, x, y, fg565, bg565, align);
+    }
+
+    bool GUI::drawTextMarquee(const String &text, int16_t x, int16_t y,
+                              int16_t maxWidth, uint16_t fg565,
+                              TextAlign align, const MarqueeTextOptions &opts)
+    {
+        if (maxWidth <= 0)
+            return false;
+
+        int16_t tw = 0, th = 0;
+        if (!measureText(text, tw, th) || tw <= 0 || th <= 0)
+            return false;
+
+        int16_t boxX = (x == -1) ? AutoX((int32_t)maxWidth) : x;
+        if (align == AlignCenter)
+            boxX -= maxWidth / 2;
+        else if (align == AlignRight)
+            boxX -= maxWidth;
+
+        const int16_t boxY = (y == -1) ? AutoY((int32_t)th) : y;
+        if (tw <= maxWidth)
+            return false;
+        const int16_t weightExpandX = (int16_t)ceilf(weightMeasureExpandXPx(_typo.psdfWeight, (float)_typo.psdfSizePx));
+        const int16_t weightExpandY = (int16_t)ceilf(weightMeasureExpandYPx(_typo.psdfWeight, (float)_typo.psdfSizePx));
+
+        pipcore::Sprite *target = getDrawTarget();
+        if (!target)
+            return false;
+
+        int32_t prevClipX = 0, prevClipY = 0, prevClipW = 0, prevClipH = 0;
+        target->getClipRect(&prevClipX, &prevClipY, &prevClipW, &prevClipH);
+
+        int32_t clipX = boxX;
+        int32_t clipY = boxY;
+        int32_t clipW = maxWidth;
+        int32_t clipH = th;
+
+        if (prevClipW > 0 && prevClipH > 0)
+        {
+            const int32_t prevRight = prevClipX + prevClipW;
+            const int32_t prevBottom = prevClipY + prevClipH;
+            const int32_t boxRight = clipX + clipW;
+            const int32_t boxBottom = clipY + clipH;
+
+            if (clipX < prevClipX)
+                clipX = prevClipX;
+            if (clipY < prevClipY)
+                clipY = prevClipY;
+
+            const int32_t finalRight = (boxRight < prevRight) ? boxRight : prevRight;
+            const int32_t finalBottom = (boxBottom < prevBottom) ? boxBottom : prevBottom;
+            clipW = finalRight - clipX;
+            clipH = finalBottom - clipY;
+        }
+
+        if (clipW <= 0 || clipH <= 0)
+        {
+            target->setClipRect(prevClipX, prevClipY, prevClipW, prevClipH);
+            return true;
+        }
+
+        target->setClipRect(clipX, clipY, clipW, clipH);
+
+        const uint16_t speedPxPerSec = opts.speedPxPerSec ? opts.speedPxPerSec : 28;
+        const uint16_t holdStartMs = opts.holdStartMs;
+        const int32_t loopPx = tw + kMarqueeGapPx;
+
+        const uint32_t now = nowMs();
+        uint32_t elapsedMs = now;
+        if (opts.phaseStartMs != 0)
+            elapsedMs = (now >= opts.phaseStartMs) ? (now - opts.phaseStartMs) : 0U;
+
+        float offset = 0.0f;
+        if (speedPxPerSec > 0 && loopPx > 0 && elapsedMs > holdStartMs)
+        {
+            const float scrollMs = (float)(elapsedMs - holdStartMs);
+            const float distancePx = (scrollMs * (float)speedPxPerSec) / 1000.0f;
+            offset = fmodf(distancePx, (float)loopPx);
+        }
+
+        drawTextImmediateMasked(text, (int16_t)lroundf((float)boxX - offset) + weightExpandX, boxY + weightExpandY,
+                                tw, th, fg565, 0, AlignLeft, boxX, maxWidth, kMarqueeEdgeFadePx);
+        if (speedPxPerSec > 0 && loopPx > 0)
+        {
+            drawTextImmediateMasked(text, (int16_t)lroundf((float)boxX - offset + loopPx) + weightExpandX, boxY + weightExpandY,
+                                    tw, th, fg565, 0, AlignLeft, boxX, maxWidth, kMarqueeEdgeFadePx);
+        }
+
+        target->setClipRect(prevClipX, prevClipY, prevClipW, prevClipH);
+        if (speedPxPerSec > 0)
+            requestRedraw();
+        return true;
+    }
+
+    bool GUI::drawTextEllipsized(const String &text, int16_t x, int16_t y,
+                                 int16_t maxWidth, uint16_t fg565,
+                                 TextAlign align)
+    {
+        if (maxWidth <= 0)
+            return false;
+
+        int16_t tw = 0, th = 0;
+        if (!measureText(text, tw, th) || tw <= 0 || th <= 0)
+            return false;
+        if (tw <= maxWidth)
+            return false;
+
+        int16_t dotsW = 0, dotsH = 0;
+        const String dots("...");
+        if (!measureText(dots, dotsW, dotsH))
+            return false;
+
+        String clipped;
+        if (dotsW >= maxWidth)
+        {
+            clipped = dots;
+        }
+        else
+        {
+            String candidate = text;
+            int16_t width = 0, height = 0;
+            while (candidate.length() > 0)
+            {
+                const size_t cut = prevUtf8Boundary(candidate, candidate.length());
+                candidate.remove(cut);
+                String trial = candidate + dots;
+                if (measureText(trial, width, height) && width <= maxWidth)
+                {
+                    clipped = trial;
+                    break;
+                }
+            }
+            if (clipped.length() == 0)
+                clipped = dots;
+        }
+
+        if (clipped.length() == 0)
+            return false;
+
+        drawTextAligned(clipped, x, y, fg565, 0, align);
+        return true;
     }
 
     void GUI::updateText(const String &text, int16_t x, int16_t y,
@@ -509,58 +794,88 @@ namespace pipgui
         else if (align == AlignRight)
             rx -= tw;
         int16_t ry = (y == -1) ? AutoY((int32_t)th) : y;
+        const int16_t weightExpandX = (int16_t)ceilf(weightMeasureExpandXPx(_typo.psdfWeight, (float)_typo.psdfSizePx));
+        const int16_t weightExpandY = (int16_t)ceilf(weightMeasureExpandYPx(_typo.psdfWeight, (float)_typo.psdfSizePx));
+        if (weightExpandX > 0 || weightExpandY > 0)
+        {
+            rx += weightExpandX;
+            ry += weightExpandY;
+        }
 
         constexpr int16_t pad = 4;
 
-        bool prevRender = _flags.renderToSprite;
+        bool prevRender = _flags.inSpritePass;
         pipcore::Sprite *prevActive = _render.activeSprite;
-        _flags.renderToSprite = 1;
+        _flags.inSpritePass = 1;
         _render.activeSprite = &_render.sprite;
 
         fillRect().pos(rx - pad, ry - pad).size(tw + pad * 2, th + pad * 2).color(bg565).draw();
         drawTextImmediate(text, rx, ry, tw, th, fg565, bg565, align);
 
-        _flags.renderToSprite = prevRender;
+        _flags.inSpritePass = prevRender;
         _render.activeSprite = prevActive;
 
-        invalidateRect(rx - pad, ry - pad, tw + pad * 2, th + pad * 2);
-        flushDirty();
+        if (!prevRender)
+        {
+            invalidateRect(rx - pad, ry - pad, tw + pad * 2, th + pad * 2);
+            flushDirty();
+        }
     }
 
-    void DrawTextFluent::draw()
+    template <bool IsUpdate>
+    void TextFluentT<IsUpdate>::draw()
     {
         if (_consumed || !_gui || _text.length() == 0)
             return;
         _consumed = true;
 
-        struct FontGuard
-        {
-            GUI *gui;
-            FontId prevId;
-            uint16_t prevSz;
-            bool hasPrev;
-            FontGuard(GUI *g) : gui(g), prevSz(g->fontSize()), hasPrev(false)
-            {
-                for (uint16_t i = 0; i < g_fontCount; ++i)
-                    if (g_fontRegistry[i] == g_currentFont)
-                    {
-                        prevId = (FontId)i;
-                        hasPrev = true;
-                        break;
-                    }
-            }
-            ~FontGuard()
-            {
-                if (hasPrev)
-                    gui->setFont(prevId);
-                gui->setFontSize(prevSz);
-            }
-        } guard(_gui);
+        detail::TextFontGuard guard(_gui);
 
         if (_fontId != (FontId)0 && !_gui->setFont(_fontId))
             return;
         if (_sizePx)
             _gui->setFontSize(_sizePx);
-        _gui->drawText(_text, _x, _y, _fg565, _bg565, _align);
+        if (_weight)
+            _gui->setFontWeight(_weight);
+        if (IsUpdate)
+            _gui->updateText(_text, _x, _y, _fg565, _bg565, _align);
+        else
+            _gui->drawText(_text, _x, _y, _fg565, _bg565, _align);
+    }
+    template void TextFluentT<false>::draw();
+    template void TextFluentT<true>::draw();
+
+    void DrawTextMarqueeFluent::draw()
+    {
+        if (_consumed || !_gui || _text.length() == 0 || _maxWidth <= 0)
+            return;
+        _consumed = true;
+
+        detail::TextFontGuard guard(_gui);
+
+        if (_fontId != (FontId)0 && !_gui->setFont(_fontId))
+            return;
+        if (_sizePx)
+            _gui->setFontSize(_sizePx);
+        if (_weight)
+            _gui->setFontWeight(_weight);
+        _gui->drawTextMarquee(_text, _x, _y, _maxWidth, _fg565, _align, _opts);
+    }
+
+    void DrawTextEllipsizedFluent::draw()
+    {
+        if (_consumed || !_gui || _text.length() == 0 || _maxWidth <= 0)
+            return;
+        _consumed = true;
+
+        detail::TextFontGuard guard(_gui);
+
+        if (_fontId != (FontId)0 && !_gui->setFont(_fontId))
+            return;
+        if (_sizePx)
+            _gui->setFontSize(_sizePx);
+        if (_weight)
+            _gui->setFontWeight(_weight);
+        _gui->drawTextEllipsized(_text, _x, _y, _maxWidth, _fg565, _align);
     }
 }

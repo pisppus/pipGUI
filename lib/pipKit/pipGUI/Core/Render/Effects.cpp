@@ -1,4 +1,4 @@
-﻿#include <pipGUI/core/api/pipGUI.hpp>
+#include <pipGUI/Core/API/pipGUI.hpp>
 
 namespace pipgui
 {
@@ -55,31 +55,21 @@ namespace pipgui
             264, 263, 262, 261, 260};
     }
 
-    void GUI::beginDirectRender()
-    {
-        _savedRenderState.renderToSprite = _flags.renderToSprite;
-        _savedRenderState.activeSprite = _render.activeSprite;
-        _flags.renderToSprite = 0;
-    }
-
-    void GUI::endDirectRender()
-    {
-        _flags.renderToSprite = _savedRenderState.renderToSprite;
-        _render.activeSprite = _savedRenderState.activeSprite;
-    }
-
     template <typename Fn>
     void GUI::renderToSpriteAndFlush(int16_t x, int16_t y, int16_t w, int16_t h, Fn &&drawCall)
     {
-        const bool prevRender = _flags.renderToSprite;
+        const bool prevRender = _flags.inSpritePass;
         pipcore::Sprite *prevActive = _render.activeSprite;
-        _flags.renderToSprite = 1;
+        _flags.inSpritePass = 1;
         _render.activeSprite = &_render.sprite;
         drawCall();
-        _flags.renderToSprite = prevRender;
+        _flags.inSpritePass = prevRender;
         _render.activeSprite = prevActive;
-        invalidateRect(x, y, w, h);
-        flushDirty();
+        if (!prevRender)
+        {
+            invalidateRect(x, y, w, h);
+            flushDirty();
+        }
     }
 
     void GUI::drawGlowCircle(int16_t x, int16_t y, int16_t r,
@@ -90,7 +80,7 @@ namespace pipgui
         if (r <= 0)
             return;
 
-        if (_flags.spriteEnabled && _disp.display && !_flags.renderToSprite)
+        if (_flags.spriteEnabled && _disp.display && !_flags.inSpritePass)
         {
             updateGlowCircle(x, y, r, fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
             return;
@@ -132,9 +122,7 @@ namespace pipgui
     {
         if (!_flags.spriteEnabled || !_disp.display)
         {
-            beginDirectRender();
             drawGlowCircle(x, y, r, fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
-            endDirectRender();
             return;
         }
 
@@ -177,7 +165,7 @@ namespace pipgui
         if (w <= 0 || h <= 0)
             return;
 
-        if (_flags.spriteEnabled && _disp.display && !_flags.renderToSprite)
+        if (_flags.spriteEnabled && _disp.display && !_flags.inSpritePass)
         {
             updateGlowRect(x, y, w, h, radiusTL, radiusTR, radiusBR, radiusBL,
                            fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
@@ -231,10 +219,8 @@ namespace pipgui
     {
         if (!_flags.spriteEnabled || !_disp.display)
         {
-            beginDirectRender();
             drawGlowRect(x, y, w, h, radiusTL, radiusTR, radiusBR, radiusBL,
                          fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
-            endDirectRender();
             return;
         }
 
@@ -343,7 +329,7 @@ namespace pipgui
         if (w <= 0 || h <= 0)
             return;
 
-        if (_flags.spriteEnabled && _disp.display && !_flags.renderToSprite)
+        if (_flags.spriteEnabled && _disp.display && !_flags.inSpritePass)
         {
             updateBlurRegion(x, y, w, h, radius, dir, gradient, materialStrength, noiseAmount, materialColor);
             return;
@@ -504,9 +490,7 @@ namespace pipgui
     {
         if (!_flags.spriteEnabled || !_disp.display)
         {
-            beginDirectRender();
             drawBlurRegion(x, y, w, h, radius, dir, gradient, materialStrength, noiseAmount, materialColor);
-            endDirectRender();
             return;
         }
         renderToSpriteAndFlush(x, y, w, h,

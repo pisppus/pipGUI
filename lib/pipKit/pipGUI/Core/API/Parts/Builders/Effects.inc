@@ -1,5 +1,5 @@
 #if !defined(PIPGUI_FLUENT_BUILDERS_INC)
-#error "Do not include this file directly. Include <pipGUI/core/api/pipGUI.hpp>"
+#error "Do not include this file directly. Include <pipGUI/Core/API/pipGUI.hpp>"
 #endif
 
 template <bool IsUpdate>

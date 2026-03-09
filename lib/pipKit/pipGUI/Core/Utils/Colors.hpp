@@ -103,6 +103,32 @@ namespace pipgui
             return ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b;
         }
 
+        static inline uint8_t fadeEdgeAlpha(int32_t pos, int32_t start, int32_t end, int32_t fadePx)
+        {
+            if (pos < start || pos >= end)
+                return 0;
+            if (fadePx <= 0 || end <= start)
+                return 255;
+
+            float alpha = 1.0f;
+            if (pos < start + fadePx)
+                alpha = (float)(pos - start + 1) / (float)(fadePx + 1);
+            if (pos >= end - fadePx)
+            {
+                const float rightAlpha = (float)(end - pos) / (float)(fadePx + 1);
+                if (rightAlpha < alpha)
+                    alpha = rightAlpha;
+            }
+
+            if (alpha <= 0.0f)
+                return 0;
+            if (alpha >= 1.0f)
+                return 255;
+
+            alpha = alpha * alpha * (3.0f - 2.0f * alpha);
+            return (uint8_t)(alpha * 255.0f + 0.5f);
+        }
+
         static inline uint32_t lighten888(uint32_t c, uint8_t amount)
         {
             uint8_t r = (uint8_t)((c >> 16) & 0xFF);

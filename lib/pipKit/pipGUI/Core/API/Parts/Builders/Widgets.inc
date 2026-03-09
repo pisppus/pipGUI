@@ -1,5 +1,5 @@
 #if !defined(PIPGUI_FLUENT_BUILDERS_INC)
-#error "Do not include this file directly. Include <pipGUI/core/api/pipGUI.hpp>"
+#error "Do not include this file directly. Include <pipGUI/Core/API/pipGUI.hpp>"
 #endif
 
 template <bool IsUpdate>
@@ -477,6 +477,74 @@ struct ToastFluent
         PIPGUI_FLUENT_GUARD(ToastFluent);
         _iconId = id;
         _iconSizePx = sizePx;
+        return *this;
+    }
+
+    void show();
+};
+
+struct NotificationFluent
+{
+    GUI *_gui;
+    String _title;
+    String _message;
+    String _buttonText;
+    uint16_t _delaySeconds;
+    NotificationType _type;
+    IconId _iconId;
+    bool _consumed;
+
+    NotificationFluent(GUI *g)
+        : _gui(g),
+          _title(),
+          _message(),
+          _buttonText("OK"),
+          _delaySeconds(0),
+          _type(NotificationType::Normal),
+          _iconId((IconId)0xFFFF),
+          _consumed(false) {}
+
+    ~NotificationFluent() { show(); }
+
+    NotificationFluent &title(const String &t)
+    {
+        PIPGUI_FLUENT_GUARD(NotificationFluent);
+        _title = t;
+        return *this;
+    }
+
+    NotificationFluent &message(const String &m)
+    {
+        PIPGUI_FLUENT_GUARD(NotificationFluent);
+        _message = m;
+        return *this;
+    }
+
+    NotificationFluent &button(const String &label)
+    {
+        PIPGUI_FLUENT_GUARD(NotificationFluent);
+        _buttonText = label;
+        return *this;
+    }
+
+    NotificationFluent &delay(uint16_t seconds)
+    {
+        PIPGUI_FLUENT_GUARD(NotificationFluent);
+        _delaySeconds = seconds;
+        return *this;
+    }
+
+    NotificationFluent &type(NotificationType v)
+    {
+        PIPGUI_FLUENT_GUARD(NotificationFluent);
+        _type = v;
+        return *this;
+    }
+
+    NotificationFluent &icon(IconId id)
+    {
+        PIPGUI_FLUENT_GUARD(NotificationFluent);
+        _iconId = id;
         return *this;
     }
 

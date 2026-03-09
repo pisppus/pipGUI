@@ -40,7 +40,7 @@ static const Glyph Glyphs[GlyphCount] =
 }
 }
 
-#include <pipGUI/core/api/pipGUI.hpp>
+#include <pipGUI/Core/API/pipGUI.hpp>
 static inline pipgui::FontId registerFont_KronaOne(pipgui::GUI &gui){
     return gui.registerFont(
         ::KronaOne,

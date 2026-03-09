@@ -1,5 +1,5 @@
  #if !defined(PIPGUI_FLUENT_BUILDERS_INC)
- #error "Do not include this file directly. Include <pipGUI/core/api/pipGUI.hpp>"
+ #error "Do not include this file directly. Include <pipGUI/Core/API/pipGUI.hpp>"
  #endif
  
  struct FillRectFluent
@@ -620,6 +620,7 @@ struct DrawTriangleFluent
     uint8_t _radius;
     bool _consumed;
     DrawTriangleFluent(GUI *g) : _gui(g), _x0(0), _y0(0), _x1(0), _y1(0), _x2(0), _y2(0), _color(0), _radius(0), _consumed(false) {}
+    ~DrawTriangleFluent() { draw(); }
     DrawTriangleFluent &point0(int16_t x, int16_t y)
     {
         PIPGUI_FLUENT_GUARD(DrawTriangleFluent);
@@ -664,6 +665,7 @@ struct FillTriangleFluent
     uint8_t _radius;
     bool _consumed;
     FillTriangleFluent(GUI *g) : _gui(g), _x0(0), _y0(0), _x1(0), _y1(0), _x2(0), _y2(0), _color(0), _radius(0), _consumed(false) {}
+    ~FillTriangleFluent() { draw(); }
     FillTriangleFluent &point0(int16_t x, int16_t y)
     {
         PIPGUI_FLUENT_GUARD(FillTriangleFluent);

@@ -1,4 +1,4 @@
-﻿#include <pipGUI/core/api/pipGUI.hpp>
+#include <pipGUI/Core/API/pipGUI.hpp>
 #include <math.h>
 
 namespace pipgui
@@ -97,14 +97,14 @@ namespace pipgui
             const uint16_t bg565 = detail::color888To565(_boot.bgColor);
             if (_flags.spriteEnabled)
             {
-                bool prevRender = _flags.renderToSprite;
+                bool prevRender = _flags.inSpritePass;
                 pipcore::Sprite *prevActive = _render.activeSprite;
 
                 _render.activeSprite = &_render.sprite;
-                _flags.renderToSprite = 1;
+                _flags.inSpritePass = 1;
                 drawCenteredTitle(_boot.title, _boot.subtitle, fg565, bg565);
 
-                _flags.renderToSprite = prevRender;
+                _flags.inSpritePass = prevRender;
                 _render.activeSprite = prevActive;
                 if (_disp.display && _flags.spriteEnabled)
                     _render.sprite.writeToDisplay(*_disp.display, 0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight);
@@ -146,13 +146,13 @@ namespace pipgui
             float fadeEase = bezierEase01(tn, 0.20f, 0.90f);
 
             bool useSprite = _flags.spriteEnabled;
-            bool prevRender = _flags.renderToSprite;
+            bool prevRender = _flags.inSpritePass;
             pipcore::Sprite *prevActive = _render.activeSprite;
 
             if (useSprite)
             {
                 _render.activeSprite = &_render.sprite;
-                _flags.renderToSprite = 1;
+                _flags.inSpritePass = 1;
             }
 
             clear(detail::color888To565(_boot.bgColor));
@@ -211,7 +211,7 @@ namespace pipgui
 
             if (useSprite)
             {
-                _flags.renderToSprite = prevRender;
+                _flags.inSpritePass = prevRender;
                 _render.activeSprite = prevActive;
                 if (_disp.display && _flags.spriteEnabled)
                     _render.sprite.writeToDisplay(*_disp.display, 0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight);

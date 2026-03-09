@@ -1,5 +1,5 @@
-﻿#if !defined(PIPGUI_GUI_PARTS)
-#error "Do not include this file directly. Include <pipGUI/core/api/pipGUI.hpp>"
+#if !defined(PIPGUI_GUI_PARTS)
+#error "Do not include this file directly. Include <pipGUI/Core/API/pipGUI.hpp>"
 #endif
 
 pipgui::ConfigureDisplayFluent configureDisplay();

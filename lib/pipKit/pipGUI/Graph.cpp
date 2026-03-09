@@ -1,4 +1,4 @@
-#include <pipGUI/core/api/pipGUI.hpp>
+#include <pipGUI/Core/API/pipGUI.hpp>
 namespace pipgui
 {
 
@@ -212,7 +212,7 @@ namespace pipgui
         if (w <= 0 || h <= 0)
             return;
 
-        if (_flags.spriteEnabled && _disp.display && !_flags.renderToSprite)
+        if (_flags.spriteEnabled && _disp.display && !_flags.inSpritePass)
         {
             updateGraphGrid(x, y, w, h, radius, dir, bgColor, gridColor, speed);
             return;
@@ -343,24 +343,21 @@ namespace pipgui
     {
         if (!_flags.spriteEnabled || !_disp.display)
         {
-            bool prevRender = _flags.renderToSprite;
-            pipcore::Sprite *prevActive = _render.activeSprite;
-            _flags.renderToSprite = 0;
             drawGraphGrid(x, y, w, h, radius, dir, bgColor, gridColor, speed);
-            _flags.renderToSprite = prevRender;
-            _render.activeSprite = prevActive;
             return;
         }
 
-        bool prevRender = _flags.renderToSprite;
+        bool prevRender = _flags.inSpritePass;
         pipcore::Sprite *prevActive = _render.activeSprite;
 
-        _flags.renderToSprite = 1;
+        _flags.inSpritePass = 1;
         _render.activeSprite = &_render.sprite;
         drawGraphGrid(x, y, w, h, radius, dir, bgColor, gridColor, speed);
-        _flags.renderToSprite = prevRender;
+        _flags.inSpritePass = prevRender;
         _render.activeSprite = prevActive;
 
+        if (prevRender)
+            return;
         if (_screen.current >= _screen.capacity)
             return;
         GraphArea *area = ensureGraphArea(_screen.current);
@@ -387,7 +384,7 @@ namespace pipgui
                             int16_t valueMin,
                             int16_t valueMax)
     {
-        if (_flags.spriteEnabled && _disp.display && !_flags.renderToSprite)
+        if (_flags.spriteEnabled && _disp.display && !_flags.inSpritePass)
         {
             updateGraphLine(lineIndex, value, color, valueMin, valueMax);
             return;
@@ -705,24 +702,21 @@ namespace pipgui
     {
         if (!_flags.spriteEnabled || !_disp.display)
         {
-            bool prevRender = _flags.renderToSprite;
-            pipcore::Sprite *prevActive = _render.activeSprite;
-            _flags.renderToSprite = 0;
             drawGraphLine(lineIndex, value, color, valueMin, valueMax);
-            _flags.renderToSprite = prevRender;
-            _render.activeSprite = prevActive;
             return;
         }
 
-        bool prevRender = _flags.renderToSprite;
+        bool prevRender = _flags.inSpritePass;
         pipcore::Sprite *prevActive = _render.activeSprite;
 
-        _flags.renderToSprite = 1;
+        _flags.inSpritePass = 1;
         _render.activeSprite = &_render.sprite;
         drawGraphLine(lineIndex, value, color, valueMin, valueMax);
-        _flags.renderToSprite = prevRender;
+        _flags.inSpritePass = prevRender;
         _render.activeSprite = prevActive;
 
+        if (prevRender)
+            return;
         if (_screen.current >= _screen.capacity)
             return;
         GraphArea *area = ensureGraphArea(_screen.current);
@@ -737,4 +731,3 @@ namespace pipgui
         flushDirty();
     }
 }
-
