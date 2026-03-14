@@ -1,73 +1,318 @@
-# Логотип
+# pipKit API
 
-## 1. Вызов логотипа
+Этот файл описывает актуальный публичный API `pipGUI` и `pipCore`, который есть в коде проекта.
 
-Как мы вызываем её в прошивке:
+---
+
+# 1. Build-time флаги
+
+Низкий слой `pipCore` выбирает платформу и драйвер дисплея на этапе компиляции. 
+
+- `PIPCORE_DISPLAY`
+  - пример: `-DPIPCORE_DISPLAY=ST7789`
+- `PIPCORE_PLATFORM`
+  - пример: `-DPIPCORE_PLATFORM=ESP32`
+
+Если в сборке доступен только один backend, `pipCore` может выбрать его автоматически. В текущем проекте это обычно значит:
+
+- платформа: `ESP32`
+- дисплей: `ST7789`
+
+Явно задавать флаги имеет смысл, если вы хотите жёстко зафиксировать конфигурацию в `platformio.ini` и не полагаться на auto-detect.
+
+Отдельно есть diagnostic-флаг `pipGUI` для автологирования ошибок в `Serial`:
+
+- `PIPGUI_SERIAL_ERRORS`
+  - по умолчанию: `1`
+  - чтобы выключить: `-DPIPGUI_SERIAL_ERRORS=0`
+
+Он не выбирает платформу или дисплей. Он только включает или отключает автоматический вывод ошибок `configureDisplay()`, `begin()` и display I/O в `Serial`.
+
+---
+
+# 2. Инициализация
+
+## 2.1. Конфигурация дисплея
+
+Полный пример:
 
 ```cpp
-ui.showLogo(
-    "PISPPUS",               // 1. Заголовок (title)
-    "Digital Thermometer" ,  // 2. Подзаголовок (subtitle, можно опустить)
-    SlideUp,                 // 3. Тип анимации (animation, можно None/FadeIn/LightFade/SlideUp/ZoomIn)
-    TFT_WHITE,               // 4. Цвет текста (fgColor)
-    TFT_BLACK,               // 5. Цвет фона (bgColor)
-    1500,                    // 6. Длительность анимации в мс (durationMs)
-    160,                     // 7. X центра блока (x)
-    40                       // 8. Y верха блока (y)
+ui.configureDisplay()
+    .pins(11, 12, 10, 9, -1)   // mosi, sclk, cs, dc, rst
+    .size(240, 320)            // width, height
+    .hz(80000000)              // частота SPI
+    .order("RGB")              // "RGB" или "BGR"
+    .invert(true)              // инверсия панели
+    .swap(false)               // swap байтов RGB565
+    .offset(0, 0);             // смещение активной области
+```
+
+Минимальный пример:
+
+```cpp
+ui.configureDisplay()
+    .pins(11, 12, 10, 9, -1)
+    .size(240, 320);
+```
+
+Обязательно указать:
+
+- `pins(...)` задаёт пины SPI и управляющие пины дисплея.
+- `size(width, height)` задаёт логический размер панели.
+
+Можно не писать и оставить дефолт библиотеки:
+
+- `hz(freq)` по умолчанию `80000000`
+- `order("RGB")` по умолчанию `RGB`
+- `invert(bool)` по умолчанию `true`
+- `swap(bool)` по умолчанию `false`
+- `offset(x, y)` по умолчанию `(0, 0)`
+
+Что делает каждая настройка:
+
+- `pins(...)` задаёт пины SPI и управляющие пины дисплея
+- `size(width, height)` задаёт логический размер панели
+- `hz(freq)` задаёт частоту SPI
+- `order("RGB")` / `order("BGR")` переключает порядок цветовых каналов контроллера
+- `invert(bool)` включает или отключает инверсию
+- `swap(bool)` включает swap байтов RGB565 перед отправкой
+- `offset(x, y)` задаёт сдвиг видимой области в памяти контроллера
+
+## 2.2. Запуск GUI
+
+После конфигурации дисплея вызывается `begin()`:
+
+```cpp
+ui.begin(
+    0,                  // rotation: 0..3
+    ui.rgb(0, 0, 0)     // bgColor
 );
 ```
 
-### Что за что отвечает
+- `rotation` принимает значения `0..3`.
+- `bgColor` задаёт цвет фона GUI при старте.
 
-- **`title`** - главная строка, всегда рисуется.
-- **`subtitle`** - вторая строка под заголовком. Если пустая строка, блок считается однострочным.
-- **`animation`** - как появится логотип:
-  - `None` - без анимации, логотип рисуется сразу.
-  - `FadeIn` - плавный проявляющийся текст.
-  - `LightFade` - текст сразу есть, плавно меняется только яркость подсветки.
-  - `SlideUp` - блок выезжает снизу вверх.
-  - `ZoomIn` - текст плавно выезжает масштабированием (zoom 0.5x → 1.0x) с мягким проявлением по цвету (bezier‑кривая).
-- **`fgColor`** - цвет текста (RGB565).
-- **`bgColor`** - цвет заливки фона под логотипом.
-- **`durationMs`** - сколько длится анимация. 0 или очень маленькое значение ≈ мгновенный показ.
-- **`x`** - горизонтальная позиция центра логотипа. `-1` = по центру экрана.
-- **`y`** - вертикальная позиция **верха блока** логотипа. `-1` = автоматически по центру.
-
-## 2. Шрифты для логотипа
-
-Внутри `GUI` есть отдельные размеры для заголовка и подзаголовка логотипа.
-
-- **`logoTitleSizePx(sizePx)`** - размер PSDF‑шрифта заголовка.
-- **`logoSubtitleSizePx(sizePx)`** - размер PSDF‑шрифта подзаголовка.
-- **`logoSizesPx(titleSizePx, subtitleSizePx)`** - сразу задать размеры для обеих строк.
-
-Пример настройки бут‑логотипа с PSDF:
+## 2.3. Подсветка и яркость
 
 ```cpp
-ui.loadBuiltinPSDF();
-ui.logoSizesPx(36, 24);
-ui.showLogo("PISPPUS", "Digital Thermometer", ZoomIn, TFT_WHITE, TFT_BLACK, 2000);
+ui.setBacklightPin(
+    48,    // pin
+    0,     // PWM channel
+    5000,  // PWM frequency
+    12     // PWM resolution bits
+);
+```
+
+Что важно:
+
+- обязательный только `pin`
+- `channel`, `freqHz` и `resolutionBits` можно не указывать
+- после `setBacklightPin(...)` библиотека сама подключает стандартное PWM-управление подсветкой через платформу
+- если вы используете `LightFade` в boot-анимации, вызовите `setBacklightPin(...)` до этой анимации
+
+### Максимальная яркость
+
+```cpp
+ui.setMaxBrightness(70);   // ограничить максимум 70%
+```
+
+Что это значит:
+
+- диапазон `0..100`
+- это верхний лимит яркости, а не команда “установить текущую яркость прямо сейчас”
+- библиотека использует этот лимит, когда сама меняет яркость
+- на текущей ESP32-платформе значение сохраняется и потом подгружается автоматически
+
+### Когда `pipGUI` сам меняет яркость
+
+Сейчас это используется в первую очередь для boot-анимации `LightFade`:
+
+- во время анимации яркость плавно растёт
+- в конце выставляется `maxBrightness()`
+
+Если вам нужен не лимит, а отдельный публичный API вида “поставить яркость 35% прямо сейчас”, это уже другая задача и сейчас такого метода в `pipGUI` нет.
+
+---
+
+# 4. Экраны и цикл
+
+## 4.1. Регистрация экранов
+
+Экраны регистрируются через макрос `SCREEN(name, order)`:
+
+```cpp
+SCREEN(ScreenHome, 0)
+{
+    ui.clear(ui.rgb(0, 0, 0));
+}
+
+SCREEN(ScreenSettings, 1)
+{
+    ui.clear(ui.rgb(8, 8, 8));
+}
+```
+
+Что создаёт макрос:
+
+- callback-функцию экрана;
+- числовой id экрана;
+- автоматическую регистрацию экрана в таблице GUI.
+
+После этого экран можно активировать:
+
+```cpp
+ui.setScreen(ScreenHome);
+```
+
+## 4.2. Основной цикл
+
+Базовый вариант:
+
+```cpp
+void loop()
+{
+    ui.loop();
+}
+```
+
+Вспомогательный вариант, если есть две кнопки `Button`:
+
+```cpp
+Button btnNext(1, Pullup);
+Button btnPrev(2, Pullup);
+
+void setup()
+{
+    btnNext.begin();
+    btnPrev.begin();
+}
+
+void loop()
+{
+    ui.loopWithInput(btnNext, btnPrev);
+}
+```
+
+`loopWithInput(...)` только обновляет сами объекты `Button` и потом вызывает `ui.loop()`.
+Логику экранов, списков и плиток вы всё равно задаёте отдельно.
+
+Если `loopWithInput(...)` не используется, вызовите `begin()` в `setup()`, потом `update()` один раз в начале каждого `loop()`.
+После этого `wasPressed()` и `isDown()` просто читают уже обновлённое состояние кнопки.
+
+## 4.3. Управление экранами
+
+```cpp
+ui.setScreen(ScreenHome);
+ui.nextScreen();
+ui.prevScreen();
+
+uint8_t current = ui.currentScreen();
+bool animActive = ui.screenTransitionActive();
+```
+
+## 4.4. Принудительная перерисовка
+
+```cpp
+ui.requestRedraw();
+```
+
+Нужно, когда вы изменили данные экрана извне и хотите гарантированно перерисовать следующий кадр.
+
+## 4.5. Анимация переходов
+
+```cpp
+ui.setScreenAnimation(SlideX, 250);
+```
+
+Доступные режимы:
+
+- `ScreenAnimNone`
+- `SlideX`
+- `SlideY`
+
+Через токен `None` тоже можно:
+
+```cpp
+ui.setScreenAnimation(None, 0);
 ```
 
 ---
 
-# PSDF‑шрифты и пресеты текста
+# 5. Базовые helpers
 
-## 1. Загрузка PSDF
+## 5.1. Размеры и доступ к низкому уровню
 
 ```cpp
-ui.loadBuiltinPSDF();
+uint16_t w = ui.screenWidth();
+uint16_t h = ui.screenHeight();
+
+pipcore::Display &disp = ui.display();
+pipcore::Platform *plat = ui.platform();
 ```
 
-`BuiltinPSDF`:
+`display()` и `platform()` нужны в основном для advanced-кейсов.
 
-- `WixMedium`
-- `WixSemiBold`
-- `WixBold`
+## 5.2. Цвет
 
-## 2. Пресеты размеров текста
+Обычный способ:
 
-Можно настроить размеры (в пикселях) под свои экраны:
+```cpp
+uint16_t c = ui.rgb(255, 0, 72);
+```
+
+Есть и `GUI::rgb888(...)` для API, которым нужен 24-битный цвет, но в большинстве пользовательских кейсов хватает `ui.rgb(...)`.
+
+## 5.3. Очистка экрана
+
+```cpp
+ui.clear(ui.rgb(0, 0, 0));
+```
+
+## 5.4. Клип
+
+```cpp
+ui.setClip(10, 20, 120, 80);
+// ... рисование только внутри области ...
+ui.clearClip();
+```
+
+---
+
+# 6. Текст, шрифты и иконки
+
+## 6.1. Встроенные шрифты
+
+Встроенные `FontId`:
+
+- `WixMadeForDisplay`
+- `KronaOne`
+
+Выбирать шрифт можно так:
+
+```cpp
+ui.setFont(WixMadeForDisplay);
+ui.setFontSize(18);
+ui.setFontWeight(Semibold);
+```
+
+Текущие значения можно читать:
+
+```cpp
+uint16_t px = ui.fontSize();
+uint16_t weight = ui.fontWeight();
+```
+
+Доступные токены толщины:
+
+- `Thin`
+- `Light`
+- `Regular`
+- `Medium`
+- `Semibold`
+- `Bold`
+- `Black`
+
+## 6.2. Текстовые стили
 
 ```cpp
 ui.configureTextStyles(
@@ -76,6 +321,8 @@ ui.configureTextStyles(
     14, // Body
     12  // Caption
 );
+
+ui.setTextStyle(H1);
 ```
 
 `TextStyle`:
@@ -85,107 +332,197 @@ ui.configureTextStyles(
 - `Body`
 - `Caption`
 
-Применить стиль (меняет текущий размер PSDF‑шрифта):
+## 6.3. Обычный текст
 
 ```cpp
-ui.setTextStyle(H1);
+ui.drawText()
+    .pos(center, 32)
+    .font(WixMadeForDisplay)
+    .size(18)
+    .weight(Semibold)
+    .text("Hello")
+    .color(ui.rgb(255, 255, 255))
+    .bgColor(ui.rgb(0, 0, 0))
+    .align(AlignCenter)
+    .draw();
 ```
 
-Нарисовать текст:
+Для in-place обновления есть такой же builder:
 
 ```cpp
-ui.drawPSDFText("Hello", -1, 30, TFT_WHITE, TFT_BLACK, AlignCenter);
+ui.updateText()
+    .pos(center, 32)
+    .text("Updated")
+    .color(ui.rgb(255, 255, 255))
+    .align(AlignCenter)
+    .draw();
+```
+
+## 6.4. Бегущая строка и ellipsis
+
+```cpp
+ui.drawTextMarquee()
+    .pos(20, 80)
+    .maxWidth(140)
+    .text("Very long text that does not fit")
+    .color(ui.rgb(255, 255, 255))
+    .speed(30)
+    .holdStart(700)
+    .draw();
+```
+
+```cpp
+ui.drawTextEllipsized()
+    .pos(20, 110)
+    .maxWidth(140)
+    .text("Very long text that does not fit")
+    .color(ui.rgb(255, 255, 255))
+    .draw();
+```
+
+## 6.5. Иконки
+
+```cpp
+ui.drawIcon()
+    .pos(20, 20)
+    .size(18)
+    .icon(WarningLayer0)
+    .color(ui.rgb(255, 255, 255))
+    .bgColor(ui.rgb(0, 0, 0))
+    .draw();
+```
+
+Иконки берутся из вашего набора `IconId`.
+
+## 6.6. Логотип
+
+```cpp
+ui.logoSizesPx(36, 20);
+
+ui.showLogo(
+    "PISPPUS",
+    "Digital Thermometer",
+    ZoomIn,
+    ui.rgb(255, 255, 255),
+    ui.rgb(0, 0, 0),
+    1800,
+    center,
+    40
+);
+```
+
+Параметры:
+
+- `title` и `subtitle` — строки логотипа;
+- `animation` вЂ” `None`, `FadeIn`, `SlideUp`, `LightFade`, `ZoomIn`;
+- `fgColor` и `bgColor` — цвета;
+- `durationMs` — длительность анимации;
+- `x`, `y` — позиция.
+
+Отдельно можно настроить размеры:
+
+```cpp
+ui.logoTitleSizePx(36);
+ui.logoSubtitleSizePx(20);
+```
+
+## 6.7. Кастомные шрифты
+
+Для обычного использования это не нужно, но API есть:
+
+```cpp
+FontId id = ui.registerFont(
+    atlasData,
+    atlasWidth, atlasHeight,
+    distanceRange,
+    nominalSizePx,
+    ascender, descender, lineHeight,
+    glyphs,
+    glyphCount
+);
+
+ui.setFont(id);
 ```
 
 ---
 
-# Рисование фигур (Fluent API)
+# 7. Рисование: Fluent API
 
-Весь API примитивов (прямоугольники, градиенты, линии, окружности, дуги, эллипсы, треугольники, сквиркли, блюр, свечение, индикаторы страниц) построен по единому **Fluent Interface**: вы вызываете метод без аргументов, задаёте параметры цепочкой вызовов и завершаете вызовом `.draw()`.
-
-## Стиль вызова
-
-Цепочки рекомендуется записывать **по одному вызову на строку**, с выравниванием по точке — так проще читать и править:
+Общий стиль у builder-ов один:
 
 ```cpp
 ui.fillRect()
-    .at(180, 53)
-    .size(23, 72)
-    .color(ui.rgb(255, 0, 72))
+    .pos(20, 40)
+    .size(100, 40)
+    .color(ui.rgb(0, 120, 255))
     .draw();
 ```
 
-Имена методов намеренно полные и однозначные: `radius`, `topLeftColor`, `point0`, `startDeg`, `bottomRightColor` и т.д., чтобы код читался без обращения к документации. Параметры в цепочке задаются в логичном порядке (позиция → размер → цвет/опции), завершение — вызовом `.draw()`.
+Рекомендуемый стиль:
 
-## О суффиксе Impl
+- `pos(...)` или `from(...)`
+- потом `size(...)` / `radius(...)`
+- потом цвет и опции
+- в конце `.draw()`
 
-Функции с суффиксом `Impl` (например, `fillRectImpl`, `drawGlowRoundRectImpl`) — **внутренняя реализация** библиотеки: в них вынесена фактическая отрисовка (заливка буфера, градиенты, блюр и т.д.). Вызывают их **только** fluent-билдеры при вызове `.draw()`. В пользовательском коде вы **не вызываете** `*Impl` напрямую — публичный контракт API составляют исключительно fluent-цепочки (`fillRect().at(...).size(...).color(...).draw()` и аналоги).
+## 7.1. Прямоугольники
 
----
-
-## fillRect — заливка прямоугольника
+Заливка:
 
 ```cpp
 ui.fillRect()
-    .at(-1, 50)                    // x, y (-1 = центр по горизонтали/вертикали)
-    .size(200, 100)                // ширина, высота
-    .color(ui.rgb(0, 0, 255))     // цвет заливки (RGB888)
+    .pos(20, 40)
+    .size(100, 40)
+    .color(ui.rgb(0, 120, 255))
     .draw();
 ```
 
-- **`at(x, y)`** — левый верхний угол. `x == -1` или `y == -1` — авто-центрирование по экрану с учётом статус-бара.
-- **`size(width, height)`** — размеры в пикселях.
-- **`color(color888)`** — цвет (удобно задавать через `ui.rgb(r, g, b)`).
-
----
-
-## fillRectAlpha — прямоугольник с прозрачностью
+Контур:
 
 ```cpp
-ui.fillRectAlpha()
-    .at(170, 170)
-    .size(140, 60)
-    .color(ui.rgb(0, 0, 0))
-    .alpha(140)                   // 0..255
+ui.drawRect()
+    .pos(20, 90)
+    .size(100, 40)
+    .color(ui.rgb(255, 255, 255))
+    .radius({10})
     .draw();
 ```
 
-- **`alpha(value)`** — непрозрачность заливки (0 = полностью прозрачно, 255 = непрозрачно).
+`drawRect()` и `fillRect()` умеют:
 
----
+- `radius({r})` — один радиус для всех углов;
+- `radius({tl, tr, br, bl})` — отдельные радиусы по углам.
 
-## Градиенты прямоугольников
+## 7.2. Градиенты
 
-Градиенты рисуются с внутренним сглаживанием (FRC/dithering), чтобы на RGB565‑дисплеях не было «лесенок» на переходах.
-
-### Вертикальный градиент
+Вертикальный:
 
 ```cpp
-ui.fillRectGradientVertical()
-    .at(10, 30)
-    .size(140, 60)
+ui.gradientVertical()
+    .pos(20, 20)
+    .size(120, 40)
     .topColor(ui.rgb(255, 0, 72))
     .bottomColor(ui.rgb(0, 87, 250))
     .draw();
 ```
 
-### Горизонтальный градиент
+Горизонтальный:
 
 ```cpp
-ui.fillRectGradientHorizontal()
-    .at(170, 30)
-    .size(140, 60)
+ui.gradientHorizontal()
+    .pos(20, 70)
+    .size(120, 40)
     .leftColor(ui.rgb(255, 128, 0))
     .rightColor(ui.rgb(80, 255, 120))
     .draw();
 ```
 
-### Четыре угла (билинейный градиент)
+4 угла:
 
 ```cpp
-ui.fillRectGradient4()
-    .at(10, 100)
-    .size(140, 60)
+ui.gradientCorners()
+    .pos(20, 120)
+    .size(120, 40)
     .topLeftColor(ui.rgb(255, 0, 72))
     .topRightColor(ui.rgb(0, 87, 250))
     .bottomLeftColor(ui.rgb(80, 255, 120))
@@ -193,181 +530,172 @@ ui.fillRectGradient4()
     .draw();
 ```
 
-### Диагональный градиент (угол → угол)
+Диагональный:
 
 ```cpp
-ui.fillRectGradientDiagonal()
-    .at(170, 100)
-    .size(140, 60)
+ui.gradientDiagonal()
+    .pos(20, 170)
+    .size(120, 40)
     .topLeftColor(ui.rgb(255, 255, 255))
-    .bottomRightColor(ui.rgb(40, 40, 40))
+    .bottomRightColor(ui.rgb(30, 30, 30))
     .draw();
 ```
 
-### Радиальный градиент
+Радиальный:
 
 ```cpp
-ui.fillRectGradientRadial()
-    .at(10, 170)
-    .size(140, 60)
-    .center(80, 200)              // центр градиента внутри прямоугольника
-    .radius(48)                   // радиус перехода
+ui.gradientRadial()
+    .pos(20, 220)
+    .size(120, 60)
+    .center(80, 250)
+    .radius(40)
     .innerColor(ui.rgb(255, 255, 255))
     .outerColor(ui.rgb(0, 87, 250))
     .draw();
 ```
 
----
+## 7.3. Линия и фигуры
 
-## Линия
+Линия:
 
 ```cpp
 ui.drawLine()
-    .from(12, 90)
-    .to(118, 160)
+    .from(20, 20)
+    .to(140, 60)
     .color(ui.rgb(255, 255, 255))
     .draw();
 ```
 
-- **`from(x0, y0)`** — начало отрезка.
-- **`to(x1, y1)`** — конец отрезка.
-
----
-
-## Окружность: контур и заливка
+Круг:
 
 ```cpp
 ui.fillCircle()
-    .at(50, 55)
+    .pos(50, 50)
     .radius(18)
     .color(ui.rgb(0, 87, 250))
     .draw();
 
 ui.drawCircle()
-    .at(50, 55)
+    .pos(50, 50)
     .radius(18)
     .color(ui.rgb(255, 255, 255))
     .draw();
 ```
 
-- **`at(cx, cy)`** — центр окружности.
-- **`radius(radius)`** — радиус в пикселях.
-
----
-
-## Дуга
+Дуга:
 
 ```cpp
 ui.drawArc()
-    .at(170, 135)
+    .pos(100, 80)
     .radius(28)
-    .startDeg(-90.0f)             // начальный угол в градусах
-    .endDeg(90.0f)                // конечный угол
+    .startDeg(-90.0f)
+    .endDeg(90.0f)
     .color(ui.rgb(80, 255, 120))
     .draw();
 ```
 
-- **`startDeg(degrees)`** / **`endDeg(degrees)`** — углы в градусах (0 = право, отсчёт против часовой стрелки).
-
----
-
-## Эллипс: контур и заливка
+Эллипс:
 
 ```cpp
 ui.fillEllipse()
-    .at(140, 55)
+    .pos(120, 50)
     .radiusX(28)
     .radiusY(16)
     .color(ui.rgb(255, 0, 72))
     .draw();
-
-ui.drawEllipse()
-    .at(140, 55)
-    .radiusX(28)
-    .radiusY(16)
-    .color(ui.rgb(255, 255, 255))
-    .draw();
 ```
 
-- **`radiusX(rx)`** / **`radiusY(ry)`** — полуоси по горизонтали и вертикали.
-
----
-
-## Треугольник: контур и заливка
+Треугольник:
 
 ```cpp
 ui.fillTriangle()
-    .point0(220, 72)
-    .point1(250, 40)
-    .point2(280, 72)
+    .point0(40, 120)
+    .point1(70, 80)
+    .point2(100, 120)
     .color(ui.rgb(0, 200, 120))
-    .draw();
-
-ui.drawTriangle()
-    .point0(220, 72)
-    .point1(250, 40)
-    .point2(280, 72)
-    .color(ui.rgb(255, 255, 255))
     .draw();
 ```
 
-- **`point0(x, y)`**, **`point1(x, y)`**, **`point2(x, y)`** — три вершины треугольника.
-
----
-
-## Сквиркль (скруглённый квадрат): контур и заливка
+Сквиркль:
 
 ```cpp
 ui.fillSquircle()
-    .at(70, 135)
+    .pos(80, 160)
     .radius(26)
     .color(ui.rgb(255, 128, 0))
     .draw();
-
-ui.drawSquircle()
-    .at(70, 135)
-    .radius(26)
-    .color(ui.rgb(255, 255, 255))
-    .draw();
 ```
 
-- **`at(cx, cy)`** — центр фигуры.
-- **`radius(radius)`** — «радиус» сквиркля (размер от центра до края).
+## 7.4. Blur
 
----
-
-## Блюр-полоска
-
-Рисует размытую полосу (для фона под движущимися объектами и т.п.):
+Рисование blur-области:
 
 ```cpp
-ui.drawBlurRegion()
-    .at(0, bandY)
-    .size(width, height)
+ui.drawBlur()
+    .pos(0, 180)
+    .size(240, 40)
     .radius(10)
-    .direction(TopDown)           // TopDown / BottomUp / LeftRight / RightLeft
-    .gradient(false)
+    .direction(TopDown)
+    .gradient(true)
     .materialStrength(160)
     .noiseAmount(40)
-    .materialColor(ui.rgb(10, 10, 10))
+    .materialColor(-1)
     .draw();
 ```
 
-- **`radius(value)`** — радиус размытия.
-- **`direction(dir)`** — направление градиента затухания блюра.
-- **`gradient(bool)`** — плавное затухание по направлению.
-- **`materialStrength`** / **`noiseAmount`** — сила «материала» и шума.
-- **`materialColor(color888)`** — оттенок наложенного слоя (-1 = фон GUI).
+Для обновления части экрана:
 
-Для инкрементального обновления (с перерисовкой только изменённой области) используется **`updateBlurStrip()`** с теми же методами цепочки и завершением `.draw()`.
+```cpp
+ui.updateBlur()
+    .pos(0, 180)
+    .size(240, 40)
+    .radius(10)
+    .direction(TopDown)
+    .draw();
+```
+
+## 7.5. Glow
+
+Круг:
+
+```cpp
+ui.drawGlowCircle()
+    .pos(60, 90)
+    .radius(18)
+    .fillColor(ui.rgb(255, 255, 255))
+    .glowColor(ui.rgb(0, 120, 255))
+    .glowSize(16)
+    .glowStrength(220)
+    .anim(Pulse)
+    .pulsePeriodMs(1200)
+    .draw();
+```
+
+Прямоугольник:
+
+```cpp
+ui.drawGlowRect()
+    .pos(30, 140)
+    .size(120, 46)
+    .radius(12)
+    .fillColor(ui.rgb(20, 20, 20))
+    .glowColor(ui.rgb(0, 120, 255))
+    .glowSize(14)
+    .glowStrength(220)
+    .draw();
+```
+
+Для in-place обновления есть `updateGlowCircle()` и `updateGlowRect()`.
 
 ---
 
-## Scroll dots (индикатор страниц)
+# 8. Виджеты
+
+## 8.1. Scroll dots
 
 ```cpp
 ui.drawScrollDots()
-    .at(center, 150)
+    .pos(center, 220)
     .count(5)
     .activeIndex(2)
     .prevIndex(1)
@@ -382,1208 +710,500 @@ ui.drawScrollDots()
     .draw();
 ```
 
-- **`count(n)`** — количество точек.
-- **`activeIndex`** / **`prevIndex`** — текущая и предыдущая активная страница (для анимации).
-- **`animProgress`** — прогресс анимации 0..1.
-- **`animate`** / **`animDirection`** — включение и направление анимации перехода.
-- **`activeColor`** / **`inactiveColor`** — цвет активной «капсулы» и неактивных точек.
-- **`dotRadius`**, **`spacing`**, **`activeWidth`** — размер точки, шаг между центрами, ширина активной капсулы.
+Есть и `updateScrollDots()` с теми же параметрами.
 
-Аналогично: **`updateScrollDots()`** с той же цепочкой для инкрементального обновления.
+## 8.2. Универсальная кнопка
 
----
-
-## Glow-эффект (свечение)
-
-### Круг со свечением
+Состояние:
 
 ```cpp
-ui.drawGlowCircle()
-    .at(60, 90)
-    .radius(16)
-    .fillColor(ui.rgb(255, 40, 40))
-    .bgColor(bg)                  // -1 = фон GUI
-    .glowColor(-1)                // -1 = авто от fillColor
-    .glowSize(14)
-    .glowStrength(240)
-    .anim(Pulse)                  // None / Pulse
-    .pulsePeriodMs(900)
+static ButtonVisualState saveBtn{};
+```
+
+Обновление анимации:
+
+```cpp
+ui.updateButtonPress(saveBtn, isDown);
+```
+
+Отрисовка:
+
+```cpp
+ui.drawButton()
+    .label("Save")
+    .pos(center, 180)
+    .size(120, 40)
+    .baseColor(ui.rgb(0, 120, 255))
+    .radius(10)
+    .state(saveBtn)
     .draw();
 ```
 
-- **`fillColor`** — цвет заливки круга.
-- **`bgColor`** / **`glowColor`** — фон для смешивания и цвет ореола (-1 = авто).
-- **`glowSize`** — толщина свечения в пикселях.
-- **`glowStrength`** — интенсивность 0..255.
-- **`anim`** — `None` или `Pulse` (пульсация).
-- **`pulsePeriodMs`** — период пульсации в мс.
+Для частичного обновления есть `updateButton()`.
 
-Для инкрементальной отрисовки используется **`updateGlowCircle()`** с той же цепочкой.
+## 8.3. Toggle switch
 
-### Скруглённый прямоугольник со свечением
+Состояние:
 
 ```cpp
-ui.drawGlowRoundRect()
-    .at(center, 70)
-    .size(110, 56)
-    .radius(14)
-    .fillColor(ui.rgb(80, 150, 255))
-    .bgColor(bg)
-    .glowColor(-1)
-    .glowSize(12)
-    .glowStrength(220)
-    .anim(Pulse)
-    .pulsePeriodMs(1400)
+static ToggleSwitchState sw{};
+```
+
+Обновление логики:
+
+```cpp
+// btn.update() уже вызван в этом кадре
+bool changed = ui.updateToggleSwitch(sw, btn.wasPressed());
+if (changed)
+    ui.requestRedraw();
+```
+
+Отрисовка:
+
+```cpp
+ui.drawToggleSwitch()
+    .pos(center, 140)
+    .size(78, 36)
+    .state(sw)
+    .activeColor(ui.rgb(21, 180, 110))
     .draw();
 ```
 
-- **`radius(value)`** — радиус скругления углов прямоугольника.
-- Остальные параметры — по смыслу как у `drawGlowCircle`.
+`inactiveColor(...)` и `knobColor(...)` задаются по желанию.
 
-Для инкрементальной отрисовки — **`updateGlowRoundRect()`** с той же цепочкой.
+## 8.4. Прогресс-бар
+
+```cpp
+ui.drawProgressBar()
+    .pos(20, 220)
+    .size(180, 16)
+    .value(65)
+    .baseColor(ui.rgb(30, 30, 30))
+    .fillColor(ui.rgb(0, 120, 255))
+    .radius(8)
+    .anim(Shimmer)
+    .draw();
+```
+
+Текст над прогрессом:
+
+```cpp
+ui.drawProgressText(20, 246, 180, 20, "Downloading",
+                    ui.rgb(255, 255, 255), ui.rgb(0, 0, 0),
+                    AlignCenter, 14);
+
+ui.drawProgressPercent(20, 268, 180, 20, 65,
+                       ui.rgb(255, 255, 255), ui.rgb(0, 0, 0),
+                       AlignCenter, 14);
+```
+
+## 8.5. Круговой прогресс-бар
+
+```cpp
+ui.drawCircularProgressBar()
+    .pos(center, 140)
+    .radius(34)
+    .thickness(8)
+    .value(72)
+    .baseColor(ui.rgb(30, 30, 30))
+    .fillColor(ui.rgb(0, 120, 255))
+    .anim(None)
+    .draw();
+```
+
+## 8.6. Drum roll
+
+Горизонтальный:
+
+```cpp
+String options[] = {"Low", "Medium", "High"};
+
+ui.drawDrumRollHorizontal(
+    20, 60, 200, 40,
+    options, 3,
+    1, 0,          // selectedIndex, prevIndex
+    0.4f,          // animProgress
+    ui.rgb(255, 255, 255),
+    ui.rgb(0, 0, 0),
+    16
+);
+```
+
+Вертикальный есть отдельной функцией `drawDrumRollVertical(...)`.
 
 ---
 
-# HAL платформа (pipCore)
+# 9. Списки и плитки
 
-`pipGUI` не должен знать ничего про железо напрямую.
-Вся платформо-зависимая часть (время, подсветка/PWM, сохранение яркости) живёт в `pipCore`.
+## 9.1. Списочное меню
 
-## 1. Подключение платформы в прошивке
-
-Для ESP32 используй готовую реализацию:
+Конфигурация:
 
 ```cpp
-#include <pipGUI/core/api/pipGUI.hpp>
-#include <pipCore/Platforms/ESP32/GUI.hpp>
-
-static pipcore::ESP32Platform platform;
-static pipgui::GUI ui;
-
-void setup() {
-  ui.setPlatform(&platform);
-  ui.configureDisplay(/* ... */);
-  ui.begin(/* ... */);
-}
-```
-
----
-
-# Кнопки (ввод)
-
-## 1. Создание кнопок
-
-```cpp
-using namespace pipgui;
-
-Button btnNext(2, Pulldown);
-Button btnPrev(4, Pulldown);
-```
-
-Доступны параметры `Pullup`, `Pulldown`.
-
-## 2. Инициализация
-
-В `setup()` нужно вызвать `begin()` для каждой кнопки:
-
-```cpp
-void setup()
-{
-    btnNext.begin();
-    btnPrev.begin();
-}
-```
-
-## 3. Обновление в loop() и события
-
-Рекомендуемый вариант (самый быстрый отклик): вызывать `update()` как можно чаще (обычно каждый проход `loop()`), а событие брать через `wasPressed()`:
-
-```cpp
-void loop()
-{
-    btnNext.update();
-    btnPrev.update();
-
-    if (btnNext.wasPressed())
-        ui.nextScreen();
-
-    if (btnPrev.wasPressed())
-        ui.prevScreen();
-
-    ui.loop();
-}
-```
-
-Текущее состояние удержания:
-
-```cpp
-bool nextDown = btnNext.isDown();
-```
-
-## 4. Насколько быстро реагирует кнопка
-
-Внутри `Button` используется debounce на основе Vertical Counter (очень быстрый и устойчивый к шуму).
-Переключение стабильного состояния происходит примерно после **4 подряд** подтверждённых сэмплов.
-
-Задержка реакции зависит от частоты вызова `update()`:
-
-- Если `update()` вызывается:
-  - каждые ~`1 ms` → отклик ~`4 ms`
-  - каждые ~`5 ms` → ~`20 ms`
-  - каждые ~`10 ms` → ~`40 ms`
-
----
-
-# Дисплей (инициализация)
-
-## 1. configureDisplay
-
-`configureDisplay` сохраняет конфигурацию дисплея внутри `GUI` и передаёт её в `platform()->guiConfigureDisplay(...)`.
-
-```cpp
-ui.configureDisplay()
-    .pins(11, 12, 10, 9, -1)      // mosi, sclk, cs, dc, rst
-    .size(240, 320)               // width, height
-    .hz(80000000)                 // частота дисплея
-    .order("RGB")                 // "RGB" (по умолчанию) или "BGR" если цвета неверны
-    .invert(true)                 // инверсия (по умолчанию включена)
-    .swap(false)                  // swap байтов RGB565 (если цвета/картинка "битые")
+ui.configureList()
+    .screen(ScreenMainMenu)
+    .parent(ScreenHome)
+    .items({
+        {"Settings", "Device configuration", ScreenSettings},
+        {"About",    "Firmware info",        ScreenAbout},
+        {"Restart",  "Reboot device",        ScreenRestart}
+    })
+    .cardColor(ui.rgb(12, 12, 12))
+    .activeColor(ui.rgb(0, 120, 255))
+    .radius(8)
+    .cardSize(0, 0)
+    .mode(Cards)
     .apply();
 ```
 
-Важно:
-
-- `width` и `height` должны быть заданы (иначе платформа вернёт `false` при `begin()`).
-- Пины можно не задавать (оставить `-1`) — тогда низкоуровневый драйвер попробует использовать дефолтные для платформы.
-- `hz` задавать не обязательно, по умолчанию `80MHz`.
-- `invert` задавать не обязательно, по умолчанию `true`.
-
-
-## 2. begin
-
-Инициализация дисплея и GUI-рендера.
+Ввод в `loop()`:
 
 ```cpp
-ui.begin(
-    3,       // поворот (0..3)
-    0x0000   // bgColor (RGB565)
-);
+// btnNext.update() и btnPrev.update() уже вызваны в начале этого loop()
+ui.listInput(ScreenMainMenu)
+    .nextDown(btnNext.isDown())
+    .prevDown(btnPrev.isDown())
+    .apply();
 ```
 
-Важно:
-
-- `setPlatform(...)` должен быть вызван ДО `begin()`.
-- Если платформа не задана, `setBacklightPin(...)` ничего не настроит.
-
-## 2. Как сделать свою платформу
-
-Сделай класс-наследник `pipcore::GuiPlatform` и реализуй минимум `nowMs()`.
-Остальное опционально.
+Отрисовка в screen-callback:
 
 ```cpp
-class MyPlatform final : public pipcore::GuiPlatform {
-public:
-  uint32_t nowMs() override { return myMonotonicMs(); }
-  void setBacklightPercent(uint8_t percent) override { myBacklight(percent); }
-};
-```
-
----
-
-# Яркость
-
-- **`setBacklightCallback(cb)`** - передаёте функцию, которая **физически выставляет яркость** (PWM, драйвер и т.п.).
-  - Аргумент `level` - `0..100` процентов яркости. 0 - экран погашен, 100 - логический максимум.
-- **`setBacklightPin(pin, channel = 0, freqHz = 5000, resolutionBits = 12)`** - настройка подсветки через HAL платформу.
-  - на ESP32 это реализовано в `pipcore::ESP32Platform` через LEDC;
-  - в прошивке достаточно вызвать `ui.setPlatform(&platform)` и затем `ui.setBacklightPin(pin)`.
-- **`setMaxBrightness(percent)`** - задаёте **глобальный максимум** яркости в процентах `0..100` (например, можно ограничить максимум 70%).
-- **`maxBrightness()`** - позволяет **прочитать текущее значение максимума** (в процентах).
-
-Таким образом:
-
-- `GUI` сам считает анимацию и даёт вам **уровень яркости** `0..maxBrightness()` в процентах `0..100`;
-- ваш код через колбэк **выставляет физическую яркость**, переводя проценты в конкретные единицы ШИМ/драйвера;
-- при использовании `setBacklightPin(...)` на ESP32 платформа (`pipCore`) сама переводит проценты в PWM и сохраняет выбранный максимум яркости между перезагрузками.
-
----
-
-# Экранные меню
-
-Внутри `GUI` есть простая система **экранов** (screen), каждый экран - это обычная функция‑колбэк.
-
-```cpp
-void screenMain(GUI &ui)    { /* рисуем главный экран */ }
-void screenSettings(GUI &ui){ /* меню настроек        */ }
-void screenInfo(GUI &ui)    { /* инфо‑экран           */ }
-
-void setup() {
-  // ... инициализация GUI ...
-
-  ui.regScreen(0, screenMain);     // id = 0
-  ui.regScreen(1, screenSettings); // id = 1
-  ui.regScreen(2, screenInfo);     // id = 2
-
-  ui.setScreen(0);   // стартовый экран
-}
-```
-
-- `regScreen(id, cb)` - привязка числового id к функции экрана.
-- `setScreen(id)` - мгновенно переключиться на экран `id` (без анимации).
-- `nextScreen()` / `prevScreen()` - перейти на следующий/предыдущий зарегистрированный экран.
-- `currentScreen()` - вернуть текущий id.
-
-## 1. Как обновляется экран внутри `loop()`
-
-В основном цикле нужно просто звать `ui.loop()` и по необходимости просить перерисовку:
-
-```cpp
-void loop() {
-  ui.loop();          // GUI сам проверит, нужно ли перерисовать текущий экран
-
-  // Пример: переключение экранов по кнопкам
-  if (nextButtonPressed)
-    ui.nextScreen();  // запустит анимацию перехода (если включена)
-
-  if (needUpdateClock) {
-    ui.setStatusBarText("pipGUI", timeString, "");
-    ui.requestRedraw();   // попросили перерисовку текущего экрана
-  }
-}
-```
-
-- Экран будет перерисован, когда:
-  - вы сменили экран (`setScreen/nextScreen/prevScreen`),
-  - вызвали `requestRedraw()`,
-  - или когда идёт внутренняя анимация (логотип, ошибка, уведомление, переход).
-
-## 2. Анимации переходов между экранами
-
-Помимо анимации логотипа, в `GUI` есть анимации переходов между экранами.
-
-```cpp
-ui.setScreenAnimation(
-    Slide, // тип анимации
-    250    // длительность в мс
-);
-```
-
-- `None` - без анимации, мгновенная смена экрана.
-- `Slide` - плавный слайд между экранами с лёгким масштабированием (если спрайты доступны).
-
-- создаёт снимок старого и нового экранов во внутренних спрайтах;
-- крутит анимацию в `ui.loop()` до завершения;
-- затем фиксирует новый текущий экран.
-
-Если спрайты нельзя создать (не хватает памяти), библиотека автоматически откатывается на простой переход без анимации.
-
----
-
-# Списочные меню
-
-`GUI` умеет рисовать вертикальные списки пунктов в виде карточек с заголовком и описанием.
-
-## 1. Конфигурация списка на экране
-
-```cpp
-void setupMainMenu()
+SCREEN(ScreenMainMenu, 1)
 {
-    ui.configureListMenu(
-        SCREEN_MAIN_MENU,  // экран, где будет список
-        SCREEN_HOME,       // родительский экран (назад по long press PREV)
-        {
-            { "Settings", "Device configuration", SCREEN_SETTINGS },
-            { "About",    "Firmware info",        SCREEN_ABOUT    },
-            { "Restart",  "Reboot device",        SCREEN_REBOOT   },
-        }
-    );
+    ui.updateList(ScreenMainMenu);
 }
 ```
 
-Внутри `configureListMenu` библиотека:
+Поведение:
 
-- копирует `title/subtitle/targetScreen` во внутренний буфер;
-- сбрасывает выделение, скролл и внутренние флаги;
-- если стиль не задан, подбирает базовый по цвету фона.
-  Объявлять `struct ListMenuItemDef` вручную не нужно —
-  она уже определена внутри `GUI`, вы просто передаёте список
-  элементов в фигурных скобках, как в примере выше.
-
-## 3. Стиль карточек списка
-
-```cpp
-ui.setListMenuStyle(
-    SCREEN_MAIN_MENU,
-    ui.rgb(12, 12, 12),  // cardColor: фон невыделенной карточки
-    ui.rgb(0, 130, 220), // cardActiveColor: фон выделенной карточки
-    8,                   // spacing: расстояние между карточками по вертикали
-    10,                  // radius: радиус скругления
-    0,                   // cardWidth: 0 = авто (оставить по ~5 px отступа слева/справа)
-    0,                   // cardHeight: 0 = авто (по умолчанию ≈50 px, с адаптацией под высоту экрана)
-    0,                   // titleFontPx: 0 = авто
-    0,                   // subtitleFontPx: 0 = авто (≈70% от заголовка)
-    0,                   // lineGapPx: 0 = авто (≈ title/3)
-    Cards                 // mode: Cards / Plain
-);
-```
+- короткое отпускание `NEXT` переключает пункт вперёд;
+- короткое отпускание `PREV` переключает пункт назад;
+- удержание `NEXT` открывает `targetScreen` выбранного пункта;
+- удержание `PREV` возвращает на `parentScreen`.
 
 Режимы списка:
 
-- `Cards` — карточки с заголовком и (если `subtitle` не пустой) описанием.
-- `Plain` — упрощённый список: **только заголовки** и **активная плашка**.
+- `Cards`
+- `Plain`
 
-Поля стиля:
+## 9.2. Плиточное меню
 
-- `cardColor` - цвет невыделенной карточки.
-- `cardActiveColor` - цвет выделенной карточки.
-- `spacing` - расстояние между карточками по вертикали.
-- `radius` - радиус скругления.
-- `cardWidth` - явная ширина карточки в пикселях (`0` = авто‑подбор от ширины экрана, с отступами ≈5 px по краям).
-- `cardHeight` - явная высота карточки (`0` = базовое значение ≈50 px с авто‑адаптацией по высоте экрана).
-- `titleFontPx` - размер PSDF‑шрифта заголовка (0 = авто, как в списочном меню).
-- `subtitleFontPx` - размер PSDF‑шрифта описания (0 = авто, ≈70% от заголовка).
-- `lineGapPx` - расстояние между заголовком и описанием (0 = авто, ≈ title/3).
-
-Если любой из этих параметров равен `0`, библиотека **сама подбирает** значение:
-
-- без описания: заголовок ~20 px;
-- с описанием: заголовок ~18 px, описание ~70% от заголовка, зазор ~⅓ от размера заголовка.
-
-При смене стиля библиотека очищает кеш отрисовки списка, чтобы избежать артефактов.
-
-## 4. Обработка ввода (навигация по списку)
+Конфигурация:
 
 ```cpp
-// Опрашиваем физические кнопки в loop()
-bool nextDown = btnNext.isDown();  // "вперёд" / вниз по списку
-bool prevDown = btnPrev.isDown();  // "назад" / вверх по списку
-
-// События короткого клика (по желанию)
-bool nextPressed = btnNext.wasPressed();
-bool prevPressed = btnPrev.wasPressed();
-
-ui.handleListMenuInput(
-    SCREEN_MAIN_MENU,  // screenId
-    nextPressed,
-    prevPressed,
-    nextDown,
-    prevDown
-);
+ui.configureTile()
+    .screen(ScreenTiles)
+    .parent(ScreenHome)
+    .items({
+        {"Main",     "Главный экран", ScreenHome},
+        {"Settings", "Настройки",     ScreenSettings},
+        {"Info",     "Инфо",          ScreenInfo},
+        {"Graph",    "Графики",       ScreenGraph}
+    })
+    .cardColor(ui.rgb(16, 16, 16))
+    .activeColor(ui.rgb(0, 120, 255))
+    .radius(12)
+    .spacing(10)
+    .columns(2)
+    .tileSize(100, 70)
+    .lineGap(5)
+    .mode(TextSubtitle)
+    .apply();
 ```
 
-Поведение по умолчанию:
-
-- Короткое нажатие **NEXT** - перейти к следующему пункту (циклически по кругу).
-- Короткое нажатие **PREV** - перейти к предыдущему пункту (тоже циклично).
-- Долгое удержание **NEXT** (≈400 мс) - открыть экран `targetScreen` для текущего пункта.
-- Долгое удержание **PREV** (≈400 мс) - вернуться на `parentScreen`.
-
-При изменении выбранного пункта `GUI` помечает активность скролла (для анимации скролл-бара)
-и вызывает `requestRedraw()`, чтобы экран перерисовался.
-
-## 5. Отрисовка списка внутри экрана
+Ввод:
 
 ```cpp
-void screenMainMenu(GUI &ui)
+// btnNext.update() и btnPrev.update() уже вызваны в начале этого loop()
+ui.tileInput(ScreenTiles)
+    .nextDown(btnNext.isDown())
+    .prevDown(btnPrev.isDown())
+    .apply();
+```
+
+Отрисовка:
+
+```cpp
+SCREEN(ScreenTiles, 2)
 {
-    ui.renderListMenu(SCREEN_MAIN_MENU);
+    ui.renderTile(ScreenTiles);
 }
 ```
 
-- `renderListMenu(screenId)` сам рассчитывает геометрию карточек с учётом статус-бара и размера экрана;
-- поддерживает плавный вертикальный скролл (карточки выезжают/заезжают мягко);
-- центрирует блок списка по горизонтали.
+Режимы плитки:
 
-### 3.6. Кеширование отрисовки
+- `TextOnly`
+- `TextSubtitle`
 
-Список использует внутренний кеш отрисованных карточек:
+## 9.3. Кастомная раскладка плиток
 
-- для каждого пункта меню создаются до **двух** буферов: обычное (`normal`) и активное (`active`) состояние;
-- карточка один раз отрисовывается во внутренний спрайт: фон + заголовок + описание;
-- пиксели спрайта сохраняются в `uint16_t`-буфер и дальше бласятся через `pushImage` при скролле;
-- при изменении размера карточки или конфигурации списка кеш автоматически очищается и пересоздаётся.
+Если стандартной сетки мало, можно описать layout строками:
+
+```cpp
+ui.configureTile()
+    .screen(ScreenTiles)
+    .items({
+        {"Main",     "Главный экран", ScreenHome},
+        {"Settings", "Настройки",     ScreenSettings},
+        {"Info",     "Инфо",          ScreenInfo},
+        {"Graph",    "Графики",       ScreenGraph}
+    })
+    .layout({
+        "AA",
+        "BC",
+        "BD"
+    })
+    .apply();
+```
+
+Это advanced-режим. Для большинства экранов хватает обычных `columns(...)`, `spacing(...)` и `tileSize(...)`.
 
 ---
 
-# Плиточные меню
+# 10. Графики
 
-Плиточное меню - это сетка карточек (тайлов) с заголовком и, опционально, описанием. Структура и логика максимально похожи на списочное меню, но пункты раскладываются по рядам и колонкам.
-
-## 1. Конфигурация плиточного меню на экране
-
-```cpp
-void setupTileMenu()
-{
-    ui.configureTileMenu(
-        SCREEN_TILE_MENU,  // экран, где будет сетка плиток
-        SCREEN_HOME,       // родительский экран (назад по long press PREV)
-        {
-            { "Main",    "Главный экран",     SCREEN_MAIN },
-            { "Settings","Настройки",          SCREEN_SETTINGS },
-            { "Info",    "Инфо",               SCREEN_INFO },
-            { "Graph",   "Графики",            SCREEN_GRAPH },
-        }
-    );
-}
-```
-
-Внутри `configureTileMenu` библиотека:
-
-- копирует `title/subtitle/targetScreen` во внутренний буфер;
-- сбрасывает выделенный индекс и флаги long press;
-- если стиль не задан, подбирает базовые цвета и отступы по фону экрана.
-
-## 2. Стиль плиток
-
-```cpp
-ui.setTileMenuStyle(
-    SCREEN_TILE_MENU,
-    ui.rgb(16, 16, 16),   // cardColor: фон обычной плитки
-    ui.rgb(0, 130, 220),  // cardActiveColor: фон выбранной плитки
-    13,                     // radius: радиус скругления
-    10,                     // spacing: зазор между плитками (и по X, и по Y)
-    2,                      // columns: сколько плиток в ряд (0/1 = авто)
-    100,                    // tileWidth: ширина плитки (0 = авто по содержимому)
-    70,                     // tileHeight: высота плитки (0 = авто по содержимому)
-    20,                     // titleFontPx: размер шрифта заголовка (0 = авто)
-    14,                     // subtitleFontPx: размер подзаголовка (0 = авто)
-    5,                      // lineGapPx: расстояние между строками (0 = авто)
-    TextSubtitle);          // режим содержимого (заголовок + подзаголовок)
-```
-
-Поля стиля:
-
-- `cardColor` - цвет обычной плитки.
-- `cardActiveColor` - цвет выбранной плитки.
-- `radius` - радиус скругления углов.
-- `spacing` - расстояние между плитками по горизонтали и вертикали.
-- `columns` - сколько плиток рисовать в одной строке. При `0` или `1` библиотека воспринимает это как одну колонку.
-- `tileWidth` - явная ширина плитки (`0` = авто‑подбор по ширине области + учёт `columns` и `spacing`).
-- `tileHeight` - явная высота плитки (`0` = авто‑подбор по высоте области + учёт количества рядов и `spacing`).
-- `titleFontPx` - размер PSDF‑шрифта заголовка (0 = авто, как в списочном меню).
-- `subtitleFontPx` - размер PSDF‑шрифта описания (0 = авто, ≈70% от заголовка).
-- `lineGapPx` - расстояние между заголовком и описанием (0 = авто, ≈ title/3).
-- `contentMode` - режим содержимого:
-  - `TextOnly` - только заголовок;
-  - `TextSubtitle` - заголовок + подзаголовок (если `subtitle` не пустой).
-
-Плитки автоматически раскладываются по сетке `rows x columns`, сетка центрируется по области экрана **с учётом статус‑бара**, как и списочное меню.
-
-## 3. Обработка ввода для плиточного меню
-
-```cpp
-bool nextDown = btnNext.isDown();
-bool prevDown = btnPrev.isDown();
-
-bool nextPressed = btnNext.wasPressed();
-bool prevPressed = btnPrev.wasPressed();
-
-ui.handleTileMenuInput(
-    SCREEN_TILE_MENU,
-    nextPressed, prevPressed,
-    nextDown,
-    prevDown
-);
-```
-
-Поведение по умолчанию такое же, как у списочного меню:
-
-- короткое нажатие **NEXT** - перейти к следующей плитке (по списку, по кругу);
-- короткое нажатие **PREV** - перейти к предыдущей плитке;
-- долгое удержание **NEXT** (≈400 мс) - открыть экран `targetScreen` выделенной плитки;
-- долгое удержание **PREV** (≈400 мс) - вернуться на `parentScreen`.
-
-## 4. Отрисовка плиточного меню внутри экрана
-
-```cpp
-void screenTileMenu(GUI &ui)
-{
-    ui.renderTileMenu(SCREEN_TILE_MENU);
-}
-```
-
-- `renderTileMenu(screenId)` рассчитывает размеры плиток и сетки из стиля и размеров экрана;
-- сетка центрируется по доступной области, тайлы получают автоматику по цвету обводки (слегка светлее фона);
-- текст внутри плиток рисуется PSDF‑шрифтом.
-
-## 5. Кастомная раскладка плиток (layout-конструктор)
-
-Если стандартной сетки `rows x columns` недостаточно, можно задать свою раскладку через сетку layout
-и указать для каждого пункта меню его прямоугольник (позицию и span в клетках).
-
-```cpp
-ui.setTileMenuLayout(
-    SCREEN_TILE_MENU,
-    2, 3, // layoutCols, layoutRows
-    {
-        {0, 0, 2, 1}, // item 0: col,row,colSpan,rowSpan
-        {0, 1, 1, 1}, // item 1
-        {0, 2, 1, 1}, // item 2
-        {1, 1, 1, 2}, // item 3
-    }
-);
-```
-
-### Как это работает
-
-- **[сетка]** `layoutCols x layoutRows` — это «виртуальная» таблица клеток.
-- **[привязка]** каждая плитка `itemIndex` берёт свою геометрию из `tiles[itemIndex]`.
-- **[прямоугольник]** `TileLayoutCell{col,row,colSpan,rowSpan}` означает: плитка начинается в клетке `(col,row)` и занимает `colSpan` клеток по X и `rowSpan` клеток по Y.
-
-  Ментальная модель — это обычная матрица:
-
-  `layoutCols = 2`, `layoutRows = 3`
-
-  ```
-  row=0: (0,0) (1,0)
-  row=1: (0,1) (1,1)
-  row=2: (0,2) (1,2)
-  ```
-
-  Где:
-  - `col` растёт слева направо
-  - `row` растёт сверху вниз
-
-- **[размеры]** сначала вычисляется размер одной клетки (`unitW/unitH`) из доступной области экрана и `spacing`.
-  Затем реальный прямоугольник плитки считается так:
-  - `tileW = colSpan*unitW + (colSpan-1)*spacing`
-  - `tileH = rowSpan*unitH + (rowSpan-1)*spacing`
-- **[границы]** если вы указали выход за границы сетки — библиотека подрежет `colSpan/rowSpan`, чтобы плитка не выходила.
-- **[пересечения]** библиотека **не проверяет** пересечения плиток между собой. Если два прямоугольника перекрываются — они будут нарисованы поверх друг друга (по порядку `itemIndex`).
-
-Где `TileLayoutCell`:
-
-- `col` — колонка (0..layoutCols-1)
-- `row` — строка (0..layoutRows-1)
-- `colSpan` — сколько колонок занимает плитка (минимум 1)
-- `rowSpan` — сколько строк занимает плитка (минимум 1)
-
-Если `layoutCols/layoutRows` равны 0, кастомная раскладка выключается и используется обычная сетка `rows x columns`.
-
-### Примеры
-
-- **[grid]** обычная сетка (tile menu) — задаётся через `setTileMenuStyle(... columns=2 ...)`
-- **[layout]** «2 маленьких слева + 1 большая справа» — задаётся через `setTileMenuLayout(... 2x3 ...)`
-- **[4 cols]** «4 плитки в ряд» — задаётся через `setTileMenuStyle(... columns=4 ...)`
-
----
-
-# Графики
-
-В `GUI` есть готовый модуль графика с сеткой и несколькими линиями.
-Состояние графика (геометрия, авто‑масштаб и т.п.) библиотека хранит **внутри себя для каждого экрана**.
-
-## 1. Фон и сетка графика:
+Фон и сетка:
 
 ```cpp
 ui.drawGraphGrid(
-    center, center,        // x, y: можно указать center, чтобы выровнять по экрану
-    graphW, graphH,        // ширина и высота рамки
-    13,                    // радиус скругления
-    LeftToRight,           // направление движения (LeftToRight / RightToLeft / Oscilloscope)
-    ui.rgb(0, 0, 0),       // цвет фона
-    ui.rgb(57, 57, 57),    // цвет сетки и рамки
-    1.0f                   // скорость (зарезервировано под анимацию сетки)
+    10, 50, 220, 120,
+    8,
+    LeftToRight,
+    ui.rgb(10, 10, 10),
+    ui.rgb(40, 40, 40),
+    1.0f
 );
 ```
 
-- При `x == center`/`y == center` график автоматически центрируется по доступной области экрана.
-
-- **`dir` (GraphDirection)**:
-  - `LeftToRight` - классический режим: новые значения добавляются справа, график «едет» влево;
-  - `RightToLeft` - зеркально: новые значения добавляются слева;
-  - `Oscilloscope` - режим осциллографа: буфер заполняется слева направо и линия перерисовывается целиком по накопленным точкам (удобно для разового построения пачки сэмплов).
-
-## 2. Авто‑масштабирование
+Auto-scale:
 
 ```cpp
-ui.setGraphAutoScale(true);  // включить авто‑масштаб для ТЕКУЩЕГО экрана
+ui.setGraphAutoScale(true);
 ```
 
-При включённом авто‑масштабе функция `drawGraphLine` сама подбирает вертикальный диапазон `min/max` на основе данных и плавно подстраивает его со временем, чтобы график не дёргался.
-
-Если нужно жёстко задать диапазон (например, 0..100), авто‑масштаб можно выключить:
+Линия графика:
 
 ```cpp
-ui.setGraphAutoScale(false);
-```
-
-## 3. Линии графика
-
-Библиотека сама хранит историю значений **для каждого экрана и для каждой линии** во внутренних буферах.
-
-Поддерживается до **5 линий** на экран (`lineIndex` от `0` до `4`). Номера больше 4 просто игнорируются.
-
-```cpp
-// Где‑то в update/loop, когда есть новое значение
-int16_t value = readSensorMv();  // пример: напряжение уже приведено к мВ
-
 ui.drawGraphLine(
-    0,                     // lineIndex: номер линии (0..4)
-    value,                 // новое значение, которое нужно добавить на график
-    ui.rgb(255, 0, 0),     // цвет линии
-    0, 100                 // базовый диапазон значений (при авто‑масштабе служит стартовым min/max)
+    0,                  // index линии
+    sensorValue,
+    ui.rgb(0, 255, 140),
+    0, 100
 );
 ```
 
-- Каждый вызов `drawGraphLine(lineIndex, value, ...)` **добавляет точку** во внутренний кольцевой буфер
-  выбранной линии и **сразу перерисовывает** ломаную по последним N точкам.
-- Количество хранимых точек примерно равно ширине графика по X – лишние старые значения постепенно выкидываются.
-- При `setGraphAutoScale(true)` реальные `min/max` считаются по этим данным с небольшим запасом и
-  плавно подстраиваются между кадрами, чтобы график не дёргался.
-- При `setGraphAutoScale(false)` используется ровно тот диапазон, который вы передали в `valueMin/valueMax`.
+Есть и `updateGraphGrid(...)` / `updateGraphLine(...)`.
+
+Режимы направления:
+
+- `LeftToRight`
+- `RightToLeft`
+- `Oscilloscope`
 
 ---
 
-# Статус‑бар
+# 11. Статус-бар
 
-Статус‑бар - это узкая панель (по умолчанию сверху), которая всегда рисуется поверх экранов и учитывается при центрировании текста, графиков и уведомлений.
-
-## 1. Включение и настройка
+## 11.1. Включение
 
 ```cpp
 ui.configureStatusBar(
-    true,               // true/false - включён ли бар
-    ui.rgb(0, 0, 0),    // bgColor - цвет фона
-    18,                 // height - высота/толщина бара (для top/bottom) или ширина (для left/right)
-    Top                 // позиция: Top / Bottom / Left / Right
+    true,
+    ui.rgb(0, 0, 0),
+    18,
+    Top
 );
-```
-
-Внутри:
-
-- сохраняется флаг включения, высота и позиция;
-- **автоматически подбирается цвет текста** (чёрный/белый) по яркости фона.
-
-## 2. Текст в статус‑баре
-
-```cpp
-ui.setStatusBarText(
-    "pipGUI", // текст слева
-    "12:34",  // по центру
-    ""        // справа (можно оставить пустым)
-);
-```
-
-- Цвет текста берётся из авто‑подбора в `configureStatusBar`.
-- Статус‑бар рисует текст PSDF‑шрифтом.
-- Высота шрифта подбирается автоматически из высоты бара (`height`), чтобы текст аккуратно вписывался по вертикали.
-
-## 3. Встроенный индикатор батареи
-
-```cpp
-// Процент заряда 0..100, стиль - полоска
-ui.setStatusBarBattery(100, Bar);
-
-// Цифровой режим: число внутри батарейки
-ui.setStatusBarBattery(87, Numeric);
-
-// Спрятать батарейку
-ui.setStatusBarBattery(-1); // level < 0 => Hidden
-```
-
-- **Bar** - прямоугольная «банка» с заливкой по уровню заряда.
-- **Numeric** - внутри батарейки рисуется число процента.
-- **Hidden** - батарейка не рисуется.
-- Корпус и обводка батарейки используют тот же цвет, что и текст бара.
-- При уровне `<= 20%` заливка становится красной, иначе - зелёной.
-- Индикатор всегда прижат к правому краю статус‑бара; левее него размещаются правые иконки и текст `right`.
-
-## 4. Иконки в статус‑баре
-
-Статус‑бар умеет рисовать небольшие RGB565‑иконки слева, по центру и справа:
-
-```cpp
-extern const uint16_t wifiIcon16x16[];
-
-ui.clearStatusBarIcons();
-ui.addStatusBarIcon(Left, wifiIcon16x16, 16, 16);
 ```
 
 Позиции:
 
-- `Left`
-- `Center`
-- `Right`
+- `Top`
+- `Bottom`
 
-- Массив `bitmap` - это сырые пиксели RGB565 (`w*h` элементов).
-- Левые иконки рисуются от левого края внутрь, перед левым текстом.
-- Правые иконки - слева от батарейки (если она включена) или от правого края.
-- Центральные иконки выравниваются как единый блок с центральным текстом `center`.
+## 11.2. Стиль
 
-## 5. Кастомный отрисовщик (для продвинутых кейсов)
+```cpp
+ui.setStatusBarStyle(StatusBarStyleSolid);
+// или
+ui.setStatusBarStyle(StatusBarStyleBlurGradient);
+```
+
+## 11.3. Текст
+
+```cpp
+ui.setStatusBarText(
+    "pipGUI",
+    "12:34",
+    "Wi-Fi"
+);
+```
+
+## 11.4. Батарея
+
+```cpp
+ui.setStatusBarBattery(87, Numeric);
+ui.setStatusBarBattery(100, Bar);
+ui.setStatusBarBattery(-1, Hidden);
+```
+
+`BatteryStyle`:
+
+- `Hidden`
+- `Numeric`
+- `Bar`
+- `WarningBar`
+- `ErrorBar`
+
+## 11.5. Кастомная дорисовка
 
 ```cpp
 void statusBarCustom(GUI &ui, int16_t x, int16_t y, int16_t w, int16_t h)
 {
-  // x, y, w, h - реальные координаты и размер бара
-  auto t = ui.getDrawTarget();
-  // пример: тонкая линия-подчёркивание снизу
-  t->drawLine(x, y + h - 1, x + w, y + h - 1, TFT_DARKGREY);
+    ui.drawLine()
+        .from(x, y + h - 1)
+        .to(x + w, y + h - 1)
+        .color(ui.rgb(70, 70, 70))
+        .draw();
 }
 
 ui.setStatusBarCustom(statusBarCustom);
 ```
 
-- Сначала библиотека сама заливает фон, рисует текст `left/center/right`, иконки и батарейку.
-- Затем вызывает ваш колбэк, чтобы вы могли дорисовать что‑то поверх.
-- В большинстве случаев достаточно встроенных иконок и батарейки, кастомный рисовальщик нужен только для особых эффектов.
-
-## 6. Как статус‑бар влияет на верстку
-
-После вызова `configureStatusBar(...)` библиотека **сама учитывает панель** во всех ключевых местах:
-
-- `drawPSDFText`:
-  - при `x == -1` текст центрируется по горизонтали **внутри доступной ширины** (с учётом бара слева/справа);
-  - при `y == -1` центрируется по вертикали **внутри доступной высоты**, вычитая бар сверху/снизу.
-
-- `drawGraphGrid`:
-  - при `x == center`/`y == center` график центрируется во внутренней области экрана, исключая статус‑бар по соответствующей стороне.
-
-- уведомления (`showNotification`) рисуют карточку по центру свободной области, не перекрывая бар.
-
-Код экрана не знает ни про высоту, ни про позицию статус‑бара - `GUI` сам сдвигает контент так, чтобы всё выглядело аккуратно.
-
----
-
-# Уведомления
-
-В `GUI` есть красивая система **модальных уведомлений**:
-
-### 1. showNotification
+Вспомогательные методы:
 
 ```cpp
-// Краткий вызов: только заголовок и текст
-ui.showNotification("Settings", "Auto notification");
-
-// Расширенный вызов с кнопкой, задержкой и типом
-ui.showNotification(
-    "Settings",           // 1. Заголовок
-    "Auto notification",  // 2. Описание под заголовком
-    "OK",                 // 3. Текст кнопки (по умолчанию "OK")
-    10,                   // 4. сколько секунд ждать до разблокировки кнопки
-    Warning               // 5. тип уведомления (Normal/Warning/Error)
-);
-```
-
-- Можно вызывать из любого места (например, через таймер после входа на экран настроек).
-- Если уведомление уже активно, повторный вызов **обновит текст**, не перезапуская анимацию появления.
-  Для более важных уведомлений можно **заблокировать кнопку** на несколько секунд и показать обратный отсчёт.
-
-### 2. notificationActive
-
-```cpp
-if (!ui.notificationActive()) {
-  // здесь обычная логика переключения экранов, обработки кнопок и т.п.
-}
+int16_t h = ui.statusBarHeight();
+ui.updateStatusBar();
+ui.renderStatusBar();
 ```
 
 ---
 
-# Ошибки
+# 12. Уведомления, toast, ошибки
 
-Экран ошибок перекрывает всё приложение и рисуется до тех пор, пока ошибка активна.
-
-## 1. Типы ошибок
+## 12.1. Toast
 
 ```cpp
-ui.showError("Low battery", "Please charge", Warning);
+ui.showToast()
+    .text("Saved")
+    .duration(1500)
+    .fromTop()
+    .show();
 ```
 
-- `Warning` – мягкая ошибка, которую можно **закрыть кнопкой OK**.
-- `Crash` – критическая ошибка, экран нельзя закрыть кнопками (ожидается перезагрузка/фикс прошивки).
-
-## 2. showError
+Проверка активности:
 
 ```cpp
-void showError(title, message, type, "TEXT");
+bool active = ui.toastActive();
 ```
 
-- `title` – заголовок ошибки.
-- `message` – деталь ошибки.
-- `type` – тип ошибки (Warning/Crash).
-- `TEXT` – текст кнопки для `Warning`. Если параметр не передать, по умолчанию будет `"OK"`.
-
-### Логика
-
-- Добавляет запись в очередь ошибок и включает экран ошибок (если он ещё не активен).
-- Для нескольких ошибок типа `Crash` можно листать карточки с помощью `nextError()`.
-- Для `Warning` на экране рисуется большая иконка, заголовок/деталь и кнопка снизу.
-
-Пример из демо (критические ошибки):
+## 12.2. Notification
 
 ```cpp
-if (!g_errorDemoActive) {
-    ui.showError("LittleFS mount failed!", "Code: 0xLFS_MNT", Crash);
-    ui.showError("Sprite creation failed!", "Code: 0xSPR_MEM", Crash);
-    ui.showError("No profiles found!",   "Code: 0xNOPROF",   Crash);
-    g_errorDemoActive = true;
-} else {
-    ui.nextError(); // перелистнуть на следующую Crash-ошибку
-}
+ui.showNotification()
+    .title("Settings")
+    .message("Changes applied")
+    .button("OK")
+    .delay(0)
+    .type(Normal)
+    .show();
 ```
 
-Пример некритической ошибки (с кнопкой по умолчанию `OK`):
+Типы уведомления:
+
+- `Normal`
+- `Warning`
+- `Error`
+
+Управление:
 
 ```cpp
-// На том же экране, по другой кнопке
-if (prevPressed && !ui.errorActive()) {
-    ui.showError("Low battery", "Please charge device", Warning);
-}
+bool active = ui.notificationActive();
+ui.setNotificationButtonDown(btnOk.isDown());
 ```
 
-Пример с кастомным текстом кнопки:
+## 12.3. Ошибки
 
 ```cpp
-// Кнопка будет с надписью "Ignore"
-ui.showError("Low battery", "Please charge device", Warning, "Ignore");
+ui.showError("Low battery", "Please charge device", Warning, "OK");
+ui.showError("LittleFS mount failed", "Code: 0xLFS", Error, "Retry");
 ```
 
-## 3. Цикл ошибок и кнопка OK
+Управление:
 
 ```cpp
-bool errorActive() const;
-void setErrorButtonDown(bool down);
-void nextError();
-```
-
-- `errorActive()` – возвращает, активен ли сейчас экран ошибок.
-- `setErrorButtonDown(down)` – сообщает библиотеке, нажата ли физическая кнопка, привязанная к `OK`.
-  - Реагирует **только** для `Warning`; для `Crash` вызов игнорируется.
-  - При отпускании кнопки (`down` изменился с `true` на `false`) ошибка типа `Warning` закрывается.
-- `nextError()` – листает вперёд по очереди **критических** ошибок (`Crash`). Для `Warning` не используется.
-
-Типичный фрагмент в `loop()` прошивки:
-
-```cpp
-void loop() {
-    ui.loop();
-
-    bool nextPressed = btnNext.wasPressed();
-    bool prevPressed = btnPrev.wasPressed();
-
-    if (ui.errorActive()) {
-        // тот же физический PREV используется как OK
-        ui.setErrorButtonDown(btnPrev.isDown());
-    } else if (ui.notificationActive()) {
-        ui.setNotificationButtonDown(btnPrev.isDown());
-    }
-}
-```
-
-- Пока `errorActive() == true`, внутри `ui.loop()` рисуется только экран ошибок (плюс, при наличии, уведомление сверху).
-- При закрытии некритической ошибки (`Warning`) флаг `errorActive()` сбрасывается, и нормальный рендер экранов возобновляется.
-
----
-
-# Универсальные кнопки
-
-В `GUI` есть общий визуальный модуль кнопки, который можно переиспользовать на любых экранах.
-
-Идея:
-
-- внешняя логика знает только, включена ли кнопка и нажата ли сейчас;
-- библиотека сама рисует анимацию и считает цвета.
-
-## 1. Состояние кнопки
-
-Обычно в прошивке достаточно просто объявить состояние и включить его:
-
-```cpp
-static ButtonVisualState mainBtn;  // всё по нулям по умолчанию
-void setup() {
-  mainBtn.enabled = true;          // логически включили кнопку
-}
-```
-
-Внутренние поля (`pressLevel`, `fadeLevel`, `prevEnabled`) библиотека ведёт сама.
-
-## 2. Обновление анимации
-
-```cpp
-bool updateButtonPress(ButtonVisualState &state, bool isDown);
-```
-
-- Вызывается в `loop()` для каждой визуальной кнопки.
-- `isDown` - текущее состояние физической кнопки (`true`, пока держишь).
-
-Если кнопка отключена (`state.enabled == false`) или включён режим загрузки (`state.loading == true`), накопленное нажатие быстро сбрасывается, чтобы не было «залипания» анимации.
-
-## 3. Отрисовка кнопки
-
-```cpp
-void drawButton(label, x, y, w, h, baseColor, radius, ButtonVisualState &state);
-
-// Вариант с иконкой слева от текста
-void drawButton(label,
-                const uint16_t *iconBitmap, uint8_t iconW, uint8_t iconH,
-                x, y, w, h,
-                baseColor, radius,
-                ButtonVisualState &state);
-```
-
-- `label` - текст;
-- `x/y/w/h` - геометрию (`x`/`y` можно поставить `center`, чтобы выровнять по экрану);
-- `baseColor` - основной цвет кнопки;
-- `radius` - радиус скругления;
-- `state` - актуальное состояние, обновлённое через `updateButtonPress`.
-
-Внутри `drawButton`:
-
-- по `pressLevel` кнопка чуть уменьшается и темнеет;
-- по `fadeLevel` идёт плавный переход между активным и неактивным фоном;
-- цвет текста выбирается автоматически:
-  - тёмный фон → белый текст;
-  - светлый фон → чёрный;
-  - при disabled текст становится серым, но остаётся читаемым;
-- если PSDF‑шрифт для кнопок загружен, размер подбирается по высоте.
-
-При `state.loading == true` кнопка визуально ведёт себя как отключённая (анимация нажатия блокируется), а сам текст `label` дополняется анимированными точками: `Label`, `Label.`, `Label..`, `Label...`, затем обратно. Эти точки добавляются автоматически внутри `drawButton` на основе времени (`millis()`), поэтому в коде достаточно передать базовый текст (`"Saving"`, `"Loading"` и т.п.).
-
----
-
-# Переключатель
-
-`ToggleSwitch` — компактный «переключатель» (ON/OFF) с плавной анимацией. Он состоит из двух частей:
-
-- **[логика]** `updateToggleSwitch(...)` — обновляет состояние и анимацию;
-- **[отрисовка]** `drawToggleSwitch(...)` — рисует трек и бегунок.
-
-## 1. Состояние переключателя
-
-```cpp
-struct ToggleSwitchState
-{
-    bool value;          // текущее логическое состояние (ON/OFF)
-    uint8_t pos;         // 0..255, позиция анимации (0 = OFF, 255 = ON)
-    uint32_t lastUpdateMs;
-};
-```
-
-Обычно достаточно объявить переменную и оставить её «по нулям»:
-
-```cpp
-static ToggleSwitchState sw;
-```
-
-## 2. Обновление (в `loop()`)
-
-```cpp
-bool updateToggleSwitch(ToggleSwitchState &s, bool pressed);
-```
-
-- **`pressed`**: событие короткого клика (например, `btnNext.wasPressed()`).
-- Возвращает `true`, если:
-  - состояние `value` поменялось
-  - или анимация ещё продолжается (нужно продолжать перерисовывать кадры).
-
-Типичный паттерн:
-
-```cpp
-bool changed = ui.updateToggleSwitch(sw, nextPressed);
-if (changed)
-    ui.requestRedraw();
-```
-
-## 3. Отрисовка (в screen-callback)
-
-```cpp
-void drawToggleSwitch(x, y, w, h,
-                      ToggleSwitchState &state,
-                      activeColor,
-                      inactiveColor,
-                      knobColor);
-```
-
-- `x/y/w/h` — позиция и размер. `x == center` / `y == center` центрируют элемент по доступной области экрана с учётом статус‑бара.
-- `activeColor` — цвет трека в состоянии ON.
-- `inactiveColor = -1` — авто‑цвет для OFF (на основе `activeColor`).
-- `knobColor = -1` — авто‑цвет бегунка (контрастный к фону).
-
-Пример экрана:
-
-```cpp
-void screenToggle(GUI &ui)
-{
-    uint16_t bg = ui.rgb(10, 10, 10);
-    ui.clear(bg);
-
-    ui.drawToggleSwitch(center, 150, 78, 36, sw, ui.rgb(21, 180, 110));
-}
+bool active = ui.errorActive();
+ui.setErrorButtonDown(btnOk.isDown());
+ui.nextError();
 ```
 
 ---
 
-# Прогресс‑бар
+# 13. Layout helpers
 
-В `GUI` есть готовый прямоугольный прогресс‑бар с аккуратными скруглениями и встроенными анимациями.
+Это лёгкие helper-ы для раскладки UI без тяжёлой layout-системы.
 
-Есть две перегрузки:
+Базовые типы:
 
 ```cpp
-// Полный контроль над цветами
-void drawProgressBar(
-    x, y,               // x, y (center - выровнять по центру экрана)
-    w, h,               // ширина/высота
-    value,              // 0..100
-    baseColor,          // цвет корпуса/подложки
-    fillColor,          // цвет заливки
-    radius = 8,         // радиус скругления
-    anim                // тип анимации
-);
-
-// Упрощённый вариант: один основной цвет
-void drawProgressBar(
-     x, y,               // x, y (center - выровнять по центру экрана)
-     w, h,               // ширина/высота
-     value,              // 0..100
-     color,              // основной цвет заливки
-     radius = 8,         // радиус скругления
-     anim                // тип анимации
-);
+UiSize   size{120, 40};
+UiRect   rect{0, 0, 240, 320};
+UiInsets insets{10, 10, 10, 10};
 ```
 
-Во второй перегрузке `baseColor` считается автоматически как слегка осветлённая версия `color`, поэтому достаточно одного оттенка.
-
-При `x == center` / `y == center` прогресс‑бар центрируется по свободной области экрана, учитывая статус‑бар (как `drawGraphGrid`).
-
-- **`anim`**
-  - `None` - без анимации, просто заливка;
-  - `Shimmer` - плавный светлый блик, который скользит по заливке (как в прогресс‑баре Windows);
-  - `Indeterminate` - неопределённый прогресс: узкая цветная «полоса» бегает по всей длине бара, игнорируя `value` (подходит для состояний вида «загрузка...» без процента).
-
-## Круговой прогресс‑бар
-
-Для каждого режима `ProgressAnim` есть круговой (кольцевой) вариант.
-
-Есть две перегрузки:
+## 13.1. Slicing API
 
 ```cpp
-// Полный контроль над цветами
-void drawCircularProgressBar(
-    x, y,               // x, y: центр кольца (center - авто‑центрирование с учётом статус‑бара)
-    r,                  // радиус
-    thickness,          // толщина кольца
-    value,              // 0..100
-    baseColor,          // цвет подложки (кольцо целиком)
-    fillColor,          // цвет заполнения
-    anim                // тип анимации (ProgressAnim)
-);
-
-// Упрощённый вариант: один основной цвет
-void drawCircularProgressBar(
-    x, y,               // x, y: центр кольца
-    r,                  // радиус
-    thickness,          // толщина кольца
-    value,              // 0..100
-    color,              // основной цвет заполнения
-    anim                // тип анимации (ProgressAnim)
-);
-```
-
-- При `anim == Indeterminate` параметр `value` игнорируется.
-- При `x == center` / `y == center` кольцо центрируется по свободной области экрана, учитывая статус‑бар.
-
-# Scroll dots (индикатор страниц)
-
-Описание и пример вызова — в разделе **«Рисование фигур (Fluent API)»**: блок **«Scroll dots (индикатор страниц)»**. Используются цепочки `drawScrollDots()` и `updateScrollDots()` с методами `.at()`, `.count()`, `.activeIndex()`, `.prevIndex()`, `.animProgress()`, `.animate()`, `.animDirection()`, `.activeColor()`, `.inactiveColor()`, `.dotRadius()`, `.spacing()`, `.activeWidth()` и завершением `.draw()`.
-
----
-
-# Layout helpers (лёгкая раскладка)
-
-Эти типы нужны, чтобы проще раскладывать UI без ручного пересчёта координат.
-Это **не flexbox** и не «большая система», а набор простых helper‑ов.
-
-## 1. Базовые структуры
-
-```cpp
-struct UiSize   { int16_t w, h; };
-struct UiRect   { int16_t x, y, w, h; };
-struct UiInsets { int16_t l, t, r, b; };
-```
-
-## 2. Slicing API (разрезание области)
-
-Можно «нарезать» область под блоки (header/footer/content) без ручной математики:
-
-```cpp
-UiRect root{0, 0, ui.width(), ui.height()};
-
+UiRect root{0, 0, 240, 320};
 UiRect work = inset(root, 10);
-UiRect header = takeTop(work, 24, 8);   // верхняя панель + gap
+
+UiRect header = takeTop(work, 24, 8);
 UiRect footer = takeBottom(work, 28, 8);
-UiRect content = work;                            // остаток
-UiRect centered = placeInside(area, size, Center, Center);
-UiRect centered = centerIn(area, size);
-UiRect insetted = inset(area, 10, 20, 10, 20);
+UiRect content = work;
 ```
 
-Доступные операции:
+Доступно:
 
-- `inset(rect, all)` — отступы со всех сторон
-- `inset(rect, l, t, r, b)` — отступы по сторонам
-- `inset(rect, UiInsets{...})` — через структуру
-- `takeTop/Bottom/Left/Right(rect, size, gap)` — вырезать часть области
-- `placeInside(area, size, hJustify, vAlign)` — разместить прямоугольник внутри области
-- `centerIn(area, size)` — сокращение для центрирования
+- `inset(rect, all)`
+- `inset(rect, l, t, r, b)`
+- `inset(rect, UiInsets{...})`
+- `takeTop(...)`
+- `takeBottom(...)`
+- `takeLeft(...)`
+- `takeRight(...)`
+- `placeInside(...)`
+- `centerIn(...)`
 
-Примечание: все эти функции также доступны в форме `UiLayout::...`.
-
-## 3. Flow API (равномерная раскладка)
-
-Пример — три кнопки в строке с отступами:
+## 13.2. Flow API
 
 ```cpp
 UiSize sizes[3] = {{40, 20}, {60, 20}, {40, 20}};
 UiRect out[3];
 
-flowRow(area, sizes, out, count, gap, justify, align);
+flowRow(area, sizes, out, 3, 10, Center, Center);
+flowColumn(area, sizes, out, 3, 8, Center, Center);
 ```
 
-Параметры: `flowRow(area, sizesArray, outArray, count, gap, justify, align)`
+Для распределения доступны:
 
-Значения для justify: `Start`, `Center`, `End`
+- `Start`
+- `Center`
+- `End`
+- `layout::SpaceBetween`
+- `layout::SpaceEvenly`
 
-Для распределения: `layout::SpaceBetween`, `layout::SpaceEvenly`
-
-Аналогично `flowColumn()` для вертикальной раскладки.
-
-## 4. Cursor-based API (вариант 2)
-
-Для более удобного кода без массивов можно использовать «курсорные» контейнеры.
-Они собирают размеры через `next(...)`, а потом одним вызовом `finish()` вычисляют позиции.
+## 13.3. Cursor-based API
 
 ```cpp
-UiRect rowArea{10, 40, 220, 30};
-UiFlowRow<3> row(rowArea, 10, layout::SpaceEvenly, Center);
+UiFlowRow<3> row(area, 10, layout::SpaceEvenly, Center);
 
 row.next(40, 24);
 row.next(60, 24);
 row.next(40, 24);
 row.finish();
-
-// Теперь row[0], row[1], row[2] - готовые прямоугольники
 ```
 
-Аналогично для колонок:
-
-```cpp
-UiFlowColumn<4> col(area, 6, Start, Center);
-col.next(200, 18);
-col.next(200, 18);
-col.next(200, 18);
-col.next(200, 18);
-col.finish();
-```
+Аналогично работает `UiFlowColumn<N>`.
 
 ---
-
-# Glow‑эффект (свечение) для фигур
-
-Описание и примеры вызова — в разделе **«Рисование фигур (Fluent API)»** выше: блоки **«Круг со свечением»** и **«Скруглённый прямоугольник со свечением»**. Используются цепочки `drawGlowCircle()` / `updateGlowCircle()` и `drawGlowRoundRect()` / `updateGlowRoundRect()` с методами `.at()`, `.radius()` / `.size()`, `.fillColor()`, `.bgColor()`, `.glowColor()`, `.glowSize()`, `.glowStrength()`, `.anim()`, `.pulsePeriodMs()` и завершением `.draw()`.
-
-**Типы анимации (`GlowAnim`):**
-
-- `None` — без анимации;
-- `Pulse` — плавное затухание/разгорание свечения (синус‑пульс).

@@ -67,6 +67,100 @@ def _hash_text(s: str) -> str:
     return hashlib.sha256(s.encode("utf-8")).hexdigest()
 
 
+def _file_stat_signature(path: str) -> str:
+    norm_path = os.path.normcase(os.path.abspath(path))
+    try:
+        st = os.stat(path)
+    except OSError:
+        return f"missing:{norm_path}"
+    return json.dumps({
+        "path": norm_path,
+        "size": st.st_size,
+        "mtime_ns": st.st_mtime_ns,
+    }, sort_keys=True)
+
+
+def _font_folder_from_base(font_base: str) -> str:
+    font_folder = _snake_to_camel(font_base)
+    if font_base.lower() == "wixmadefordisplay":
+        font_folder = "WixMadeForDisplay"
+    return font_folder
+
+
+def _project_stamp_path(project_dir: str) -> str:
+    return os.path.join(project_dir, "tools", "fonts", "bin", "PSDF", "project.stamp")
+
+
+def _project_stamp(project_dir: str, cfg_path: str, ttf_files: list[str], msdf_exe: str) -> str:
+    psdf_path = os.path.join(project_dir, "tools", "psdf.py")
+    parts = [
+        "fonts_project_cache_v1",
+        _hash_file(cfg_path),
+        _hash_file(os.path.abspath(__file__)),
+        _hash_file(psdf_path),
+        _file_stat_signature(msdf_exe),
+    ]
+
+    for ttf_file in ttf_files:
+        ttf_path = os.path.join(project_dir, "tools", "fonts", "TTF", ttf_file)
+        parts.append(json.dumps({
+            "file": ttf_file,
+            "hash": _hash_file(ttf_path),
+        }, sort_keys=True))
+
+    return "\n".join(parts)
+
+
+def _project_outputs_exist(project_dir: str, ttf_files: list[str]) -> bool:
+    fonts_metrics_path = os.path.join(project_dir, "lib", "pipKit", "pipGUI", "Fonts", "metrics.hpp")
+    if not os.path.isfile(fonts_metrics_path):
+        return False
+
+    for ttf_file in ttf_files:
+        font_base = os.path.splitext(os.path.basename(ttf_file))[0]
+        font_folder = _font_folder_from_base(font_base)
+        out_fonts_dir = os.path.join(project_dir, "lib", "pipKit", "pipGUI", "Fonts", font_folder)
+        if not (
+            os.path.isfile(os.path.join(out_fonts_dir, f"{font_folder}.hpp"))
+            and os.path.isfile(os.path.join(out_fonts_dir, f"{font_folder}.cpp"))
+            and os.path.isfile(os.path.join(out_fonts_dir, "metrics.hpp"))
+        ):
+            return False
+
+    return True
+
+
+def is_up_to_date(project_dir: str, announce: bool = False) -> bool:
+    tools_fonts_dir = os.path.join(project_dir, "tools", "fonts")
+    ttf_dir = os.path.join(tools_fonts_dir, "TTF")
+    cfg_path = os.path.join(project_dir, "tools", "fonts", "config.py")
+
+    if not os.path.isfile(cfg_path) or not os.path.isdir(ttf_dir):
+        return False
+
+    msdf_exe = find_msdf_atlas_gen(project_dir)
+    if not msdf_exe:
+        return False
+
+    ttf_files = [f for f in os.listdir(ttf_dir) if f.lower().endswith(".ttf")]
+    ttf_files.sort()
+    if not ttf_files:
+        return False
+
+    stamp_path = _project_stamp_path(project_dir)
+    try:
+        with open(stamp_path, "r", encoding="utf-8") as f:
+            prev_stamp = f.read()
+    except OSError:
+        return False
+
+    current_stamp = _project_stamp(project_dir, cfg_path, ttf_files, msdf_exe)
+    up_to_date = (prev_stamp == current_stamp) and _project_outputs_exist(project_dir, ttf_files)
+    if up_to_date and announce:
+        print(f"[fonts] up-to-date ({len(ttf_files)})")
+    return up_to_date
+
+
 def _gen_atlas_decl_hpp(var_name: str) -> str:
     out = []
     out.append("#pragma once\n\n")
@@ -275,11 +369,26 @@ def generate_all(project_dir: str) -> bool:
         print("[fonts] msdf-atlas-gen.exe not found (PATH / tools/fonts / tools/msdf-atlas-gen)")
         return False
 
-    generated = 0
-    uptodate = 0
-
     ttf_files = [f for f in os.listdir(ttf_dir) if f.lower().endswith(".ttf")]
     ttf_files.sort()
+    if not ttf_files:
+        print("[fonts] No TTF files found")
+        return False
+
+    project_stamp = _project_stamp(project_dir, cfg_path, ttf_files, msdf_exe)
+    project_stamp_path = _project_stamp_path(project_dir)
+    try:
+        with open(project_stamp_path, "r", encoding="utf-8") as f:
+            prev_project_stamp = f.read()
+    except OSError:
+        prev_project_stamp = None
+
+    if prev_project_stamp == project_stamp and _project_outputs_exist(project_dir, ttf_files):
+        print(f"[fonts] up-to-date ({len(ttf_files)})")
+        return True
+
+    generated = 0
+    uptodate = 0
     
     font_names = []
     font_idents = []
@@ -290,9 +399,7 @@ def generate_all(project_dir: str) -> bool:
             continue
 
         font_base = os.path.splitext(os.path.basename(ttf_path))[0]
-        font_folder = _snake_to_camel(font_base)
-        if font_base.lower() == "wixmadefordisplay":
-            font_folder = "WixMadeForDisplay"
+        font_folder = _font_folder_from_base(font_base)
         font_ident = _safe_ident(font_folder)
         
         font_names.append(font_folder)
@@ -426,6 +533,10 @@ def generate_all(project_dir: str) -> bool:
         os.makedirs(os.path.dirname(fonts_metrics_path), exist_ok=True)
         central_metrics = _gen_fonts_metrics_hpp(font_names, font_idents)
         _write_if_changed(fonts_metrics_path, central_metrics)
+
+    os.makedirs(os.path.dirname(project_stamp_path), exist_ok=True)
+    with open(project_stamp_path, "w", encoding="utf-8") as f:
+        f.write(project_stamp)
 
     if generated == 0 and uptodate > 0:
         print(f"[fonts] up-to-date ({uptodate})")

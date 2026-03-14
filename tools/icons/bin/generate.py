@@ -17,11 +17,103 @@ from psdf import (
     _read_json,
     _write_if_changed,
     _hash_bytes,
+    _hash_file,
     _safe_ident,
     _snake_to_camel,
     _camel_from_file,
     _best_grid,
 )
+
+
+def _file_stat_signature(path: str) -> str:
+    norm_path = os.path.normcase(os.path.abspath(path))
+    try:
+        st = os.stat(path)
+    except OSError:
+        return f"missing:{norm_path}"
+    return json.dumps({
+        "path": norm_path,
+        "size": st.st_size,
+        "mtime_ns": st.st_mtime_ns,
+    }, sort_keys=True)
+
+
+def _project_stamp_path(project_dir: str) -> str:
+    return os.path.join(project_dir, "tools", "icons", "bin", "PSDF", "project.stamp")
+
+
+def _project_stamp(project_dir: str, svg_files: list[str], icons_exe: str, icon_px: int, pxrange: int) -> str:
+    psdf_path = os.path.join(project_dir, "tools", "psdf.py")
+    steps = os.environ.get("PIPGUI_STROKE2PATH_STEPS", "2048")
+
+    try:
+        import importlib.util
+        svgpathtools_spec = importlib.util.find_spec("svgpathtools")
+        svgpathtools_sig = _file_stat_signature(svgpathtools_spec.origin) if svgpathtools_spec and svgpathtools_spec.origin else "present"
+    except Exception:
+        svgpathtools_sig = "missing"
+
+    parts = [
+        "icons_project_cache_v1",
+        _hash_file(os.path.abspath(__file__)),
+        _hash_file(psdf_path),
+        _file_stat_signature(icons_exe),
+        json.dumps({
+            "icon_px": icon_px,
+            "pxrange": pxrange,
+            "stroke_steps": steps,
+            "svgpathtools": svgpathtools_sig,
+        }, sort_keys=True),
+    ]
+
+    for svg_file in svg_files:
+        svg_path = os.path.join(project_dir, "tools", "icons", "SVG", svg_file)
+        parts.append(json.dumps({
+            "file": svg_file,
+            "hash": _hash_file(svg_path),
+        }, sort_keys=True))
+
+    return "\n".join(parts)
+
+
+def _project_outputs_exist(project_dir: str) -> bool:
+    out_icons_dir = os.path.join(project_dir, "lib", "pipKit", "pipGUI", "icons")
+    return (
+        os.path.isfile(os.path.join(out_icons_dir, "icons.hpp"))
+        and os.path.isfile(os.path.join(out_icons_dir, "icons.cpp"))
+        and os.path.isfile(os.path.join(out_icons_dir, "metrics.hpp"))
+        and os.path.isfile(os.path.join(project_dir, "tools", "icons", "bin", "PSDF", "atlas.bin"))
+        and os.path.isfile(os.path.join(project_dir, "tools", "icons", "bin", "PSDF", "atlas.json"))
+        and os.path.isfile(os.path.join(project_dir, "tools", "icons", "bin", "PSDF", "atlas.png"))
+    )
+
+
+def is_up_to_date(project_dir: str, announce: bool = False) -> bool:
+    icons_svg_dir = os.path.join(project_dir, "tools", "icons", "SVG")
+    icons_exe = os.path.join(project_dir, "tools", "icons", "bin", "msdfgen.exe")
+    if not os.path.isfile(icons_exe):
+        icons_exe = os.path.join(project_dir, "tools", "icons", "msdfgen.exe")
+
+    if not os.path.isdir(icons_svg_dir) or not os.path.isfile(icons_exe):
+        return False
+
+    svg_files = [f for f in os.listdir(icons_svg_dir) if f.lower().endswith(".svg")]
+    svg_files.sort()
+    if not svg_files:
+        return False
+
+    stamp_path = _project_stamp_path(project_dir)
+    try:
+        with open(stamp_path, "r", encoding="utf-8") as f:
+            prev_stamp = f.read()
+    except OSError:
+        return False
+
+    current_stamp = _project_stamp(project_dir, svg_files, icons_exe, 48, 8)
+    up_to_date = (prev_stamp == current_stamp) and _project_outputs_exist(project_dir)
+    if up_to_date and announce:
+        print("[icons] up-to-date")
+    return up_to_date
 
 def _stroke_to_path_svg(project_dir: str, in_svg_path: str, out_svg_path: str) -> bool:
     try:
@@ -358,6 +450,18 @@ def generate_all(project_dir: str) -> bool:
     icon_px = 48
     pxrange = 8
 
+    project_stamp = _project_stamp(project_dir, svg_files, icons_exe, icon_px, pxrange)
+    project_stamp_path = _project_stamp_path(project_dir)
+    try:
+        with open(project_stamp_path, "r", encoding="utf-8") as f:
+            prev_project_stamp = f.read()
+    except OSError:
+        prev_project_stamp = None
+
+    if prev_project_stamp == project_stamp and _project_outputs_exist(project_dir):
+        print("[icons] up-to-date")
+        return True
+
     per_icon_bins = []
     per_icon_hashes = []
     icon_names = []
@@ -546,6 +650,10 @@ def generate_all(project_dir: str) -> bool:
     _write_if_changed(out_icons_hpp, _gen_icons_decl_hpp())
     _write_if_changed(out_icons_cpp, _gen_icons_def_cpp(atlas_data))
     _write_if_changed(out_metrics_hpp, _gen_icons_metrics_hpp(icon_names, icon_aliases, icon_boxes, atlas_w, atlas_h, icon_px, pxrange))
+
+    os.makedirs(os.path.dirname(project_stamp_path), exist_ok=True)
+    with open(project_stamp_path, "w", encoding="utf-8") as f:
+        f.write(project_stamp)
 
     print("[icons] generated")
 

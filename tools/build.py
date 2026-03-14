@@ -97,7 +97,9 @@ def build_assets(targets=None):
         try:
             fonts_gen_path = os.path.join(tools_dir, "fonts", "bin", "generate.py")
             fonts_mod = _import_from_path("fonts_generate", fonts_gen_path)
-            if not fonts_mod.generate_all(project_dir):
+            if hasattr(fonts_mod, "is_up_to_date") and fonts_mod.is_up_to_date(project_dir, announce=True):
+                pass
+            elif not fonts_mod.generate_all(project_dir):
                 success = False
         except Exception as e:
             if verbose:
@@ -106,12 +108,15 @@ def build_assets(targets=None):
 
     if run_icons:
         try:
-            if not _ensure_pip_packages(["svgpathtools"]):
-                success = False
             icons_gen_path = os.path.join(tools_dir, "icons", "bin", "generate.py")
             icons_mod = _import_from_path("icons_generate", icons_gen_path)
-            if not icons_mod.generate_all(project_dir):
-                success = False
+            if hasattr(icons_mod, "is_up_to_date") and icons_mod.is_up_to_date(project_dir, announce=True):
+                pass
+            else:
+                if not _ensure_pip_packages(["svgpathtools"]):
+                    success = False
+                elif not icons_mod.generate_all(project_dir):
+                    success = False
         except Exception as e:
             if verbose:
                 print(f"[build] Icon generation failed: {e}")

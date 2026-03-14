@@ -1662,7 +1662,7 @@ void updateClockDisplay(uint32_t nowMs)
 void maybeShowToast(uint32_t nowMs)
 {
   static uint32_t lastToastMs = 0;
-  if (ui.toastActive() || ui.notificationActive() || nowMs - lastToastMs < kToastIntervalMs)
+  if (ui.toastActive() || nowMs - lastToastMs < kToastIntervalMs)
     return;
 
   lastToastMs = nowMs;
