@@ -5,12 +5,17 @@
 
 namespace pipcore
 {
-    class GuiDisplay;
+    class Display;
+    class Platform;
 
     class Sprite
     {
     public:
         Sprite() = default;
+        explicit Sprite(Platform *platform)
+            : _platform(platform)
+        {
+        }
         ~Sprite();
 
         Sprite(const Sprite &) = delete;
@@ -21,6 +26,7 @@ namespace pipcore
 
         int16_t width() const { return _w; }
         int16_t height() const { return _h; }
+        void setPlatform(Platform *platform) { _platform = platform; }
 
         void *getBuffer() { return _buf; }
         const void *getBuffer() const { return _buf; }
@@ -35,7 +41,7 @@ namespace pipcore
         void getClipRect(int32_t *x, int32_t *y, int32_t *w, int32_t *h) const;
 
         void pushSprite(Sprite *dst, int16_t x, int16_t y) const;
-        void writeToDisplay(GuiDisplay &display, int16_t x, int16_t y, int16_t w, int16_t h) const;
+        void writeToDisplay(Display &display, int16_t x, int16_t y, int16_t w, int16_t h) const;
 
         static inline uint16_t color565(uint8_t r, uint8_t g, uint8_t b)
         {
@@ -77,6 +83,7 @@ namespace pipcore
         }
 
     private:
+        Platform *platform() const { return _platform; }
         void clipNormalize();
         inline void fillRow(uint16_t *dst, int16_t w, uint16_t v);
 
@@ -86,6 +93,7 @@ namespace pipcore
         }
 
     private:
+        Platform *_platform = nullptr;
         uint16_t *_buf = nullptr;
         int16_t _w = 0;
         int16_t _h = 0;

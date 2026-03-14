@@ -9,7 +9,7 @@
 #include <esp_heap_caps.h>
 #include <soc/spi_periph.h>
 
-namespace pipcore
+namespace pipcore::esp32
 {
     namespace
     {
@@ -105,18 +105,29 @@ namespace pipcore
         }
     }
 
-    Esp32St7789Spi::Esp32St7789Spi(int8_t mosi, int8_t sclk, int8_t cs, int8_t dc, int8_t rst, uint32_t hz)
-        : _pinMosi(mosi), _pinSclk(sclk), _pinCs(cs), _pinDc(dc), _pinRst(rst),
-          _hz(hz ? hz : 80000000U),
-          _spiHandle(nullptr),
-          _dmaBufSize(DmaBufferBytes),
-          _dmaBuf{nullptr, nullptr},
-          _trans{nullptr, nullptr},
-          _transInFlight{false, false},
-          _dmaNext(0), _dmaInflight(0),
-          _dcLevel(-1),
-          _initialized(false)
+    void St7789Spi::configure(int8_t mosi, int8_t sclk, int8_t cs, int8_t dc, int8_t rst, uint32_t hz)
     {
+        deinit();
+        _pinMosi = mosi;
+        _pinSclk = sclk;
+        _pinCs = cs;
+        _pinDc = dc;
+        _pinRst = rst;
+        _hz = hz ? hz : 80000000U;
+        _spiHandle = nullptr;
+        _dmaBufSize = DmaBufferBytes;
+        _dmaBuf[0] = nullptr;
+        _dmaBuf[1] = nullptr;
+        _trans[0] = nullptr;
+        _trans[1] = nullptr;
+        _transInFlight[0] = false;
+        _transInFlight[1] = false;
+        _dmaNext = 0;
+        _dmaInflight = 0;
+        _dcLevel = -1;
+        _initialized = false;
+        _lastError = st7789::IoError::None;
+
         if (!isPinValid(_pinMosi))
             _pinMosi = resolveDefaultMosi();
         if (!isPinValid(_pinSclk))
@@ -125,14 +136,21 @@ namespace pipcore
             _pinCs = resolveDefaultCs();
     }
 
-    Esp32St7789Spi::~Esp32St7789Spi() { deinit(); }
+    St7789Spi::~St7789Spi() { deinit(); }
 
-    bool Esp32St7789Spi::init()
+    bool St7789Spi::fail(st7789::IoError error)
     {
+        _lastError = error;
+        return false;
+    }
+
+    bool St7789Spi::init()
+    {
+        clearError();
         if (_initialized)
             return true;
         if (!isPinValid(_pinDc))
-            return false;
+            return fail(st7789::IoError::InvalidConfig);
         if (!initSpi())
             return false;
 
@@ -144,14 +162,18 @@ namespace pipcore
         io.pin_bit_mask = 1ULL << (uint8_t)_pinDc;
         if (isPinValid(_pinRst))
             io.pin_bit_mask |= 1ULL << (uint8_t)_pinRst;
-        gpio_config(&io);
+        if (gpio_config(&io) != ESP_OK)
+        {
+            deinit();
+            return fail(st7789::IoError::Gpio);
+        }
 
         _dcLevel = -1;
         _initialized = true;
         return true;
     }
 
-    void Esp32St7789Spi::deinit()
+    void St7789Spi::deinit()
     {
         if (_spiHandle)
         {
@@ -181,10 +203,12 @@ namespace pipcore
         _initialized = false;
     }
 
-    bool Esp32St7789Spi::initSpi()
+    bool St7789Spi::initSpi()
     {
         if (_spiHandle)
             return true;
+        if (!isPinValid(_pinMosi) || !isPinValid(_pinSclk))
+            return fail(st7789::IoError::InvalidConfig);
 
         spi_bus_config_t bus{};
         bus.mosi_io_num = _pinMosi;
@@ -195,7 +219,7 @@ namespace pipcore
         bus.max_transfer_sz = (int)DmaBufferBytes;
 
         if (spi_bus_initialize(SPI2_HOST, &bus, SPI_DMA_CH_AUTO) != ESP_OK)
-            return false;
+            return fail(st7789::IoError::SpiBusInit);
 
         spi_device_interface_config_t dev{};
         dev.mode = 3;
@@ -209,7 +233,7 @@ namespace pipcore
         if (spi_bus_add_device(SPI2_HOST, &dev, &h) != ESP_OK)
         {
             spi_bus_free(SPI2_HOST);
-            return false;
+            return fail(st7789::IoError::SpiDeviceAdd);
         }
         _spiHandle = h;
 
@@ -219,7 +243,7 @@ namespace pipcore
             if (!_dmaBuf[i])
             {
                 deinit();
-                return false;
+                return fail(st7789::IoError::DmaBufferAlloc);
             }
         }
         for (int i = 0; i < 2; ++i)
@@ -228,66 +252,81 @@ namespace pipcore
             if (!_trans[i])
             {
                 deinit();
-                return false;
+                return fail(st7789::IoError::TransactionAlloc);
             }
             _transInFlight[i] = false;
         }
 
         _dmaNext = _dmaInflight = 0;
+        clearError();
         return true;
     }
 
-    inline void Esp32St7789Spi::setDcCached(int level)
+    inline bool St7789Spi::setDcCached(int level)
     {
         if (_dcLevel != level)
         {
-            gpio_set_level((gpio_num_t)_pinDc, level);
+            if (gpio_set_level((gpio_num_t)_pinDc, level) != ESP_OK)
+                return fail(st7789::IoError::Gpio);
             _dcLevel = level;
         }
+        return true;
     }
 
-    void Esp32St7789Spi::setDc(bool level) { setDcCached(level ? 1 : 0); }
-    void Esp32St7789Spi::setRst(bool level)
+    bool St7789Spi::setRst(bool level)
     {
         if (isPinValid(_pinRst))
-            gpio_set_level((gpio_num_t)_pinRst, level ? 1 : 0);
+        {
+            if (gpio_set_level((gpio_num_t)_pinRst, level ? 1 : 0) != ESP_OK)
+                return fail(st7789::IoError::Gpio);
+        }
+        return true;
     }
 
-    void Esp32St7789Spi::delayMs(uint32_t ms) { vTaskDelay(pdMS_TO_TICKS(ms)); }
+    void St7789Spi::delayMs(uint32_t ms) { vTaskDelay(pdMS_TO_TICKS(ms)); }
 
-    void Esp32St7789Spi::writeCommand(uint8_t cmd)
+    bool St7789Spi::writeCommand(uint8_t cmd)
     {
         if (!_spiHandle)
-            return;
-        flushQueued();
-        setDcCached(0);
+            return fail(st7789::IoError::NotReady);
+        if (!flushQueued())
+            return false;
+        if (!setDcCached(0))
+            return false;
 
         spi_transaction_t t{};
         t.flags = SPI_TRANS_USE_TXDATA;
         t.length = 8;
         t.tx_data[0] = cmd;
-        spi_device_polling_transmit((spi_device_handle_t)_spiHandle, &t);
+        if (spi_device_polling_transmit((spi_device_handle_t)_spiHandle, &t) != ESP_OK)
+            return fail(st7789::IoError::CommandTransmit);
+        return true;
     }
 
-    void Esp32St7789Spi::write(const void *data, size_t len)
+    bool St7789Spi::write(const void *data, size_t len)
     {
         if (!len || !_spiHandle)
-            return;
-        flushQueued();
-        setDcCached(1);
+            return fail(st7789::IoError::NotReady);
+        if (!flushQueued())
+            return false;
+        if (!setDcCached(1))
+            return false;
 
         spi_transaction_t t{};
         t.length = (int)(len * 8U);
         t.tx_buffer = data;
-        spi_device_polling_transmit((spi_device_handle_t)_spiHandle, &t);
+        if (spi_device_polling_transmit((spi_device_handle_t)_spiHandle, &t) != ESP_OK)
+            return fail(st7789::IoError::DataTransmit);
+        return true;
     }
 
-    void Esp32St7789Spi::writePixels(const void *data, size_t len)
+    bool St7789Spi::writePixels(const void *data, size_t len)
     {
         if (!len || !_spiHandle || !_dmaBuf[0] || !_dmaBuf[1] || !_trans[0] || !_trans[1])
-            return;
+            return fail(st7789::IoError::NotReady);
 
-        setDcCached(1);
+        if (!setDcCached(1))
+            return false;
 
         const uint8_t *p = (const uint8_t *)data;
         size_t remaining = len;
@@ -295,7 +334,10 @@ namespace pipcore
         while (remaining)
         {
             while (_transInFlight[_dmaNext])
-                waitQueued();
+            {
+                if (!waitQueued())
+                    return false;
+            }
 
             const int slot = _dmaNext;
             _dmaNext ^= 1;
@@ -311,36 +353,62 @@ namespace pipcore
             t->rx_buffer = nullptr;
             t->user = nullptr;
 
-            spi_device_queue_trans((spi_device_handle_t)_spiHandle, t, portMAX_DELAY);
+            const esp_err_t err = spi_device_queue_trans((spi_device_handle_t)_spiHandle, t, portMAX_DELAY);
+            if (err != ESP_OK)
+            {
+                _transInFlight[slot] = false;
+                flushQueued();
+                return fail(st7789::IoError::QueueTransmit);
+            }
             _transInFlight[slot] = true;
             ++_dmaInflight;
 
             p += n;
             remaining -= n;
         }
+        return true;
     }
 
-    void Esp32St7789Spi::flush() { flushQueued(); }
+    bool St7789Spi::flush() { return flushQueued(); }
 
-    void Esp32St7789Spi::waitQueued()
+    bool St7789Spi::waitQueued()
     {
         if (_dmaInflight <= 0 || !_spiHandle)
-            return;
+            return true;
 
         spi_transaction_t *r = nullptr;
-        spi_device_get_trans_result((spi_device_handle_t)_spiHandle, &r, portMAX_DELAY);
+        const esp_err_t err = spi_device_get_trans_result((spi_device_handle_t)_spiHandle, &r, portMAX_DELAY);
+        if (err != ESP_OK || !r)
+        {
+            _transInFlight[0] = false;
+            _transInFlight[1] = false;
+            _dmaInflight = 0;
+            return fail(st7789::IoError::QueueResult);
+        }
 
         if (r == _trans[0])
             _transInFlight[0] = false;
         else if (r == _trans[1])
             _transInFlight[1] = false;
+        else
+        {
+            _transInFlight[0] = false;
+            _transInFlight[1] = false;
+            _dmaInflight = 0;
+            return fail(st7789::IoError::UnexpectedTransaction);
+        }
 
         --_dmaInflight;
+        return true;
     }
 
-    void Esp32St7789Spi::flushQueued()
+    bool St7789Spi::flushQueued()
     {
         while (_dmaInflight > 0)
-            waitQueued();
+        {
+            if (!waitQueued())
+                return false;
+        }
+        return true;
     }
 }

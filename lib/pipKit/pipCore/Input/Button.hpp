@@ -1,7 +1,7 @@
-#pragma once
+﻿#pragma once
 
-#include <pipCore/Platforms/GuiPlatform.hpp>
-#include <pipCore/Platforms/PlatformFactory.hpp>
+#include <pipCore/Platform.hpp>
+#include <pipCore/Platforms/Select.hpp>
 #include <cstdint>
 
 namespace pipcore
@@ -20,59 +20,61 @@ namespace pipcore
               _pin(pin),
               _pull(pull),
               _activeLow(true),
+              _rawState(false),
               _stableState(false),
               _pressedFlag(false),
-              _vc0(0xFF),
-              _vc1(0xFF)
+              _lastRawChangeMs(0)
         {
             applyPullDefaults();
         }
 
-        Button(GuiPlatform *platform, uint8_t pin, PullMode pull = Pullup)
+        Button(Platform *platform, uint8_t pin, PullMode pull = Pullup)
             : _platform(platform),
               _pin(pin),
               _pull(pull),
               _activeLow(true),
+              _rawState(false),
               _stableState(false),
               _pressedFlag(false),
-              _vc0(0xFF),
-              _vc1(0xFF)
+              _lastRawChangeMs(0)
         {
             applyPullDefaults();
         }
 
         void begin()
         {
-            GuiPlatform *plat = platform();
+            Platform *plat = platform();
             if (plat)
             {
-                const bool enablePullup = (_pull == Pullup);
-                plat->ioPinModeInput(_pin, enablePullup);
+                const InputMode inputMode = (_pull == Pullup)
+                                                ? InputMode::Pullup
+                                                : InputMode::Pulldown;
+                plat->pinModeInput(_pin, inputMode);
             }
 
             bool raw = readRaw();
 
+            _rawState = raw;
             _stableState = raw;
             _pressedFlag = false;
-
-            _vc0 = 0xFF;
-            _vc1 = 0xFF;
+            _lastRawChangeMs = nowMs();
         }
 
         void update()
         {
-            const uint8_t sample = readRaw() ? 0x01 : 0x00;
-            const uint8_t deb = _stableState ? 0x01 : 0x00;
-            const uint8_t delta = (uint8_t)(sample ^ deb);
+            const bool raw = readRaw();
+            const uint32_t now = nowMs();
 
-            _vc0 = (uint8_t)~(_vc0 & delta);
-            _vc1 = (uint8_t)(_vc0 ^ (_vc1 & delta));
-            const uint8_t toggles = (uint8_t)(delta & _vc0 & _vc1);
+            if (raw != _rawState)
+            {
+                _rawState = raw;
+                _lastRawChangeMs = now;
+            }
 
-            if (toggles)
+            if (_stableState != _rawState && (uint32_t)(now - _lastRawChangeMs) >= debounceMs())
             {
                 const bool prev = _stableState;
-                _stableState = !_stableState;
+                _stableState = _rawState;
                 if (!prev && _stableState)
                     _pressedFlag = true;
             }
@@ -80,7 +82,6 @@ namespace pipcore
 
         bool wasPressed()
         {
-            update();
             if (_pressedFlag)
             {
                 _pressedFlag = false;
@@ -95,7 +96,18 @@ namespace pipcore
         PullMode pullMode() const { return _pull; }
 
     private:
-        GuiPlatform *platform() const { return _platform ? _platform : GetPlatform(); }
+        Platform *platform() const { return _platform ? _platform : GetPlatform(); }
+
+        uint32_t nowMs() const
+        {
+            Platform *plat = platform();
+            return plat ? plat->nowMs() : 0;
+        }
+
+        static constexpr uint32_t debounceMs()
+        {
+            return 16;
+        }
 
         void applyPullDefaults()
         {
@@ -108,19 +120,19 @@ namespace pipcore
         bool readRaw() const
         {
             bool v = false;
-            GuiPlatform *plat = platform();
+            Platform *plat = platform();
             if (plat)
-                v = plat->ioDigitalRead(_pin);
+                v = plat->digitalRead(_pin);
             return _activeLow ? !v : v;
         }
 
-        GuiPlatform *_platform;
+        Platform *_platform;
         uint8_t _pin;
         PullMode _pull;
         bool _activeLow;
+        bool _rawState;
         bool _stableState;
         bool _pressedFlag;
-        uint8_t _vc0;
-        uint8_t _vc1;
+        uint32_t _lastRawChangeMs;
     };
 }

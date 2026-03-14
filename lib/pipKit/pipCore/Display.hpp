@@ -5,10 +5,10 @@
 
 namespace pipcore
 {
-    class GuiDisplay
+    class Display
     {
     public:
-        virtual ~GuiDisplay() = default;
+        virtual ~Display() = default;
 
         virtual bool begin(uint8_t rotation) = 0;
         virtual uint16_t width() const = 0;

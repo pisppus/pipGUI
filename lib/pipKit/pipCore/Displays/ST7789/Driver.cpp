@@ -1,5 +1,6 @@
 #include <pipCore/Displays/ST7789/Driver.hpp>
-namespace pipcore
+
+namespace pipcore::st7789
 {
     namespace
     {
@@ -31,13 +32,115 @@ namespace pipcore
         }
     }
 
-    bool ST7789::configure(ISt7789Transport *transport,
+    const char *ioErrorText(IoError error)
+    {
+        switch (error)
+        {
+        case IoError::None:
+            return "ok";
+        case IoError::InvalidConfig:
+            return "invalid config";
+        case IoError::NotReady:
+            return "transport not ready";
+        case IoError::Gpio:
+            return "gpio operation failed";
+        case IoError::SpiBusInit:
+            return "spi bus init failed";
+        case IoError::SpiDeviceAdd:
+            return "spi device add failed";
+        case IoError::DmaBufferAlloc:
+            return "dma buffer alloc failed";
+        case IoError::TransactionAlloc:
+            return "spi transaction alloc failed";
+        case IoError::CommandTransmit:
+            return "spi command transmit failed";
+        case IoError::DataTransmit:
+            return "spi data transmit failed";
+        case IoError::QueueTransmit:
+            return "spi queue transmit failed";
+        case IoError::QueueResult:
+            return "spi queue result failed";
+        case IoError::UnexpectedTransaction:
+            return "unexpected spi transaction result";
+        default:
+            return "unknown st7789 io error";
+        }
+    }
+
+    void Driver::reset()
+    {
+        _transport = nullptr;
+        _width = 0;
+        _height = 0;
+        _physWidth = 0;
+        _physHeight = 0;
+        _rotation = 0;
+        _xStart = 0;
+        _yStart = 0;
+        _xOffsetCfg = 0;
+        _yOffsetCfg = 0;
+        _order = 0;
+        _invert = true;
+        _swap = false;
+        _initialized = false;
+        _lastError = IoError::None;
+    }
+
+    bool Driver::failFromTransport(IoError fallback)
+    {
+        _lastError = (_transport && _transport->lastError() != IoError::None)
+                         ? _transport->lastError()
+                         : fallback;
+        return false;
+    }
+
+    bool Driver::sendCommand(uint8_t cmd)
+    {
+        if (!_transport)
+            return failFromTransport(IoError::NotReady);
+        if (_transport->writeCommand(cmd))
+            return true;
+        return failFromTransport(IoError::CommandTransmit);
+    }
+
+    bool Driver::sendBytes(const void *data, size_t len)
+    {
+        if (!_transport)
+            return failFromTransport(IoError::NotReady);
+        if (_transport->write(data, len))
+            return true;
+        return failFromTransport(IoError::DataTransmit);
+    }
+
+    bool Driver::sendPixels(const void *data, size_t len)
+    {
+        if (!_transport)
+            return failFromTransport(IoError::NotReady);
+        if (_transport->writePixels(data, len))
+            return true;
+        return failFromTransport(IoError::DataTransmit);
+    }
+
+    bool Driver::flushTransport()
+    {
+        if (!_transport)
+            return failFromTransport(IoError::NotReady);
+        if (_transport->flush())
+            return true;
+        return failFromTransport(IoError::QueueResult);
+    }
+
+    bool Driver::configure(Transport *transport,
                            uint16_t width, uint16_t height, uint8_t order,
                            bool invert, bool swap,
                            int16_t xOffset, int16_t yOffset)
     {
         if (!transport || !width || !height || xOffset < 0 || yOffset < 0)
+        {
+            reset();
+            _lastError = IoError::InvalidConfig;
             return false;
+        }
 
         _transport = transport;
         _width = _physWidth = width;
@@ -48,63 +151,94 @@ namespace pipcore
         _invert = invert;
         _swap = swap;
         _initialized = false;
+        _lastError = IoError::None;
+        _transport->clearError();
         return true;
     }
 
-    void ST7789::hardReset()
+    bool Driver::hardReset()
     {
         if (!_transport)
-            return;
-        _transport->setRst(0);
+            return failFromTransport(IoError::NotReady);
+        if (!_transport->setRst(false))
+            return failFromTransport(IoError::Gpio);
         _transport->delayMs(20);
-        _transport->setRst(1);
+        if (!_transport->setRst(true))
+            return failFromTransport(IoError::Gpio);
         _transport->delayMs(150);
+        return true;
     }
 
-    bool ST7789::begin(uint8_t rotation)
+    bool Driver::begin(uint8_t rotation)
     {
-        if (!_transport || !_width || !_height || !_transport->init())
+        _initialized = false;
+        _lastError = IoError::None;
+
+        if (!_transport || !_width || !_height)
+        {
+            _lastError = IoError::InvalidConfig;
+            return false;
+        }
+
+        _transport->clearError();
+        if (!_transport->init())
+            return failFromTransport(IoError::NotReady);
+
+        if (!hardReset())
             return false;
 
-        hardReset();
-
-        _transport->writeCommand(CmdSWRESET);
+        if (!sendCommand(CmdSWRESET))
+            return false;
         _transport->delayMs(150);
-        _transport->writeCommand(CmdSLPOUT);
+
+        if (!sendCommand(CmdSLPOUT))
+            return false;
         _transport->delayMs(200);
 
-        _transport->writeCommand(CmdCOLMOD);
+        if (!sendCommand(CmdCOLMOD))
+            return false;
         {
             uint8_t v = Colmod16bpp;
-            _transport->write(&v, 1);
+            if (!sendBytes(&v, 1))
+                return false;
         }
         _transport->delayMs(10);
 
-        _transport->writeCommand(_invert ? CmdINVON : CmdINVOFF);
-        _transport->delayMs(10);
-        _transport->writeCommand(CmdNORON);
+        if (!sendCommand(_invert ? CmdINVON : CmdINVOFF))
+            return false;
         _transport->delayMs(10);
 
-        setRotationInternal(rotation);
+        if (!sendCommand(CmdNORON))
+            return false;
+        _transport->delayMs(10);
 
-        _transport->writeCommand(CmdDISPON);
+        if (!setRotationInternal(rotation))
+            return false;
+
+        if (!sendCommand(CmdDISPON))
+            return false;
         _transport->delayMs(100);
 
         _initialized = true;
+        _lastError = IoError::None;
         return true;
     }
 
-    void ST7789::setInversion(bool enabled)
+    void Driver::setInversion(bool enabled)
     {
         _invert = enabled;
         if (!_transport || !_initialized)
             return;
-        _transport->writeCommand(_invert ? CmdINVON : CmdINVOFF);
+        if (!sendCommand(_invert ? CmdINVON : CmdINVOFF))
+            return;
         _transport->delayMs(10);
     }
 
-    void ST7789::setRotationInternal(uint8_t rotation)
+    bool Driver::setRotationInternal(uint8_t rotation)
     {
+        if (!_transport)
+            return failFromTransport(IoError::NotReady);
+
         _rotation = rotation & 3U;
 
         const uint8_t bgr = (_order == 1) ? MadctlBGR : 0;
@@ -141,47 +275,66 @@ namespace pipcore
             _yStart = _xOffsetCfg;
             break;
         default:
-            return;
+            _lastError = IoError::InvalidConfig;
+            return false;
         }
 
-        _transport->writeCommand(CmdMADCTL);
-        _transport->write(&madctl, 1);
+        if (!sendCommand(CmdMADCTL))
+            return false;
+        if (!sendBytes(&madctl, 1))
+            return false;
+        return true;
     }
 
-    void ST7789::setAddrWindow(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1)
+    bool Driver::setAddrWindow(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1)
     {
-        if (!_transport || x1 < x0 || y1 < y0 || !_width || !_height)
-            return;
+        if (!_transport || !_initialized || !_width || !_height || x1 < x0 || y1 < y0)
+        {
+            _lastError = (_transport && _initialized) ? IoError::InvalidConfig : IoError::NotReady;
+            return false;
+        }
         if (x0 >= _width || y0 >= _height)
-            return;
+            return true;
 
         if (x1 >= _width)
             x1 = (uint16_t)(_width - 1U);
         if (y1 >= _height)
             y1 = (uint16_t)(_height - 1U);
 
-        const int32_t xs32 = x0 + _xStart, xe32 = x1 + _xStart;
-        const int32_t ys32 = y0 + _yStart, ye32 = y1 + _yStart;
+        const int32_t xs32 = x0 + _xStart;
+        const int32_t xe32 = x1 + _xStart;
+        const int32_t ys32 = y0 + _yStart;
+        const int32_t ye32 = y1 + _yStart;
         if (xs32 < 0 || ys32 < 0)
-            return;
+        {
+            _lastError = IoError::InvalidConfig;
+            return false;
+        }
 
         uint8_t buf[4];
 
-        _transport->writeCommand(CmdCASET);
+        if (!sendCommand(CmdCASET))
+            return false;
         pack16BE(buf, (uint16_t)xs32, (uint16_t)xe32);
-        _transport->write(buf, 4);
+        if (!sendBytes(buf, 4))
+            return false;
 
-        _transport->writeCommand(CmdRASET);
+        if (!sendCommand(CmdRASET))
+            return false;
         pack16BE(buf, (uint16_t)ys32, (uint16_t)ye32);
-        _transport->write(buf, 4);
+        if (!sendBytes(buf, 4))
+            return false;
 
-        _transport->writeCommand(CmdRAMWR);
+        return sendCommand(CmdRAMWR);
     }
 
-    void ST7789::writePixels565(const uint16_t *pixels, size_t pixelCount, bool swapBytes)
+    bool Driver::writePixels565(const uint16_t *pixels, size_t pixelCount, bool swapBytes)
     {
-        if (!_transport || !pixelCount)
-            return;
+        if (!_transport || !_initialized || !pixels || !pixelCount)
+        {
+            _lastError = (_transport && _initialized) ? IoError::InvalidConfig : IoError::NotReady;
+            return false;
+        }
 
         if (!swapBytes)
         {
@@ -189,11 +342,12 @@ namespace pipcore
             while (pixelCount)
             {
                 size_t n = pixelCount > Chunk ? Chunk : pixelCount;
-                _transport->writePixels(pixels, n * sizeof(uint16_t));
+                if (!sendPixels(pixels, n * sizeof(uint16_t)))
+                    return false;
                 pixels += n;
                 pixelCount -= n;
             }
-            return;
+            return true;
         }
 
         constexpr size_t Chunk = 256;
@@ -203,18 +357,24 @@ namespace pipcore
             size_t n = pixelCount > Chunk ? Chunk : pixelCount;
             for (size_t i = 0; i < n; ++i)
                 tmp[i] = bswap16(pixels[i]);
-            _transport->writePixels(tmp, n * sizeof(uint16_t));
+            if (!sendPixels(tmp, n * sizeof(uint16_t)))
+                return false;
             pixels += n;
             pixelCount -= n;
         }
+        return true;
     }
 
-    void ST7789::fillScreen565(uint16_t color565, bool swapBytes)
+    bool Driver::fillScreen565(uint16_t color565, bool swapBytes)
     {
-        if (!_transport)
-            return;
+        if (!_transport || !_initialized || !_width || !_height)
+        {
+            _lastError = (_transport && _initialized) ? IoError::InvalidConfig : IoError::NotReady;
+            return false;
+        }
 
-        setAddrWindow(0, 0, (uint16_t)(_width - 1U), (uint16_t)(_height - 1U));
+        if (!setAddrWindow(0, 0, (uint16_t)(_width - 1U), (uint16_t)(_height - 1U)))
+            return false;
 
         constexpr size_t Chunk = 256;
         uint16_t tmp[Chunk];
@@ -226,10 +386,11 @@ namespace pipcore
         while (remaining)
         {
             size_t n = remaining > Chunk ? Chunk : remaining;
-            _transport->writePixels(tmp, n * sizeof(uint16_t));
+            if (!sendPixels(tmp, n * sizeof(uint16_t)))
+                return false;
             remaining -= n;
         }
-        _transport->flush();
-    }
 
+        return flushTransport();
+    }
 }

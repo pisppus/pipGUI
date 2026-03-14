@@ -3,50 +3,55 @@
 #include <pipCore/Displays/ST7789/Driver.hpp>
 
 #if !defined(ESP32)
-#error "Esp32St7789Spi requires ESP32"
+#error "pipcore::esp32::St7789Spi requires ESP32"
 #endif
 
 struct spi_transaction_t;
 
-namespace pipcore
+namespace pipcore::esp32
 {
-    class Esp32St7789Spi final : public ISt7789Transport
+    class St7789Spi final : public st7789::Transport
     {
     public:
-        Esp32St7789Spi(int8_t mosi, int8_t sclk, int8_t cs, int8_t dc, int8_t rst, uint32_t hz = 80000000);
-        ~Esp32St7789Spi();
+        St7789Spi() = default;
+        ~St7789Spi();
+
+        void configure(int8_t mosi, int8_t sclk, int8_t cs, int8_t dc, int8_t rst, uint32_t hz = 80000000);
 
         bool init() override;
         void deinit() override;
-        void setDc(bool level) override;
-        void setRst(bool level) override;
+        st7789::IoError lastError() const override { return _lastError; }
+        void clearError() override { _lastError = st7789::IoError::None; }
+        bool setRst(bool level) override;
         void delayMs(uint32_t ms) override;
-        void write(const void *data, size_t len) override;
-        void writeCommand(uint8_t cmd) override;
-        void writePixels(const void *data, size_t len) override;
-        void flush() override;
+        bool write(const void *data, size_t len) override;
+        bool writeCommand(uint8_t cmd) override;
+        bool writePixels(const void *data, size_t len) override;
+        bool flush() override;
 
     private:
         bool initSpi();
-        void waitQueued();
-        void flushQueued();
-        inline void setDcCached(int level);
+        bool waitQueued();
+        bool flushQueued();
+        bool fail(st7789::IoError error);
+        inline bool setDcCached(int level);
 
-        int8_t _pinMosi;
-        int8_t _pinSclk;
-        int8_t _pinCs;
-        int8_t _pinDc;
-        int8_t _pinRst;
-        uint32_t _hz;
+        int8_t _pinMosi = -1;
+        int8_t _pinSclk = -1;
+        int8_t _pinCs = -1;
+        int8_t _pinDc = -1;
+        int8_t _pinRst = -1;
+        uint32_t _hz = 80000000U;
 
-        void *_spiHandle;
-        size_t _dmaBufSize;
-        uint8_t *_dmaBuf[2];
-        spi_transaction_t *_trans[2];
-        bool _transInFlight[2];
-        int _dmaNext;
-        int _dmaInflight;
-        int8_t _dcLevel;
-        bool _initialized;
+        void *_spiHandle = nullptr;
+        size_t _dmaBufSize = 8192;
+        uint8_t *_dmaBuf[2] = {nullptr, nullptr};
+        spi_transaction_t *_trans[2] = {nullptr, nullptr};
+        bool _transInFlight[2] = {false, false};
+        int _dmaNext = 0;
+        int _dmaInflight = 0;
+        int8_t _dcLevel = -1;
+        bool _initialized = false;
+        st7789::IoError _lastError = st7789::IoError::None;
     };
 }

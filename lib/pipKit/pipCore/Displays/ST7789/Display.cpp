@@ -1,21 +1,25 @@
 #include <pipCore/Displays/ST7789/Display.hpp>
-#include <pipCore/Platforms/PlatformFactory.hpp>
-#include <string.h>
+#include <pipCore/Platform.hpp>
 
-namespace pipcore
+namespace pipcore::st7789
 {
-    ST7789Display::~ST7789Display()
+    namespace
     {
-        if (_lineBuf)
+        inline uint16_t bswap16(uint16_t v) { return (uint16_t)__builtin_bswap16(v); }
+    }
+
+    Display::~Display()
+    {
+        if (_lineBuf && _platform)
         {
-            GetPlatform()->guiFree(_lineBuf);
+            _platform->free(_lineBuf);
             _lineBuf = nullptr;
             _lineBufCapPixels = 0;
         }
     }
 
-    void ST7789Display::writeRect565(int16_t x, int16_t y, int16_t w, int16_t h,
-                                     const uint16_t *pixels, int32_t stridePixels)
+    void Display::writeRect565(int16_t x, int16_t y, int16_t w, int16_t h,
+                               const uint16_t *pixels, int32_t stridePixels)
     {
         if (!pixels || w <= 0 || h <= 0 || stridePixels < w)
             return;
@@ -43,32 +47,56 @@ namespace pipcore
 
         pixels += (size_t)(y0 - y) * stridePixels + (x0 - x);
 
-        _drv.setAddrWindow((uint16_t)x0, (uint16_t)y0, (uint16_t)x1, (uint16_t)y1);
+        if (!_drv.setAddrWindow((uint16_t)x0, (uint16_t)y0, (uint16_t)x1, (uint16_t)y1))
+            return;
 
         const bool swap = _drv.swapBytes();
+        const size_t totalPixels = (size_t)cW * (size_t)cH;
+
+        if (cH == 1 || stridePixels == cW)
+        {
+            if (!_drv.writePixels565(pixels, totalPixels, swap))
+                return;
+            return;
+        }
 
         if (swap)
         {
             const size_t need = (size_t)cW;
             if (_lineBufCapPixels < need)
             {
-                GetPlatform()->guiFree(_lineBuf);
-                _lineBuf = (uint16_t *)GetPlatform()->guiAlloc(need * sizeof(uint16_t), GuiAllocCaps::PreferExternal);
-                _lineBufCapPixels = _lineBuf ? need : 0;
+                uint16_t *newBuf = _platform ? (uint16_t *)_platform->alloc(need * sizeof(uint16_t), AllocCaps::PreferExternal) : nullptr;
+                if (newBuf)
+                {
+                    if (_lineBuf)
+                        _platform->free(_lineBuf);
+                    _lineBuf = newBuf;
+                    _lineBufCapPixels = need;
+                }
             }
         }
 
         for (int16_t yy = 0; yy < cH; ++yy)
         {
             const uint16_t *row = pixels + (size_t)yy * stridePixels;
-            if (swap && _lineBuf)
+            if (!swap)
             {
-                memcpy(_lineBuf, row, (size_t)cW * sizeof(uint16_t));
-                _drv.writePixels565(_lineBuf, (size_t)cW, true);
+                if (!_drv.writePixels565(row, (size_t)cW, false))
+                    return;
+                continue;
+            }
+
+            if (_lineBuf && _lineBufCapPixels >= (size_t)cW)
+            {
+                for (int16_t xx = 0; xx < cW; ++xx)
+                    _lineBuf[xx] = bswap16(row[xx]);
+                if (!_drv.writePixels565(_lineBuf, (size_t)cW, false))
+                    return;
             }
             else
             {
-                _drv.writePixels565(row, (size_t)cW, false);
+                if (!_drv.writePixels565(row, (size_t)cW, true))
+                    return;
             }
         }
     }

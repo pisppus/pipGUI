@@ -1,6 +1,6 @@
 #pragma once
 
-#include <pipCore/Platforms/GuiPlatform.hpp>
+#include <pipCore/Platform.hpp>
 
 #if !defined(PIPCORE_PLATFORM)
 #if defined(ESP32)
@@ -12,19 +12,19 @@
 #error "Platform not selected. Define PIPCORE_PLATFORM (e.g., -DPIPCORE_PLATFORM=NAME) or ensure target macro (ESP32, STM32, etc.) is defined"
 #endif
 
-#if PIPCORE_PLATFORM == ESP32
-#include <pipCore/Platforms/ESP32/GUI.hpp>
+#if defined(ESP32) && (PIPCORE_PLATFORM == ESP32)
+#include <pipCore/Platforms/ESP32/Platform.hpp>
+#else
+#error "Unsupported PIPCORE_PLATFORM value for this target"
 #endif
 
 namespace pipcore
 {
-    inline GuiPlatform *GetPlatform()
+    using SelectedPlatform = esp32::Platform;
+
+    inline Platform *GetPlatform()
     {
-#if PIPCORE_PLATFORM == ESP32
-        static ESP32Platform instance;
+        static SelectedPlatform instance;
         return &instance;
-#else
-#error "Unsupported PIPCORE_PLATFORM value"
-#endif
     }
 }

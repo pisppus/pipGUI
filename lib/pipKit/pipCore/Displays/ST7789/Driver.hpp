@@ -3,29 +3,49 @@
 #include <cstdint>
 #include <cstddef>
 
-namespace pipcore
+namespace pipcore::st7789
 {
-    class ISt7789Transport
+    enum class IoError : uint8_t
     {
-    public:
-        virtual ~ISt7789Transport() = default;
-        virtual bool init() = 0;
-        virtual void deinit() = 0;
-        virtual void setDc(bool level) = 0;
-        virtual void setRst(bool level) = 0;
-        virtual void delayMs(uint32_t ms) = 0;
-        virtual void write(const void *data, size_t len) = 0;
-        virtual void writeCommand(uint8_t cmd) = 0;
-        virtual void writePixels(const void *data, size_t len) = 0;
-        virtual void flush() = 0;
+        None = 0,
+        InvalidConfig,
+        NotReady,
+        Gpio,
+        SpiBusInit,
+        SpiDeviceAdd,
+        DmaBufferAlloc,
+        TransactionAlloc,
+        CommandTransmit,
+        DataTransmit,
+        QueueTransmit,
+        QueueResult,
+        UnexpectedTransaction
     };
 
-    class ST7789
+    const char *ioErrorText(IoError error);
+
+    class Transport
     {
     public:
-        ST7789() = default;
+        virtual ~Transport() = default;
+        virtual bool init() = 0;
+        virtual void deinit() = 0;
+        virtual IoError lastError() const = 0;
+        virtual void clearError() = 0;
+        virtual bool setRst(bool level) = 0;
+        virtual void delayMs(uint32_t ms) = 0;
+        virtual bool write(const void *data, size_t len) = 0;
+        virtual bool writeCommand(uint8_t cmd) = 0;
+        virtual bool writePixels(const void *data, size_t len) = 0;
+        virtual bool flush() = 0;
+    };
 
-        bool configure(ISt7789Transport *transport,
+    class Driver
+    {
+    public:
+        Driver() = default;
+
+        bool configure(Transport *transport,
                        uint16_t width,
                        uint16_t height,
                        uint8_t order = 0,
@@ -35,25 +55,33 @@ namespace pipcore
                        int16_t yOffset = 0);
 
         bool begin(uint8_t rotation);
+        void reset();
+        IoError lastError() const { return _lastError; }
+        const char *lastErrorText() const { return ioErrorText(_lastError); }
 
         uint16_t width() const { return _width; }
         uint16_t height() const { return _height; }
         bool swapBytes() const { return _swap; }
 
-        void setAddrWindow(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1);
+        bool setAddrWindow(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1);
 
-        void writePixels565(const uint16_t *pixels, size_t pixelCount, bool swapBytes = false);
+        bool writePixels565(const uint16_t *pixels, size_t pixelCount, bool swapBytes = false);
 
-        void fillScreen565(uint16_t color565, bool swapBytes = false);
+        bool fillScreen565(uint16_t color565, bool swapBytes = false);
 
         void setInversion(bool enabled);
 
     private:
-        void hardReset();
-        void setRotationInternal(uint8_t rotation);
+        bool hardReset();
+        bool setRotationInternal(uint8_t rotation);
+        bool sendCommand(uint8_t cmd);
+        bool sendBytes(const void *data, size_t len);
+        bool sendPixels(const void *data, size_t len);
+        bool flushTransport();
+        bool failFromTransport(IoError fallback);
 
     private:
-        ISt7789Transport *_transport = nullptr;
+        Transport *_transport = nullptr;
 
         uint16_t _width = 0;
         uint16_t _height = 0;
@@ -70,5 +98,6 @@ namespace pipcore
         bool _invert = true;
         bool _swap = false;
         bool _initialized = false;
+        IoError _lastError = IoError::None;
     };
 }
