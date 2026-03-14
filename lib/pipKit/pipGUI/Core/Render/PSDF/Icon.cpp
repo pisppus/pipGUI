@@ -1,4 +1,5 @@
 #include <pipGUI/Core/API/pipGUI.hpp>
+#include <pipGUI/Core/API/Internal/BuilderAccess.hpp>
 #include <pipGUI/Core/Utils/Colors.hpp>
 #include <pipGUI/Core/Render/Draw/Blend.hpp>
 #include <pipGUI/Icons/icons.hpp>
@@ -7,7 +8,7 @@
 namespace pipgui
 {
 
-    static inline uint8_t sampleBilinear(pipcore::GuiPlatform *plat,
+    static inline uint8_t sampleBilinear(pipcore::Platform *plat,
                                          int32_t u16, int32_t v16,
                                          uint32_t atlasW, uint32_t atlasH)
     {
@@ -84,7 +85,7 @@ namespace pipgui
         const uint32_t atlasW = (uint32_t)psdf_icons::AtlasWidth;
         const uint32_t atlasH = (uint32_t)psdf_icons::AtlasHeight;
         const uint16_t fgNative = pipcore::Sprite::swap16(fg565);
-        pipcore::GuiPlatform *plat = platform();
+        pipcore::Platform *plat = platform();
 
         const int32_t duFP = (int32_t)((float)ic.w / (float)renderSizePx * 65536.f);
         const int32_t dvFP = (int32_t)((float)ic.h / (float)renderSizePx * 65536.f);
@@ -156,10 +157,7 @@ namespace pipgui
         if (_consumed || !_gui || _sizePx == 0)
             return;
         _consumed = true;
-
-        if (_gui->_flags.spriteEnabled && _gui->_disp.display && !_gui->_flags.inSpritePass)
-            _gui->updateIconInternal(_iconId, _x, _y, _sizePx, _fg565, _bg565);
-        else
-            _gui->drawIconInternal(_iconId, _x, _y, _sizePx, _fg565);
+        detail::BuilderAccess::drawIcon(*_gui, _iconId, _x, _y, _sizePx, _fg565, _bg565);
     }
 }
+

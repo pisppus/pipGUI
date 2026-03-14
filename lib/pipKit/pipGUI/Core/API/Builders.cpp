@@ -1,4 +1,5 @@
 #include <pipGUI/Core/API/pipGUI.hpp>
+#include <pipGUI/Core/API/Internal/BuilderAccess.hpp>
 
 namespace pipgui
 {
@@ -8,11 +9,27 @@ namespace pipgui
         if (_consumed || !_gui)
             return;
         if (_perCorner)
-            _gui->fillRoundRect(_x, _y, _w, _h, _radiusTL, _radiusTR, _radiusBR, _radiusBL, _color);
+        {
+            detail::BuilderAccess::fillRoundRect(
+                *_gui,
+                _x,
+                _y,
+                _w,
+                _h,
+                _radiusTL,
+                _radiusTR,
+                _radiusBR,
+                _radiusBL,
+                _color);
+        }
         else if (_radius > 0)
-            _gui->fillRoundRect(_x, _y, _w, _h, _radius, _color);
+        {
+            detail::BuilderAccess::fillRoundRect(*_gui, _x, _y, _w, _h, _radius, _color);
+        }
         else
-            _gui->fillRect(_x, _y, _w, _h, _color);
+        {
+            detail::BuilderAccess::fillRect(*_gui, _x, _y, _w, _h, _color);
+        }
         _consumed = true;
     }
 
@@ -22,11 +39,11 @@ namespace pipgui
             return;
         if (_perCorner)
         {
-            _gui->drawRoundRect(_x, _y, _w, _h, _radiusTL, _radiusTR, _radiusBR, _radiusBL, _color);
+            detail::BuilderAccess::drawRoundRect(*_gui, _x, _y, _w, _h, _radiusTL, _radiusTR, _radiusBR, _radiusBL, _color);
         }
         else if (_radius > 0)
         {
-            _gui->drawRoundRect(_x, _y, _w, _h, _radius, _color);
+            detail::BuilderAccess::drawRoundRect(*_gui, _x, _y, _w, _h, _radius, _color);
         }
         else
         {
@@ -34,10 +51,10 @@ namespace pipgui
             const int16_t y0 = _y;
             const int16_t x1 = (int16_t)(_x + _w - 1);
             const int16_t y1 = (int16_t)(_y + _h - 1);
-            _gui->drawLine(x0, y0, x1, y0, _color);
-            _gui->drawLine(x1, y0, x1, y1, _color);
-            _gui->drawLine(x1, y1, x0, y1, _color);
-            _gui->drawLine(x0, y1, x0, y0, _color);
+            detail::BuilderAccess::drawLine(*_gui, x0, y0, x1, y0, _color);
+            detail::BuilderAccess::drawLine(*_gui, x1, y0, x1, y1, _color);
+            detail::BuilderAccess::drawLine(*_gui, x1, y1, x0, y1, _color);
+            detail::BuilderAccess::drawLine(*_gui, x0, y1, x0, y0, _color);
         }
         _consumed = true;
     }
@@ -46,7 +63,7 @@ namespace pipgui
     {
         if (_consumed || !_gui)
             return;
-        _gui->fillRectGradientVertical(_x, _y, _w, _h, _topColor, _bottomColor);
+        detail::BuilderAccess::fillRectGradientVertical(*_gui, _x, _y, _w, _h, _topColor, _bottomColor);
         _consumed = true;
     }
 
@@ -54,7 +71,7 @@ namespace pipgui
     {
         if (_consumed || !_gui)
             return;
-        _gui->fillRectGradientHorizontal(_x, _y, _w, _h, _leftColor, _rightColor);
+        detail::BuilderAccess::fillRectGradientHorizontal(*_gui, _x, _y, _w, _h, _leftColor, _rightColor);
         _consumed = true;
     }
 
@@ -62,7 +79,7 @@ namespace pipgui
     {
         if (_consumed || !_gui)
             return;
-        _gui->fillRectGradientCorners(_x, _y, _w, _h, _c00, _c10, _c01, _c11);
+        detail::BuilderAccess::fillRectGradientCorners(*_gui, _x, _y, _w, _h, _c00, _c10, _c01, _c11);
         _consumed = true;
     }
 
@@ -70,7 +87,7 @@ namespace pipgui
     {
         if (_consumed || !_gui)
             return;
-        _gui->fillRectGradientDiagonal(_x, _y, _w, _h, _tlColor, _brColor);
+        detail::BuilderAccess::fillRectGradientDiagonal(*_gui, _x, _y, _w, _h, _tlColor, _brColor);
         _consumed = true;
     }
 
@@ -78,7 +95,7 @@ namespace pipgui
     {
         if (_consumed || !_gui)
             return;
-        _gui->fillRectGradientRadial(_x, _y, _w, _h, _cx, _cy, _radius, _innerColor, _outerColor);
+        detail::BuilderAccess::fillRectGradientRadial(*_gui, _x, _y, _w, _h, _cx, _cy, _radius, _innerColor, _outerColor);
         _consumed = true;
     }
 
@@ -86,7 +103,7 @@ namespace pipgui
     {
         if (_consumed || !_gui)
             return;
-        _gui->drawLine(_x0, _y0, _x1, _y1, _color);
+        detail::BuilderAccess::drawLine(*_gui, _x0, _y0, _x1, _y1, _color);
         _consumed = true;
     }
 
@@ -94,7 +111,7 @@ namespace pipgui
     {
         if (_consumed || !_gui)
             return;
-        _gui->drawCircle(_cx, _cy, _r, _color);
+        detail::BuilderAccess::drawCircle(*_gui, _cx, _cy, _r, _color);
         _consumed = true;
     }
 
@@ -102,7 +119,7 @@ namespace pipgui
     {
         if (_consumed || !_gui)
             return;
-        _gui->fillCircle(_cx, _cy, _r, _color);
+        detail::BuilderAccess::fillCircle(*_gui, _cx, _cy, _r, _color);
         _consumed = true;
     }
 
@@ -110,7 +127,7 @@ namespace pipgui
     {
         if (_consumed || !_gui)
             return;
-        _gui->drawArc(_cx, _cy, _r, _startDeg, _endDeg, _color);
+        detail::BuilderAccess::drawArc(*_gui, _cx, _cy, _r, _startDeg, _endDeg, _color);
         _consumed = true;
     }
 
@@ -118,7 +135,7 @@ namespace pipgui
     {
         if (_consumed || !_gui)
             return;
-        _gui->drawEllipse(_cx, _cy, _rx, _ry, _color);
+        detail::BuilderAccess::drawEllipse(*_gui, _cx, _cy, _rx, _ry, _color);
         _consumed = true;
     }
 
@@ -126,7 +143,7 @@ namespace pipgui
     {
         if (_consumed || !_gui)
             return;
-        _gui->fillEllipse(_cx, _cy, _rx, _ry, _color);
+        detail::BuilderAccess::fillEllipse(*_gui, _cx, _cy, _rx, _ry, _color);
         _consumed = true;
     }
 
@@ -135,9 +152,9 @@ namespace pipgui
         if (_consumed || !_gui)
             return;
         if (_radius > 0)
-            _gui->drawRoundTriangle(_x0, _y0, _x1, _y1, _x2, _y2, _radius, _color);
+            detail::BuilderAccess::drawRoundTriangle(*_gui, _x0, _y0, _x1, _y1, _x2, _y2, _radius, _color);
         else
-            _gui->drawTriangle(_x0, _y0, _x1, _y1, _x2, _y2, _color);
+            detail::BuilderAccess::drawTriangle(*_gui, _x0, _y0, _x1, _y1, _x2, _y2, _color);
         _consumed = true;
     }
 
@@ -146,9 +163,9 @@ namespace pipgui
         if (_consumed || !_gui)
             return;
         if (_radius > 0)
-            _gui->fillRoundTriangle(_x0, _y0, _x1, _y1, _x2, _y2, _radius, _color);
+            detail::BuilderAccess::fillRoundTriangle(*_gui, _x0, _y0, _x1, _y1, _x2, _y2, _radius, _color);
         else
-            _gui->fillTriangle(_x0, _y0, _x1, _y1, _x2, _y2, _color);
+            detail::BuilderAccess::fillTriangle(*_gui, _x0, _y0, _x1, _y1, _x2, _y2, _color);
         _consumed = true;
     }
 
@@ -156,7 +173,7 @@ namespace pipgui
     {
         if (_consumed || !_gui)
             return;
-        _gui->drawSquircle(_cx, _cy, _r, _color);
+        detail::BuilderAccess::drawSquircle(*_gui, _cx, _cy, _r, _color);
         _consumed = true;
     }
 
@@ -164,7 +181,7 @@ namespace pipgui
     {
         if (_consumed || !_gui)
             return;
-        _gui->fillSquircle(_cx, _cy, _r, _color);
+        detail::BuilderAccess::fillSquircle(*_gui, _cx, _cy, _r, _color);
         _consumed = true;
     }
 
@@ -174,9 +191,35 @@ namespace pipgui
         if (_consumed || !_gui)
             return;
         if (IsUpdate)
-            _gui->updateBlurRegion(_x, _y, _w, _h, _radius, _dir, _gradient, _materialStrength, _noiseAmount, _materialColor);
+        {
+            detail::BuilderAccess::updateBlurRegion(
+                *_gui,
+                _x,
+                _y,
+                _w,
+                _h,
+                _radius,
+                _dir,
+                _gradient,
+                _materialStrength,
+                _noiseAmount,
+                _materialColor);
+        }
         else
-            _gui->drawBlurRegion(_x, _y, _w, _h, _radius, _dir, _gradient, _materialStrength, _noiseAmount, _materialColor);
+        {
+            detail::BuilderAccess::drawBlurRegion(
+                *_gui,
+                _x,
+                _y,
+                _w,
+                _h,
+                _radius,
+                _dir,
+                _gradient,
+                _materialStrength,
+                _noiseAmount,
+                _materialColor);
+        }
         _consumed = true;
     }
     template void BlurRegionFluentT<false>::draw();
@@ -188,9 +231,41 @@ namespace pipgui
         if (_consumed || !_gui)
             return;
         if (IsUpdate)
-            _gui->updateScrollDotsImpl(_x, _y, _count, _activeIndex, _prevIndex, _animProgress, _animate, _animDirection, _activeColor, _inactiveColor, _dotRadius, _spacing, _activeWidth);
+        {
+            detail::BuilderAccess::updateScrollDots(
+                *_gui,
+                _x,
+                _y,
+                _count,
+                _activeIndex,
+                _prevIndex,
+                _animProgress,
+                _animate,
+                _animDirection,
+                _activeColor,
+                _inactiveColor,
+                _dotRadius,
+                _spacing,
+                _activeWidth);
+        }
         else
-            _gui->drawScrollDotsImpl(_x, _y, _count, _activeIndex, _prevIndex, _animProgress, _animate, _animDirection, _activeColor, _inactiveColor, _dotRadius, _spacing, _activeWidth);
+        {
+            detail::BuilderAccess::drawScrollDots(
+                *_gui,
+                _x,
+                _y,
+                _count,
+                _activeIndex,
+                _prevIndex,
+                _animProgress,
+                _animate,
+                _animDirection,
+                _activeColor,
+                _inactiveColor,
+                _dotRadius,
+                _spacing,
+                _activeWidth);
+        }
         _consumed = true;
     }
     template void ScrollDotsFluentT<false>::draw();
@@ -202,9 +277,35 @@ namespace pipgui
         if (_consumed || !_gui)
             return;
         if (IsUpdate)
-            _gui->updateGlowCircle(_x, _y, _r, _fillColor, _bgColor, _glowColor, _glowSize, _glowStrength, _anim, _pulsePeriodMs);
+        {
+            detail::BuilderAccess::updateGlowCircle(
+                *_gui,
+                _x,
+                _y,
+                _r,
+                _fillColor,
+                _bgColor,
+                _glowColor,
+                _glowSize,
+                _glowStrength,
+                _anim,
+                _pulsePeriodMs);
+        }
         else
-            _gui->drawGlowCircle(_x, _y, _r, _fillColor, _bgColor, _glowColor, _glowSize, _glowStrength, _anim, _pulsePeriodMs);
+        {
+            detail::BuilderAccess::drawGlowCircle(
+                *_gui,
+                _x,
+                _y,
+                _r,
+                _fillColor,
+                _bgColor,
+                _glowColor,
+                _glowSize,
+                _glowStrength,
+                _anim,
+                _pulsePeriodMs);
+        }
         _consumed = true;
     }
     template void GlowCircleFluentT<false>::draw();
@@ -219,25 +320,55 @@ namespace pipgui
         {
             if (IsUpdate)
             {
-                _gui->updateGlowRect(_x, _y, _w, _h,
-                                     _radiusTL, _radiusTR, _radiusBR, _radiusBL,
-                                     _fillColor, _bgColor, _glowColor,
-                                     _glowSize, _glowStrength, _anim, _pulsePeriodMs);
+                detail::BuilderAccess::updateGlowRect(*_gui, _x, _y, _w, _h,
+                                                      _radiusTL, _radiusTR, _radiusBR, _radiusBL,
+                                                      _fillColor, _bgColor, _glowColor,
+                                                      _glowSize, _glowStrength, _anim, _pulsePeriodMs);
             }
             else
             {
-                _gui->drawGlowRect(_x, _y, _w, _h,
-                                   _radiusTL, _radiusTR, _radiusBR, _radiusBL,
-                                   _fillColor, _bgColor, _glowColor,
-                                   _glowSize, _glowStrength, _anim, _pulsePeriodMs);
+                detail::BuilderAccess::drawGlowRect(*_gui, _x, _y, _w, _h,
+                                                    _radiusTL, _radiusTR, _radiusBR, _radiusBL,
+                                                    _fillColor, _bgColor, _glowColor,
+                                                    _glowSize, _glowStrength, _anim, _pulsePeriodMs);
             }
         }
         else
         {
             if (IsUpdate)
-                _gui->updateGlowRect(_x, _y, _w, _h, _radius, _fillColor, _bgColor, _glowColor, _glowSize, _glowStrength, _anim, _pulsePeriodMs);
+            {
+                detail::BuilderAccess::updateGlowRect(
+                    *_gui,
+                    _x,
+                    _y,
+                    _w,
+                    _h,
+                    _radius,
+                    _fillColor,
+                    _bgColor,
+                    _glowColor,
+                    _glowSize,
+                    _glowStrength,
+                    _anim,
+                    _pulsePeriodMs);
+            }
             else
-                _gui->drawGlowRect(_x, _y, _w, _h, _radius, _fillColor, _bgColor, _glowColor, _glowSize, _glowStrength, _anim, _pulsePeriodMs);
+            {
+                detail::BuilderAccess::drawGlowRect(
+                    *_gui,
+                    _x,
+                    _y,
+                    _w,
+                    _h,
+                    _radius,
+                    _fillColor,
+                    _bgColor,
+                    _glowColor,
+                    _glowSize,
+                    _glowStrength,
+                    _anim,
+                    _pulsePeriodMs);
+            }
         }
         _consumed = true;
     }
@@ -248,7 +379,7 @@ namespace pipgui
     {
         if (_consumed || !_gui)
             return;
-        _gui->showToastInternal(_text, _durationMs, _fromTop, _iconId, _iconSizePx);
+        detail::BuilderAccess::showToast(*_gui, _text, _durationMs, _fromTop, _iconId, _iconSizePx);
         _consumed = true;
     }
 
@@ -256,7 +387,7 @@ namespace pipgui
     {
         if (_consumed || !_gui)
             return;
-        _gui->showNotificationInternal(_title, _message, _buttonText, _delaySeconds, _type, _iconId);
+        detail::BuilderAccess::showNotification(*_gui, _title, _message, _buttonText, _delaySeconds, _type, _iconId);
         _consumed = true;
     }
 
@@ -266,9 +397,31 @@ namespace pipgui
         if (_consumed || !_gui || !_state)
             return;
         if (IsUpdate)
-            _gui->updateToggleSwitch(_x, _y, _w, _h, *_state, _activeColor, _inactiveColor, _knobColor);
+        {
+            detail::BuilderAccess::updateToggleSwitch(
+                *_gui,
+                _x,
+                _y,
+                _w,
+                _h,
+                *_state,
+                _activeColor,
+                _inactiveColor,
+                _knobColor);
+        }
         else
-            _gui->drawToggleSwitch(_x, _y, _w, _h, *_state, _activeColor, _inactiveColor, _knobColor);
+        {
+            detail::BuilderAccess::drawToggleSwitch(
+                *_gui,
+                _x,
+                _y,
+                _w,
+                _h,
+                *_state,
+                _activeColor,
+                _inactiveColor,
+                _knobColor);
+        }
         _consumed = true;
     }
     template void ToggleSwitchFluentT<false>::draw();
@@ -280,9 +433,31 @@ namespace pipgui
         if (_consumed || !_gui || !_state)
             return;
         if (IsUpdate)
-            _gui->updateButton(_label, _x, _y, _w, _h, _baseColor, _radius, *_state);
+        {
+            detail::BuilderAccess::updateButton(
+                *_gui,
+                _label,
+                _x,
+                _y,
+                _w,
+                _h,
+                _baseColor,
+                _radius,
+                *_state);
+        }
         else
-            _gui->drawButton(_label, _x, _y, _w, _h, _baseColor, _radius, *_state);
+        {
+            detail::BuilderAccess::drawButton(
+                *_gui,
+                _label,
+                _x,
+                _y,
+                _w,
+                _h,
+                _baseColor,
+                _radius,
+                *_state);
+        }
         _consumed = true;
     }
     template void ButtonFluentT<false>::draw();
@@ -294,9 +469,34 @@ namespace pipgui
         if (_consumed || !_gui)
             return;
         if (IsUpdate)
-            _gui->updateProgressBar(_x, _y, _w, _h, _value, _baseColor, _fillColor, _radius, _anim, _doFlush);
+        {
+            detail::BuilderAccess::updateProgressBar(
+                *_gui,
+                _x,
+                _y,
+                _w,
+                _h,
+                _value,
+                _baseColor,
+                _fillColor,
+                _radius,
+                _anim,
+                _doFlush);
+        }
         else
-            _gui->drawProgressBar(_x, _y, _w, _h, _value, _baseColor, _fillColor, _radius, _anim);
+        {
+            detail::BuilderAccess::drawProgressBar(
+                *_gui,
+                _x,
+                _y,
+                _w,
+                _h,
+                _value,
+                _baseColor,
+                _fillColor,
+                _radius,
+                _anim);
+        }
         _consumed = true;
     }
     template void ProgressBarFluentT<false>::draw();
@@ -308,9 +508,32 @@ namespace pipgui
         if (_consumed || !_gui)
             return;
         if (IsUpdate)
-            _gui->updateCircularProgressBar(_x, _y, _r, _thickness, _value, _baseColor, _fillColor, _anim, _doFlush);
+        {
+            detail::BuilderAccess::updateCircularProgressBar(
+                *_gui,
+                _x,
+                _y,
+                _r,
+                _thickness,
+                _value,
+                _baseColor,
+                _fillColor,
+                _anim,
+                _doFlush);
+        }
         else
-            _gui->drawCircularProgressBar(_x, _y, _r, _thickness, _value, _baseColor, _fillColor, _anim);
+        {
+            detail::BuilderAccess::drawCircularProgressBar(
+                *_gui,
+                _x,
+                _y,
+                _r,
+                _thickness,
+                _value,
+                _baseColor,
+                _fillColor,
+                _anim);
+        }
         _consumed = true;
     }
     template void CircularProgressBarFluentT<false>::draw();

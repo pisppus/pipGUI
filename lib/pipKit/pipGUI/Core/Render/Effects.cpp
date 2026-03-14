@@ -1,4 +1,4 @@
-#include <pipGUI/Core/API/pipGUI.hpp>
+﻿#include <pipGUI/Core/API/pipGUI.hpp>
 
 namespace pipgui
 {
@@ -244,20 +244,20 @@ namespace pipgui
         if (smallLen == 0 || sw <= 0 || sh <= 0)
             return false;
 
-        pipcore::GuiPlatform *plat = platform();
+        pipcore::Platform *plat = platform();
 
         auto alloc565Pair = [&](uint16_t *&a, uint16_t *&b, size_t n) -> bool
         {
-            void *na = detail::guiAlloc(plat, n * sizeof(uint16_t), pipcore::GuiAllocCaps::PreferExternal);
-            void *nb = detail::guiAlloc(plat, n * sizeof(uint16_t), pipcore::GuiAllocCaps::PreferExternal);
+            void *na = detail::alloc(plat, n * sizeof(uint16_t), pipcore::AllocCaps::PreferExternal);
+            void *nb = detail::alloc(plat, n * sizeof(uint16_t), pipcore::AllocCaps::PreferExternal);
             if (!na || !nb)
             {
-                detail::guiFree(plat, na);
-                detail::guiFree(plat, nb);
+                detail::free(plat, na);
+                detail::free(plat, nb);
                 return false;
             }
-            detail::guiFree(plat, a);
-            detail::guiFree(plat, b);
+            detail::free(plat, a);
+            detail::free(plat, b);
             a = (uint16_t *)na;
             b = (uint16_t *)nb;
             return true;
@@ -265,19 +265,19 @@ namespace pipgui
 
         auto alloc32Triple = [&](uint32_t *&a, uint32_t *&b, uint32_t *&c, size_t n) -> bool
         {
-            void *na = detail::guiAlloc(plat, n * sizeof(uint32_t), pipcore::GuiAllocCaps::Default);
-            void *nb = detail::guiAlloc(plat, n * sizeof(uint32_t), pipcore::GuiAllocCaps::Default);
-            void *nc = detail::guiAlloc(plat, n * sizeof(uint32_t), pipcore::GuiAllocCaps::Default);
+            void *na = detail::alloc(plat, n * sizeof(uint32_t), pipcore::AllocCaps::Default);
+            void *nb = detail::alloc(plat, n * sizeof(uint32_t), pipcore::AllocCaps::Default);
+            void *nc = detail::alloc(plat, n * sizeof(uint32_t), pipcore::AllocCaps::Default);
             if (!na || !nb || !nc)
             {
-                detail::guiFree(plat, na);
-                detail::guiFree(plat, nb);
-                detail::guiFree(plat, nc);
+                detail::free(plat, na);
+                detail::free(plat, nb);
+                detail::free(plat, nc);
                 return false;
             }
-            detail::guiFree(plat, a);
-            detail::guiFree(plat, b);
-            detail::guiFree(plat, c);
+            detail::free(plat, a);
+            detail::free(plat, b);
+            detail::free(plat, c);
             a = (uint32_t *)na;
             b = (uint32_t *)nb;
             c = (uint32_t *)nc;
@@ -498,3 +498,4 @@ namespace pipgui
                                { drawBlurRegion(x, y, w, h, radius, dir, gradient, materialStrength, noiseAmount, materialColor); });
     }
 }
+

@@ -1,4 +1,5 @@
-#include <pipGUI/Core/API/pipGUI.hpp>
+﻿#include <pipGUI/Core/API/pipGUI.hpp>
+#include <pipGUI/Core/API/Internal/RuntimeState.hpp>
 #include <new>
 
 namespace pipgui
@@ -11,8 +12,8 @@ namespace pipgui
             return nullptr;
         if (!arr[screenId])
         {
-            pipcore::GuiPlatform *plat = GUI::sharedPlatform();
-            void *mem = detail::guiAlloc(plat, sizeof(T), pipcore::GuiAllocCaps::Default);
+            pipcore::Platform *plat = pipcore::GetPlatform();
+            void *mem = detail::alloc(plat, sizeof(T), pipcore::AllocCaps::Default);
             if (!mem)
                 return nullptr;
             T *obj = new (mem) T();
@@ -50,7 +51,7 @@ namespace pipgui
     {
         if (id < _screen.capacity)
             return;
-        pipcore::GuiPlatform *plat = platform();
+        pipcore::Platform *plat = platform();
         uint16_t newCap = _screen.capacity ? _screen.capacity : 8;
         while (newCap <= id)
         {
@@ -64,20 +65,20 @@ namespace pipgui
         }
         if (newCap < (uint16_t)(id + 1))
             newCap = (uint16_t)(id + 1);
-        ScreenCallback *newScreens = (ScreenCallback *)detail::guiAlloc(plat, sizeof(ScreenCallback) * newCap, pipcore::GuiAllocCaps::Default);
-        GraphArea **newGraphs = (GraphArea **)detail::guiAlloc(plat, sizeof(GraphArea *) * newCap, pipcore::GuiAllocCaps::Default);
-        ListState **newLists = (ListState **)detail::guiAlloc(plat, sizeof(ListState *) * newCap, pipcore::GuiAllocCaps::Default);
-        TileState **newTiles = (TileState **)detail::guiAlloc(plat, sizeof(TileState *) * newCap, pipcore::GuiAllocCaps::Default);
+        ScreenCallback *newScreens = (ScreenCallback *)detail::alloc(plat, sizeof(ScreenCallback) * newCap, pipcore::AllocCaps::Default);
+        GraphArea **newGraphs = (GraphArea **)detail::alloc(plat, sizeof(GraphArea *) * newCap, pipcore::AllocCaps::Default);
+        ListState **newLists = (ListState **)detail::alloc(plat, sizeof(ListState *) * newCap, pipcore::AllocCaps::Default);
+        TileState **newTiles = (TileState **)detail::alloc(plat, sizeof(TileState *) * newCap, pipcore::AllocCaps::Default);
         if (!newScreens || !newGraphs || !newLists || !newTiles)
         {
             if (newScreens)
-                detail::guiFree(plat, newScreens);
+                detail::free(plat, newScreens);
             if (newGraphs)
-                detail::guiFree(plat, newGraphs);
+                detail::free(plat, newGraphs);
             if (newLists)
-                detail::guiFree(plat, newLists);
+                detail::free(plat, newLists);
             if (newTiles)
-                detail::guiFree(plat, newTiles);
+                detail::free(plat, newTiles);
             return;
         }
         for (uint16_t i = 0; i < newCap; ++i)
@@ -102,13 +103,13 @@ namespace pipgui
             }
         }
         if (_screen.callbacks)
-            detail::guiFree(plat, _screen.callbacks);
+            detail::free(plat, _screen.callbacks);
         if (_screen.graphAreas)
-            detail::guiFree(plat, _screen.graphAreas);
+            detail::free(plat, _screen.graphAreas);
         if (_screen.lists)
-            detail::guiFree(plat, _screen.lists);
+            detail::free(plat, _screen.lists);
         if (_screen.tiles)
-            detail::guiFree(plat, _screen.tiles);
+            detail::free(plat, _screen.tiles);
         _screen.callbacks = newScreens;
         _screen.graphAreas = newGraphs;
         _screen.lists = newLists;
@@ -146,3 +147,4 @@ namespace pipgui
     }
 
 }
+

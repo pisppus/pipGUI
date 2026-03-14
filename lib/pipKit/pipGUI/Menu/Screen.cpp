@@ -1,4 +1,6 @@
 #include <pipGUI/Core/API/pipGUI.hpp>
+#include <pipGUI/Core/API/Internal/RuntimeState.hpp>
+#include <pipGUI/Core/Debug.hpp>
 #include <math.h>
 
 namespace pipgui
@@ -45,59 +47,6 @@ namespace pipgui
             return anim != ScreenAnimNone;
         }
 
-        void writeSpriteRegionToDisplay(pipcore::GuiDisplay &display,
-                                        const pipcore::Sprite &sprite,
-                                        int16_t dstX,
-                                        int16_t dstY,
-                                        int16_t srcX,
-                                        int16_t srcY,
-                                        int16_t w,
-                                        int16_t h)
-        {
-            if (w <= 0 || h <= 0)
-                return;
-
-            const auto *buf = static_cast<const uint16_t *>(sprite.getBuffer());
-            const int16_t srcW = sprite.width();
-            const int16_t srcH = sprite.height();
-            if (!buf || srcW <= 0 || srcH <= 0)
-                return;
-
-            if (srcX < 0)
-            {
-                dstX -= srcX;
-                w += srcX;
-                srcX = 0;
-            }
-            if (srcY < 0)
-            {
-                dstY -= srcY;
-                h += srcY;
-                srcY = 0;
-            }
-            if (dstX < 0)
-            {
-                srcX -= dstX;
-                w += dstX;
-                dstX = 0;
-            }
-            if (dstY < 0)
-            {
-                srcY -= dstY;
-                h += dstY;
-                dstY = 0;
-            }
-
-            if (srcX + w > srcW)
-                w = srcW - srcX;
-            if (srcY + h > srcH)
-                h = srcH - srcY;
-
-            if (w <= 0 || h <= 0)
-                return;
-
-            display.writeRect565(dstX, dstY, w, h, buf + (size_t)srcY * srcW + srcX, srcW);
-        }
     }
 
     void GUI::syncRegisteredScreens()
@@ -186,12 +135,6 @@ namespace pipgui
 
     void GUI::activateScreenId(uint8_t id, int8_t transDir)
     {
-        if (_flags.toastActive)
-        {
-            _flags.toastActive = 0;
-            _toast.text = String();
-        }
-
         if (screenAnimationEnabled(_screen.anim) &&
             _flags.spriteEnabled &&
             _disp.display &&
@@ -233,6 +176,60 @@ namespace pipgui
         _screen.current = prevCurrent;
         _render.activeSprite = prevActive;
         _flags.inSpritePass = prevRender;
+    }
+
+    bool GUI::presentSpriteRegion(int16_t dstX, int16_t dstY,
+                                  int16_t srcX, int16_t srcY,
+                                  int16_t w, int16_t h,
+                                  const char *stage)
+    {
+        if (!_disp.display || !_flags.spriteEnabled || w <= 0 || h <= 0)
+            return false;
+
+        const auto *buf = static_cast<const uint16_t *>(_render.sprite.getBuffer());
+        const int16_t srcW = _render.sprite.width();
+        const int16_t srcH = _render.sprite.height();
+        if (!buf || srcW <= 0 || srcH <= 0)
+            return false;
+
+        if (srcX < 0)
+        {
+            dstX -= srcX;
+            w += srcX;
+            srcX = 0;
+        }
+        if (srcY < 0)
+        {
+            dstY -= srcY;
+            h += srcY;
+            srcY = 0;
+        }
+        if (dstX < 0)
+        {
+            srcX -= dstX;
+            w += dstX;
+            dstX = 0;
+        }
+        if (dstY < 0)
+        {
+            srcY -= dstY;
+            h += dstY;
+            dstY = 0;
+        }
+
+        if (srcX + w > srcW)
+            w = srcW - srcX;
+        if (srcY + h > srcH)
+            h = srcH - srcY;
+
+        if (w <= 0 || h <= 0)
+            return false;
+
+        _disp.display->writeRect565(dstX, dstY, w, h, buf + (size_t)srcY * srcW + srcX, srcW);
+        reportPlatformErrorOnce(stage);
+
+        pipcore::Platform *plat = platform();
+        return !plat || plat->lastError() == pipcore::PlatformError::None;
     }
 
     void GUI::nextScreen()
@@ -325,28 +322,26 @@ namespace pipgui
                 const int16_t dstX = forward ? (int16_t)(contentX + contentW - revealPrimary) : contentX;
                 const int16_t srcX = forward ? contentX : (int16_t)(contentX + contentW - revealPrimary);
 
-                writeSpriteRegionToDisplay(*_disp.display,
-                                           _render.sprite,
-                                           dstX,
-                                           contentY,
-                                           srcX,
-                                           contentY,
-                                           revealPrimary,
-                                           contentH);
+                presentSpriteRegion(dstX,
+                                    contentY,
+                                    srcX,
+                                    contentY,
+                                    revealPrimary,
+                                    contentH,
+                                    "present");
             }
             else
             {
                 const int16_t dstY = forward ? (int16_t)(contentY + contentH - revealPrimary) : contentY;
                 const int16_t srcY = forward ? contentY : (int16_t)(contentY + contentH - revealPrimary);
 
-                writeSpriteRegionToDisplay(*_disp.display,
-                                           _render.sprite,
-                                           contentX,
-                                           dstY,
-                                           contentX,
-                                           srcY,
-                                           contentW,
-                                           revealPrimary);
+                presentSpriteRegion(contentX,
+                                    dstY,
+                                    contentX,
+                                    srcY,
+                                    contentW,
+                                    revealPrimary,
+                                    "present");
             }
         }
 
@@ -359,14 +354,13 @@ namespace pipgui
                 renderStatusBar();
                 const int16_t sbh = (int16_t)std::min<uint16_t>(_status.height, (uint16_t)_render.screenHeight);
                 const int16_t sbY = (_status.pos == Bottom) ? (int16_t)(_render.screenHeight - sbh) : 0;
-                writeSpriteRegionToDisplay(*_disp.display,
-                                           _render.sprite,
-                                           0,
-                                           sbY,
-                                           0,
-                                           sbY,
-                                           (int16_t)_render.screenWidth,
-                                           sbh);
+                presentSpriteRegion(0,
+                                    sbY,
+                                    0,
+                                    sbY,
+                                    (int16_t)_render.screenWidth,
+                                    sbh,
+                                    "present");
             }
             _flags.needRedraw = 0;
             _dirty.count = 0;
@@ -382,10 +376,19 @@ namespace pipgui
 
         const auto renderOverlays = [&]()
         {
-            if (_flags.toastActive)
-                renderToastOverlay();
+            bool wroteOverlay = false;
             if (_flags.notifActive)
+            {
                 renderNotificationOverlay();
+                wroteOverlay = true;
+            }
+            if (_flags.toastActive)
+            {
+                renderToastOverlay();
+                wroteOverlay = true;
+            }
+            if (wroteOverlay && _flags.spriteEnabled && _disp.display)
+                presentSprite(0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight, "present");
         };
 
         if (_flags.bootActive)
@@ -434,15 +437,17 @@ namespace pipgui
                     {
                         updateList(_screen.current);
                         updateStatusBar();
+                        if (_flags.toastActive || _flags.notifActive)
+                            renderOverlays();
                         return;
                     }
 
                     renderScreenToMainSprite(currentCb, _screen.current);
                     renderStatusBar();
-                    if (_flags.toastActive)
-                        renderToastOverlay();
+                    if (_flags.toastActive || _flags.notifActive)
+                        renderOverlays();
                     else
-                        _render.sprite.writeToDisplay(*_disp.display, 0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight);
+                        presentSprite(0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight, "present");
                     _dirty.count = 0;
                 }
                 else
@@ -471,3 +476,4 @@ namespace pipgui
         loop();
     }
 }
+

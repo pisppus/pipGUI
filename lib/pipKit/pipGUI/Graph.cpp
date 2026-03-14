@@ -1,4 +1,5 @@
-#include <pipGUI/Core/API/pipGUI.hpp>
+﻿#include <pipGUI/Core/API/pipGUI.hpp>
+#include <pipGUI/Core/API/Internal/RuntimeState.hpp>
 namespace pipgui
 {
 
@@ -9,9 +10,9 @@ namespace pipgui
         uint8_t b = (uint8_t)(color888 & 0xFF);
         return pipcore::Sprite::color565(r, g, b);
     }
-    static pipcore::GuiPlatform *graphPlatform()
+    static pipcore::Platform *graphPlatform()
     {
-        return pipgui::GUI::sharedPlatform();
+        return pipcore::GetPlatform();
     }
 
     static void drawBoldGraphLine(GUI &g, pipcore::Sprite *t, int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint32_t color, uint32_t bg)
@@ -81,19 +82,19 @@ namespace pipgui
 
         uint16_t newLineCount = (uint16_t)(lineIndex + 1);
 
-        pipcore::GuiPlatform *plat = graphPlatform();
-        int16_t **newSamples = (int16_t **)detail::guiAlloc(plat, sizeof(int16_t *) * newLineCount, pipcore::GuiAllocCaps::Default);
-        uint16_t *newCounts = (uint16_t *)detail::guiAlloc(plat, sizeof(uint16_t) * newLineCount, pipcore::GuiAllocCaps::Default);
-        uint16_t *newHead = (uint16_t *)detail::guiAlloc(plat, sizeof(uint16_t) * newLineCount, pipcore::GuiAllocCaps::Default);
+        pipcore::Platform *plat = graphPlatform();
+        int16_t **newSamples = (int16_t **)detail::alloc(plat, sizeof(int16_t *) * newLineCount, pipcore::AllocCaps::Default);
+        uint16_t *newCounts = (uint16_t *)detail::alloc(plat, sizeof(uint16_t) * newLineCount, pipcore::AllocCaps::Default);
+        uint16_t *newHead = (uint16_t *)detail::alloc(plat, sizeof(uint16_t) * newLineCount, pipcore::AllocCaps::Default);
 
         if (!newSamples || !newCounts || !newHead)
         {
             if (newSamples)
-                detail::guiFree(plat, newSamples);
+                detail::free(plat, newSamples);
             if (newCounts)
-                detail::guiFree(plat, newCounts);
+                detail::free(plat, newCounts);
             if (newHead)
-                detail::guiFree(plat, newHead);
+                detail::free(plat, newHead);
             return false;
         }
 
@@ -115,11 +116,11 @@ namespace pipgui
         }
 
         if (area.samples)
-            detail::guiFree(plat, area.samples);
+            detail::free(plat, area.samples);
         if (area.sampleCounts)
-            detail::guiFree(plat, area.sampleCounts);
+            detail::free(plat, area.sampleCounts);
         if (area.sampleHead)
-            detail::guiFree(plat, area.sampleHead);
+            detail::free(plat, area.sampleHead);
 
         area.samples = newSamples;
         area.sampleCounts = newCounts;
@@ -140,7 +141,7 @@ namespace pipgui
             return true;
         }
 
-        pipcore::GuiPlatform *plat = graphPlatform();
+        pipcore::Platform *plat = graphPlatform();
 
         for (uint16_t line = 0; line < area.lineCount; ++line)
         {
@@ -149,7 +150,7 @@ namespace pipgui
             uint16_t oldCount = area.sampleCounts[line];
             uint16_t oldHead = area.sampleHead[line];
 
-            int16_t *newBuf = (int16_t *)detail::guiAlloc(plat, sizeof(int16_t) * desiredCap, pipcore::GuiAllocCaps::PreferExternal);
+            int16_t *newBuf = (int16_t *)detail::alloc(plat, sizeof(int16_t) * desiredCap, pipcore::AllocCaps::PreferExternal);
             if (!newBuf)
                 return false;
 
@@ -167,7 +168,7 @@ namespace pipgui
             }
 
             if (oldBuf)
-                detail::guiFree(plat, oldBuf);
+                detail::free(plat, oldBuf);
             area.samples[line] = newBuf;
             area.sampleCounts[line] = keep;
             area.sampleHead[line] = (keep >= desiredCap) ? 0 : keep;
@@ -188,8 +189,8 @@ namespace pipgui
         if (area.sampleCapacity < 2)
             return false;
 
-        pipcore::GuiPlatform *plat = graphPlatform();
-        int16_t *buf = (int16_t *)detail::guiAlloc(plat, sizeof(int16_t) * area.sampleCapacity, pipcore::GuiAllocCaps::PreferExternal);
+        pipcore::Platform *plat = graphPlatform();
+        int16_t *buf = (int16_t *)detail::alloc(plat, sizeof(int16_t) * area.sampleCapacity, pipcore::AllocCaps::PreferExternal);
         if (!buf)
             return false;
         for (uint16_t i = 0; i < area.sampleCapacity; ++i)
@@ -731,3 +732,4 @@ namespace pipgui
         flushDirty();
     }
 }
+

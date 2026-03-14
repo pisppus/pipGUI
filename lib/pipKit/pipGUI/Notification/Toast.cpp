@@ -1,31 +1,47 @@
-// Toast notification: short-lived message sliding in from top or bottom with Bezier easing.
-// Renders on top of all content (including alert dialog if any).
-
 #include <pipGUI/Core/API/pipGUI.hpp>
 
 namespace pipgui
 {
-    // Cubic Bezier ease-out — smooth decelerate into position (softer than 0.18/0.99)
-    static float bezierEaseOut(float t)
+    namespace
     {
-        if (t <= 0.0f)
-            return 0.0f;
-        if (t >= 1.0f)
-            return 1.0f;
-        float u = 1.0f - t;
-        float uu = u * u;
-        float tt = t * t;
-        return 3.0f * uu * t * 0.22f + 3.0f * u * tt * 0.92f + tt * t;
-    }
+        float cubicBezierPoint(float u, float p1, float p2)
+        {
+            const float inv = 1.0f - u;
+            return 3.0f * inv * inv * u * p1 + 3.0f * inv * u * u * p2 + u * u * u;
+        }
 
-    // Ease-in for exit — smooth accelerate off-screen (smoothstep)
-    static float bezierEaseIn(float t)
-    {
-        if (t <= 0.0f)
-            return 0.0f;
-        if (t >= 1.0f)
-            return 1.0f;
-        return t * t * (3.0f - 2.0f * t);
+        float cubicBezierEase(float t, float x1, float y1, float x2, float y2)
+        {
+            if (t <= 0.0f)
+                return 0.0f;
+            if (t >= 1.0f)
+                return 1.0f;
+
+            float lo = 0.0f;
+            float hi = 1.0f;
+            float u = t;
+            for (uint8_t i = 0; i < 10; ++i)
+            {
+                const float x = cubicBezierPoint(u, x1, x2);
+                if (x < t)
+                    lo = u;
+                else
+                    hi = u;
+                u = (lo + hi) * 0.5f;
+            }
+
+            return cubicBezierPoint(u, y1, y2);
+        }
+
+        float toastEnterEase(float t)
+        {
+            return cubicBezierEase(t, 0.16f, 1.0f, 0.30f, 1.0f);
+        }
+
+        float toastExitEase(float t)
+        {
+            return cubicBezierEase(t, 0.40f, 0.0f, 1.0f, 1.0f);
+        }
     }
 
     void GUI::showToastInternal(const String &text,
@@ -47,6 +63,7 @@ namespace pipgui
         _toast.startMs = nowMs();
         _toast.animDurMs = 420;
         _flags.toastActive = 1;
+        _flags.needRedraw = 1;
     }
 
     bool GUI::toastActive() const { return _flags.toastActive && _toast.text.length() > 0; }
@@ -64,8 +81,9 @@ namespace pipgui
         if (!_flags.spriteEnabled || !_disp.display)
             return;
 
-        uint32_t now = nowMs(), elapsed = (now >= _toast.startMs) ? (now - _toast.startMs) : 0;
-        uint32_t totalDur = _toast.animDurMs * 2 + _toast.displayMs;
+        const uint32_t now = nowMs();
+        const uint32_t elapsed = (now >= _toast.startMs) ? (now - _toast.startMs) : 0;
+        const uint32_t totalDur = _toast.animDurMs * 2 + _toast.displayMs;
 
         if (elapsed >= totalDur)
         {
@@ -74,103 +92,117 @@ namespace pipgui
             return;
         }
 
-        // Phase: 0.._toast.animDurMs = enter, _toast.animDurMs..(_toast.animDurMs+_toast.displayMs) = hold, then exit
-        float phaseProgress;
-        float slideT; // 0 = off-screen, 1 = on-screen (visible)
+        float visualP = 1.0f;
         if (elapsed < _toast.animDurMs)
         {
-            phaseProgress = (float)elapsed / (float)_toast.animDurMs;
-            slideT = bezierEaseOut(phaseProgress);
+            const float phaseProgress = (float)elapsed / (float)_toast.animDurMs;
+            visualP = toastEnterEase(phaseProgress);
         }
-        else if (elapsed < _toast.animDurMs + _toast.displayMs)
+        else if (elapsed >= _toast.animDurMs + _toast.displayMs)
         {
-            slideT = 1.0f;
-        }
-        else
-        {
-            uint32_t exitElapsed = elapsed - _toast.animDurMs - _toast.displayMs;
-            phaseProgress = (float)exitElapsed / (float)_toast.animDurMs;
+            const uint32_t exitElapsed = elapsed - _toast.animDurMs - _toast.displayMs;
+            const float phaseProgress = (float)exitElapsed / (float)_toast.animDurMs;
             if (phaseProgress >= 1.0f)
             {
                 _flags.toastActive = 0;
                 _flags.needRedraw = 1;
                 return;
             }
-            slideT = 1.0f - bezierEaseIn(phaseProgress);
+            visualP = 1.0f - toastExitEase(phaseProgress);
         }
 
-        // Slightly larger text for better legibility
-        uint16_t fontPx = 16;
+        const uint16_t prevSize = fontSize();
+        const uint16_t prevWeight = fontWeight();
+        const uint16_t fontPx = 16;
         setFontSize(fontPx);
         setFontWeight(Medium);
-        int16_t tw = 0, th = 0;
+
+        int16_t tw = 0;
+        int16_t th = 0;
         measureText(_toast.text, tw, th);
 
-        const bool hasIcon = true; // we always reserve space for icon when using fluent toast
+        const bool hasIcon = (_toast.iconId < psdf_icons::IconCount) && (_toast.iconSizePx > 0);
         const int16_t padH = 18;
         const int16_t padV = 9;
         const int16_t iconGap = hasIcon ? 8 : 0;
-        const int16_t radius = 10;
-
-        int16_t iconSide = (int16_t)_toast.iconSizePx;
-        int16_t contentW = (int16_t)(tw + (hasIcon ? (iconSide + iconGap) : 0));
+        const int16_t baseRadius = 10;
+        const int16_t iconSide = (int16_t)_toast.iconSizePx;
+        const int16_t contentW = (int16_t)(tw + (hasIcon ? (iconSide + iconGap) : 0));
 
         int16_t boxW = (int16_t)(contentW + padH * 2);
         int16_t boxH = (int16_t)(th + padV * 2);
         if (boxW > (int16_t)_render.screenWidth - 24)
             boxW = (int16_t)_render.screenWidth - 24;
-        int16_t boxX = ((int16_t)_render.screenWidth - boxW) / 2;
 
-        // Slightly longer travel for more \"inertia\"
-        int16_t fullTravel = (int16_t)(boxH + 28);
-        int16_t startY = _toast.fromTop ? (int16_t)(-fullTravel) : (int16_t)(_render.screenHeight + fullTravel);
-        int16_t endY = _toast.fromTop ? (int16_t)(20) : (int16_t)(_render.screenHeight - boxH - 20);
-        int16_t sb = statusBarHeight();
+        const int16_t drawW = boxW;
+        const int16_t drawH = boxH;
+
+        int16_t boxX = ((int16_t)_render.screenWidth - drawW) / 2;
+        int16_t startY = _toast.fromTop ? (int16_t)(-drawH - 18) : (int16_t)(_render.screenHeight + 18);
+        int16_t endY = _toast.fromTop ? 18 : (int16_t)(_render.screenHeight - drawH - 18);
+
+        const int16_t sb = statusBarHeight();
         if (_flags.statusBarEnabled && sb > 0 && _status.style == StatusBarStyleSolid)
         {
             if (_status.pos == Top && _toast.fromTop)
-                endY = (int16_t)(sb + 12);
+                endY = (int16_t)(sb + 10);
             else if (_status.pos == Bottom && !_toast.fromTop)
-                endY = (int16_t)(_render.screenHeight - sb - boxH - 12);
+                endY = (int16_t)(_render.screenHeight - sb - drawH - 10);
         }
-        int16_t boxY = (int16_t)((float)startY + (float)(endY - startY) * slideT + 0.5f);
+
+        int16_t boxY = (int16_t)lroundf((float)startY + (float)(endY - startY) * visualP);
+        const int16_t motionOffset = (int16_t)lroundf((1.0f - visualP) * 10.0f);
+        if (_toast.fromTop)
+            boxY = (int16_t)(boxY + motionOffset);
+        else
+            boxY = (int16_t)(boxY - motionOffset);
 
         const uint16_t bgColor = 0x2965;
-        uint16_t borderColor = (uint16_t)detail::blend565(bgColor, (uint16_t)0x0000, 40);
-        uint16_t fgColor = 0xFFFF;
+        const uint16_t borderColor = (uint16_t)detail::blend565(bgColor, (uint16_t)0x0000, 40);
+        const uint16_t fgColor = 0xFFFF;
 
-        bool prevRender = _flags.inSpritePass;
+        const bool prevRender = _flags.inSpritePass;
         pipcore::Sprite *prevActive = _render.activeSprite;
         _flags.inSpritePass = 1;
         _render.activeSprite = &_render.sprite;
 
-        fillRoundRect(boxX, boxY, boxW, boxH, (uint8_t)radius, borderColor);
-        fillRoundRect(boxX + 1, boxY + 1, boxW - 2, boxH - 2, (uint8_t)(radius > 2 ? radius - 2 : radius), bgColor);
+        const int16_t drawRadius = baseRadius;
+        fillRoundRect(boxX, boxY, drawW, drawH, (uint8_t)drawRadius, borderColor);
+        fillRoundRect(boxX + 1, boxY + 1, drawW - 2, drawH - 2,
+                      (uint8_t)(drawRadius > 2 ? drawRadius - 2 : drawRadius), bgColor);
 
-        int16_t textX = boxX + (boxW - tw) / 2;
-        int16_t textY = boxY + (boxH - th) / 2;
+        int16_t textX = boxX + (drawW - tw) / 2;
+        const int16_t textY = boxY + (drawH - th) / 2;
+        const int16_t textMaxW = (int16_t)max<int16_t>(24, drawW - padH * 2 - (hasIcon ? (iconSide + iconGap) : 0));
 
         if (hasIcon)
         {
-            int16_t iconX = (int16_t)(boxX + padH);
-            int16_t iconY = (int16_t)(boxY + (boxH - iconSide) / 2);
+            const int16_t iconX = (int16_t)(boxX + padH);
+            const int16_t iconY = (int16_t)(boxY + (drawH - iconSide) / 2);
             drawIcon()
                 .pos(iconX, iconY)
                 .size((uint16_t)iconSide)
                 .icon(_toast.iconId)
                 .color(0xFFFF)
-                .bgColor(0x2965)
+                .bgColor(bgColor)
                 .draw();
             textX = (int16_t)(iconX + iconSide + iconGap);
         }
 
-        drawTextAligned(_toast.text, textX, textY, fgColor, bgColor, AlignLeft);
+        MarqueeTextOptions marqueeOpts;
+        marqueeOpts.speedPxPerSec = 24;
+        marqueeOpts.holdStartMs = 700;
+        marqueeOpts.phaseStartMs = _toast.startMs;
+
+        if (!drawTextMarquee(_toast.text, textX, textY, textMaxW, fgColor, AlignLeft, marqueeOpts) &&
+            !drawTextEllipsized(_toast.text, textX, textY, textMaxW, fgColor, AlignLeft))
+        {
+            drawTextAligned(_toast.text, textX, textY, fgColor, bgColor, AlignLeft);
+        }
 
         _flags.inSpritePass = prevRender;
         _render.activeSprite = prevActive;
-
-        _render.sprite.writeToDisplay(*_disp.display, 0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight);
+        setFontWeight(prevWeight);
+        setFontSize(prevSize);
     }
 }
-
-

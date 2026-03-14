@@ -107,7 +107,7 @@ namespace pipgui
                 _flags.inSpritePass = prevRender;
                 _render.activeSprite = prevActive;
                 if (_disp.display && _flags.spriteEnabled)
-                    _render.sprite.writeToDisplay(*_disp.display, 0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight);
+                    presentSprite(0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight, "present");
             }
             else
             {
@@ -214,7 +214,7 @@ namespace pipgui
                 _flags.inSpritePass = prevRender;
                 _render.activeSprite = prevActive;
                 if (_disp.display && _flags.spriteEnabled)
-                    _render.sprite.writeToDisplay(*_disp.display, 0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight);
+                    presentSprite(0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight, "present");
             }
             break;
         }

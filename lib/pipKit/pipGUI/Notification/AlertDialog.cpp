@@ -508,9 +508,6 @@ namespace pipgui
             setFontSize(prevSize);
             _flags.inSpritePass = prevRender;
             _render.activeSprite = prevActive;
-
-            if (_disp.display && _flags.spriteEnabled)
-                _render.sprite.writeToDisplay(*_disp.display, 0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight);
         }
         else
         {

@@ -213,8 +213,9 @@ namespace pipgui
     {
         if (_dirty.count == 0)
             return;
-        if (_flags.screenTransition)
+        if (_flags.bootActive || _flags.screenTransition || _flags.errorActive || _flags.notifActive || _flags.toastActive)
         {
+            _flags.needRedraw = 1;
             _dirty.count = 0;
             Debug::clearRects();
             return;
@@ -266,7 +267,7 @@ namespace pipgui
                 Debug::drawOverlay(buf, stride, x0, y0, w, h);
             }
 
-            _render.sprite.writeToDisplay(*_disp.display, x0, y0, w, h);
+            presentSprite(x0, y0, w, h, "present");
         }
 
         _dirty.count = 0;

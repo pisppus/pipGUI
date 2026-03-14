@@ -321,7 +321,7 @@ namespace pipgui
         }
 
         if (_flags.spriteEnabled && _disp.display)
-            _render.sprite.writeToDisplay(*_disp.display, 0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight);
+            presentSprite(0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight, "present");
 
         _flags.inSpritePass = prevRenderFrame;
         _render.activeSprite = prevActiveFrame;

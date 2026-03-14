@@ -1,6 +1,6 @@
-#include "Debug.hpp"
-#include <pipCore/Platforms/GuiPlatform.hpp>
-#include <pipCore/Platforms/PlatformFactory.hpp>
+﻿#include "Debug.hpp"
+#include <pipCore/Platform.hpp>
+#include <pipCore/Platforms/Select.hpp>
 #include <pipCore/Graphics/Sprite.hpp>
 
 namespace pipgui
@@ -25,11 +25,11 @@ namespace pipgui
         if (!_enabled)
             return;
 
-        pipcore::GuiPlatform *plat = pipcore::GetPlatform();
-        _metrics.freeHeapTotal = plat->guiFreeHeapTotal();
-        _metrics.freeHeapInternal = plat->guiFreeHeapInternal();
-        _metrics.largestFreeBlock = plat->guiLargestFreeBlock();
-        _metrics.minFreeHeap = plat->guiMinFreeHeap();
+        pipcore::Platform *plat = pipcore::GetPlatform();
+        _metrics.freeHeapTotal = plat->freeHeapTotal();
+        _metrics.freeHeapInternal = plat->freeHeapInternal();
+        _metrics.largestFreeBlock = plat->largestFreeBlock();
+        _metrics.minFreeHeap = plat->minFreeHeap();
     }
 
     void Debug::formatStatusBar(char *out, size_t len)
@@ -70,13 +70,13 @@ namespace pipgui
         else
         {
             uint16_t newCap = _rectCapacity ? _rectCapacity * 2 : 16;
-            pipcore::GuiPlatform *plat = pipcore::GetPlatform();
-            DirtyRect *newRects = (DirtyRect *)plat->guiAlloc(sizeof(DirtyRect) * newCap, pipcore::GuiAllocCaps::Default);
+            pipcore::Platform *plat = pipcore::GetPlatform();
+            DirtyRect *newRects = (DirtyRect *)plat->alloc(sizeof(DirtyRect) * newCap, pipcore::AllocCaps::Default);
             if (!newRects)
                 return;
             for (uint16_t i = 0; i < _rectCount; ++i)
                 newRects[i] = _rects[i];
-            plat->guiFree(_rects);
+            plat->free(_rects);
             _rects = newRects;
             _rectCapacity = newCap;
             _rects[_rectCount++] = {x, y, w, h};
@@ -126,10 +126,11 @@ namespace pipgui
     void Debug::clearRects()
     {
         _rectCount = 0;
-        pipcore::GuiPlatform *plat = pipcore::GetPlatform();
-        plat->guiFree(_rects);
+        pipcore::Platform *plat = pipcore::GetPlatform();
+        plat->free(_rects);
         _rects = nullptr;
         _rectCapacity = 0;
     }
 
 }
+

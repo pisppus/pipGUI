@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <math.h>
 #include <pipGUI/Core/API/pipGUI.hpp>
+#include <pipGUI/Core/API/Internal/BuilderAccess.hpp>
 #include <pipGUI/Core/Utils/Colors.hpp>
 #include <pipGUI/Core/Render/Draw/Blend.hpp>
 #include <pipGUI/Fonts/WixMadeForDisplay/WixMadeForDisplay.hpp>
@@ -435,7 +436,7 @@ namespace pipgui
         return true;
     }
 
-    static inline uint8_t sampleGlyphBilinear(pipcore::GuiPlatform *plat,
+    static inline uint8_t sampleGlyphBilinear(pipcore::Platform *plat,
                                               const PSDFFontData *font,
                                               const Glyph &glyph,
                                               int32_t u16, int32_t v16)
@@ -509,7 +510,7 @@ namespace pipgui
         float dthr = (0.f - kOffset) / kScale;
         uint8_t s8Min = (dthr > 0.f && dthr < 255.f) ? (uint8_t)dthr : 0;
 
-        pipcore::GuiPlatform *plat = platform();
+        pipcore::Platform *plat = platform();
 
         forEachGlyph(text.c_str(), (int)text.length(), font, sizePx,
                      [&](const Glyph *g, float penX, float penY, bool nl) -> bool
@@ -838,9 +839,9 @@ namespace pipgui
         if (_weight)
             _gui->setFontWeight(_weight);
         if (IsUpdate)
-            _gui->updateText(_text, _x, _y, _fg565, _bg565, _align);
+            detail::BuilderAccess::updateText(*_gui, _text, _x, _y, _fg565, _bg565, _align);
         else
-            _gui->drawText(_text, _x, _y, _fg565, _bg565, _align);
+            detail::BuilderAccess::drawText(*_gui, _text, _x, _y, _fg565, _bg565, _align);
     }
     template void TextFluentT<false>::draw();
     template void TextFluentT<true>::draw();
@@ -859,7 +860,7 @@ namespace pipgui
             _gui->setFontSize(_sizePx);
         if (_weight)
             _gui->setFontWeight(_weight);
-        _gui->drawTextMarquee(_text, _x, _y, _maxWidth, _fg565, _align, _opts);
+        detail::BuilderAccess::drawTextMarquee(*_gui, _text, _x, _y, _maxWidth, _fg565, _align, _opts);
     }
 
     void DrawTextEllipsizedFluent::draw()
@@ -876,6 +877,7 @@ namespace pipgui
             _gui->setFontSize(_sizePx);
         if (_weight)
             _gui->setFontWeight(_weight);
-        _gui->drawTextEllipsized(_text, _x, _y, _maxWidth, _fg565, _align);
+        detail::BuilderAccess::drawTextEllipsized(*_gui, _text, _x, _y, _maxWidth, _fg565, _align);
     }
 }
+

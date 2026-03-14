@@ -1,4 +1,6 @@
-﻿#include <pipGUI/Core/API/pipGUI.hpp>
+#include <pipGUI/Core/API/pipGUI.hpp>
+#include <pipGUI/Core/API/Internal/BuilderAccess.hpp>
+#include <pipGUI/Core/API/Internal/RuntimeState.hpp>
 #include <pipGUI/Core/Utils/Colors.hpp>
 #include <math.h>
 namespace pipgui
@@ -34,19 +36,19 @@ namespace pipgui
         return true;
     }
 
-    static void destroyList(ListState &menu, pipcore::GuiPlatform *plat)
+    static void destroyList(ListState &menu, pipcore::Platform *plat)
     {
         if (menu.items)
         {
             for (uint8_t i = 0; i < menu.capacity; ++i)
                 menu.items[i].~Item();
-            detail::guiFree(plat, menu.items);
+            detail::free(plat, menu.items);
         }
         menu = {};
         menu.parentScreen = INVALID_SCREEN_ID;
     }
 
-    static bool ensureListCapacity(ListState &menu, uint8_t newCapacity, pipcore::GuiPlatform *plat)
+    static bool ensureListCapacity(ListState &menu, uint8_t newCapacity, pipcore::Platform *plat)
     {
         if (newCapacity == 0)
         {
@@ -65,10 +67,10 @@ namespace pipgui
 
         if (_screenId == INVALID_SCREEN_ID)
             return;
-        ListState *menu = _gui->ensureList(_screenId);
+        ListState *menu = detail::BuilderAccess::ensureList(*_gui, _screenId);
         if (!menu)
             return;
-        if (!ensureListCapacity(*menu, _itemCount, _gui->platform()))
+        if (!ensureListCapacity(*menu, _itemCount, detail::BuilderAccess::platform(*_gui)))
         {
             menu->configured = false;
             return;
@@ -585,18 +587,18 @@ namespace pipgui
                 if (hasSub && cardH <= 52)
                 {
                     if (autoTitlePx)
-                        titlePx = 15;
+                        titlePx = 16;
                     if (autoSubPx)
-                        subPx = 10;
+                        subPx = 11;
                     if (autoGapPx)
                         gapPx = 1;
                 }
                 else if (hasSub && cardH <= 58)
                 {
                     if (autoTitlePx)
-                        titlePx = 16;
+                        titlePx = 17;
                     if (autoSubPx)
-                        subPx = 11;
+                        subPx = 12;
                     if (autoGapPx)
                         gapPx = 2;
                 }
@@ -749,3 +751,4 @@ namespace pipgui
         return true;
     }
 }
+

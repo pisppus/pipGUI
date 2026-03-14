@@ -372,11 +372,15 @@ namespace pipgui
         {
         }
 
-        UiRect next(int16_t w, int16_t h)
+        UiRect &next(int16_t w, int16_t h)
         {
             assert(count < N);
             if (count >= N)
-                return UiRect{area.x, area.y, 0, 0};
+            {
+                static UiRect empty{};
+                empty = UiRect{area.x, area.y, 0, 0};
+                return empty;
+            }
             if (w < 0)
                 w = 0;
             if (h < 0)
@@ -392,7 +396,16 @@ namespace pipgui
             UiLayout::flowRow(area, sizes, rects, count, gap, justify, align);
         }
 
-        const UiRect &operator[](uint8_t i) const { return rects[i]; }
+        const UiRect &operator[](uint8_t i) const
+        {
+            assert(i < count);
+            if (i >= count)
+            {
+                static const UiRect empty{};
+                return empty;
+            }
+            return rects[i];
+        }
     };
 
     template <uint8_t N>
@@ -414,11 +427,15 @@ namespace pipgui
         {
         }
 
-        UiRect next(int16_t w, int16_t h)
+        UiRect &next(int16_t w, int16_t h)
         {
             assert(count < N);
             if (count >= N)
-                return UiRect{area.x, area.y, 0, 0};
+            {
+                static UiRect empty{};
+                empty = UiRect{area.x, area.y, 0, 0};
+                return empty;
+            }
             if (w < 0)
                 w = 0;
             if (h < 0)
@@ -434,7 +451,16 @@ namespace pipgui
             UiLayout::flowColumn(area, sizes, rects, count, gap, justify, align);
         }
 
-        const UiRect &operator[](uint8_t i) const { return rects[i]; }
+        const UiRect &operator[](uint8_t i) const
+        {
+            assert(i < count);
+            if (i >= count)
+            {
+                static const UiRect empty{};
+                return empty;
+            }
+            return rects[i];
+        }
     };
 
 }
