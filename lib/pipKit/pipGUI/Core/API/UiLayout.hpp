@@ -45,8 +45,8 @@ namespace pipgui
 
     namespace layout
     {
-        static constexpr UiJustify SpaceBetween = UiJustify::SpaceBetween;
-        static constexpr UiJustify SpaceEvenly = UiJustify::SpaceEvenly;
+        inline constexpr UiJustify SpaceBetween = UiJustify::SpaceBetween;
+        inline constexpr UiJustify SpaceEvenly = UiJustify::SpaceEvenly;
     }
 
     struct UiLayout
@@ -284,49 +284,49 @@ namespace pipgui
         }
     };
 
-    static inline UiRect inset(const UiRect &rc, int16_t all) noexcept
+    [[nodiscard]] inline UiRect inset(const UiRect &rc, int16_t all) noexcept
     {
         return UiLayout::inset(rc, all);
     }
 
-    static inline UiRect inset(const UiRect &rc, const UiInsets &in) noexcept
+    [[nodiscard]] inline UiRect inset(const UiRect &rc, const UiInsets &in) noexcept
     {
         return UiLayout::inset(rc, in);
     }
 
-    static inline UiRect takeTop(UiRect &rc, int16_t h, int16_t gap = 0) noexcept
+    [[nodiscard]] inline UiRect takeTop(UiRect &rc, int16_t h, int16_t gap = 0) noexcept
     {
         return UiLayout::takeTop(rc, h, gap);
     }
 
-    static inline UiRect takeBottom(UiRect &rc, int16_t h, int16_t gap = 0) noexcept
+    [[nodiscard]] inline UiRect takeBottom(UiRect &rc, int16_t h, int16_t gap = 0) noexcept
     {
         return UiLayout::takeBottom(rc, h, gap);
     }
 
-    static inline UiRect takeLeft(UiRect &rc, int16_t w, int16_t gap = 0) noexcept
+    [[nodiscard]] inline UiRect takeLeft(UiRect &rc, int16_t w, int16_t gap = 0) noexcept
     {
         return UiLayout::takeLeft(rc, w, gap);
     }
 
-    static inline UiRect takeRight(UiRect &rc, int16_t w, int16_t gap = 0) noexcept
+    [[nodiscard]] inline UiRect takeRight(UiRect &rc, int16_t w, int16_t gap = 0) noexcept
     {
         return UiLayout::takeRight(rc, w, gap);
     }
 
-    static inline UiRect placeInside(const UiRect &area, const UiSize &size,
-                                     UiJustify hJustify = UiJustify::Center,
-                                     UiAlign vAlign = UiAlign::Center) noexcept
+    [[nodiscard]] inline UiRect placeInside(const UiRect &area, const UiSize &size,
+                                            UiJustify hJustify = UiJustify::Center,
+                                            UiAlign vAlign = UiAlign::Center) noexcept
     {
         return UiLayout::placeInside(area, size, hJustify, vAlign);
     }
 
-    static inline UiRect centerIn(const UiRect &area, const UiSize &size) noexcept
+    [[nodiscard]] inline UiRect centerIn(const UiRect &area, const UiSize &size) noexcept
     {
         return UiLayout::centerIn(area, size);
     }
 
-    static inline UiRect inset(const UiRect &rc, int16_t l, int16_t t, int16_t r, int16_t b) noexcept
+    [[nodiscard]] inline UiRect inset(const UiRect &rc, int16_t l, int16_t t, int16_t r, int16_t b) noexcept
     {
         return UiLayout::inset(rc, l, t, r, b);
     }
@@ -372,7 +372,7 @@ namespace pipgui
         {
         }
 
-        UiRect &next(int16_t w, int16_t h)
+        [[nodiscard]] UiRect &next(int16_t w, int16_t h)
         {
             assert(count < N);
             if (count >= N)
@@ -396,7 +396,7 @@ namespace pipgui
             UiLayout::flowRow(area, sizes, rects, count, gap, justify, align);
         }
 
-        const UiRect &operator[](uint8_t i) const
+        [[nodiscard]] const UiRect &operator[](uint8_t i) const
         {
             assert(i < count);
             if (i >= count)
@@ -427,7 +427,7 @@ namespace pipgui
         {
         }
 
-        UiRect &next(int16_t w, int16_t h)
+        [[nodiscard]] UiRect &next(int16_t w, int16_t h)
         {
             assert(count < N);
             if (count >= N)
@@ -451,7 +451,7 @@ namespace pipgui
             UiLayout::flowColumn(area, sizes, rects, count, gap, justify, align);
         }
 
-        const UiRect &operator[](uint8_t i) const
+        [[nodiscard]] const UiRect &operator[](uint8_t i) const
         {
             assert(i < count);
             if (i >= count)

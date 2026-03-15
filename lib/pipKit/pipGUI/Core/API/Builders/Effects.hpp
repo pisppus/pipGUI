@@ -12,8 +12,7 @@ namespace pipgui
         BlurDirection _dir;
         bool _gradient;
         uint8_t _materialStrength;
-        uint8_t _noiseAmount;
-        int32_t _materialColor;
+        std::optional<uint16_t> _materialColor;
         BlurRegionFluentT(GUI *g)
             : detail::FluentLifetime(g),
               _x(0),
@@ -24,8 +23,7 @@ namespace pipgui
               _dir(TopDown),
               _gradient(true),
               _materialStrength(32),
-              _noiseAmount(8),
-              _materialColor(-1)
+              _materialColor(std::nullopt)
         {
         }
         ~BlurRegionFluentT() { draw(); }
@@ -73,18 +71,11 @@ namespace pipgui
             _materialStrength = s;
             return *this;
         }
-        BlurRegionFluentT &noiseAmount(uint8_t n)
-        {
-            if (!canMutate())
-                return *this;
-            _noiseAmount = n;
-            return *this;
-        }
         BlurRegionFluentT &materialColor(int32_t c)
         {
             if (!canMutate())
                 return *this;
-            _materialColor = c;
+            detail::assignOptionalColor(_materialColor, c);
             return *this;
         }
         void draw();
@@ -97,7 +88,8 @@ namespace pipgui
         int16_t _x, _y;
         int16_t _r;
         uint16_t _fillColor;
-        int16_t _bgColor, _glowColor;
+        std::optional<uint16_t> _bgColor;
+        std::optional<uint16_t> _glowColor;
         uint8_t _glowSize, _glowStrength;
         GlowAnim _anim;
         uint16_t _pulsePeriodMs;
@@ -107,8 +99,8 @@ namespace pipgui
               _y(0),
               _r(0),
               _fillColor(0),
-              _bgColor(-1),
-              _glowColor(-1),
+              _bgColor(std::nullopt),
+              _glowColor(std::nullopt),
               _glowSize(12),
               _glowStrength(220),
               _anim(None),
@@ -142,28 +134,28 @@ namespace pipgui
         {
             if (!canMutate())
                 return *this;
-            _bgColor = c;
+            detail::assignOptionalColor(_bgColor, c);
             return *this;
         }
         GlowCircleFluentT &bgColor(uint16_t c)
         {
             if (!canMutate())
                 return *this;
-            _bgColor = (int16_t)c;
+            _bgColor = c;
             return *this;
         }
         GlowCircleFluentT &glowColor(int16_t c)
         {
             if (!canMutate())
                 return *this;
-            _glowColor = c;
+            detail::assignOptionalColor(_glowColor, c);
             return *this;
         }
         GlowCircleFluentT &glowColor(uint16_t c)
         {
             if (!canMutate())
                 return *this;
-            _glowColor = (int16_t)c;
+            _glowColor = c;
             return *this;
         }
         GlowCircleFluentT &glowSize(uint8_t s)
@@ -205,7 +197,8 @@ namespace pipgui
         uint8_t _radius;
         uint8_t _radiusTL, _radiusTR, _radiusBR, _radiusBL;
         uint16_t _fillColor;
-        int16_t _bgColor, _glowColor;
+        std::optional<uint16_t> _bgColor;
+        std::optional<uint16_t> _glowColor;
         uint8_t _glowSize, _glowStrength;
         GlowAnim _anim;
         uint16_t _pulsePeriodMs;
@@ -213,14 +206,10 @@ namespace pipgui
         GlowRectFluentT(GUI *g)
             : detail::FluentLifetime(g), _x(0), _y(0), _w(0), _h(0), _radius(0),
               _radiusTL(0), _radiusTR(0), _radiusBR(0), _radiusBL(0),
-              _fillColor(0), _bgColor(-1), _glowColor(-1),
+              _fillColor(0), _bgColor(std::nullopt), _glowColor(std::nullopt),
               _glowSize(12), _glowStrength(220), _anim(None), _pulsePeriodMs(1000),
               _perCorner(false) {}
-        ~GlowRectFluentT()
-        {
-            if (!_consumed)
-                draw();
-        }
+        ~GlowRectFluentT() { draw(); }
         GlowRectFluentT &pos(int16_t x, int16_t y)
         {
             if (!canMutate())
@@ -267,28 +256,28 @@ namespace pipgui
         {
             if (!canMutate())
                 return *this;
-            _bgColor = c;
+            detail::assignOptionalColor(_bgColor, c);
             return *this;
         }
         GlowRectFluentT &bgColor(uint16_t c)
         {
             if (!canMutate())
                 return *this;
-            _bgColor = (int16_t)c;
+            _bgColor = c;
             return *this;
         }
         GlowRectFluentT &glowColor(int16_t c)
         {
             if (!canMutate())
                 return *this;
-            _glowColor = c;
+            detail::assignOptionalColor(_glowColor, c);
             return *this;
         }
         GlowRectFluentT &glowColor(uint16_t c)
         {
             if (!canMutate())
                 return *this;
-            _glowColor = (int16_t)c;
+            _glowColor = c;
             return *this;
         }
         GlowRectFluentT &glowSize(uint8_t s)

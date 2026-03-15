@@ -163,8 +163,8 @@ namespace pipgui
         ConfigureListFluent(ConfigureListFluent &&other) noexcept
             : detail::FluentLifetime(std::move(other)),
               _screenId(other._screenId),
-              _items(other._items),
-              _itemCount(other._itemCount),
+              _items(std::exchange(other._items, nullptr)),
+              _itemCount(std::exchange(other._itemCount, 0)),
               _ownedItems(std::move(other._ownedItems)),
               _parentScreen(other._parentScreen),
               _cardColor(other._cardColor),
@@ -174,8 +174,6 @@ namespace pipgui
               _cardHeight(other._cardHeight),
               _mode(other._mode)
         {
-            other._items = nullptr;
-            other._itemCount = 0;
         }
 
         ConfigureListFluent &operator=(ConfigureListFluent &&other) noexcept
@@ -184,8 +182,8 @@ namespace pipgui
             {
                 detail::FluentLifetime::operator=(std::move(other));
                 _screenId = other._screenId;
-                _items = other._items;
-                _itemCount = other._itemCount;
+                _items = std::exchange(other._items, nullptr);
+                _itemCount = std::exchange(other._itemCount, 0);
                 _ownedItems = std::move(other._ownedItems);
                 _parentScreen = other._parentScreen;
                 _cardColor = other._cardColor;
@@ -194,9 +192,6 @@ namespace pipgui
                 _cardWidth = other._cardWidth;
                 _cardHeight = other._cardHeight;
                 _mode = other._mode;
-
-                other._items = nullptr;
-                other._itemCount = 0;
             }
             return *this;
         }
@@ -358,13 +353,13 @@ namespace pipgui
         ConfigureTileFluent(ConfigureTileFluent &&other) noexcept
             : detail::FluentLifetime(std::move(other)),
               _screenId(other._screenId),
-              _items(other._items),
-              _itemCount(other._itemCount),
+              _items(std::exchange(other._items, nullptr)),
+              _itemCount(std::exchange(other._itemCount, 0)),
               _ownedItems(std::move(other._ownedItems)),
-              _layoutRowsSpec(other._layoutRowsSpec),
+              _layoutRowsSpec(std::exchange(other._layoutRowsSpec, nullptr)),
               _ownedLayoutRowsSpec(std::move(other._ownedLayoutRowsSpec)),
-              _layoutRowCount(other._layoutRowCount),
-              _layoutConfigured(other._layoutConfigured),
+              _layoutRowCount(std::exchange(other._layoutRowCount, 0)),
+              _layoutConfigured(std::exchange(other._layoutConfigured, false)),
               _parentScreen(other._parentScreen),
               _cardColor(other._cardColor),
               _cardActiveColor(other._cardActiveColor),
@@ -376,11 +371,6 @@ namespace pipgui
               _lineGapPx(other._lineGapPx),
               _contentMode(other._contentMode)
         {
-            other._items = nullptr;
-            other._itemCount = 0;
-            other._layoutRowsSpec = nullptr;
-            other._layoutRowCount = 0;
-            other._layoutConfigured = false;
         }
 
         ConfigureTileFluent &operator=(ConfigureTileFluent &&other) noexcept
@@ -389,13 +379,13 @@ namespace pipgui
             {
                 detail::FluentLifetime::operator=(std::move(other));
                 _screenId = other._screenId;
-                _items = other._items;
-                _itemCount = other._itemCount;
+                _items = std::exchange(other._items, nullptr);
+                _itemCount = std::exchange(other._itemCount, 0);
                 _ownedItems = std::move(other._ownedItems);
-                _layoutRowsSpec = other._layoutRowsSpec;
+                _layoutRowsSpec = std::exchange(other._layoutRowsSpec, nullptr);
                 _ownedLayoutRowsSpec = std::move(other._ownedLayoutRowsSpec);
-                _layoutRowCount = other._layoutRowCount;
-                _layoutConfigured = other._layoutConfigured;
+                _layoutRowCount = std::exchange(other._layoutRowCount, 0);
+                _layoutConfigured = std::exchange(other._layoutConfigured, false);
                 _parentScreen = other._parentScreen;
                 _cardColor = other._cardColor;
                 _cardActiveColor = other._cardActiveColor;
@@ -406,12 +396,6 @@ namespace pipgui
                 _tileHeight = other._tileHeight;
                 _lineGapPx = other._lineGapPx;
                 _contentMode = other._contentMode;
-
-                other._items = nullptr;
-                other._itemCount = 0;
-                other._layoutRowsSpec = nullptr;
-                other._layoutRowCount = 0;
-                other._layoutConfigured = false;
             }
             return *this;
         }

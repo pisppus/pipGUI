@@ -27,18 +27,18 @@ namespace pipgui
         static void init();
         static void update();
 
-        static const DebugMetrics &metrics() { return _metrics; }
+        [[nodiscard]] static const DebugMetrics &metrics() noexcept { return _metrics; }
 
         static void formatStatusBar(char *out, size_t len);
 
-        static bool isEnabled() { return _enabled; }
-        static void setEnabled(bool enable) { _enabled = enable; }
+        [[nodiscard]] static bool isEnabled() noexcept { return _enabled; }
+        static void setEnabled(bool enable) noexcept { _enabled = enable; }
 
-        static void setDirtyRectEnabled(bool enabled) { _dirtyRectEnabled = enabled; }
-        static bool dirtyRectEnabled() { return _dirtyRectEnabled; }
+        static void setDirtyRectEnabled(bool enabled) noexcept { _dirtyRectEnabled = enabled; }
+        [[nodiscard]] static bool dirtyRectEnabled() noexcept { return _dirtyRectEnabled; }
 
-        static void setDirtyRectActiveColor(uint16_t color) { _dirtyRectActiveColor = color; }
-        static uint16_t dirtyRectActiveColor() { return _dirtyRectActiveColor; }
+        static void setDirtyRectActiveColor(uint16_t color) noexcept { _dirtyRectActiveColor = color; }
+        [[nodiscard]] static uint16_t dirtyRectActiveColor() noexcept { return _dirtyRectActiveColor; }
 
         static void recordDirtyRect(int16_t x, int16_t y, int16_t w, int16_t h);
 

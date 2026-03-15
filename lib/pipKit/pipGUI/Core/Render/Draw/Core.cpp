@@ -78,8 +78,7 @@ namespace pipgui
 
     void GUI::clear(uint16_t color)
     {
-        _render.bgColor = detail::color565To888(color);
-        _render.bgColor565 = color;
+        setBackgroundColorCache(color);
 
         if (!_flags.spriteEnabled)
             return;

@@ -8,13 +8,13 @@ namespace pipcore::esp32::services
     class Prefs
     {
     public:
-        ~Prefs();
+        ~Prefs() noexcept;
 
-        bool loadMaxBrightnessPercent(uint8_t &percent);
-        bool storeMaxBrightnessPercent(uint8_t percent);
+        [[nodiscard]] bool loadMaxBrightnessPercent(uint8_t &percent) noexcept;
+        [[nodiscard]] bool storeMaxBrightnessPercent(uint8_t percent) noexcept;
 
     private:
-        bool ensureOpen();
+        [[nodiscard]] bool ensureOpen() noexcept;
 
     private:
         Preferences _prefs;

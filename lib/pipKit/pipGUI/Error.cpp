@@ -327,7 +327,7 @@ namespace pipgui
         _render.activeSprite = prevActiveFrame;
     }
 
-    bool GUI::errorActive() const
+    bool GUI::errorActive() const noexcept
     {
         return _flags.errorActive;
     }

@@ -475,6 +475,20 @@ namespace pipgui
         if (!m.configured || m.itemCount == 0)
             return;
 
+#if PIPGUI_SCREENSHOTS
+        if (_diag.screenshotNext && _diag.screenshotPrev &&
+            _diag.screenshotNext->isDown() && _diag.screenshotPrev->isDown())
+        {
+            m.nextHoldStartMs = 0;
+            m.prevHoldStartMs = 0;
+            m.nextLongFired = false;
+            m.prevLongFired = false;
+            m.lastNextDown = false;
+            m.lastPrevDown = false;
+            return;
+        }
+#endif
+
         uint8_t prevSelected = m.selectedIndex;
 
         uint32_t now = nowMs();

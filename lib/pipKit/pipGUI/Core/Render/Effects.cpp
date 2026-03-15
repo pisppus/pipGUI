@@ -25,6 +25,42 @@ namespace pipgui
             return (uint16_t)(res > 255 ? 255 : res);
         }
 
+        static inline uint16_t resolveOptionalColor565(int32_t color, uint16_t fallback)
+        {
+            return color >= 0 ? (uint16_t)color : fallback;
+        }
+
+        static inline bool intersectRectWithClip(int16_t &x, int16_t &y, int16_t &w, int16_t &h,
+                                                 int32_t clipX, int32_t clipY, int32_t clipW, int32_t clipH)
+        {
+            if (w <= 0 || h <= 0 || clipW <= 0 || clipH <= 0)
+                return false;
+
+            int32_t x0 = x;
+            int32_t y0 = y;
+            int32_t x1 = x0 + w;
+            int32_t y1 = y0 + h;
+            const int32_t clipR = clipX + clipW;
+            const int32_t clipB = clipY + clipH;
+
+            if (x0 < clipX)
+                x0 = clipX;
+            if (y0 < clipY)
+                y0 = clipY;
+            if (x1 > clipR)
+                x1 = clipR;
+            if (y1 > clipB)
+                y1 = clipB;
+            if (x0 >= x1 || y0 >= y1)
+                return false;
+
+            x = (int16_t)x0;
+            y = (int16_t)y0;
+            w = (int16_t)(x1 - x0);
+            h = (int16_t)(y1 - y0);
+            return true;
+        }
+
         static const uint32_t inv16[257] = {
             0,
             65536, 32768, 21845, 16384, 13107, 10923, 9362, 8192, 7282, 6554,
@@ -56,7 +92,7 @@ namespace pipgui
     }
 
     template <typename Fn>
-    void GUI::renderToSpriteAndFlush(int16_t x, int16_t y, int16_t w, int16_t h, Fn &&drawCall)
+    void GUI::renderToSpriteAndInvalidate(int16_t x, int16_t y, int16_t w, int16_t h, Fn &&drawCall)
     {
         const bool prevRender = _flags.inSpritePass;
         pipcore::Sprite *prevActive = _render.activeSprite;
@@ -66,10 +102,7 @@ namespace pipgui
         _flags.inSpritePass = prevRender;
         _render.activeSprite = prevActive;
         if (!prevRender)
-        {
             invalidateRect(x, y, w, h);
-            flushDirty();
-        }
     }
 
     void GUI::drawGlowCircle(int16_t x, int16_t y, int16_t r,
@@ -92,7 +125,7 @@ namespace pipgui
         if (y == center)
             y = (int16_t)(AutoY(diam) + diam / 2);
 
-        const uint16_t bg = bgColor >= 0 ? (uint16_t)bgColor : _render.bgColor;
+        const uint16_t bg = resolveOptionalColor565(bgColor, _render.bgColor565);
         const uint16_t glow = glowColor >= 0 ? (uint16_t)glowColor : detail::blend565WithWhite(fillColor, 80);
         const uint16_t strength = computeGlowStrength(glowStrength, anim, pulsePeriodMs, nowMs());
 
@@ -132,9 +165,9 @@ namespace pipgui
         if (y == center)
             y = (int16_t)(AutoY(diam) + diam / 2);
 
-        const uint16_t bg = bgColor >= 0 ? (uint16_t)bgColor : _render.bgColor;
+        const uint16_t bg = resolveOptionalColor565(bgColor, _render.bgColor565);
         constexpr int16_t pad = 2;
-        renderToSpriteAndFlush(
+        renderToSpriteAndInvalidate(
             (int16_t)(x - outerR - pad), (int16_t)(y - outerR - pad),
             (int16_t)(diam + pad * 2), (int16_t)(diam + pad * 2),
             [&]
@@ -177,7 +210,7 @@ namespace pipgui
         if (y == center)
             y = (int16_t)(AutoY(h + 2 * glowSize) + glowSize);
 
-        const uint16_t bg = bgColor >= 0 ? (uint16_t)bgColor : _render.bgColor;
+        const uint16_t bg = resolveOptionalColor565(bgColor, _render.bgColor565);
         const uint16_t glow = glowColor >= 0 ? (uint16_t)glowColor : detail::blend565WithWhite(fillColor, 80);
         const uint16_t strength = computeGlowStrength(glowStrength, anim, pulsePeriodMs, nowMs());
 
@@ -229,9 +262,9 @@ namespace pipgui
         if (y == center)
             y = (int16_t)(AutoY(h + 2 * glowSize) + glowSize);
 
-        const uint16_t bg = bgColor >= 0 ? (uint16_t)bgColor : _render.bgColor;
+        const uint16_t bg = resolveOptionalColor565(bgColor, _render.bgColor565);
         constexpr int16_t pad = 2;
-        renderToSpriteAndFlush(
+        renderToSpriteAndInvalidate(
             (int16_t)(x - glowSize - pad), (int16_t)(y - glowSize - pad),
             (int16_t)(w + glowSize * 2 + pad * 2), (int16_t)(h + glowSize * 2 + pad * 2),
             [&]
@@ -304,42 +337,43 @@ namespace pipgui
 
     void GUI::drawBlurRegion(int16_t x, int16_t y, int16_t w, int16_t h,
                              uint8_t radius, BlurDirection dir, bool gradient,
-                             uint8_t materialStrength, uint8_t noiseAmount, int32_t materialColor)
+                             uint8_t materialStrength, int32_t materialColor)
     {
-        (void)noiseAmount;
         if (w <= 0 || h <= 0)
             return;
         if (radius < 1)
             radius = 1;
 
-        if (x < 0)
-        {
-            w += x;
-            x = 0;
-        }
-        if (y < 0)
-        {
-            h += y;
-            y = 0;
-        }
-        if (x + w > _render.screenWidth)
-            w = _render.screenWidth - x;
-        if (y + h > _render.screenHeight)
-            h = _render.screenHeight - y;
-        if (w <= 0 || h <= 0)
-            return;
-
         if (_flags.spriteEnabled && _disp.display && !_flags.inSpritePass)
         {
-            updateBlurRegion(x, y, w, h, radius, dir, gradient, materialStrength, noiseAmount, materialColor);
+            updateBlurRegion(x, y, w, h, radius, dir, gradient, materialStrength, materialColor);
             return;
         }
 
-        pipcore::Sprite *spr = _render.activeSprite ? _render.activeSprite : &_render.sprite;
+        pipcore::Sprite *spr = getDrawTarget();
+        if (!spr)
+            return;
+        int32_t clipX = 0;
+        int32_t clipY = 0;
+        int32_t clipW = spr->width();
+        int32_t clipH = spr->height();
+        spr->getClipRect(&clipX, &clipY, &clipW, &clipH);
+        if (!intersectRectWithClip(x, y, w, h, clipX, clipY, clipW, clipH))
+            return;
+
         uint16_t *screenBuf = (uint16_t *)spr->getBuffer();
         const int16_t stride = spr->width();
         if (!screenBuf || stride <= 0)
             return;
+
+        const int16_t sampleX = (int16_t)(x - radius);
+        const int16_t sampleY = (int16_t)(y - radius);
+        const int16_t sampleW = (int16_t)(w + radius * 2);
+        const int16_t sampleH = (int16_t)(h + radius * 2);
+        if (sampleW <= 0 || sampleH <= 0)
+            return;
+        const int32_t clipR = clipX + clipW - 1;
+        const int32_t clipB = clipY + clipH - 1;
 
         auto swap16 = [](uint16_t v)
         { return (uint16_t)((v >> 8) | (v << 8)); };
@@ -348,8 +382,8 @@ namespace pipgui
         auto write565 = [&](int32_t i, uint16_t c)
         { screenBuf[i] = swap16(c); };
 
-        const int16_t sw = (int16_t)((w + 1) >> 1);
-        const int16_t sh = (int16_t)((h + 1) >> 1);
+        const int16_t sw = (int16_t)((sampleW + 1) >> 1);
+        const int16_t sh = (int16_t)((sampleH + 1) >> 1);
         const uint32_t smallLen = (uint32_t)sw * (uint32_t)sh;
         if (!smallLen || !ensureBlurWorkBuffers(smallLen, sw, sh))
             return;
@@ -360,14 +394,30 @@ namespace pipgui
 
         for (int16_t sy = 0; sy < sh; ++sy)
         {
-            const int16_t y0 = y + (sy << 1);
-            const int16_t y1 = (y0 + 1 < y + h) ? y0 + 1 : y0;
+            int16_t y0 = sampleY + (sy << 1);
+            int16_t y1 = (y0 + 1 < sampleY + sampleH) ? y0 + 1 : y0;
+            if (y0 < clipY)
+                y0 = (int16_t)clipY;
+            else if (y0 > clipB)
+                y0 = (int16_t)clipB;
+            if (y1 < clipY)
+                y1 = (int16_t)clipY;
+            else if (y1 > clipB)
+                y1 = (int16_t)clipB;
             const int32_t row0 = (int32_t)y0 * stride;
             const int32_t row1 = (int32_t)y1 * stride;
             for (int16_t sx = 0; sx < sw; ++sx)
             {
-                const int16_t x0 = x + (sx << 1);
-                const int16_t x1 = (x0 + 1 < x + w) ? x0 + 1 : x0;
+                int16_t x0 = sampleX + (sx << 1);
+                int16_t x1 = (x0 + 1 < sampleX + sampleW) ? x0 + 1 : x0;
+                if (x0 < clipX)
+                    x0 = (int16_t)clipX;
+                else if (x0 > clipR)
+                    x0 = (int16_t)clipR;
+                if (x1 < clipX)
+                    x1 = (int16_t)clipX;
+                else if (x1 > clipR)
+                    x1 = (int16_t)clipR;
                 const uint16_t c00 = read565(row0 + x0);
                 const uint16_t c10 = read565(row0 + x1);
                 const uint16_t c01 = read565(row1 + x0);
@@ -439,8 +489,7 @@ namespace pipgui
 
         const bool useMaterial = (materialStrength > 0);
         const uint16_t mat565 = useMaterial
-                                    ? (materialColor >= 0 ? detail::color888To565((uint32_t)materialColor)
-                                                          : detail::color888To565(_render.bgColor))
+                                    ? resolveOptionalColor565(materialColor, _render.bgColor565)
                                     : 0;
 
         const bool gradH = gradient && (dir == LeftRight || dir == RightLeft);
@@ -458,7 +507,7 @@ namespace pipgui
             }
 
             const int32_t screenOff = (int32_t)(y + iy) * stride + x;
-            const uint32_t syOff = (uint32_t)min(iy >> 1, (int)sh - 1) * (uint32_t)sw;
+            const uint32_t sampleYOff = (uint32_t)min(((int32_t)(y + iy) - sampleY) >> 1, (int32_t)sh - 1) * (uint32_t)sw;
 
             for (int16_t ix = 0; ix < w; ++ix)
             {
@@ -471,8 +520,8 @@ namespace pipgui
                         alpha = w <= 1 ? 255 : (uint8_t)(ix * 255 / (w - 1));
                 }
 
-                const uint32_t sx = (uint32_t)min(ix >> 1, (int)sw - 1);
-                uint16_t mixed = detail::blend565(read565(screenOff + ix), smallIn[syOff + sx], alpha);
+                const uint32_t sampleXOff = (uint32_t)min(((int32_t)(x + ix) - sampleX) >> 1, (int32_t)sw - 1);
+                uint16_t mixed = detail::blend565(read565(screenOff + ix), smallIn[sampleYOff + sampleXOff], alpha);
 
                 if (useMaterial)
                     mixed = detail::blend565(mixed, mat565,
@@ -486,16 +535,15 @@ namespace pipgui
 
     void GUI::updateBlurRegion(int16_t x, int16_t y, int16_t w, int16_t h,
                                uint8_t radius, BlurDirection dir, bool gradient,
-                               uint8_t materialStrength, uint8_t noiseAmount, int32_t materialColor)
+                               uint8_t materialStrength, int32_t materialColor)
     {
         if (!_flags.spriteEnabled || !_disp.display)
         {
-            drawBlurRegion(x, y, w, h, radius, dir, gradient, materialStrength, noiseAmount, materialColor);
+            drawBlurRegion(x, y, w, h, radius, dir, gradient, materialStrength, materialColor);
             return;
         }
-        renderToSpriteAndFlush(x, y, w, h,
-                               [&]
-                               { drawBlurRegion(x, y, w, h, radius, dir, gradient, materialStrength, noiseAmount, materialColor); });
+        renderToSpriteAndInvalidate(x, y, w, h,
+                                    [&]
+                                    { drawBlurRegion(x, y, w, h, radius, dir, gradient, materialStrength, materialColor); });
     }
 }
-

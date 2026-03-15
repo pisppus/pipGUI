@@ -1,5 +1,4 @@
 #include <Arduino.h>
-#include <SPIFFS.h>
 #include <math.h>
 #include <pipKit.hpp>
 
@@ -390,8 +389,7 @@ SCREEN(screenBlurDemo, 17)
       .radius(10)
       .direction(TopDown)
       .gradient(false)
-      .materialStrength(160)
-      .noiseAmount(40)
+      .materialStrength(0)
       .materialColor(ui.rgb(10, 10, 10));
 
   buildBlurRow(t, (int16_t)w, bandY + bandH + 10, 18, 16, row);
@@ -1642,6 +1640,16 @@ SCREEN(screenAutoTextColorDemo, 38)
   drawCenteredText("Text color auto-selected based on bg", 310, ui.rgb(180, 180, 180), bg565);
 }
 
+SCREEN(screenScreenshotGallery, 39)
+{
+  ui.clear(ui.rgb(10, 10, 10));
+  ui.drawScreenshot()
+      .pos(8, 28)
+      .size(224, 284)
+      .grid(3, 5)
+      .padding(8);
+}
+
 void updateClockDisplay(uint32_t nowMs)
 {
   static uint32_t lastMinute = 0xFFFFFFFF;
@@ -1731,6 +1739,7 @@ void configureListMenus()
           {error_layer0, "Error", "Full-screen error overlay presentation", screenErrorOverlayDemo},
           {warning_layer0, "Warning", "Full-screen warning overlay presentation", screenWarningOverlayDemo},
           {error_layer0, "Blur strip", "Material-style blur strip with moving content", screenBlurDemo},
+          {warning_layer0, "Screenshots", "Captured frames gallery", screenScreenshotGallery},
           {warning_layer0, "Dither demo", "Gamma + BlueNoise", screenDitherDemo},
           {error_layer0, "Dither Blue", "BlueNoise only", screenDitherBlueDemo},
           {warning_layer0, "Dither Temporal", "Temporal FRC", screenDitherTemporalDemo},
@@ -1768,6 +1777,7 @@ void configureListMenus()
           {error_layer0, "Graph osc", "Digital oscilloscope style waveform preview", screenGraphOsc},
           {error_layer0, "Tile menu", "Grid menu with icons, title, and subtitle", screenTileMenuDemo},
           {warning_layer0, "ToggleSwitch", "Toggle switch interaction and state preview", screenToggleSwitchDemo},
+          {warning_layer0, "Screenshots", "Captured frames gallery", screenScreenshotGallery},
           {error_layer0, "Dither demo", "Gamma + BlueNoise", screenDitherDemo},
           {warning_layer0, "Dither Cubes", "Two cubes + avg (16/24)", screenDitherCubesDemo},
           {error_layer0, "Dither Compare", "Compare 16-bit vs 24-bit", screenDitherCompareGradDemo},
@@ -1920,8 +1930,7 @@ void updateBlurDemoFrame(uint32_t nowMs)
       .radius(10)
       .direction(TopDown)
       .gradient(false)
-      .materialStrength(160)
-      .noiseAmount(40)
+      .materialStrength(0)
       .materialColor(ui.rgb(10, 10, 10));
 }
 
@@ -2178,14 +2187,11 @@ void handleErrorDemo(uint8_t screenId, bool nextPressed, bool prevPressed)
 
 void setup()
 {
-  Serial.begin(115200);
-  SPIFFS.begin(true);
+  Serial.begin(1000000);
 
   ui.configureDisplay()
       .pins({11, 12, 10, 9, 14})
-      .hz(80000000)
-      .size(240, 320)
-      .apply();
+      .size(240, 320);
 
   ui.begin(3, 0);
   ui.setScreenAnimation(SlideX, 320);
@@ -2197,6 +2203,7 @@ void setup()
 
   btnNext.begin();
   btnPrev.begin();
+  ui.setScreenshotShortcut(&btnNext, &btnPrev);
 
   ui.configureTextStyles(24, 18, 14, 12);
   ui.logoSizesPx(36, 24);
@@ -2210,14 +2217,12 @@ void setup()
 
 void loop()
 {
-  btnNext.update();
-  btnPrev.update();
-
+  const auto input = ui.pollInput(btnNext, btnPrev);
   const uint32_t nowMs = millis();
-  const bool nextPressed = btnNext.wasPressed();
-  const bool prevPressed = btnPrev.wasPressed();
-  const bool nextDown = btnNext.isDown();
-  const bool prevDown = btnPrev.isDown();
+  const bool nextPressed = input.nextPressed;
+  const bool prevPressed = input.prevPressed;
+  const bool nextDown = input.nextDown;
+  const bool prevDown = input.prevDown;
 
   if (ui.screenTransitionActive())
   {

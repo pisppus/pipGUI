@@ -18,6 +18,18 @@ namespace pipgui
                 return gui.platform();
             }
 
+            static void renderScreenshotGallery(GUI &gui,
+                                                int16_t x,
+                                                int16_t y,
+                                                int16_t w,
+                                                int16_t h,
+                                                uint8_t cols,
+                                                uint8_t rows,
+                                                uint16_t padding)
+            {
+                gui.renderScreenshotGallery(x, y, w, h, cols, rows, padding);
+            }
+
             static ListState *ensureList(GUI &gui, uint8_t screenId)
             {
                 return gui.ensureList(screenId);
@@ -283,10 +295,9 @@ namespace pipgui
                                        BlurDirection dir,
                                        bool gradient,
                                        uint8_t materialStrength,
-                                       uint8_t noiseAmount,
                                        int32_t materialColor)
             {
-                gui.drawBlurRegion(x, y, w, h, radius, dir, gradient, materialStrength, noiseAmount, materialColor);
+                gui.drawBlurRegion(x, y, w, h, radius, dir, gradient, materialStrength, materialColor);
             }
 
             static void updateBlurRegion(GUI &gui,
@@ -298,10 +309,9 @@ namespace pipgui
                                          BlurDirection dir,
                                          bool gradient,
                                          uint8_t materialStrength,
-                                         uint8_t noiseAmount,
                                          int32_t materialColor)
             {
-                gui.updateBlurRegion(x, y, w, h, radius, dir, gradient, materialStrength, noiseAmount, materialColor);
+                gui.updateBlurRegion(x, y, w, h, radius, dir, gradient, materialStrength, materialColor);
             }
 
             static void drawScrollDots(GUI &gui,

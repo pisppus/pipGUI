@@ -14,15 +14,15 @@ namespace pipcore
         if (w <= 0 || h <= 0)
             return false;
 
-        Platform *plat = platform();
-        if (!plat)
+        if (Platform *const plat = platform(); !plat)
             return false;
-
-        const size_t pixels = (size_t)w * (size_t)h;
-        if (pixels > SIZE_MAX / sizeof(uint16_t))
-            return false;
-
-        _buf = (uint16_t *)plat->alloc(pixels * sizeof(uint16_t), AllocCaps::PreferExternal);
+        else
+        {
+            const size_t pixels = static_cast<size_t>(w) * static_cast<size_t>(h);
+            if (pixels > SIZE_MAX / sizeof(uint16_t))
+                return false;
+            _buf = static_cast<uint16_t *>(plat->alloc(pixels * sizeof(uint16_t), AllocCaps::PreferExternal));
+        }
         if (!_buf)
             return false;
 
@@ -38,8 +38,7 @@ namespace pipcore
     {
         if (_buf)
         {
-            Platform *plat = platform();
-            if (plat)
+            if (Platform *const plat = platform(); plat)
                 plat->free(_buf);
             _buf = nullptr;
         }
@@ -54,15 +53,15 @@ namespace pipcore
             return;
         }
 
-        int16_t x1 = std::max<int16_t>(0, _clipX);
-        int16_t y1 = std::max<int16_t>(0, _clipY);
-        int16_t x2 = std::min<int16_t>(_w, _clipX + std::max<int16_t>(0, _clipW));
-        int16_t y2 = std::min<int16_t>(_h, _clipY + std::max<int16_t>(0, _clipH));
+        const int32_t x1 = std::max<int32_t>(0, _clipX);
+        const int32_t y1 = std::max<int32_t>(0, _clipY);
+        const int32_t x2 = std::min<int32_t>(_w, static_cast<int32_t>(_clipX) + std::max<int32_t>(0, _clipW));
+        const int32_t y2 = std::min<int32_t>(_h, static_cast<int32_t>(_clipY) + std::max<int32_t>(0, _clipH));
 
-        _clipX = x1;
-        _clipY = y1;
-        _clipW = std::max<int16_t>(0, x2 - x1);
-        _clipH = std::max<int16_t>(0, y2 - y1);
+        _clipX = static_cast<int16_t>(x1);
+        _clipY = static_cast<int16_t>(y1);
+        _clipW = static_cast<int16_t>(std::max<int32_t>(0, x2 - x1));
+        _clipH = static_cast<int16_t>(std::max<int32_t>(0, y2 - y1));
     }
 
     void Sprite::setClipRect(int16_t x, int16_t y, int16_t w, int16_t h)
@@ -93,18 +92,18 @@ namespace pipcore
 
         const int32_t srcClipX1 = _clipX;
         const int32_t srcClipY1 = _clipY;
-        const int32_t srcClipX2 = (int32_t)_clipX + _clipW;
-        const int32_t srcClipY2 = (int32_t)_clipY + _clipH;
+        const int32_t srcClipX2 = static_cast<int32_t>(_clipX) + _clipW;
+        const int32_t srcClipY2 = static_cast<int32_t>(_clipY) + _clipH;
 
         const int32_t dstClipX1 = dst->_clipX;
         const int32_t dstClipY1 = dst->_clipY;
-        const int32_t dstClipX2 = (int32_t)dst->_clipX + dst->_clipW;
-        const int32_t dstClipY2 = (int32_t)dst->_clipY + dst->_clipH;
+        const int32_t dstClipX2 = static_cast<int32_t>(dst->_clipX) + dst->_clipW;
+        const int32_t dstClipY2 = static_cast<int32_t>(dst->_clipY) + dst->_clipH;
 
-        const int32_t x1 = std::max<int32_t>((int32_t)x + srcClipX1, dstClipX1);
-        const int32_t y1 = std::max<int32_t>((int32_t)y + srcClipY1, dstClipY1);
-        const int32_t x2 = std::min<int32_t>((int32_t)x + srcClipX2, dstClipX2);
-        const int32_t y2 = std::min<int32_t>((int32_t)y + srcClipY2, dstClipY2);
+        const int32_t x1 = std::max<int32_t>(static_cast<int32_t>(x) + srcClipX1, dstClipX1);
+        const int32_t y1 = std::max<int32_t>(static_cast<int32_t>(y) + srcClipY1, dstClipY1);
+        const int32_t x2 = std::min<int32_t>(static_cast<int32_t>(x) + srcClipX2, dstClipX2);
+        const int32_t y2 = std::min<int32_t>(static_cast<int32_t>(y) + srcClipY2, dstClipY2);
 
         const int32_t cw = x2 - x1;
         const int32_t ch = y2 - y1;
@@ -113,10 +112,19 @@ namespace pipcore
 
         const int32_t srcX = x1 - x;
         const int32_t srcY = y1 - y;
-        const size_t bytes = (size_t)cw * sizeof(uint16_t);
+        const size_t bytes = static_cast<size_t>(cw) * sizeof(uint16_t);
+        const bool contiguous = srcX == 0 && x1 == 0 && cw == _w && cw == dst->_w;
 
         if (dst == this)
         {
+            if (contiguous)
+            {
+                memmove(dst->_buf + static_cast<size_t>(y1) * dst->_w,
+                        _buf + static_cast<size_t>(srcY) * _w,
+                        static_cast<size_t>(ch) * bytes);
+                return;
+            }
+
             const int32_t srcX2 = srcX + cw;
             const int32_t srcY2 = srcY + ch;
             const int32_t dstX2 = x1 + cw;
@@ -127,8 +135,8 @@ namespace pipcore
             {
                 for (int32_t row = ch - 1; row >= 0; --row)
                 {
-                    uint16_t *dstRow = dst->_buf + ((size_t)(y1 + row) * dst->_w + x1);
-                    const uint16_t *srcRow = _buf + ((size_t)(srcY + row) * _w + srcX);
+                    uint16_t *dstRow = dst->_buf + (static_cast<size_t>(y1 + row) * dst->_w + x1);
+                    const uint16_t *srcRow = _buf + (static_cast<size_t>(srcY + row) * _w + srcX);
                     memmove(dstRow, srcRow, bytes);
                 }
                 return;
@@ -136,15 +144,23 @@ namespace pipcore
 
             for (int32_t row = 0; row < ch; ++row)
             {
-                uint16_t *dstRow = dst->_buf + ((size_t)(y1 + row) * dst->_w + x1);
-                const uint16_t *srcRow = _buf + ((size_t)(srcY + row) * _w + srcX);
+                uint16_t *dstRow = dst->_buf + (static_cast<size_t>(y1 + row) * dst->_w + x1);
+                const uint16_t *srcRow = _buf + (static_cast<size_t>(srcY + row) * _w + srcX);
                 memmove(dstRow, srcRow, bytes);
             }
             return;
         }
 
-        const uint16_t *src = _buf + ((size_t)srcY * _w + srcX);
-        uint16_t *dst_ = dst->_buf + ((size_t)y1 * dst->_w + x1);
+        if (contiguous)
+        {
+            memcpy(dst->_buf + static_cast<size_t>(y1) * dst->_w,
+                   _buf + static_cast<size_t>(srcY) * _w,
+                   static_cast<size_t>(ch) * bytes);
+            return;
+        }
+
+        const uint16_t *src = _buf + (static_cast<size_t>(srcY) * _w + srcX);
+        uint16_t *dst_ = dst->_buf + (static_cast<size_t>(y1) * dst->_w + x1);
 
         for (int32_t row = 0; row < ch; ++row)
         {
@@ -159,15 +175,21 @@ namespace pipcore
         if (!_buf || w <= 0 || h <= 0)
             return;
 
-        int16_t x1 = std::max<int16_t>(x, _clipX);
-        int16_t y1 = std::max<int16_t>(y, _clipY);
-        int16_t x2 = std::min<int16_t>(x + w, _clipX + _clipW);
-        int16_t y2 = std::min<int16_t>(y + h, _clipY + _clipH);
+        const int32_t x1 = std::max<int32_t>(x, _clipX);
+        const int32_t y1 = std::max<int32_t>(y, _clipY);
+        const int32_t x2 = std::min<int32_t>(static_cast<int32_t>(x) + w, static_cast<int32_t>(_clipX) + _clipW);
+        const int32_t y2 = std::min<int32_t>(static_cast<int32_t>(y) + h, static_cast<int32_t>(_clipY) + _clipH);
 
-        int16_t cw = x2 - x1, ch = y2 - y1;
+        const int32_t cw = x2 - x1;
+        const int32_t ch = y2 - y1;
         if (cw <= 0 || ch <= 0)
             return;
 
-        display.writeRect565(x1, y1, cw, ch, _buf + (size_t)y1 * _w + x1, _w);
+        display.writeRect565(static_cast<int16_t>(x1),
+                             static_cast<int16_t>(y1),
+                             static_cast<int16_t>(cw),
+                             static_cast<int16_t>(ch),
+                             _buf + (static_cast<size_t>(y1) * _w + x1),
+                             _w);
     }
 }

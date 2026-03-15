@@ -50,6 +50,7 @@ namespace pipgui
     inline NotificationFluent GUI::showNotification() { return NotificationFluent(this); }
 
     inline DrawIconFluent GUI::drawIcon() { return DrawIconFluent(this); }
+    inline DrawScreenshotFluent GUI::drawScreenshot() { return DrawScreenshotFluent(this); }
     inline DrawTextFluent GUI::drawText() { return DrawTextFluent(this); }
     inline UpdateTextFluent GUI::updateText() { return UpdateTextFluent(this); }
     inline DrawTextMarqueeFluent GUI::drawTextMarquee() { return DrawTextMarqueeFluent(this); }

@@ -3,7 +3,7 @@
 
 namespace pipcore::esp32::services
 {
-    void Gpio::pinModeInput(uint8_t pin, InputMode mode) const
+    void Gpio::pinModeInput(uint8_t pin, InputMode mode) const noexcept
     {
         uint8_t arduinoMode = INPUT;
 
@@ -17,7 +17,7 @@ namespace pipcore::esp32::services
         pinMode(pin, arduinoMode);
     }
 
-    bool Gpio::digitalRead(uint8_t pin) const
+    bool Gpio::digitalRead(uint8_t pin) const noexcept
     {
         return ::digitalRead(pin) != 0;
     }

@@ -110,6 +110,20 @@ namespace pipgui
         if (!menu.configured || menu.itemCount == 0)
             return;
 
+#if PIPGUI_SCREENSHOTS
+        if (_diag.screenshotNext && _diag.screenshotPrev &&
+            _diag.screenshotNext->isDown() && _diag.screenshotPrev->isDown())
+        {
+            menu.nextHoldStartMs = 0;
+            menu.prevHoldStartMs = 0;
+            menu.nextLongFired = false;
+            menu.prevLongFired = false;
+            menu.lastNextDown = false;
+            menu.lastPrevDown = false;
+            return;
+        }
+#endif
+
         const uint32_t now = nowMs();
         bool changed = false;
         const uint32_t holdMs = 400;

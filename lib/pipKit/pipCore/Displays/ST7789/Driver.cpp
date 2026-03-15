@@ -1,4 +1,5 @@
 #include <pipCore/Displays/ST7789/Driver.hpp>
+#include <algorithm>
 
 namespace pipcore::st7789
 {
@@ -21,18 +22,53 @@ namespace pipcore::st7789
         constexpr uint8_t MadctlMV = 0x20;
         constexpr uint8_t MadctlBGR = 0x08;
 
-        inline uint16_t bswap16(uint16_t v) { return (uint16_t)__builtin_bswap16(v); }
+        [[nodiscard]] inline constexpr uint16_t bswap16(uint16_t v) noexcept { return __builtin_bswap16(v); }
 
-        inline void pack16BE(uint8_t *buf, uint16_t a, uint16_t b)
+        inline void pack16BE(uint8_t *buf, uint16_t a, uint16_t b) noexcept
         {
-            buf[0] = (uint8_t)(a >> 8);
-            buf[1] = (uint8_t)(a & 0xFF);
-            buf[2] = (uint8_t)(b >> 8);
-            buf[3] = (uint8_t)(b & 0xFF);
+            buf[0] = static_cast<uint8_t>(a >> 8);
+            buf[1] = static_cast<uint8_t>(a & 0xFF);
+            buf[2] = static_cast<uint8_t>(b >> 8);
+            buf[3] = static_cast<uint8_t>(b & 0xFF);
+        }
+
+        inline void copySwap565(uint16_t *dst, const uint16_t *src, size_t pixels) noexcept
+        {
+            if (pixels == 0)
+                return;
+
+            const bool canUse32 = (((reinterpret_cast<uintptr_t>(src) | reinterpret_cast<uintptr_t>(dst)) & 1U) == 0U) &&
+                                  ((reinterpret_cast<uintptr_t>(src) & 2U) == (reinterpret_cast<uintptr_t>(dst) & 2U));
+
+            if (canUse32)
+            {
+                if ((reinterpret_cast<uintptr_t>(src) & 2U) != 0U)
+                {
+                    *dst++ = bswap16(*src++);
+                    --pixels;
+                }
+
+                auto *dst32 = reinterpret_cast<uint32_t *>(dst);
+                auto *src32 = reinterpret_cast<const uint32_t *>(src);
+                size_t pairs = pixels >> 1;
+
+                while (pairs--)
+                {
+                    const uint32_t p = __builtin_bswap32(*src32++);
+                    *dst32++ = (p >> 16) | (p << 16);
+                }
+
+                src = reinterpret_cast<const uint16_t *>(src32);
+                dst = reinterpret_cast<uint16_t *>(dst32);
+                pixels &= 1U;
+            }
+
+            while (pixels--)
+                *dst++ = bswap16(*src++);
         }
     }
 
-    const char *ioErrorText(IoError error)
+    const char *ioErrorText(IoError error) noexcept
     {
         switch (error)
         {
@@ -337,26 +373,14 @@ namespace pipcore::st7789
         }
 
         if (!swapBytes)
-        {
-            constexpr size_t Chunk = 1024;
-            while (pixelCount)
-            {
-                size_t n = pixelCount > Chunk ? Chunk : pixelCount;
-                if (!sendPixels(pixels, n * sizeof(uint16_t)))
-                    return false;
-                pixels += n;
-                pixelCount -= n;
-            }
-            return true;
-        }
+            return sendPixels(pixels, pixelCount * sizeof(uint16_t));
 
-        constexpr size_t Chunk = 256;
-        uint16_t tmp[Chunk];
+        constexpr size_t Chunk = 1024;
+        alignas(4) uint16_t tmp[Chunk];
         while (pixelCount)
         {
-            size_t n = pixelCount > Chunk ? Chunk : pixelCount;
-            for (size_t i = 0; i < n; ++i)
-                tmp[i] = bswap16(pixels[i]);
+            const size_t n = std::min(pixelCount, Chunk);
+            copySwap565(tmp, pixels, n);
             if (!sendPixels(tmp, n * sizeof(uint16_t)))
                 return false;
             pixels += n;
@@ -376,7 +400,7 @@ namespace pipcore::st7789
         if (!setAddrWindow(0, 0, (uint16_t)(_width - 1U), (uint16_t)(_height - 1U)))
             return false;
 
-        constexpr size_t Chunk = 256;
+        constexpr size_t Chunk = 1024;
         uint16_t tmp[Chunk];
         const uint16_t v = swapBytes ? bswap16(color565) : color565;
         for (size_t i = 0; i < Chunk; ++i)
@@ -385,7 +409,7 @@ namespace pipcore::st7789
         size_t remaining = (size_t)_width * (size_t)_height;
         while (remaining)
         {
-            size_t n = remaining > Chunk ? Chunk : remaining;
+            const size_t n = std::min(remaining, Chunk);
             if (!sendPixels(tmp, n * sizeof(uint16_t)))
                 return false;
             remaining -= n;

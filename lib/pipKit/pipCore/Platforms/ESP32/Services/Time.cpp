@@ -3,7 +3,7 @@
 
 namespace pipcore::esp32::services
 {
-    uint32_t Time::nowMs() const
+    uint32_t Time::nowMs() const noexcept
     {
         return millis();
     }

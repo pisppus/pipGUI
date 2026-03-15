@@ -16,27 +16,14 @@ namespace pipcore
     {
     public:
         Button(uint8_t pin, PullMode pull = Pullup)
-            : _platform(nullptr),
-              _pin(pin),
-              _pull(pull),
-              _activeLow(true),
-              _rawState(false),
-              _stableState(false),
-              _pressedFlag(false),
-              _lastRawChangeMs(0)
+            : Button(nullptr, pin, pull)
         {
-            applyPullDefaults();
         }
 
         Button(Platform *platform, uint8_t pin, PullMode pull = Pullup)
             : _platform(platform),
               _pin(pin),
-              _pull(pull),
-              _activeLow(true),
-              _rawState(false),
-              _stableState(false),
-              _pressedFlag(false),
-              _lastRawChangeMs(0)
+              _pull(pull)
         {
             applyPullDefaults();
         }
@@ -90,49 +77,44 @@ namespace pipcore
             return false;
         }
 
-        bool isDown() const { return _stableState; }
+        [[nodiscard]] bool isDown() const noexcept { return _stableState; }
 
-        uint8_t pin() const { return _pin; }
-        PullMode pullMode() const { return _pull; }
+        [[nodiscard]] uint8_t pin() const noexcept { return _pin; }
+        [[nodiscard]] PullMode pullMode() const noexcept { return _pull; }
 
     private:
-        Platform *platform() const { return _platform ? _platform : GetPlatform(); }
+        [[nodiscard]] Platform *platform() const noexcept { return _platform ? _platform : GetPlatform(); }
 
-        uint32_t nowMs() const
+        [[nodiscard]] uint32_t nowMs() const noexcept
         {
             Platform *plat = platform();
             return plat ? plat->nowMs() : 0;
         }
 
-        static constexpr uint32_t debounceMs()
+        [[nodiscard]] static constexpr uint32_t debounceMs() noexcept
         {
             return 16;
         }
 
-        void applyPullDefaults()
+        void applyPullDefaults() noexcept
         {
-            if (_pull == Pullup)
-                _activeLow = true;
-            else if (_pull == Pulldown)
-                _activeLow = false;
+            _activeLow = (_pull == Pullup);
         }
 
-        bool readRaw() const
+        [[nodiscard]] bool readRaw() const noexcept
         {
-            bool v = false;
             Platform *plat = platform();
-            if (plat)
-                v = plat->digitalRead(_pin);
+            const bool v = plat && plat->digitalRead(_pin);
             return _activeLow ? !v : v;
         }
 
-        Platform *_platform;
-        uint8_t _pin;
-        PullMode _pull;
-        bool _activeLow;
-        bool _rawState;
-        bool _stableState;
-        bool _pressedFlag;
-        uint32_t _lastRawChangeMs;
+        Platform *_platform = nullptr;
+        uint8_t _pin = 0;
+        PullMode _pull = Pullup;
+        bool _activeLow = true;
+        bool _rawState = false;
+        bool _stableState = false;
+        bool _pressedFlag = false;
+        uint32_t _lastRawChangeMs = 0;
     };
 }

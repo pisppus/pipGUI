@@ -81,32 +81,41 @@ namespace pipgui
         uint16_t atlasBottom;
         uint16_t atlasRight;
         uint16_t atlasTop;
-        
-        __attribute__((always_inline)) float unpackAdvance() const {
+
+        __attribute__((always_inline)) float unpackAdvance() const
+        {
             return advance * (1.0f / 256.0f);
         }
-        __attribute__((always_inline)) float unpackPadLeft() const {
+        __attribute__((always_inline)) float unpackPadLeft() const
+        {
             return padLeft * (1.0f / 128.0f);
         }
-        __attribute__((always_inline)) float unpackPadBottom() const {
+        __attribute__((always_inline)) float unpackPadBottom() const
+        {
             return padBottom * (1.0f / 128.0f);
         }
-        __attribute__((always_inline)) float unpackPadRight() const {
+        __attribute__((always_inline)) float unpackPadRight() const
+        {
             return padRight * (1.0f / 128.0f);
         }
-        __attribute__((always_inline)) float unpackPadTop() const {
+        __attribute__((always_inline)) float unpackPadTop() const
+        {
             return padTop * (1.0f / 128.0f);
         }
-        __attribute__((always_inline)) float unpackAtlasLeft() const {
+        __attribute__((always_inline)) float unpackAtlasLeft() const
+        {
             return (float)atlasLeft;
         }
-        __attribute__((always_inline)) float unpackAtlasBottom() const {
+        __attribute__((always_inline)) float unpackAtlasBottom() const
+        {
             return (float)atlasBottom;
         }
-        __attribute__((always_inline)) float unpackAtlasRight() const {
+        __attribute__((always_inline)) float unpackAtlasRight() const
+        {
             return (float)atlasRight;
         }
-        __attribute__((always_inline)) float unpackAtlasTop() const {
+        __attribute__((always_inline)) float unpackAtlasTop() const
+        {
             return (float)atlasTop;
         }
     };
@@ -154,7 +163,12 @@ namespace pipgui
         &fontWixMadeForDisplay, &fontKronaOne,
         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
     static uint8_t g_fontCount = 2;
-    static const PSDFFontData *g_currentFont = g_fontRegistry[0];
+
+    static inline const PSDFFontData *fontDataForId(FontId fontId)
+    {
+        const uint16_t id = (uint16_t)fontId;
+        return (id < g_fontCount) ? g_fontRegistry[id] : nullptr;
+    }
 
     namespace detail
     {
@@ -166,23 +180,19 @@ namespace pipgui
             uint16_t prevWeight;
             bool hasPrev;
 
-            explicit TextFontGuard(GUI *g) : gui(g), prevSz(g->fontSize()), prevWeight(g->fontWeight()), hasPrev(false)
+            explicit TextFontGuard(GUI *g)
+                : gui(g),
+                  prevId(g->fontId()),
+                  prevSz(g->fontSize()),
+                  prevWeight(g->fontWeight()),
+                  hasPrev(fontDataForId(g->fontId()) != nullptr)
             {
-                for (uint16_t i = 0; i < g_fontCount; ++i)
-                {
-                    if (g_fontRegistry[i] == g_currentFont)
-                    {
-                        prevId = (FontId)i;
-                        hasPrev = true;
-                        break;
-                    }
-                }
             }
 
             ~TextFontGuard()
             {
                 if (hasPrev)
-                    gui->setFont(prevId);
+                    static_cast<void>(gui->setFont(prevId));
                 gui->setFontSize(prevSz);
                 gui->setFontWeight(prevWeight);
             }
@@ -289,14 +299,14 @@ namespace pipgui
 
     bool GUI::setFont(FontId fontId)
     {
-        uint16_t id = (uint16_t)fontId;
-        if (id < g_fontCount && g_fontRegistry[id])
+        if (fontDataForId(fontId))
         {
-            g_currentFont = g_fontRegistry[id];
+            _typo.currentFontId = fontId;
             return true;
         }
         return false;
     }
+    FontId GUI::fontId() const noexcept { return _typo.currentFontId; }
 
     void GUI::configureTextStyles(uint16_t h1Px, uint16_t h2Px, uint16_t bodyPx, uint16_t captionPx)
     {
@@ -319,13 +329,13 @@ namespace pipgui
     }
 
     void GUI::setFontSize(uint16_t px) { _typo.psdfSizePx = px; }
-    uint16_t GUI::fontSize() const { return _typo.psdfSizePx; }
+    uint16_t GUI::fontSize() const noexcept { return _typo.psdfSizePx; }
 
     void GUI::setFontWeight(uint16_t weight)
     {
         _typo.psdfWeight = clampFontWeight(weight);
     }
-    uint16_t GUI::fontWeight() const { return _typo.psdfWeight; }
+    uint16_t GUI::fontWeight() const noexcept { return _typo.psdfWeight; }
 
     template <typename Fn>
     static inline bool forEachGlyph(const char *s, int len,
@@ -393,7 +403,8 @@ namespace pipgui
     bool GUI::measureText(const String &text, int16_t &outW, int16_t &outH) const
     {
         outW = outH = 0;
-        if (!_typo.psdfSizePx || !g_currentFont)
+        const PSDFFontData *font = fontDataForId(_typo.currentFontId);
+        if (!_typo.psdfSizePx || !font)
             return false;
         int len = (int)text.length();
         if (!len)
@@ -403,7 +414,7 @@ namespace pipgui
         uint16_t lines = 1;
         float maxX = 0.f, curX = 0.f;
 
-        forEachGlyph(text.c_str(), len, g_currentFont, sizePx,
+        forEachGlyph(text.c_str(), len, font, sizePx,
                      [&](const Glyph *g, float penX, float, bool nl) -> bool
                      {
                          if (nl)
@@ -423,7 +434,7 @@ namespace pipgui
         if (curX > maxX)
             maxX = curX;
         outW = (int16_t)ceilf(maxX);
-        outH = (int16_t)ceilf((float)lines * g_currentFont->lineHeight * sizePx);
+        outH = (int16_t)ceilf((float)lines * font->lineHeight * sizePx);
 
         const int16_t weightExpandX = (int16_t)ceilf(weightMeasureExpandXPx(_typo.psdfWeight, sizePx));
         const int16_t weightExpandY = (int16_t)ceilf(weightMeasureExpandYPx(_typo.psdfWeight, sizePx));
@@ -473,10 +484,13 @@ namespace pipgui
                                       uint16_t fg565, uint16_t, TextAlign,
                                       int16_t fadeBoxX, int16_t fadeBoxW, uint8_t fadePx)
     {
-        if (!_typo.psdfSizePx)
+        const PSDFFontData *font = fontDataForId(_typo.currentFontId);
+        if (!_typo.psdfSizePx || !font)
             return;
 
-        pipcore::Sprite *spr = _render.activeSprite ? _render.activeSprite : &_render.sprite;
+        pipcore::Sprite *spr = getDrawTarget();
+        if (!spr)
+            return;
         uint16_t *buf = (uint16_t *)spr->getBuffer();
         if (!buf)
             return;
@@ -497,7 +511,6 @@ namespace pipgui
                                           : 0;
         const bool useFade = (fadePxClamped > 0 && fadeBoxW > 0);
 
-        const PSDFFontData *font = g_currentFont;
         const float sizePx = (float)_typo.psdfSizePx;
         const float distanceScale = font->distanceRange * (sizePx / font->nominalSizePx);
         const float weightBias = weightBiasFor(_typo.psdfWeight, sizePx, font);
@@ -782,7 +795,7 @@ namespace pipgui
     void GUI::updateText(const String &text, int16_t x, int16_t y,
                          uint16_t fg565, uint16_t bg565, TextAlign align)
     {
-        if (!_typo.psdfSizePx || !g_currentFont)
+        if (!_typo.psdfSizePx || !fontDataForId(_typo.currentFontId))
             return;
 
         int16_t tw = 0, th = 0;
@@ -817,44 +830,40 @@ namespace pipgui
         _render.activeSprite = prevActive;
 
         if (!prevRender)
-        {
             invalidateRect(rx - pad, ry - pad, tw + pad * 2, th + pad * 2);
-            flushDirty();
-        }
     }
 
     template <bool IsUpdate>
     void TextFluentT<IsUpdate>::draw()
     {
-        if (_consumed || !_gui || _text.length() == 0)
+        if (_text.length() == 0 || !beginCommit())
             return;
-        _consumed = true;
 
         detail::TextFontGuard guard(_gui);
 
-        if (_fontId != (FontId)0 && !_gui->setFont(_fontId))
+        if (_fontId && !_gui->setFont(*_fontId))
             return;
         if (_sizePx)
             _gui->setFontSize(_sizePx);
         if (_weight)
             _gui->setFontWeight(_weight);
-        if (IsUpdate)
-            detail::BuilderAccess::updateText(*_gui, _text, _x, _y, _fg565, _bg565, _align);
-        else
-            detail::BuilderAccess::drawText(*_gui, _text, _x, _y, _fg565, _bg565, _align);
+        detail::callByMode<IsUpdate>(
+            [&]
+            { detail::BuilderAccess::updateText(*_gui, _text, _x, _y, _fg565, _bg565, _align); },
+            [&]
+            { detail::BuilderAccess::drawText(*_gui, _text, _x, _y, _fg565, _bg565, _align); });
     }
     template void TextFluentT<false>::draw();
     template void TextFluentT<true>::draw();
 
     void DrawTextMarqueeFluent::draw()
     {
-        if (_consumed || !_gui || _text.length() == 0 || _maxWidth <= 0)
+        if (_text.length() == 0 || _maxWidth <= 0 || !beginCommit())
             return;
-        _consumed = true;
 
         detail::TextFontGuard guard(_gui);
 
-        if (_fontId != (FontId)0 && !_gui->setFont(_fontId))
+        if (_fontId && !_gui->setFont(*_fontId))
             return;
         if (_sizePx)
             _gui->setFontSize(_sizePx);
@@ -865,13 +874,12 @@ namespace pipgui
 
     void DrawTextEllipsizedFluent::draw()
     {
-        if (_consumed || !_gui || _text.length() == 0 || _maxWidth <= 0)
+        if (_text.length() == 0 || _maxWidth <= 0 || !beginCommit())
             return;
-        _consumed = true;
 
         detail::TextFontGuard guard(_gui);
 
-        if (_fontId != (FontId)0 && !_gui->setFont(_fontId))
+        if (_fontId && !_gui->setFont(*_fontId))
             return;
         if (_sizePx)
             _gui->setFontSize(_sizePx);
@@ -880,4 +888,3 @@ namespace pipgui
         detail::BuilderAccess::drawTextEllipsized(*_gui, _text, _x, _y, _maxWidth, _fg565, _align);
     }
 }
-

@@ -10,9 +10,9 @@ namespace pipcore
     public:
         virtual ~Display() = default;
 
-        virtual bool begin(uint8_t rotation) = 0;
-        virtual uint16_t width() const = 0;
-        virtual uint16_t height() const = 0;
+        [[nodiscard]] virtual bool begin(uint8_t rotation) = 0;
+        [[nodiscard]] virtual uint16_t width() const noexcept = 0;
+        [[nodiscard]] virtual uint16_t height() const noexcept = 0;
 
         virtual void fillScreen565(uint16_t color565) = 0;
 

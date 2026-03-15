@@ -6,7 +6,7 @@ namespace pipgui
 {
     namespace detail
     {
-        static inline uint32_t color565To888(uint16_t c)
+        [[nodiscard]] inline constexpr uint32_t color565To888(uint16_t c) noexcept
         {
             uint8_t r5 = (uint8_t)((c >> 11) & 0x1F);
             uint8_t g6 = (uint8_t)((c >> 5) & 0x3F);
@@ -17,7 +17,7 @@ namespace pipgui
             return ((uint32_t)r8 << 16) | ((uint32_t)g8 << 8) | (uint32_t)b8;
         }
 
-        static inline uint16_t color888To565(uint32_t c)
+        [[nodiscard]] inline constexpr uint16_t color888To565(uint32_t c) noexcept
         {
             uint8_t r = (uint8_t)((c >> 16) & 0xFF);
             uint8_t g = (uint8_t)((c >> 8) & 0xFF);
@@ -25,7 +25,7 @@ namespace pipgui
             return (uint16_t)((((uint16_t)(r >> 3)) << 11) | (((uint16_t)(g >> 2)) << 5) | ((uint16_t)(b >> 3)));
         }
 
-        static inline uint32_t lerp888(uint32_t a, uint32_t b, float t)
+        [[nodiscard]] inline uint32_t lerp888(uint32_t a, uint32_t b, float t) noexcept
         {
             if (t <= 0.0f)
                 return a;
@@ -47,7 +47,7 @@ namespace pipgui
             return ((uint32_t)cr << 16) | ((uint32_t)cg << 8) | (uint32_t)cb;
         }
 
-        static inline uint16_t blend565(uint16_t bg, uint16_t fg, uint8_t alpha)
+        [[nodiscard]] inline constexpr uint16_t blend565(uint16_t bg, uint16_t fg, uint8_t alpha) noexcept
         {
             uint32_t a = alpha + (alpha >> 7);
 
@@ -67,7 +67,7 @@ namespace pipgui
             return (uint16_t)((r << 11) | g | b);
         }
 
-        static inline uint16_t blend565WithWhite(uint16_t c, uint8_t alpha)
+        [[nodiscard]] inline constexpr uint16_t blend565WithWhite(uint16_t c, uint8_t alpha) noexcept
         {
             uint32_t a = alpha + (alpha >> 7);
 
@@ -84,7 +84,7 @@ namespace pipgui
             return (uint16_t)((r << 11) | g | b);
         }
 
-        static inline uint32_t blend888(uint32_t bg, uint32_t fg, uint8_t alpha)
+        [[nodiscard]] inline constexpr uint32_t blend888(uint32_t bg, uint32_t fg, uint8_t alpha) noexcept
         {
             uint32_t a = alpha + (alpha >> 7);
 
@@ -103,7 +103,7 @@ namespace pipgui
             return ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b;
         }
 
-        static inline uint8_t fadeEdgeAlpha(int32_t pos, int32_t start, int32_t end, int32_t fadePx)
+        [[nodiscard]] inline uint8_t fadeEdgeAlpha(int32_t pos, int32_t start, int32_t end, int32_t fadePx) noexcept
         {
             if (pos < start || pos >= end)
                 return 0;
@@ -129,7 +129,7 @@ namespace pipgui
             return (uint8_t)(alpha * 255.0f + 0.5f);
         }
 
-        static inline uint32_t lighten888(uint32_t c, uint8_t amount)
+        [[nodiscard]] inline constexpr uint32_t lighten888(uint32_t c, uint8_t amount) noexcept
         {
             uint8_t r = (uint8_t)((c >> 16) & 0xFF);
             uint8_t g = (uint8_t)((c >> 8) & 0xFF);
@@ -146,7 +146,7 @@ namespace pipgui
             return (uint32_t)((ar << 16) | (ag << 8) | ab);
         }
 
-        static inline uint16_t autoTextColor(uint16_t bg565, uint8_t threshold = 128)
+        [[nodiscard]] inline constexpr uint16_t autoTextColor(uint16_t bg565, uint8_t threshold = 128) noexcept
         {
             uint8_t r5 = (uint8_t)((bg565 >> 11) & 0x1F);
             uint8_t g6 = (uint8_t)((bg565 >> 5) & 0x3F);

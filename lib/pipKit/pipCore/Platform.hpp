@@ -29,7 +29,7 @@ namespace pipcore
         DisplayIoFailed
     };
 
-    inline const char *platformErrorText(PlatformError error)
+    [[nodiscard]] inline constexpr const char *platformErrorText(PlatformError error) noexcept
     {
         switch (error)
         {
@@ -71,39 +71,39 @@ namespace pipcore
     {
     public:
         virtual ~Platform() = default;
-        virtual uint32_t nowMs() = 0;
+        [[nodiscard]] virtual uint32_t nowMs() noexcept = 0;
 
-        virtual void pinModeInput(uint8_t, InputMode) {}
-        virtual bool digitalRead(uint8_t) { return false; }
+        virtual void pinModeInput(uint8_t, InputMode) noexcept {}
+        [[nodiscard]] virtual bool digitalRead(uint8_t) noexcept { return false; }
 
-        virtual void configureBacklightPin(uint8_t, uint8_t = 0, uint32_t = 5000, uint8_t = 12) {}
-        virtual uint8_t loadMaxBrightnessPercent() { return 100; }
-        virtual void storeMaxBrightnessPercent(uint8_t) {}
-        virtual void setBacklightPercent(uint8_t) {}
+        virtual void configureBacklightPin(uint8_t, uint8_t = 0, uint32_t = 5000, uint8_t = 12) noexcept {}
+        [[nodiscard]] virtual uint8_t loadMaxBrightnessPercent() noexcept { return 100; }
+        virtual void storeMaxBrightnessPercent(uint8_t) noexcept {}
+        virtual void setBacklightPercent(uint8_t) noexcept {}
 
-        virtual void *alloc(size_t bytes, AllocCaps caps = AllocCaps::Default) = 0;
-        virtual void free(void *ptr) = 0;
+        virtual void *alloc(size_t bytes, AllocCaps caps = AllocCaps::Default) noexcept = 0;
+        virtual void free(void *ptr) noexcept = 0;
 
-        virtual bool configureDisplay(const DisplayConfig &)
+        [[nodiscard]] virtual bool configureDisplay(const DisplayConfig &) noexcept
         {
             return false;
         }
 
-        virtual bool beginDisplay(uint8_t)
+        [[nodiscard]] virtual bool beginDisplay(uint8_t) noexcept
         {
             return false;
         }
 
-        virtual Display *display() { return nullptr; }
+        [[nodiscard]] virtual Display *display() noexcept { return nullptr; }
 
-        virtual uint32_t freeHeapTotal() { return 0; }
-        virtual uint32_t freeHeapInternal() { return 0; }
-        virtual uint32_t largestFreeBlock() { return 0; }
-        virtual uint32_t minFreeHeap() { return 0; }
+        [[nodiscard]] virtual uint32_t freeHeapTotal() noexcept { return 0; }
+        [[nodiscard]] virtual uint32_t freeHeapInternal() noexcept { return 0; }
+        [[nodiscard]] virtual uint32_t largestFreeBlock() noexcept { return 0; }
+        [[nodiscard]] virtual uint32_t minFreeHeap() noexcept { return 0; }
 
-        virtual PlatformError lastError() const { return PlatformError::None; }
-        virtual const char *lastErrorText() const { return platformErrorText(lastError()); }
+        [[nodiscard]] virtual PlatformError lastError() const noexcept { return PlatformError::None; }
+        [[nodiscard]] virtual const char *lastErrorText() const noexcept { return platformErrorText(lastError()); }
 
-        virtual uint8_t readProgmemByte(const void *addr) { return *(const uint8_t *)addr; }
+        [[nodiscard]] virtual uint8_t readProgmemByte(const void *addr) noexcept { return *static_cast<const uint8_t *>(addr); }
     };
 }

@@ -7,8 +7,8 @@ namespace pipcore::esp32::services
     class Backlight
     {
     public:
-        void configurePin(uint8_t pin, uint8_t channel, uint32_t freqHz, uint8_t resolutionBits);
-        void setPercent(uint8_t percent);
+        void configurePin(uint8_t pin, uint8_t channel, uint32_t freqHz, uint8_t resolutionBits) noexcept;
+        void setPercent(uint8_t percent) noexcept;
 
     private:
         bool _configured = false;

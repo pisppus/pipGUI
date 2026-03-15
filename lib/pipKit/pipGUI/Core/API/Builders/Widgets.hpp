@@ -10,15 +10,15 @@ namespace pipgui
         int16_t _x, _y, _w, _h;
         ToggleSwitchState *_state;
         uint16_t _activeColor;
-        int32_t _inactiveColor;
-        int32_t _knobColor;
+        std::optional<uint16_t> _inactiveColor;
+        std::optional<uint16_t> _knobColor;
         ToggleSwitchFluentT(GUI *g)
             : detail::FluentLifetime(g),
               _x(0), _y(0), _w(0), _h(0),
               _state(nullptr),
               _activeColor(0),
-              _inactiveColor(-1),
-              _knobColor(-1)
+              _inactiveColor(std::nullopt),
+              _knobColor(std::nullopt)
         {
         }
 
@@ -62,7 +62,7 @@ namespace pipgui
         {
             if (!canMutate())
                 return *this;
-            _inactiveColor = c;
+            detail::assignOptionalColor(_inactiveColor, c);
             return *this;
         }
 
@@ -70,7 +70,7 @@ namespace pipgui
         {
             if (!canMutate())
                 return *this;
-            _knobColor = c;
+            detail::assignOptionalColor(_knobColor, c);
             return *this;
         }
 
@@ -509,7 +509,7 @@ namespace pipgui
         String _buttonText;
         uint16_t _delaySeconds;
         NotificationType _type;
-        IconId _iconId;
+        std::optional<IconId> _iconId;
 
         NotificationFluent(GUI *g)
             : detail::FluentLifetime(g),
@@ -518,7 +518,7 @@ namespace pipgui
               _buttonText("OK"),
               _delaySeconds(0),
               _type(NotificationType::Normal),
-              _iconId((IconId)0xFFFF) {}
+              _iconId(std::nullopt) {}
 
         ~NotificationFluent() { show(); }
 
@@ -632,6 +632,61 @@ namespace pipgui
             if (!canMutate())
                 return *this;
             _bg565 = bg565;
+            return *this;
+        }
+
+        void draw();
+    };
+
+    struct DrawScreenshotFluent : detail::FluentLifetime
+    {
+        PIPGUI_DEFAULT_FLUENT_MOVE(DrawScreenshotFluent);
+        int16_t _x, _y, _w, _h;
+        uint16_t _padding;
+        uint8_t _cols, _rows;
+
+        DrawScreenshotFluent(GUI *g)
+            : detail::FluentLifetime(g),
+              _x(0), _y(0), _w(-1), _h(-1),
+              _padding(0),
+              _cols(0), _rows(0)
+        {
+        }
+
+        ~DrawScreenshotFluent() { draw(); }
+
+        DrawScreenshotFluent &pos(int16_t x, int16_t y)
+        {
+            if (!canMutate())
+                return *this;
+            _x = x;
+            _y = y;
+            return *this;
+        }
+
+        DrawScreenshotFluent &size(int16_t w, int16_t h)
+        {
+            if (!canMutate())
+                return *this;
+            _w = w;
+            _h = h;
+            return *this;
+        }
+
+        DrawScreenshotFluent &grid(uint8_t cols, uint8_t rows)
+        {
+            if (!canMutate())
+                return *this;
+            _cols = cols;
+            _rows = rows;
+            return *this;
+        }
+
+        DrawScreenshotFluent &padding(uint16_t px)
+        {
+            if (!canMutate())
+                return *this;
+            _padding = px;
             return *this;
         }
 

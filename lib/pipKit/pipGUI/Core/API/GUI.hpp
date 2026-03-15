@@ -5,6 +5,19 @@
 #include <pipGUI/Core/API/Common.hpp>
 #include <pipGUI/Core/Utils/Colors.hpp>
 
+#ifndef PIPGUI_SCREENSHOTS
+#define PIPGUI_SCREENSHOTS 1
+#endif
+
+#ifndef PIPGUI_SCREENSHOT_MODE
+#define PIPGUI_SCREENSHOT_MODE 1
+#endif
+
+#if (PIPGUI_SCREENSHOT_MODE == 2)
+#include <FS.h>
+#include <LittleFS.h>
+#endif
+
 namespace pipgui
 {
     struct ConfigureDisplayFluent;
@@ -70,6 +83,7 @@ namespace pipgui
     struct ToastFluent;
     struct NotificationFluent;
     struct DrawIconFluent;
+    struct DrawScreenshotFluent;
 
     template <bool IsUpdate>
     struct TextFluentT;
@@ -95,77 +109,100 @@ namespace pipgui
         struct TextFontGuard;
     }
 
+    enum class ScreenshotFormat : uint8_t
+    {
+        // Payload bytes are a QOI stream (RGB888), without the QOI file header.
+        // For serial streaming, payloadSize may be 0 and the receiver should read until the QOI end marker.
+        QoiRgb = 3,
+    };
+
     class GUI
     {
     public:
+        struct InputState
+        {
+            bool nextDown = false;
+            bool prevDown = false;
+            bool nextPressed = false;
+            bool prevPressed = false;
+            bool comboDown = false;
+        };
+
         GUI();
         ~GUI() noexcept;
 
         GUI(const GUI &) = delete;
         GUI &operator=(const GUI &) = delete;
 
-        pipcore::Platform *platform() const;
+        [[nodiscard]] pipcore::Platform *platform() const noexcept;
 
-        ConfigureDisplayFluent configureDisplay();
+        [[nodiscard]] ConfigureDisplayFluent configureDisplay();
         void configureDisplay(const pipcore::DisplayConfig &cfg);
         void begin(uint8_t rotation = 0, uint16_t bgColor = 0x0000);
 
-        void setBacklightCallback(BacklightCallback cb) { _disp.backlightCb = cb; }
+        void setBacklightCallback(BacklightCallback cb) noexcept { _disp.backlightCb = cb; }
         void setBacklightPin(uint8_t pin, uint8_t channel = 0, uint32_t freqHz = 5000, uint8_t resolutionBits = 12);
         void setMaxBrightness(uint8_t percent);
-        uint8_t maxBrightness() const { return _disp.brightnessMax; }
+        [[nodiscard]] uint8_t maxBrightness() const noexcept { return _disp.brightnessMax; }
 
         pipcore::Display &display();
-        pipcore::Display *displayPtr() const { return _disp.display; }
-        bool displayReady() const { return _disp.display != nullptr; }
+        [[nodiscard]] pipcore::Display *displayPtr() const noexcept { return _disp.display; }
+        [[nodiscard]] bool displayReady() const noexcept { return _disp.display != nullptr; }
+
+        [[nodiscard]] bool startScreenshot();
+        void configureScreenshotGallery(uint8_t maxShots = 12, uint16_t thumbW = 64, uint16_t thumbH = 40, uint16_t padding = 6);
+        [[nodiscard]] uint8_t screenshotCount() const noexcept { return _shots.count; }
+        [[nodiscard]] DrawScreenshotFluent drawScreenshot();
+        void setScreenshotShortcut(Button *next, Button *prev, uint16_t holdMs = 500);
+        InputState pollInput(Button &next, Button &prev);
 
         uint16_t rgb(uint8_t r, uint8_t g, uint8_t b) const;
         void clear(uint16_t color = 0x0000);
 
-        FillRectFluent fillRect();
-        DrawRectFluent drawRect();
-        GradientVerticalFluent gradientVertical();
-        GradientHorizontalFluent gradientHorizontal();
-        GradientCornersFluent gradientCorners();
-        GradientDiagonalFluent gradientDiagonal();
-        GradientRadialFluent gradientRadial();
+        [[nodiscard]] FillRectFluent fillRect();
+        [[nodiscard]] DrawRectFluent drawRect();
+        [[nodiscard]] GradientVerticalFluent gradientVertical();
+        [[nodiscard]] GradientHorizontalFluent gradientHorizontal();
+        [[nodiscard]] GradientCornersFluent gradientCorners();
+        [[nodiscard]] GradientDiagonalFluent gradientDiagonal();
+        [[nodiscard]] GradientRadialFluent gradientRadial();
 
-        DrawLineFluent drawLine();
-        DrawCircleFluent drawCircle();
-        FillCircleFluent fillCircle();
-        DrawArcFluent drawArc();
-        DrawEllipseFluent drawEllipse();
-        FillEllipseFluent fillEllipse();
-        DrawTriangleFluent drawTriangle();
-        FillTriangleFluent fillTriangle();
-        DrawSquircleFluent drawSquircle();
-        FillSquircleFluent fillSquircle();
+        [[nodiscard]] DrawLineFluent drawLine();
+        [[nodiscard]] DrawCircleFluent drawCircle();
+        [[nodiscard]] FillCircleFluent fillCircle();
+        [[nodiscard]] DrawArcFluent drawArc();
+        [[nodiscard]] DrawEllipseFluent drawEllipse();
+        [[nodiscard]] FillEllipseFluent fillEllipse();
+        [[nodiscard]] DrawTriangleFluent drawTriangle();
+        [[nodiscard]] FillTriangleFluent fillTriangle();
+        [[nodiscard]] DrawSquircleFluent drawSquircle();
+        [[nodiscard]] FillSquircleFluent fillSquircle();
 
-        DrawBlurFluent drawBlur();
-        UpdateBlurFluent updateBlur();
+        [[nodiscard]] DrawBlurFluent drawBlur();
+        [[nodiscard]] UpdateBlurFluent updateBlur();
 
-        DrawGlowCircleFluent drawGlowCircle();
-        UpdateGlowCircleFluent updateGlowCircle();
-        DrawGlowRectFluent drawGlowRect();
-        UpdateGlowRectFluent updateGlowRect();
+        [[nodiscard]] DrawGlowCircleFluent drawGlowCircle();
+        [[nodiscard]] UpdateGlowCircleFluent updateGlowCircle();
+        [[nodiscard]] DrawGlowRectFluent drawGlowRect();
+        [[nodiscard]] UpdateGlowRectFluent updateGlowRect();
 
-        DrawScrollDotsFluent drawScrollDots();
-        UpdateScrollDotsFluent updateScrollDots();
+        [[nodiscard]] DrawScrollDotsFluent drawScrollDots();
+        [[nodiscard]] UpdateScrollDotsFluent updateScrollDots();
 
-        DrawToggleSwitchFluent drawToggleSwitch();
-        UpdateToggleSwitchFluent updateToggleSwitch();
+        [[nodiscard]] DrawToggleSwitchFluent drawToggleSwitch();
+        [[nodiscard]] UpdateToggleSwitchFluent updateToggleSwitch();
 
-        DrawButtonFluent drawButton();
-        UpdateButtonFluent updateButton();
+        [[nodiscard]] DrawButtonFluent drawButton();
+        [[nodiscard]] UpdateButtonFluent updateButton();
 
-        DrawProgressBarFluent drawProgressBar();
-        UpdateProgressBarFluent updateProgressBar();
+        [[nodiscard]] DrawProgressBarFluent drawProgressBar();
+        [[nodiscard]] UpdateProgressBarFluent updateProgressBar();
 
-        DrawCircularProgressBarFluent drawCircularProgressBar();
-        UpdateCircularProgressBarFluent updateCircularProgressBar();
+        [[nodiscard]] DrawCircularProgressBarFluent drawCircularProgressBar();
+        [[nodiscard]] UpdateCircularProgressBarFluent updateCircularProgressBar();
 
-        ToastFluent showToast();
-        NotificationFluent showNotification();
+        [[nodiscard]] ToastFluent showToast();
+        [[nodiscard]] NotificationFluent showNotification();
 
         void drawGraphGrid(int16_t x, int16_t y, int16_t w, int16_t h,
                            uint8_t radius, GraphDirection dir, uint32_t bgColor,
@@ -230,11 +267,11 @@ namespace pipgui
         void updateButtonPress(ButtonVisualState &s, bool isDown);
         bool updateToggleSwitch(ToggleSwitchState &s, bool pressed);
 
-        DrawIconFluent drawIcon();
-        DrawTextFluent drawText();
-        UpdateTextFluent updateText();
-        DrawTextMarqueeFluent drawTextMarquee();
-        DrawTextEllipsizedFluent drawTextEllipsized();
+        [[nodiscard]] DrawIconFluent drawIcon();
+        [[nodiscard]] DrawTextFluent drawText();
+        [[nodiscard]] UpdateTextFluent updateText();
+        [[nodiscard]] DrawTextMarqueeFluent drawTextMarquee();
+        [[nodiscard]] DrawTextEllipsizedFluent drawTextEllipsized();
 
         void drawDrumRollHorizontal(int16_t x, int16_t y, int16_t w, int16_t h,
                                     const String *options, uint8_t count, uint8_t selectedIndex, uint8_t prevIndex,
@@ -250,27 +287,28 @@ namespace pipgui
                             float ascender, float descender, float lineHeight,
                             const void *glyphs, uint16_t glyphCount);
 
-        bool setFont(FontId fontId);
+        [[nodiscard]] bool setFont(FontId fontId);
+        [[nodiscard]] FontId fontId() const noexcept;
         void setFontSize(uint16_t px);
-        uint16_t fontSize() const;
+        [[nodiscard]] uint16_t fontSize() const noexcept;
         void setFontWeight(uint16_t weight);
-        uint16_t fontWeight() const;
+        [[nodiscard]] uint16_t fontWeight() const noexcept;
 
         void configureTextStyles(uint16_t h1Px = 24, uint16_t h2Px = 18,
                                  uint16_t bodyPx = 14, uint16_t captionPx = 12);
         void setTextStyle(TextStyle style);
 
-        ConfigureListFluent configureList();
+        [[nodiscard]] ConfigureListFluent configureList();
         bool updateList(uint8_t screenId);
-        ListInputFluent listInput(uint8_t screenId);
+        [[nodiscard]] ListInputFluent listInput(uint8_t screenId);
 
-        ConfigureTileFluent configureTile();
+        [[nodiscard]] ConfigureTileFluent configureTile();
         void renderTile(uint8_t screenId);
-        TileInputFluent tileInput(uint8_t screenId);
+        [[nodiscard]] TileInputFluent tileInput(uint8_t screenId);
 
         void setScreen(uint8_t id);
-        uint8_t currentScreen() const;
-        bool screenTransitionActive() const;
+        [[nodiscard]] uint8_t currentScreen() const noexcept;
+        [[nodiscard]] bool screenTransitionActive() const noexcept;
         void nextScreen();
         void prevScreen();
         void loop();
@@ -285,28 +323,28 @@ namespace pipgui
                       uint32_t bg = 0x000000, uint32_t dur = 0,
                       int16_t x = -1, int16_t y = -1);
 
-        void logoTitleSizePx(uint16_t sizePx) { _typo.logoTitleSizePx = sizePx; }
-        void logoSubtitleSizePx(uint16_t sizePx) { _typo.logoSubtitleSizePx = sizePx; }
-        void logoSizesPx(uint16_t titleSizePx, uint16_t subtitleSizePx)
+        void logoTitleSizePx(uint16_t sizePx) noexcept { _typo.logoTitleSizePx = sizePx; }
+        void logoSubtitleSizePx(uint16_t sizePx) noexcept { _typo.logoSubtitleSizePx = sizePx; }
+        void logoSizesPx(uint16_t titleSizePx, uint16_t subtitleSizePx) noexcept
         {
             _typo.logoTitleSizePx = titleSizePx;
             _typo.logoSubtitleSizePx = subtitleSizePx;
         }
 
         void setNotificationButtonDown(bool down);
-        bool notificationActive() const;
-        bool toastActive() const;
+        [[nodiscard]] bool notificationActive() const noexcept;
+        [[nodiscard]] bool toastActive() const;
 
         void showError(const String &title, const String &message,
                        ErrorType type = Warning, const String &buttonText = "OK");
         void nextError();
-        bool errorActive() const;
+        [[nodiscard]] bool errorActive() const noexcept;
         void setErrorButtonDown(bool down);
 
         void configureStatusBar(bool enabled, uint32_t bgColor = 0x000000,
                                 uint8_t height = 0, StatusBarPosition pos = Top);
 
-        void setStatusBarStyle(StatusBarStyle style)
+        void setStatusBarStyle(StatusBarStyle style) noexcept
         {
             _status.style = style;
             _status.dirtyMask = StatusBarDirtyAll;
@@ -315,17 +353,17 @@ namespace pipgui
         void setStatusBarText(const String &left, const String &center, const String &right);
         void setStatusBarBattery(int8_t levelPercent, BatteryStyle style);
         void setStatusBarCustom(StatusBarCustomCallback cb);
-        int16_t statusBarHeight() const;
+        [[nodiscard]] int16_t statusBarHeight() const noexcept;
         void updateStatusBar();
         void renderStatusBar();
 
-        static constexpr uint32_t rgb888(uint8_t r, uint8_t g, uint8_t b)
+        [[nodiscard]] static constexpr uint32_t rgb888(uint8_t r, uint8_t g, uint8_t b) noexcept
         {
-            return ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b;
+            return (static_cast<uint32_t>(r) << 16) | (static_cast<uint32_t>(g) << 8) | static_cast<uint32_t>(b);
         }
 
-        uint16_t screenWidth() const { return _render.screenWidth; }
-        uint16_t screenHeight() const { return _render.screenHeight; }
+        [[nodiscard]] uint16_t screenWidth() const noexcept { return _render.screenWidth; }
+        [[nodiscard]] uint16_t screenHeight() const noexcept { return _render.screenHeight; }
 
     private:
         friend struct detail::BuilderAccess;
@@ -412,6 +450,7 @@ namespace pipgui
             uint16_t captionPx = 12;
             uint16_t psdfSizePx = 0;
             uint16_t psdfWeight = 500;
+            FontId currentFontId = static_cast<FontId>(0);
         } _typo;
 
         struct ErrorEntry
@@ -439,7 +478,7 @@ namespace pipgui
             String message;
             String buttonText;
             NotificationType type = NotificationType::Normal;
-            IconId iconId = (IconId)0xFFFF;
+            IconId iconId = static_cast<IconId>(0xFFFF);
             uint32_t startMs = 0;
             uint32_t animDurationMs = 0;
             uint32_t unlockMs = 0;
@@ -528,14 +567,103 @@ namespace pipgui
         struct DiagnosticsState
         {
             pipcore::PlatformError lastReportedError = pipcore::PlatformError::None;
+            uint32_t screenshotHoldStartMs = 0;
+            uint16_t screenshotHoldMs = 500;
+            bool screenshotCaptured = false;
+            Button *screenshotNext = nullptr;
+            Button *screenshotPrev = nullptr;
         } _diag;
+
+        struct ScreenshotEntry
+        {
+            uint16_t *pixels = nullptr;
+            uint32_t timestampMs = 0;
+#if (PIPGUI_SCREENSHOT_MODE == 2)
+            uint32_t stamp = 0;
+            char path[64] = {};
+            bool thumbOnFlash = false;
+#endif
+        };
+
+        struct ScreenshotGalleryState
+        {
+            ScreenshotEntry *entries = nullptr;
+            uint16_t thumbW = 64;
+            uint16_t thumbH = 40;
+            uint16_t padding = 6;
+            uint8_t maxShots = 12;
+            uint8_t count = 0;
+#if (PIPGUI_SCREENSHOT_MODE == 2)
+            uint8_t flashLoadIndex = 0;
+            bool fsReady = false;
+            bool fsDirsReady = false;
+            bool flashScanDone = false;
+            bool flashScanActive = false;
+            bool flashThumbsDone = false;
+            bool thumbIndexReady = false;
+            uint16_t thumbIndexW = 0;
+            uint16_t thumbIndexH = 0;
+            uint32_t lastDrawMs = 0;
+            fs::File scanDir;
+            uint8_t *rowBuf = nullptr;
+            uint32_t rowBufSize = 0;
+#endif
+        } _shots;
+
+        struct ScreenshotStreamState
+        {
+            ScreenshotFormat format = ScreenshotFormat::QoiRgb;
+            uint16_t width = 0;
+            uint16_t height = 0;
+            uint8_t header[13] = {};
+            uint8_t headerOffset = 0;
+            uint32_t payloadSize = 0;
+            uint32_t payloadOffset = 0;
+            uint32_t payloadCrc = 0;
+            uint8_t *buffer = nullptr;
+            uint32_t bufferSize = 0;
+            bool active = false;
+            bool headerReady = false;
+            bool notifyOnComplete = false;
+
+            // QOI stream encoder state (RGB888, no QOI file header).
+            const uint16_t *qoiSrc16 = nullptr;
+            bool qoiSrcBE = false;
+            uint32_t qoiPos = 0;
+            uint32_t qoiPayloadBytes = 0;
+            uint32_t qoiPrev = 0x000000FFu;
+            uint32_t qoiIndex[64] = {};
+            uint8_t qoiRun = 0;
+            uint8_t qoiTailOffset = 0;
+            uint16_t qoiOutOff = 0;
+            uint16_t qoiOutLen = 0;
+            uint8_t qoiOut[1024] = {};
+#if (PIPGUI_SCREENSHOT_MODE == 2)
+            fs::File file;
+            uint32_t stamp = 0;
+            char path[64] = {};
+#endif
+        } _shotStream;
 
         uint32_t nowMs() const;
 
         void initFonts();
+        void setBackgroundColorCache(uint16_t color565) noexcept;
         void resetDisplayRuntime() noexcept;
         void clearReportedPlatformError();
         void reportPlatformErrorOnce(const char *stage);
+        void handleScreenshotShortcut(bool nextDown, bool prevDown);
+        void freeScreenshotGallery(pipcore::Platform *plat) noexcept;
+        void freeScreenshotStream(pipcore::Platform *plat) noexcept;
+        void resetScreenshotStreamState(pipcore::Platform *plat, bool keepBuffer) noexcept;
+        bool ensureScreenshotGallery(pipcore::Platform *plat);
+        void captureScreenshotToGallery();
+        void insertShotToGalleryFrom565(const uint16_t *src565be, uint16_t w, uint16_t h, uint32_t stamp, const char *path);
+        void renderScreenshotGallery(int16_t x, int16_t y, int16_t w, int16_t h,
+                                     uint8_t cols, uint8_t rows, uint16_t padding);
+        void serviceScreenshotGalleryFlash();
+        void startScreenshotStream();
+        void serviceScreenshotStream();
         bool presentSprite(int16_t x, int16_t y, int16_t w, int16_t h, const char *stage);
         bool presentSpriteRegion(int16_t dstX, int16_t dstY,
                                  int16_t srcX, int16_t srcY,
@@ -547,7 +675,7 @@ namespace pipgui
         void invalidateRect(int16_t x, int16_t y, int16_t w, int16_t h);
 
         template <typename Fn>
-        void renderToSpriteAndFlush(int16_t x, int16_t y, int16_t w, int16_t h, Fn &&drawCall);
+        void renderToSpriteAndInvalidate(int16_t x, int16_t y, int16_t w, int16_t h, Fn &&drawCall);
 
         void ensureScreenState(uint8_t id);
         void syncRegisteredScreens();
@@ -638,11 +766,11 @@ namespace pipgui
         void drawBlurRegion(int16_t x, int16_t y, int16_t w, int16_t h,
                             uint8_t radius, BlurDirection dir,
                             bool gradient, uint8_t materialStrength,
-                            uint8_t noiseAmount, int32_t materialColor);
+                            int32_t materialColor);
         void updateBlurRegion(int16_t x, int16_t y, int16_t w, int16_t h,
                               uint8_t radius, BlurDirection dir,
                               bool gradient, uint8_t materialStrength,
-                              uint8_t noiseAmount, int32_t materialColor);
+                              int32_t materialColor);
 
         void drawScrollDotsImpl(int16_t x, int16_t y,
                                 uint8_t count, uint8_t activeIndex,

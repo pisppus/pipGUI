@@ -1,14 +1,15 @@
 #include <pipCore/Platforms/ESP32/Services/Prefs.hpp>
+#include <algorithm>
 
 namespace pipcore::esp32::services
 {
-    Prefs::~Prefs()
+    Prefs::~Prefs() noexcept
     {
         if (_opened)
             _prefs.end();
     }
 
-    bool Prefs::ensureOpen()
+    bool Prefs::ensureOpen() noexcept
     {
         if (_opened)
             return true;
@@ -18,23 +19,20 @@ namespace pipcore::esp32::services
         return true;
     }
 
-    bool Prefs::loadMaxBrightnessPercent(uint8_t &percent)
+    bool Prefs::loadMaxBrightnessPercent(uint8_t &percent) noexcept
     {
         percent = 100;
         if (!ensureOpen())
             return false;
 
-        uint16_t raw = _prefs.getUShort("bmax", 100);
-        if (raw > 100)
-            raw = 100;
+        const uint16_t raw = std::min<uint16_t>(_prefs.getUShort("bmax", 100), 100);
         percent = static_cast<uint8_t>(raw);
         return true;
     }
 
-    bool Prefs::storeMaxBrightnessPercent(uint8_t percent)
+    bool Prefs::storeMaxBrightnessPercent(uint8_t percent) noexcept
     {
-        if (percent > 100)
-            percent = 100;
+        percent = std::min<uint8_t>(percent, 100);
         if (!ensureOpen())
             return false;
         _prefs.putUShort("bmax", percent);

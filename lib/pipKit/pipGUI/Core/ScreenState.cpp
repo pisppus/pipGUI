@@ -1,18 +1,18 @@
 ﻿#include <pipGUI/Core/API/pipGUI.hpp>
 #include <pipGUI/Core/API/Internal/RuntimeState.hpp>
+#include <algorithm>
 #include <new>
 
 namespace pipgui
 {
 
     template <typename T, typename InitFunc, typename PtrArr>
-    static T *ensureLazy(uint8_t screenId, PtrArr &arr, uint16_t cap, InitFunc initFunc)
+    static T *ensureLazy(pipcore::Platform *plat, uint8_t screenId, PtrArr &arr, uint16_t cap, InitFunc initFunc)
     {
-        if (screenId >= cap || !arr)
+        if (!plat || screenId >= cap || !arr)
             return nullptr;
         if (!arr[screenId])
         {
-            pipcore::Platform *plat = pipcore::GetPlatform();
             void *mem = detail::alloc(plat, sizeof(T), pipcore::AllocCaps::Default);
             if (!mem)
                 return nullptr;
@@ -22,14 +22,14 @@ namespace pipgui
         }
         return arr[screenId];
     }
-    static void initGraphAreaDefaults(pipgui::GraphArea &area)
+    static void initGraphAreaDefaults(pipgui::GraphArea &area) noexcept
     {
         area = {};
         area.autoMax = 1;
         area.speed = 1.0f;
         area.direction = pipgui::LeftToRight;
     }
-    static void initListDefaults(pipgui::ListState &menu)
+    static void initListDefaults(pipgui::ListState &menu) noexcept
     {
         menu = {};
         menu.parentScreen = INVALID_SCREEN_ID;
@@ -37,7 +37,7 @@ namespace pipgui
         menu.style.spacing = 6;
         menu.style.mode = pipgui::Cards;
     }
-    static void initTileDefaults(pipgui::TileState &tile)
+    static void initTileDefaults(pipgui::TileState &tile) noexcept
     {
         tile = {};
         tile.parentScreen = INVALID_SCREEN_ID;
@@ -81,13 +81,10 @@ namespace pipgui
                 detail::free(plat, newTiles);
             return;
         }
-        for (uint16_t i = 0; i < newCap; ++i)
-        {
-            newScreens[i] = nullptr;
-            newGraphs[i] = nullptr;
-            newLists[i] = nullptr;
-            newTiles[i] = nullptr;
-        }
+        std::fill_n(newScreens, newCap, nullptr);
+        std::fill_n(newGraphs, newCap, nullptr);
+        std::fill_n(newLists, newCap, nullptr);
+        std::fill_n(newTiles, newCap, nullptr);
         if (_screen.capacity > 0)
         {
             for (uint16_t i = 0; i < _screen.capacity; ++i)
@@ -120,17 +117,17 @@ namespace pipgui
     GraphArea *GUI::ensureGraphArea(uint8_t screenId)
     {
         ensureScreenState(screenId);
-        return ensureLazy<GraphArea>(screenId, _screen.graphAreas, _screen.capacity, initGraphAreaDefaults);
+        return ensureLazy<GraphArea>(platform(), screenId, _screen.graphAreas, _screen.capacity, initGraphAreaDefaults);
     }
     ListState *GUI::ensureList(uint8_t screenId)
     {
         ensureScreenState(screenId);
-        return ensureLazy<ListState>(screenId, _screen.lists, _screen.capacity, initListDefaults);
+        return ensureLazy<ListState>(platform(), screenId, _screen.lists, _screen.capacity, initListDefaults);
     }
     TileState *GUI::ensureTile(uint8_t screenId)
     {
         ensureScreenState(screenId);
-        return ensureLazy<TileState>(screenId, _screen.tiles, _screen.capacity, initTileDefaults);
+        return ensureLazy<TileState>(platform(), screenId, _screen.tiles, _screen.capacity, initTileDefaults);
     }
 
     ListState *GUI::getList(uint8_t screenId)
@@ -147,4 +144,3 @@ namespace pipgui
     }
 
 }
-

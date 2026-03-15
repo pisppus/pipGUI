@@ -22,26 +22,26 @@ namespace pipcore::st7789
         Display(Display &&) = delete;
         Display &operator=(Display &&) = delete;
 
-        bool configure(pipcore::Platform *platform,
-                       Transport *transport,
-                       uint16_t width,
-                       uint16_t height,
-                       uint8_t order = 0,
-                       bool invert = true,
-                       bool swap = false,
-                       int16_t xOffset = 0,
-                       int16_t yOffset = 0)
+        [[nodiscard]] bool configure(pipcore::Platform *platform,
+                                     Transport *transport,
+                                     uint16_t width,
+                                     uint16_t height,
+                                     uint8_t order = 0,
+                                     bool invert = true,
+                                     bool swap = false,
+                                     int16_t xOffset = 0,
+                                     int16_t yOffset = 0)
         {
             _platform = platform;
             return _drv.configure(transport, width, height, order, invert, swap, xOffset, yOffset);
         }
 
-        bool begin(uint8_t rotation) override { return _drv.begin(rotation); }
-        uint16_t width() const override { return _drv.width(); }
-        uint16_t height() const override { return _drv.height(); }
-        void reset() { _drv.reset(); }
-        IoError lastError() const { return _drv.lastError(); }
-        const char *lastErrorText() const { return _drv.lastErrorText(); }
+        [[nodiscard]] bool begin(uint8_t rotation) override { return _drv.begin(rotation); }
+        [[nodiscard]] uint16_t width() const noexcept override { return _drv.width(); }
+        [[nodiscard]] uint16_t height() const noexcept override { return _drv.height(); }
+        void reset() noexcept { _drv.reset(); }
+        [[nodiscard]] IoError lastError() const noexcept { return _drv.lastError(); }
+        [[nodiscard]] const char *lastErrorText() const noexcept { return _drv.lastErrorText(); }
 
         void fillScreen565(uint16_t color565) override { (void)_drv.fillScreen565(color565, _drv.swapBytes()); }
 

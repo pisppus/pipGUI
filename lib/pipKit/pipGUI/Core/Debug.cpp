@@ -26,6 +26,8 @@ namespace pipgui
             return;
 
         pipcore::Platform *plat = pipcore::GetPlatform();
+        if (!plat)
+            return;
         _metrics.freeHeapTotal = plat->freeHeapTotal();
         _metrics.freeHeapInternal = plat->freeHeapInternal();
         _metrics.largestFreeBlock = plat->largestFreeBlock();
@@ -71,6 +73,8 @@ namespace pipgui
         {
             uint16_t newCap = _rectCapacity ? _rectCapacity * 2 : 16;
             pipcore::Platform *plat = pipcore::GetPlatform();
+            if (!plat)
+                return;
             DirtyRect *newRects = (DirtyRect *)plat->alloc(sizeof(DirtyRect) * newCap, pipcore::AllocCaps::Default);
             if (!newRects)
                 return;
@@ -126,11 +130,10 @@ namespace pipgui
     void Debug::clearRects()
     {
         _rectCount = 0;
-        pipcore::Platform *plat = pipcore::GetPlatform();
-        plat->free(_rects);
+        if (pipcore::Platform *plat = pipcore::GetPlatform())
+            plat->free(_rects);
         _rects = nullptr;
         _rectCapacity = 0;
     }
 
 }
-

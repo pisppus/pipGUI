@@ -17,11 +17,13 @@ namespace pipgui
         int8_t dc = -1;
         int8_t rst = -1;
 
+        constexpr DisplayPins() noexcept = default;
+
         constexpr DisplayPins(int8_t mosi_,
                               int8_t sclk_,
                               int8_t cs_,
                               int8_t dc_,
-                              int8_t rst_ = -1)
+                              int8_t rst_ = -1) noexcept
             : mosi(mosi_),
               sclk(sclk_),
               cs(cs_),
@@ -67,19 +69,19 @@ namespace pipgui
     struct WeightToken
     {
         uint16_t value;
-        constexpr operator uint16_t() const { return value; }
+        constexpr operator uint16_t() const noexcept { return value; }
     };
 
-    static constexpr WeightToken Thin{100};
-    static constexpr WeightToken Light{300};
-    static constexpr WeightToken Regular{400};
-    static constexpr WeightToken Medium{500};
-    static constexpr WeightToken Semibold{600};
-    static constexpr WeightToken Bold{700};
-    static constexpr WeightToken Black{900};
+    inline constexpr WeightToken Thin{100};
+    inline constexpr WeightToken Light{300};
+    inline constexpr WeightToken Regular{400};
+    inline constexpr WeightToken Medium{500};
+    inline constexpr WeightToken Semibold{600};
+    inline constexpr WeightToken Bold{700};
+    inline constexpr WeightToken Black{900};
 
-    static constexpr int16_t center = -1;
-    static constexpr uint8_t INVALID_SCREEN_ID = 255;
+    inline constexpr int16_t center = -1;
+    inline constexpr uint8_t INVALID_SCREEN_ID = 255;
 
     enum StatusBarPosition : uint8_t
     {
@@ -167,22 +169,22 @@ namespace pipgui
 
             Code code;
 
-            constexpr operator TextAlign() const
+            constexpr operator TextAlign() const noexcept
             {
                 return (code == TokCenter) ? AlignCenter : ((code == TokRight) ? AlignRight : AlignLeft);
             }
 
-            constexpr operator StatusBarPosition() const
+            constexpr operator StatusBarPosition() const noexcept
             {
                 return (code == TokBottom) ? StatusBarBottom : StatusBarTop;
             }
 
-            constexpr operator UiAlign() const
+            constexpr operator UiAlign() const noexcept
             {
                 return (code == TokCenter) ? UiAlign::Center : ((code == TokRight) ? UiAlign::End : UiAlign::Start);
             }
 
-            constexpr operator UiJustify() const
+            constexpr operator UiJustify() const noexcept
             {
                 return (code == TokCenter) ? UiJustify::Center : ((code == TokRight) ? UiJustify::End : UiJustify::Start);
             }
@@ -190,45 +192,45 @@ namespace pipgui
 
         struct NoneToken
         {
-            constexpr operator BootAnimation() const { return BootAnimNone; }
-            constexpr operator ScreenAnim() const { return ScreenAnimNone; }
-            constexpr operator ProgressAnim() const { return ProgressAnimNone; }
-            constexpr operator GlowAnim() const { return GlowNone; }
+            constexpr operator BootAnimation() const noexcept { return BootAnimNone; }
+            constexpr operator ScreenAnim() const noexcept { return ScreenAnimNone; }
+            constexpr operator ProgressAnim() const noexcept { return ProgressAnimNone; }
+            constexpr operator GlowAnim() const noexcept { return GlowNone; }
         };
 
         struct WarningToken
         {
-            constexpr operator ErrorType() const { return ErrorTypeWarning; }
-            constexpr operator NotificationType() const { return NotificationType::Warning; }
+            constexpr operator ErrorType() const noexcept { return ErrorTypeWarning; }
+            constexpr operator NotificationType() const noexcept { return NotificationType::Warning; }
         };
 
         struct NormalToken
         {
-            constexpr operator NotificationType() const { return NotificationType::Normal; }
+            constexpr operator NotificationType() const noexcept { return NotificationType::Normal; }
         };
 
         struct ErrorToken
         {
-            constexpr operator NotificationType() const { return NotificationType::Error; }
+            constexpr operator NotificationType() const noexcept { return NotificationType::Error; }
         };
 
         struct PulseToken
         {
-            constexpr operator GlowAnim() const { return GlowPulse; }
+            constexpr operator GlowAnim() const noexcept { return GlowPulse; }
         };
     }
 
-    static constexpr detail::AlignToken Left{detail::AlignToken::TokLeft};
-    static constexpr detail::AlignToken Center{detail::AlignToken::TokCenter};
-    static constexpr detail::AlignToken Right{detail::AlignToken::TokRight};
-    static constexpr detail::AlignToken Top{detail::AlignToken::TokTop};
-    static constexpr detail::AlignToken Bottom{detail::AlignToken::TokBottom};
+    inline constexpr detail::AlignToken Left{detail::AlignToken::TokLeft};
+    inline constexpr detail::AlignToken Center{detail::AlignToken::TokCenter};
+    inline constexpr detail::AlignToken Right{detail::AlignToken::TokRight};
+    inline constexpr detail::AlignToken Top{detail::AlignToken::TokTop};
+    inline constexpr detail::AlignToken Bottom{detail::AlignToken::TokBottom};
 
-    static constexpr detail::NoneToken None{};
-    static constexpr detail::NormalToken Normal{};
-    static constexpr detail::WarningToken Warning{};
-    static constexpr detail::ErrorToken Error{};
-    static constexpr detail::PulseToken Pulse{};
+    inline constexpr detail::NoneToken None{};
+    inline constexpr detail::NormalToken Normal{};
+    inline constexpr detail::WarningToken Warning{};
+    inline constexpr detail::ErrorToken Error{};
+    inline constexpr detail::PulseToken Pulse{};
 
     using ScreenCallback = void (*)(GUI &ui);
     using BacklightCallback = void (*)(uint16_t level);
@@ -236,19 +238,19 @@ namespace pipgui
 
     struct ButtonVisualState
     {
-        bool enabled;
-        uint8_t pressLevel;
-        uint8_t fadeLevel;
-        bool prevEnabled;
-        bool loading;
-        uint32_t lastUpdateMs;
+        bool enabled = false;
+        uint8_t pressLevel = 0;
+        uint8_t fadeLevel = 0;
+        bool prevEnabled = false;
+        bool loading = false;
+        uint32_t lastUpdateMs = 0;
     };
 
     struct ToggleSwitchState
     {
-        bool value;
-        uint8_t pos;
-        uint32_t lastUpdateMs;
+        bool value = false;
+        uint8_t pos = 0;
+        uint32_t lastUpdateMs = 0;
     };
 
     struct ListItemDef

@@ -9,14 +9,14 @@ namespace pipgui
     {
         uint8_t r, g, b;
 
-        static Color888 fromUint32(uint32_t c)
+        [[nodiscard]] static constexpr Color888 fromUint32(uint32_t c) noexcept
         {
             return {(uint8_t)((c >> 16) & 0xFF),
                     (uint8_t)((c >> 8) & 0xFF),
                     (uint8_t)(c & 0xFF)};
         }
 
-        uint32_t toUint32() const
+        [[nodiscard]] constexpr uint32_t toUint32() const noexcept
         {
             return ((uint32_t)r << 16) | ((uint32_t)g << 8) | b;
         }
@@ -25,7 +25,7 @@ namespace pipgui
     namespace detail
     {
 
-        static constexpr uint8_t blueNoiseLut32x32[1024] = {
+        inline constexpr uint8_t blueNoiseLut32x32[1024] = {
             55, 173, 79, 224, 65, 140, 34, 195, 158, 54, 17, 206, 62, 144, 240, 190,
             72, 40, 214, 54, 192, 5, 146, 60, 82, 185, 3, 138, 169, 25, 83, 245,
             143, 30, 192, 245, 12, 112, 236, 101, 2, 244, 113, 165, 225, 118, 47, 20,
@@ -91,14 +91,14 @@ namespace pipgui
             221, 125, 40, 94, 163, 50, 214, 174, 69, 229, 135, 79, 25, 92, 217, 129,
             103, 155, 16, 237, 168, 75, 212, 126, 203, 157, 104, 223, 50, 96, 115, 189};
 
-        static inline uint8_t blueNoise32x32(int16_t x, int16_t y)
+        [[nodiscard]] inline constexpr uint8_t blueNoise32x32(int16_t x, int16_t y) noexcept
         {
             const uint8_t xx = static_cast<uint8_t>(x & 31U);
             const uint8_t yy = static_cast<uint8_t>(y & 31U);
             return blueNoiseLut32x32[(static_cast<uint16_t>(yy) << 5) | xx];
         }
 
-        inline uint16_t quantize565(Color888 c, int16_t x, int16_t y)
+        [[nodiscard]] inline constexpr uint16_t quantize565(Color888 c, int16_t x, int16_t y) noexcept
         {
             const uint8_t thrR = blueNoise32x32(x, y);
             const uint8_t thrG = blueNoise32x32(x + 5, y + 7);

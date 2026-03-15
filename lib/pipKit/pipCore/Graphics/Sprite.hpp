@@ -12,7 +12,7 @@ namespace pipcore
     {
     public:
         Sprite() = default;
-        explicit Sprite(Platform *platform)
+        explicit Sprite(Platform *platform) noexcept
             : _platform(platform)
         {
         }
@@ -21,15 +21,15 @@ namespace pipcore
         Sprite(const Sprite &) = delete;
         Sprite &operator=(const Sprite &) = delete;
 
-        bool createSprite(int16_t w, int16_t h);
+        [[nodiscard]] bool createSprite(int16_t w, int16_t h);
         void deleteSprite();
 
-        int16_t width() const { return _w; }
-        int16_t height() const { return _h; }
-        void setPlatform(Platform *platform) { _platform = platform; }
+        [[nodiscard]] int16_t width() const noexcept { return _w; }
+        [[nodiscard]] int16_t height() const noexcept { return _h; }
+        void setPlatform(Platform *platform) noexcept { _platform = platform; }
 
-        void *getBuffer() { return _buf; }
-        const void *getBuffer() const { return _buf; }
+        [[nodiscard]] void *getBuffer() noexcept { return _buf; }
+        [[nodiscard]] const void *getBuffer() const noexcept { return _buf; }
 
         void fillScreen(uint16_t color565);
         void drawPixel(int16_t x, int16_t y, uint16_t color565);
@@ -43,17 +43,17 @@ namespace pipcore
         void pushSprite(Sprite *dst, int16_t x, int16_t y) const;
         void writeToDisplay(Display &display, int16_t x, int16_t y, int16_t w, int16_t h) const;
 
-        static inline uint16_t color565(uint8_t r, uint8_t g, uint8_t b)
+        [[nodiscard]] static constexpr uint16_t color565(uint8_t r, uint8_t g, uint8_t b) noexcept
         {
             return (uint16_t)((((uint16_t)(r >> 3)) << 11) | (((uint16_t)(g >> 2)) << 5) | ((uint16_t)(b >> 3)));
         }
 
-        static inline uint16_t swap16(uint16_t v)
+        [[nodiscard]] static constexpr uint16_t swap16(uint16_t v) noexcept
         {
             return __builtin_bswap16(v);
         }
 
-        static inline uint8_t u8clamp(int v)
+        [[nodiscard]] static constexpr uint8_t u8clamp(int v) noexcept
         {
             if (v < 0)
                 return 0;
@@ -62,7 +62,7 @@ namespace pipcore
             return static_cast<uint8_t>(v);
         }
 
-        static inline uint16_t blend565(uint16_t bg, uint16_t fg, uint8_t alpha)
+        [[nodiscard]] static constexpr uint16_t blend565(uint16_t bg, uint16_t fg, uint8_t alpha) noexcept
         {
             uint32_t a = alpha + (alpha >> 7);
 
@@ -83,11 +83,11 @@ namespace pipcore
         }
 
     private:
-        Platform *platform() const { return _platform; }
+        [[nodiscard]] Platform *platform() const noexcept { return _platform; }
         void clipNormalize();
         inline void fillRow(uint16_t *dst, int16_t w, uint16_t v);
 
-        static inline int16_t clampi16(int16_t v, int16_t lo, int16_t hi)
+        [[nodiscard]] static constexpr int16_t clampi16(int16_t v, int16_t lo, int16_t hi) noexcept
         {
             return (v < lo) ? lo : (v > hi ? hi : v);
         }

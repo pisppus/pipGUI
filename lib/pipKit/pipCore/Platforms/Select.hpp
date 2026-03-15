@@ -22,7 +22,7 @@ namespace pipcore
 {
     using SelectedPlatform = esp32::Platform;
 
-    inline Platform *GetPlatform()
+    [[nodiscard]] inline Platform *GetPlatform() noexcept
     {
         static SelectedPlatform instance;
         return &instance;

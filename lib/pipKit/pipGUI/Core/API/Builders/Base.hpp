@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <initializer_list>
 #include <new>
+#include <optional>
 #include <utility>
 #include <pipCore/Platform.hpp>
 #include <pipCore/Platforms/Select.hpp>
@@ -15,7 +16,7 @@ namespace pipgui
     {
         pipcore::Platform *resolvePlatform(GUI *gui) noexcept;
 
-        static inline void *alloc(pipcore::Platform *plat, size_t bytes, pipcore::AllocCaps caps) noexcept
+        [[nodiscard]] inline void *alloc(pipcore::Platform *plat, size_t bytes, pipcore::AllocCaps caps) noexcept
         {
             pipcore::Platform *p = plat ? plat : pipcore::GetPlatform();
             if (!p)
@@ -28,7 +29,7 @@ namespace pipgui
             return nullptr;
         }
 
-        static inline void free(pipcore::Platform *plat, void *ptr) noexcept
+        inline void free(pipcore::Platform *plat, void *ptr) noexcept
         {
             if (!ptr)
                 return;
@@ -37,7 +38,7 @@ namespace pipgui
                 p->free(ptr);
         }
 
-        static inline bool assignString(String &text, const char *src)
+        [[nodiscard]] inline bool assignString(String &text, const char *src)
         {
             if (!src)
             {
@@ -50,7 +51,7 @@ namespace pipgui
         }
 
         template <typename T>
-        static bool ensureCapacity(pipcore::Platform *plat, T *&arr, uint8_t &capacity, uint8_t need) noexcept
+        [[nodiscard]] static bool ensureCapacity(pipcore::Platform *plat, T *&arr, uint8_t &capacity, uint8_t need) noexcept
         {
             if (capacity >= need && arr)
                 return true;
@@ -90,7 +91,7 @@ namespace pipgui
             return true;
         }
 
-        static inline pipcore::DisplayConfig defaultDisplayConfig() noexcept
+        [[nodiscard]] inline pipcore::DisplayConfig defaultDisplayConfig() noexcept
         {
             pipcore::DisplayConfig cfg;
             cfg.mosi = -1;
@@ -109,6 +110,39 @@ namespace pipgui
             return cfg;
         }
 
+        inline void assignOptionalColor(std::optional<uint16_t> &slot, int32_t value) noexcept
+        {
+            if (value < 0)
+                slot.reset();
+            else
+                slot = static_cast<uint16_t>(value);
+        }
+
+        [[nodiscard]] constexpr int16_t optionalColor16(const std::optional<uint16_t> &slot) noexcept
+        {
+            return slot ? static_cast<int16_t>(*slot) : static_cast<int16_t>(-1);
+        }
+
+        [[nodiscard]] constexpr int32_t optionalColor32(const std::optional<uint16_t> &slot) noexcept
+        {
+            return slot ? static_cast<int32_t>(*slot) : -1;
+        }
+
+        template <typename T>
+        [[nodiscard]] constexpr T valueOr(const std::optional<T> &slot, T fallback) noexcept
+        {
+            return slot ? *slot : fallback;
+        }
+
+        template <bool IsUpdate, typename UpdateFn, typename DrawFn>
+        inline void callByMode(UpdateFn &&updateFn, DrawFn &&drawFn)
+        {
+            if constexpr (IsUpdate)
+                std::forward<UpdateFn>(updateFn)();
+            else
+                std::forward<DrawFn>(drawFn)();
+        }
+
         struct FluentLifetime
         {
         protected:
@@ -122,27 +156,32 @@ namespace pipgui
             FluentLifetime &operator=(const FluentLifetime &) = delete;
 
             FluentLifetime(FluentLifetime &&other) noexcept
-                : _gui(other._gui), _consumed(other._consumed)
+                : _gui(std::exchange(other._gui, nullptr)),
+                  _consumed(std::exchange(other._consumed, true))
             {
-                other._gui = nullptr;
-                other._consumed = true;
             }
 
             FluentLifetime &operator=(FluentLifetime &&other) noexcept
             {
                 if (this != &other)
                 {
-                    _gui = other._gui;
-                    _consumed = other._consumed;
-                    other._gui = nullptr;
-                    other._consumed = true;
+                    _gui = std::exchange(other._gui, nullptr);
+                    _consumed = std::exchange(other._consumed, true);
                 }
                 return *this;
             }
 
-            bool canMutate() const noexcept
+            [[nodiscard]] bool canMutate() const noexcept
             {
                 return !_consumed;
+            }
+
+            [[nodiscard]] bool beginCommit() noexcept
+            {
+                if (_consumed || !_gui)
+                    return false;
+                _consumed = true;
+                return true;
             }
         };
 
@@ -161,10 +200,9 @@ namespace pipgui
             OwnedHeapArray &operator=(const OwnedHeapArray &) = delete;
 
             OwnedHeapArray(OwnedHeapArray &&other) noexcept
-                : plat(other.plat), data(other.data)
+                : plat(std::exchange(other.plat, nullptr)),
+                  data(std::exchange(other.data, nullptr))
             {
-                other.plat = nullptr;
-                other.data = nullptr;
             }
 
             OwnedHeapArray &operator=(OwnedHeapArray &&other) noexcept
@@ -172,10 +210,8 @@ namespace pipgui
                 if (this != &other)
                 {
                     reset();
-                    plat = other.plat;
-                    data = other.data;
-                    other.plat = nullptr;
-                    other.data = nullptr;
+                    plat = std::exchange(other.plat, nullptr);
+                    data = std::exchange(other.data, nullptr);
                 }
                 return *this;
             }
@@ -200,7 +236,7 @@ namespace pipgui
             }
 
             template <typename U>
-            T *copyFrom(std::initializer_list<U> items) noexcept
+            [[nodiscard]] T *copyFrom(std::initializer_list<U> items) noexcept
             {
                 reset();
                 if (items.size() == 0)

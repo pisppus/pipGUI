@@ -22,32 +22,32 @@ namespace pipcore::esp32
         Platform() = default;
         ~Platform() override = default;
 
-        void pinModeInput(uint8_t pin, InputMode mode) override;
-        bool digitalRead(uint8_t pin) override;
+        void pinModeInput(uint8_t pin, InputMode mode) noexcept override;
+        [[nodiscard]] bool digitalRead(uint8_t pin) noexcept override;
 
-        void configureBacklightPin(uint8_t pin, uint8_t channel = 0, uint32_t freqHz = 5000, uint8_t resolutionBits = 12) override;
+        void configureBacklightPin(uint8_t pin, uint8_t channel = 0, uint32_t freqHz = 5000, uint8_t resolutionBits = 12) noexcept override;
 
-        uint32_t nowMs() override;
-        uint8_t loadMaxBrightnessPercent() override;
-        void storeMaxBrightnessPercent(uint8_t percent) override;
+        [[nodiscard]] uint32_t nowMs() noexcept override;
+        [[nodiscard]] uint8_t loadMaxBrightnessPercent() noexcept override;
+        void storeMaxBrightnessPercent(uint8_t percent) noexcept override;
 
-        void setBacklightPercent(uint8_t percent) override;
+        void setBacklightPercent(uint8_t percent) noexcept override;
 
-        void *alloc(size_t bytes, AllocCaps caps = AllocCaps::Default) override;
-        void free(void *ptr) override;
+        void *alloc(size_t bytes, AllocCaps caps = AllocCaps::Default) noexcept override;
+        void free(void *ptr) noexcept override;
 
-        bool configureDisplay(const DisplayConfig &cfg) override;
-        bool beginDisplay(uint8_t rotation) override;
-        pipcore::Display *display() override;
+        [[nodiscard]] bool configureDisplay(const DisplayConfig &cfg) noexcept override;
+        [[nodiscard]] bool beginDisplay(uint8_t rotation) noexcept override;
+        [[nodiscard]] pipcore::Display *display() noexcept override;
 
-        uint32_t freeHeapTotal() override;
-        uint32_t freeHeapInternal() override;
-        uint32_t largestFreeBlock() override;
-        uint32_t minFreeHeap() override;
-        PlatformError lastError() const override;
-        const char *lastErrorText() const override;
+        [[nodiscard]] uint32_t freeHeapTotal() noexcept override;
+        [[nodiscard]] uint32_t freeHeapInternal() noexcept override;
+        [[nodiscard]] uint32_t largestFreeBlock() noexcept override;
+        [[nodiscard]] uint32_t minFreeHeap() noexcept override;
+        [[nodiscard]] PlatformError lastError() const noexcept override;
+        [[nodiscard]] const char *lastErrorText() const noexcept override;
 
-        uint8_t readProgmemByte(const void *addr) override;
+        [[nodiscard]] uint8_t readProgmemByte(const void *addr) noexcept override;
 
     private:
         services::Time _time;

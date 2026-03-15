@@ -8,7 +8,7 @@ namespace pipgui
     {
         PIPGUI_DEFAULT_FLUENT_MOVE(TextFluentT);
         int16_t _x, _y;
-        FontId _fontId;
+        std::optional<FontId> _fontId;
         uint16_t _sizePx;
         uint16_t _weight;
         String _text;
@@ -18,7 +18,7 @@ namespace pipgui
         TextFluentT(GUI *g)
             : detail::FluentLifetime(g),
               _x(-1), _y(-1),
-              _fontId((FontId)0),
+              _fontId(std::nullopt),
               _sizePx(0),
               _weight(0),
               _text(),
@@ -107,7 +107,7 @@ namespace pipgui
     {
         PIPGUI_DEFAULT_FLUENT_MOVE(DrawTextMarqueeFluent);
         int16_t _x, _y, _maxWidth;
-        FontId _fontId;
+        std::optional<FontId> _fontId;
         uint16_t _sizePx;
         uint16_t _weight;
         String _text;
@@ -117,7 +117,7 @@ namespace pipgui
         DrawTextMarqueeFluent(GUI *g)
             : detail::FluentLifetime(g),
               _x(-1), _y(-1), _maxWidth(0),
-              _fontId((FontId)0),
+              _fontId(std::nullopt),
               _sizePx(0),
               _weight(0),
               _text(),
@@ -238,7 +238,7 @@ namespace pipgui
     {
         PIPGUI_DEFAULT_FLUENT_MOVE(DrawTextEllipsizedFluent);
         int16_t _x, _y, _maxWidth;
-        FontId _fontId;
+        std::optional<FontId> _fontId;
         uint16_t _sizePx;
         uint16_t _weight;
         String _text;
@@ -247,7 +247,7 @@ namespace pipgui
         DrawTextEllipsizedFluent(GUI *g)
             : detail::FluentLifetime(g),
               _x(-1), _y(-1), _maxWidth(0),
-              _fontId((FontId)0),
+              _fontId(std::nullopt),
               _sizePx(0),
               _weight(0),
               _text(),

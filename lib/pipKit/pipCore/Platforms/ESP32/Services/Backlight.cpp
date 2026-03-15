@@ -1,11 +1,12 @@
 #include <pipCore/Platforms/ESP32/Services/Backlight.hpp>
 #include <Arduino.h>
+#include <algorithm>
 
 namespace pipcore::esp32::services
 {
-    void Backlight::configurePin(uint8_t pin, uint8_t channel, uint32_t freqHz, uint8_t resolutionBits)
+    void Backlight::configurePin(uint8_t pin, uint8_t channel, uint32_t freqHz, uint8_t resolutionBits) noexcept
     {
-        const uint8_t resolvedBits = resolutionBits > 16 ? 12 : resolutionBits;
+        const uint8_t resolvedBits = resolutionBits <= 16 ? resolutionBits : 12;
         ledcSetup(channel, freqHz, resolvedBits);
         ledcAttachPin(pin, channel);
         _configured = true;
@@ -13,13 +14,12 @@ namespace pipcore::esp32::services
         _resolutionBits = resolvedBits;
     }
 
-    void Backlight::setPercent(uint8_t percent)
+    void Backlight::setPercent(uint8_t percent) noexcept
     {
         if (!_configured)
             return;
 
-        if (percent > 100)
-            percent = 100;
+        percent = std::min<uint8_t>(percent, 100);
 
         const uint32_t dutyMax = (1U << _resolutionBits) - 1U;
         const uint32_t duty = (dutyMax * (uint32_t)percent + 50U) / 100U;

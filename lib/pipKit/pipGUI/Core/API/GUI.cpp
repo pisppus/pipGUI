@@ -2,7 +2,9 @@
 #include <pipGUI/Core/API/Internal/BuilderAccess.hpp>
 #include <pipGUI/Core/API/Internal/RuntimeState.hpp>
 #include <pipGUI/Core/Debug.hpp>
+#include <pipGUI/Core/Utils/Colors.hpp>
 #include <pipCore/Platforms/Select.hpp>
+#include <algorithm>
 
 #ifndef PIPGUI_SERIAL_ERRORS
 #define PIPGUI_SERIAL_ERRORS 1
@@ -24,8 +26,8 @@ namespace pipgui
         {
         public:
             bool begin(uint8_t) override { return false; }
-            uint16_t width() const override { return 0; }
-            uint16_t height() const override { return 0; }
+            uint16_t width() const noexcept override { return 0; }
+            uint16_t height() const noexcept override { return 0; }
             void fillScreen565(uint16_t) override {}
             void writeRect565(int16_t, int16_t, int16_t, int16_t, const uint16_t *, int32_t) override {}
         };
@@ -50,6 +52,7 @@ namespace pipgui
             (void)plat;
 #endif
         }
+
     }
 
     void GUI::clearReportedPlatformError()
@@ -89,6 +92,35 @@ namespace pipgui
         return !plat || plat->lastError() == pipcore::PlatformError::None;
     }
 
+    GUI::InputState GUI::pollInput(Button &next, Button &prev)
+    {
+        next.update();
+        prev.update();
+
+        const bool nextDown = next.isDown();
+        const bool prevDown = prev.isDown();
+        const bool combo = nextDown && prevDown;
+
+#if PIPGUI_SCREENSHOTS
+        handleScreenshotShortcut(nextDown, prevDown);
+
+        if (combo)
+        {
+            (void)next.wasPressed();
+            (void)prev.wasPressed();
+            return {};
+        }
+#endif
+
+        InputState out;
+        out.nextDown = nextDown;
+        out.prevDown = prevDown;
+        out.nextPressed = next.wasPressed();
+        out.prevPressed = prev.wasPressed();
+        out.comboDown = combo;
+        return out;
+    }
+
     static void backlightPlatformCallback(uint16_t level)
     {
         pipcore::Platform *p = pipcore::GetPlatform();
@@ -113,6 +145,10 @@ namespace pipgui
         freeTiles(plat);
         freeErrors(plat);
         freeScreenState(plat);
+#if PIPGUI_SCREENSHOTS
+        freeScreenshotGallery(plat);
+        freeScreenshotStream(plat);
+#endif
 
         _render.sprite.deleteSprite();
         _flags.spriteEnabled = 0;
@@ -289,6 +325,9 @@ namespace pipgui
         _render.activeSprite = nullptr;
         _flags.spriteEnabled = 0;
         _dirty.count = 0;
+#if PIPGUI_SCREENSHOTS
+        freeScreenshotStream(platform());
+#endif
     }
 
     pipcore::Display &GUI::display()
@@ -422,12 +461,18 @@ namespace pipgui
             _typo.psdfSizePx = _typo.bodyPx;
     }
 
+    void GUI::setBackgroundColorCache(uint16_t color565) noexcept
+    {
+        _render.bgColor = detail::color565To888(color565);
+        _render.bgColor565 = color565;
+    }
+
     uint32_t GUI::nowMs() const
     {
         return pipcore::GetPlatform()->nowMs();
     }
 
-    pipcore::Platform *GUI::platform() const
+    pipcore::Platform *GUI::platform() const noexcept
     {
         return pipcore::GetPlatform();
     }

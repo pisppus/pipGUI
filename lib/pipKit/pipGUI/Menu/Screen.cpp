@@ -127,9 +127,9 @@ namespace pipgui
         activateScreenId(id, transDir);
     }
 
-    uint8_t GUI::currentScreen() const { return _screen.current; }
+    uint8_t GUI::currentScreen() const noexcept { return _screen.current; }
 
-    bool GUI::screenTransitionActive() const { return _flags.screenTransition; }
+    bool GUI::screenTransitionActive() const noexcept { return _flags.screenTransition; }
 
     void GUI::requestRedraw() { _flags.needRedraw = 1; }
 
@@ -374,6 +374,13 @@ namespace pipgui
 
         Debug::update();
 
+#if PIPGUI_SCREENSHOTS
+        if (_diag.screenshotNext && _diag.screenshotPrev)
+            handleScreenshotShortcut(_diag.screenshotNext->isDown(), _diag.screenshotPrev->isDown());
+
+        serviceScreenshotStream();
+#endif
+
         const auto renderOverlays = [&]()
         {
             bool wroteOverlay = false;
@@ -465,14 +472,23 @@ namespace pipgui
 
         if (_flags.notifActive && !_flags.spriteEnabled)
             renderNotificationOverlay();
+        if (!_flags.needRedraw && _dirty.count > 0 && _flags.spriteEnabled && _disp.display)
+            flushDirty();
         if (_flags.toastActive)
             _flags.needRedraw = 1;
+
+#if PIPGUI_SCREENSHOTS && (PIPGUI_SCREENSHOT_MODE == 2)
+        serviceScreenshotGalleryFlash();
+#endif
     }
 
     void GUI::loopWithInput(Button &next, Button &prev)
     {
         next.update();
         prev.update();
+#if PIPGUI_SCREENSHOTS
+        handleScreenshotShortcut(next.isDown(), prev.isDown());
+#endif
         loop();
     }
 }

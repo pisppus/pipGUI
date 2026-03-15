@@ -8,6 +8,7 @@
 #include <esp_rom_sys.h>
 #include <esp_heap_caps.h>
 #include <soc/spi_periph.h>
+#include <algorithm>
 
 namespace pipcore::esp32
 {
@@ -15,9 +16,9 @@ namespace pipcore::esp32
     {
         constexpr size_t DmaBufferBytes = 8192;
 
-        inline bool isPinValid(int8_t pin) { return pin >= 0; }
+        [[nodiscard]] inline constexpr bool isPinValid(int8_t pin) noexcept { return pin >= 0; }
 
-        inline int8_t getSpi2IomuxMosi()
+        [[nodiscard]] inline int8_t getSpi2IomuxMosi() noexcept
         {
 #if defined(spi_periph_signal)
             return (int8_t)spi_periph_signal[SPI2_HOST].spid_iomux_pin;
@@ -26,7 +27,7 @@ namespace pipcore::esp32
 #endif
         }
 
-        inline int8_t getSpi2IomuxSclk()
+        [[nodiscard]] inline int8_t getSpi2IomuxSclk() noexcept
         {
 #if defined(spi_periph_signal)
             return (int8_t)spi_periph_signal[SPI2_HOST].spiclk_iomux_pin;
@@ -35,7 +36,7 @@ namespace pipcore::esp32
 #endif
         }
 
-        inline int8_t getSpi2IomuxCs0()
+        [[nodiscard]] inline int8_t getSpi2IomuxCs0() noexcept
         {
 #if defined(spi_periph_signal)
             return (int8_t)spi_periph_signal[SPI2_HOST].spics0_iomux_pin;
@@ -44,7 +45,7 @@ namespace pipcore::esp32
 #endif
         }
 
-        int8_t resolveDefaultMosi()
+        [[nodiscard]] int8_t resolveDefaultMosi() noexcept
         {
             int8_t pin = getSpi2IomuxMosi();
             if (isPinValid(pin))
@@ -64,7 +65,7 @@ namespace pipcore::esp32
 #endif
         }
 
-        int8_t resolveDefaultSclk()
+        [[nodiscard]] int8_t resolveDefaultSclk() noexcept
         {
             int8_t pin = getSpi2IomuxSclk();
             if (isPinValid(pin))
@@ -84,7 +85,7 @@ namespace pipcore::esp32
 #endif
         }
 
-        int8_t resolveDefaultCs()
+        [[nodiscard]] int8_t resolveDefaultCs() noexcept
         {
             int8_t pin = getSpi2IomuxCs0();
             if (isPinValid(pin))
@@ -105,7 +106,7 @@ namespace pipcore::esp32
         }
     }
 
-    void St7789Spi::configure(int8_t mosi, int8_t sclk, int8_t cs, int8_t dc, int8_t rst, uint32_t hz)
+    void St7789Spi::configure(int8_t mosi, int8_t sclk, int8_t cs, int8_t dc, int8_t rst, uint32_t hz) noexcept
     {
         deinit();
         _pinMosi = mosi;
@@ -177,7 +178,7 @@ namespace pipcore::esp32
     {
         if (_spiHandle)
         {
-            flush();
+            (void)flush();
             spi_bus_remove_device((spi_device_handle_t)_spiHandle);
             spi_bus_free(SPI2_HOST);
             _spiHandle = nullptr;
@@ -239,7 +240,7 @@ namespace pipcore::esp32
 
         for (int i = 0; i < 2; ++i)
         {
-            _dmaBuf[i] = (uint8_t *)heap_caps_aligned_alloc(4, _dmaBufSize, MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
+            _dmaBuf[i] = static_cast<uint8_t *>(heap_caps_aligned_alloc(4, _dmaBufSize, MALLOC_CAP_DMA | MALLOC_CAP_8BIT));
             if (!_dmaBuf[i])
             {
                 deinit();
@@ -248,7 +249,7 @@ namespace pipcore::esp32
         }
         for (int i = 0; i < 2; ++i)
         {
-            _trans[i] = (spi_transaction_t *)heap_caps_calloc(1, sizeof(spi_transaction_t), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+            _trans[i] = static_cast<spi_transaction_t *>(heap_caps_calloc(1, sizeof(spi_transaction_t), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
             if (!_trans[i])
             {
                 deinit();
@@ -328,7 +329,12 @@ namespace pipcore::esp32
         if (!setDcCached(1))
             return false;
 
-        const uint8_t *p = (const uint8_t *)data;
+        bool busAcquired = false;
+        if (spi_device_acquire_bus(static_cast<spi_device_handle_t>(_spiHandle), portMAX_DELAY) != ESP_OK)
+            return fail(st7789::IoError::QueueTransmit);
+        busAcquired = true;
+
+        const uint8_t *p = static_cast<const uint8_t *>(data);
         size_t remaining = len;
 
         while (remaining)
@@ -336,17 +342,21 @@ namespace pipcore::esp32
             while (_transInFlight[_dmaNext])
             {
                 if (!waitQueued())
+                {
+                    if (busAcquired)
+                        spi_device_release_bus(static_cast<spi_device_handle_t>(_spiHandle));
                     return false;
+                }
             }
 
             const int slot = _dmaNext;
             _dmaNext ^= 1;
 
-            const size_t n = remaining > _dmaBufSize ? _dmaBufSize : remaining;
+            const size_t n = std::min(remaining, _dmaBufSize);
             memcpy(_dmaBuf[slot], p, n);
 
             spi_transaction_t *t = _trans[slot];
-            t->flags = 0;
+            t->flags = remaining > n ? SPI_TRANS_CS_KEEP_ACTIVE : 0;
             t->length = (int)(n * 8U);
             t->rxlength = 0;
             t->tx_buffer = _dmaBuf[slot];
@@ -357,7 +367,9 @@ namespace pipcore::esp32
             if (err != ESP_OK)
             {
                 _transInFlight[slot] = false;
-                flushQueued();
+                (void)flushQueued();
+                if (busAcquired)
+                    spi_device_release_bus(static_cast<spi_device_handle_t>(_spiHandle));
                 return fail(st7789::IoError::QueueTransmit);
             }
             _transInFlight[slot] = true;
@@ -366,6 +378,9 @@ namespace pipcore::esp32
             p += n;
             remaining -= n;
         }
+
+        if (busAcquired)
+            spi_device_release_bus(static_cast<spi_device_handle_t>(_spiHandle));
         return true;
     }
 

@@ -12,7 +12,7 @@ namespace pipgui
             uint8_t order;
             ScreenRegistration *next;
 
-            static ScreenRegistration *&head() noexcept
+            [[nodiscard]] static ScreenRegistration *&head() noexcept
             {
                 static ScreenRegistration *listHead = nullptr;
                 return listHead;

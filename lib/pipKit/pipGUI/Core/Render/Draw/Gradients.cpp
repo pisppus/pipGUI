@@ -6,28 +6,6 @@
 
 namespace pipgui
 {
-    static IRAM_ATTR inline uint32_t isqrt32(uint32_t n)
-    {
-        uint32_t res = 0;
-        uint32_t bit = 1u << 30;
-        while (bit > n)
-            bit >>= 2;
-        while (bit)
-        {
-            if (n >= res + bit)
-            {
-                n -= res + bit;
-                res = (res >> 1) + bit;
-            }
-            else
-            {
-                res >>= 1;
-            }
-            bit >>= 2;
-        }
-        return res;
-    }
-
     void GUI::fillRectGradientVertical(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t topColor, uint32_t bottomColor)
     {
         if (x == -1)

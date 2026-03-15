@@ -141,7 +141,7 @@ namespace pipgui
         }
     }
 
-    bool GUI::notificationActive() const { return _flags.notifActive; }
+    bool GUI::notificationActive() const noexcept { return _flags.notifActive; }
 
     void GUI::renderNotificationOverlay()
     {

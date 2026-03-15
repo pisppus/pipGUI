@@ -16,25 +16,25 @@ namespace pipcore::esp32
         St7789Spi() = default;
         ~St7789Spi();
 
-        void configure(int8_t mosi, int8_t sclk, int8_t cs, int8_t dc, int8_t rst, uint32_t hz = 80000000);
+        void configure(int8_t mosi, int8_t sclk, int8_t cs, int8_t dc, int8_t rst, uint32_t hz = 80000000) noexcept;
 
-        bool init() override;
+        [[nodiscard]] bool init() override;
         void deinit() override;
-        st7789::IoError lastError() const override { return _lastError; }
-        void clearError() override { _lastError = st7789::IoError::None; }
-        bool setRst(bool level) override;
+        [[nodiscard]] st7789::IoError lastError() const noexcept override { return _lastError; }
+        void clearError() noexcept override { _lastError = st7789::IoError::None; }
+        [[nodiscard]] bool setRst(bool level) override;
         void delayMs(uint32_t ms) override;
-        bool write(const void *data, size_t len) override;
-        bool writeCommand(uint8_t cmd) override;
-        bool writePixels(const void *data, size_t len) override;
-        bool flush() override;
+        [[nodiscard]] bool write(const void *data, size_t len) override;
+        [[nodiscard]] bool writeCommand(uint8_t cmd) override;
+        [[nodiscard]] bool writePixels(const void *data, size_t len) override;
+        [[nodiscard]] bool flush() override;
 
     private:
-        bool initSpi();
-        bool waitQueued();
-        bool flushQueued();
-        bool fail(st7789::IoError error);
-        inline bool setDcCached(int level);
+        [[nodiscard]] bool initSpi();
+        [[nodiscard]] bool waitQueued();
+        [[nodiscard]] bool flushQueued();
+        [[nodiscard]] bool fail(st7789::IoError error);
+        [[nodiscard]] inline bool setDcCached(int level);
 
         int8_t _pinMosi = -1;
         int8_t _pinSclk = -1;

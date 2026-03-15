@@ -32,7 +32,9 @@ namespace pipgui
         if (ic.w == 0 || ic.h == 0)
             return;
 
-        pipcore::Sprite *spr = _render.activeSprite ? _render.activeSprite : &_render.sprite;
+        pipcore::Sprite *spr = getDrawTarget();
+        if (!spr)
+            return;
         uint16_t *buf = (uint16_t *)spr->getBuffer();
         if (!buf)
             return;
@@ -40,6 +42,16 @@ namespace pipgui
         const int16_t stride = spr->width(), maxH = spr->height();
         if (stride <= 0 || maxH <= 0)
             return;
+
+        int32_t clipX = 0;
+        int32_t clipY = 0;
+        int32_t clipW = stride;
+        int32_t clipH = maxH;
+        spr->getClipRect(&clipX, &clipY, &clipW, &clipH);
+        if (clipW <= 0 || clipH <= 0)
+            return;
+        const int32_t clipR = clipX + clipW;
+        const int32_t clipB = clipY + clipH;
 
         uint16_t renderSizePx = sizePx;
         int16_t inset = 0;
@@ -63,16 +75,16 @@ namespace pipgui
         int16_t ix1 = drawX + (int16_t)renderSizePx;
         int16_t iy1 = drawY + (int16_t)renderSizePx;
 
-        if (ix1 <= 0 || iy1 <= 0 || ix0 >= stride || iy0 >= maxH)
+        if (ix1 <= clipX || iy1 <= clipY || ix0 >= clipR || iy0 >= clipB)
             return;
-        if (ix0 < 0)
-            ix0 = 0;
-        if (iy0 < 0)
-            iy0 = 0;
-        if (ix1 > stride)
-            ix1 = stride;
-        if (iy1 > maxH)
-            iy1 = maxH;
+        if (ix0 < clipX)
+            ix0 = (int16_t)clipX;
+        if (iy0 < clipY)
+            iy0 = (int16_t)clipY;
+        if (ix1 > clipR)
+            ix1 = (int16_t)clipR;
+        if (iy1 > clipB)
+            iy1 = (int16_t)clipB;
 
         const float distanceScale = (float)psdf_icons::DistanceRange * ((float)renderSizePx / (float)psdf_icons::NominalSizePx);
         constexpr float iconBias = 0.0f;
@@ -146,18 +158,13 @@ namespace pipgui
         _render.activeSprite = prevActive;
 
         if (!prevRender)
-        {
             invalidateRect(rx - pad, ry - pad, sizePx + pad * 2, sizePx + pad * 2);
-            flushDirty();
-        }
     }
 
     void DrawIconFluent::draw()
     {
-        if (_consumed || !_gui || _sizePx == 0)
+        if (_sizePx == 0 || !beginCommit())
             return;
-        _consumed = true;
         detail::BuilderAccess::drawIcon(*_gui, _iconId, _x, _y, _sizePx, _fg565, _bg565);
     }
 }
-

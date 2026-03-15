@@ -6,14 +6,11 @@
 # PlatformIO
 .pio/
 .vscode/
+data/
+include/
 platformio.ini
 
 logs/
-
-# Syncthing (если ты его используешь)
-.stfolder/
-.stignore
-.stversions/
 
 # Build artifacts
 *.bin
@@ -24,3 +21,4 @@ logs/
 # Project specific
 термометр/
 thermometer/
+tools/screenshots/captures/

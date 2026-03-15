@@ -1,6 +1,7 @@
 #include <pipGUI/Core/API/pipGUI.hpp>
 #include <pipGUI/Core/Debug.hpp>
 #include <pipGUI/Icons/metrics.hpp>
+#include <algorithm>
 
 namespace pipgui
 {
@@ -24,16 +25,13 @@ namespace pipgui
         _status.bg = bgColor;
         _status.pos = (pos == Bottom) ? Bottom : Top;
 
-        uint8_t hLocal = height;
-        if (hLocal == 0)
-            hLocal = 18;
+        uint8_t hLocal = height ? height : 18;
 
         if (_render.screenWidth == 0 || _render.screenHeight == 0)
             _status.height = hLocal;
         else
         {
-            if (hLocal > _render.screenHeight)
-                hLocal = (uint8_t)_render.screenHeight;
+            hLocal = static_cast<uint8_t>(std::min<uint16_t>(hLocal, _render.screenHeight));
             _status.height = hLocal;
         }
 
@@ -67,7 +65,7 @@ namespace pipgui
             return;
         }
 
-        int8_t lvl = (levelPercent > 100) ? 100 : levelPercent;
+        const int8_t lvl = static_cast<int8_t>(std::clamp<int>(levelPercent, 0, 100));
         if (_status.batteryLevel == lvl && _status.batteryStyle == style)
             return;
         _status.batteryLevel = lvl;
@@ -135,32 +133,33 @@ namespace pipgui
             return tw;
         };
 
+        auto unionRect = [](const DirtyRect &a, const DirtyRect &b) noexcept -> DirtyRect
+        {
+            if (a.w <= 0 || a.h <= 0)
+                return b;
+            if (b.w <= 0 || b.h <= 0)
+                return a;
+
+            const int16_t x1 = (a.x < b.x) ? a.x : b.x;
+            const int16_t y1 = (a.y < b.y) ? a.y : b.y;
+            const int16_t x2 = ((a.x + a.w) > (b.x + b.w)) ? (a.x + a.w) : (b.x + b.w);
+            const int16_t y2 = ((a.y + a.h) > (b.y + b.h)) ? (a.y + a.h) : (b.y + b.h);
+            return {x1, y1, static_cast<int16_t>(x2 - x1), static_cast<int16_t>(y2 - y1)};
+        };
+
+        auto trackDirty = [&](const DirtyRect &current, DirtyRect &last) noexcept
+        {
+            totalDirty = unionRect(totalDirty, unionRect(current, last));
+            last = current;
+        };
+
         if ((mask & StatusBarDirtyLeft) != 0)
         {
             int16_t tw = textWidth(_status.textLeft);
             DirtyRect newLeft = {0, 0, 0, 0};
             if (tw > 0)
                 newLeft = {(int16_t)(bar.x), (int16_t)(bar.y - 2), (int16_t)(tw + 4), (int16_t)(bar.h + 4)};
-
-            if (totalDirty.w == 0 && newLeft.x == _status.lastLeft.x && newLeft.w == _status.lastLeft.w)
-                totalDirty = newLeft;
-            else
-            {
-                DirtyRect a = newLeft, b = _status.lastLeft;
-                if (a.w <= 0)
-                    totalDirty = b;
-                else if (b.w <= 0)
-                    totalDirty = a;
-                else
-                {
-                    int16_t x1 = (a.x < b.x) ? a.x : b.x;
-                    int16_t y1 = (a.y < b.y) ? a.y : b.y;
-                    int16_t x2 = ((a.x + a.w) > (b.x + b.w)) ? (a.x + a.w) : (b.x + b.w);
-                    int16_t y2 = ((a.y + a.h) > (b.y + b.h)) ? (a.y + a.h) : (b.y + b.h);
-                    totalDirty = {x1, y1, (int16_t)(x2 - x1), (int16_t)(y2 - y1)};
-                }
-            }
-            _status.lastLeft = newLeft;
+            trackDirty(newLeft, _status.lastLeft);
         }
 
         DirtyRect newBat = {};
@@ -176,41 +175,7 @@ namespace pipgui
             int16_t by = (int16_t)(bar.y + (bar.h - iconSize) / 2);
 
             newBat = {(int16_t)(bx - 1), (int16_t)(by - 1), (int16_t)(iconSize + 2), (int16_t)(iconSize + 2)};
-
-            if (totalDirty.w == 0)
-            {
-                DirtyRect a = newBat, b = _status.lastBattery;
-                if (a.w <= 0)
-                    totalDirty = b;
-                else if (b.w <= 0)
-                    totalDirty = a;
-                else
-                {
-                    int16_t x1 = (a.x < b.x) ? a.x : b.x;
-                    int16_t y1 = (a.y < b.y) ? a.y : b.y;
-                    int16_t x2 = ((a.x + a.w) > (b.x + b.w)) ? (a.x + a.w) : (b.x + b.w);
-                    int16_t y2 = ((a.y + a.h) > (b.y + b.h)) ? (a.y + a.h) : (b.y + b.h);
-                    totalDirty = {x1, y1, (int16_t)(x2 - x1), (int16_t)(y2 - y1)};
-                }
-            }
-            else
-            {
-                DirtyRect a = newBat, b = _status.lastBattery;
-                if (a.w > 0 && b.w > 0)
-                {
-                    int16_t x1 = (a.x < b.x) ? a.x : b.x;
-                    int16_t y1 = (a.y < b.y) ? a.y : b.y;
-                    int16_t x2 = ((a.x + a.w) > (b.x + b.w)) ? (a.x + a.w) : (b.x + b.w);
-                    int16_t y2 = ((a.y + a.h) > (b.y + b.h)) ? (a.y + a.h) : (b.y + b.h);
-                    DirtyRect batUnion = {x1, y1, (int16_t)(x2 - x1), (int16_t)(y2 - y1)};
-                    x1 = (totalDirty.x < batUnion.x) ? totalDirty.x : batUnion.x;
-                    y1 = (totalDirty.y < batUnion.y) ? totalDirty.y : batUnion.y;
-                    x2 = ((totalDirty.x + totalDirty.w) > (batUnion.x + batUnion.w)) ? (totalDirty.x + totalDirty.w) : (batUnion.x + batUnion.w);
-                    y2 = ((totalDirty.y + totalDirty.h) > (batUnion.y + batUnion.h)) ? (totalDirty.y + totalDirty.h) : (batUnion.y + batUnion.h);
-                    totalDirty = {x1, y1, (int16_t)(x2 - x1), (int16_t)(y2 - y1)};
-                }
-            }
-            _status.lastBattery = newBat;
+            trackDirty(newBat, _status.lastBattery);
         }
         else if (_status.batteryStyle != Hidden && _status.batteryLevel >= 0 && _status.lastBattery.w > 0)
         {
@@ -226,41 +191,7 @@ namespace pipgui
                 int16_t startX = (int16_t)(bar.x + (bar.w - tw) / 2);
                 newCenter = {(int16_t)(startX - 2), (int16_t)(bar.y - 2), (int16_t)(tw + 4), (int16_t)(bar.h + 4)};
             }
-
-            if (totalDirty.w == 0)
-            {
-                DirtyRect a = newCenter, b = _status.lastCenter;
-                if (a.w <= 0)
-                    totalDirty = b;
-                else if (b.w <= 0)
-                    totalDirty = a;
-                else
-                {
-                    int16_t x1 = (a.x < b.x) ? a.x : b.x;
-                    int16_t y1 = (a.y < b.y) ? a.y : b.y;
-                    int16_t x2 = ((a.x + a.w) > (b.x + b.w)) ? (a.x + a.w) : (b.x + b.w);
-                    int16_t y2 = ((a.y + a.h) > (b.y + b.h)) ? (a.y + a.h) : (b.y + b.h);
-                    totalDirty = {x1, y1, (int16_t)(x2 - x1), (int16_t)(y2 - y1)};
-                }
-            }
-            else
-            {
-                DirtyRect a = newCenter, b = _status.lastCenter;
-                if (a.w > 0 && b.w > 0)
-                {
-                    int16_t x1 = (a.x < b.x) ? a.x : b.x;
-                    int16_t y1 = (a.y < b.y) ? a.y : b.y;
-                    int16_t x2 = ((a.x + a.w) > (b.x + b.w)) ? (a.x + a.w) : (b.x + b.w);
-                    int16_t y2 = ((a.y + a.h) > (b.y + b.h)) ? (a.y + a.h) : (b.y + b.h);
-                    DirtyRect cenUnion = {x1, y1, (int16_t)(x2 - x1), (int16_t)(y2 - y1)};
-                    x1 = (totalDirty.x < cenUnion.x) ? totalDirty.x : cenUnion.x;
-                    y1 = (totalDirty.y < cenUnion.y) ? totalDirty.y : cenUnion.y;
-                    x2 = ((totalDirty.x + totalDirty.w) > (cenUnion.x + cenUnion.w)) ? (totalDirty.x + totalDirty.w) : (cenUnion.x + cenUnion.w);
-                    y2 = ((totalDirty.y + totalDirty.h) > (cenUnion.y + cenUnion.h)) ? (totalDirty.y + totalDirty.h) : (cenUnion.y + cenUnion.h);
-                    totalDirty = {x1, y1, (int16_t)(x2 - x1), (int16_t)(y2 - y1)};
-                }
-            }
-            _status.lastCenter = newCenter;
+            trackDirty(newCenter, _status.lastCenter);
         }
 
         if ((mask & StatusBarDirtyRight) != 0)
@@ -280,41 +211,7 @@ namespace pipgui
                     startX = bar.x;
                 newRight = {(int16_t)(startX - 2), (int16_t)(bar.y - 2), (int16_t)(tw + 4), (int16_t)(bar.h + 4)};
             }
-
-            if (totalDirty.w == 0)
-            {
-                DirtyRect a = newRight, b = _status.lastRight;
-                if (a.w <= 0)
-                    totalDirty = b;
-                else if (b.w <= 0)
-                    totalDirty = a;
-                else
-                {
-                    int16_t x1 = (a.x < b.x) ? a.x : b.x;
-                    int16_t y1 = (a.y < b.y) ? a.y : b.y;
-                    int16_t x2 = ((a.x + a.w) > (b.x + b.w)) ? (a.x + a.w) : (b.x + b.w);
-                    int16_t y2 = ((a.y + a.h) > (b.y + b.h)) ? (a.y + a.h) : (b.y + b.h);
-                    totalDirty = {x1, y1, (int16_t)(x2 - x1), (int16_t)(y2 - y1)};
-                }
-            }
-            else
-            {
-                DirtyRect a = newRight, b = _status.lastRight;
-                if (a.w > 0 && b.w > 0)
-                {
-                    int16_t x1 = (a.x < b.x) ? a.x : b.x;
-                    int16_t y1 = (a.y < b.y) ? a.y : b.y;
-                    int16_t x2 = ((a.x + a.w) > (b.x + b.w)) ? (a.x + a.w) : (b.x + b.w);
-                    int16_t y2 = ((a.y + a.h) > (b.y + b.h)) ? (a.y + a.h) : (b.y + b.h);
-                    DirtyRect rgtUnion = {x1, y1, (int16_t)(x2 - x1), (int16_t)(y2 - y1)};
-                    x1 = (totalDirty.x < rgtUnion.x) ? totalDirty.x : rgtUnion.x;
-                    y1 = (totalDirty.y < rgtUnion.y) ? totalDirty.y : rgtUnion.y;
-                    x2 = ((totalDirty.x + totalDirty.w) > (rgtUnion.x + rgtUnion.w)) ? (totalDirty.x + totalDirty.w) : (rgtUnion.x + rgtUnion.w);
-                    y2 = ((totalDirty.y + totalDirty.h) > (rgtUnion.y + rgtUnion.h)) ? (totalDirty.y + totalDirty.h) : (rgtUnion.y + rgtUnion.h);
-                    totalDirty = {x1, y1, (int16_t)(x2 - x1), (int16_t)(y2 - y1)};
-                }
-            }
-            _status.lastRight = newRight;
+            trackDirty(newRight, _status.lastRight);
         }
 
         if (totalDirty.w > 0 && totalDirty.h > 0)
@@ -332,7 +229,7 @@ namespace pipgui
         _status.dirtyMask = StatusBarDirtyAll;
     }
 
-    int16_t GUI::statusBarHeight() const
+    int16_t GUI::statusBarHeight() const noexcept
     {
         if (!_flags.statusBarEnabled || _status.height == 0)
             return 0;
@@ -393,75 +290,27 @@ namespace pipgui
             uint8_t blurRadius = (uint8_t)(dim / 8);
             if (blurRadius < 1)
                 blurRadius = 1;
-            drawBlurRegion(x, y, w, h, blurRadius, dir, true, 0, 0, -1);
+            drawBlurRegion(x, y, w, h, blurRadius, dir, true, 0, -1);
         }
 
-        if (_flags.statusBarDebugMetrics)
-        {
-            int16_t textH = 0;
-            {
-                uint16_t px = (h > 6) ? (uint16_t)(h - 4) : (uint16_t)h;
-                if (px < 8)
-                    px = 8;
-                setFontSize(px);
-                setFontWeight(Medium);
-                int16_t tmpW = 0;
-                measureText(String("Ag"), tmpW, textH);
-                if (textH <= 0 || textH > h)
-                    textH = h;
-            }
-
-            int16_t baseY = y + (h - textH) / 2;
-            if (baseY < y)
-                baseY = y;
-
-            auto measureTextWidth = [&](const String &s) -> int16_t
-            {
-                if (!s.length())
-                    return 0;
-                int16_t tw = 0;
-                int16_t th = 0;
-                measureText(s, tw, th);
-                return tw;
-            };
-
-            auto drawTextAt = [&](const String &s, int16_t tx)
-            {
-                if (!s.length())
-                    return;
-                drawTextAligned(s, tx, baseY, fg565, bg565, AlignLeft);
-            };
-
-            char metricsText[64];
-            Debug::formatStatusBar(metricsText, sizeof(metricsText));
-            int16_t tw = measureTextWidth(String(metricsText));
-            int16_t mx = x + (w - tw) / 2;
-            if (mx < x + 2)
-                mx = x + 2;
-            drawTextAt(String(metricsText), mx);
-
-            _flags.inSpritePass = prevRender;
-            _render.activeSprite = prevActive;
-            return;
-        }
-
-        int16_t textH = 0;
-
+        auto prepareTextMetrics = [&]() -> int16_t
         {
             uint16_t px = (h > 6) ? (uint16_t)(h - 4) : (uint16_t)h;
             if (px < 8)
                 px = 8;
             setFontSize(px);
             setFontWeight(Medium);
+
+            int16_t textH = 0;
             int16_t tmpW = 0;
             measureText(String("Ag"), tmpW, textH);
             if (textH <= 0 || textH > h)
                 textH = h;
-        }
+            return textH;
+        };
 
-        int16_t baseY = y + (h - textH) / 2;
-        if (baseY < y)
-            baseY = y;
+        const int16_t textH = prepareTextMetrics();
+        const int16_t baseY = std::max<int16_t>(y, (int16_t)(y + (h - textH) / 2));
 
         auto measureTextWidth = [&](const String &s) -> int16_t
         {
@@ -479,6 +328,21 @@ namespace pipgui
                 return;
             drawTextAligned(s, tx, baseY, fg565, bg565, AlignLeft);
         };
+
+        if (_flags.statusBarDebugMetrics)
+        {
+            char metricsText[64];
+            Debug::formatStatusBar(metricsText, sizeof(metricsText));
+            int16_t tw = measureTextWidth(String(metricsText));
+            int16_t mx = x + (w - tw) / 2;
+            if (mx < x + 2)
+                mx = x + 2;
+            drawTextAt(String(metricsText), mx);
+
+            _flags.inSpritePass = prevRender;
+            _render.activeSprite = prevActive;
+            return;
+        }
 
         int16_t leftX = x + 2;
         if (_status.textLeft.length() > 0)
