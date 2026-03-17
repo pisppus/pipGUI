@@ -17,8 +17,15 @@ logs/
 *.elf
 *.hex
 
+partitions_ota_littlefs_16MB.csv
+partitions_ota_littlefs_8MB.csv
 
 # Project specific
 термометр/
 thermometer/
 tools/screenshots/captures/
+ota_ed25519.key
+tools/ota/*.key
+tools/ota/keys/
+tools/ota/out/
+fw/

@@ -1,0 +1,57 @@
+#pragma once
+
+#ifndef PIPGUI_DEBUG_DIRTY_RECTS
+#define PIPGUI_DEBUG_DIRTY_RECTS 0
+#endif
+
+#ifndef PIPGUI_DEBUG_METRICS
+#define PIPGUI_DEBUG_METRICS 0
+#endif
+
+#ifndef PIPGUI_SCREENSHOTS
+#define PIPGUI_SCREENSHOTS 1
+#endif
+
+#ifndef PIPGUI_SCREENSHOT_MODE
+#define PIPGUI_SCREENSHOT_MODE 2
+#endif
+
+#ifndef PIPGUI_STATUS_BAR
+#define PIPGUI_STATUS_BAR 0
+#endif
+
+#ifndef PIPGUI_STATUS_BAR_DEBUG_METRICS_DEFAULT
+#define PIPGUI_STATUS_BAR_DEBUG_METRICS_DEFAULT 0
+#endif
+
+// WiFi
+#ifndef PIPGUI_WIFI
+#define PIPGUI_WIFI 0
+#endif
+#ifndef PIPGUI_WIFI_SSID
+#define PIPGUI_WIFI_SSID "EXAMPLE_WIFI_SSID"
+#endif
+#ifndef PIPGUI_WIFI_PASSWORD
+#define PIPGUI_WIFI_PASSWORD "EXAMPLE_WIFI_PASSWORD"
+#endif
+
+// OTA updater
+#ifndef PIPGUI_OTA
+#define PIPGUI_OTA 0
+#endif
+#ifndef PIPGUI_OTA_MANIFEST_URL_STABLE
+#define PIPGUI_OTA_MANIFEST_URL_STABLE "https://pisppus.vercel.app/fw/stable/manifest.json"
+#endif
+#ifndef PIPGUI_OTA_MANIFEST_URL_BETA
+#define PIPGUI_OTA_MANIFEST_URL_BETA "https://pisppus.vercel.app/fw/beta/manifest.json"
+#endif
+
+#ifndef PIPGUI_FIRMWARE_VER_MAJOR
+#define PIPGUI_FIRMWARE_VER_MAJOR 1
+#endif
+#ifndef PIPGUI_FIRMWARE_VER_MINOR
+#define PIPGUI_FIRMWARE_VER_MINOR 0
+#endif
+#ifndef PIPGUI_FIRMWARE_VER_PATCH
+#define PIPGUI_FIRMWARE_VER_PATCH 3
+#endif

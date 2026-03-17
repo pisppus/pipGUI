@@ -1,6 +1,8 @@
 #include <Arduino.h>
 #include <math.h>
 #include <pipKit.hpp>
+#include <pipGUI/Systems/Network/Wifi.hpp>
+#include <pipGUI/Systems/Update/Ota.hpp>
 
 using namespace pipgui;
 
@@ -12,6 +14,28 @@ namespace
   constexpr uint32_t kFrameStepMs = 30;
   constexpr uint32_t kSettingsLoadingDurationMs = 2400;
   constexpr uint8_t kBlurRectCount = 3;
+
+#ifndef PIPGUI_DEMO_BTN_NEXT_PIN
+#define PIPGUI_DEMO_BTN_NEXT_PIN 2
+#endif
+
+#ifndef PIPGUI_DEMO_BTN_PREV_PIN
+#define PIPGUI_DEMO_BTN_PREV_PIN 4
+#endif
+
+// Set to 255 to disable backlight pin control in the demo.
+// This is useful if your backlight pin conflicts with buttons.
+#ifndef PIPGUI_DEMO_BACKLIGHT_PIN
+#define PIPGUI_DEMO_BACKLIGHT_PIN 255
+#endif
+
+  constexpr uint8_t kBtnNextPin = (uint8_t)PIPGUI_DEMO_BTN_NEXT_PIN;
+  constexpr uint8_t kBtnPrevPin = (uint8_t)PIPGUI_DEMO_BTN_PREV_PIN;
+  constexpr uint8_t kBacklightPin = (uint8_t)PIPGUI_DEMO_BACKLIGHT_PIN;
+
+  static_assert(kBtnNextPin != kBtnPrevPin, "Buttons must be on different pins");
+  static_assert(kBacklightPin == 255 || (kBacklightPin != kBtnNextPin && kBacklightPin != kBtnPrevPin),
+                "Backlight pin conflicts with a button pin");
 
   struct BlurRect
   {
@@ -30,10 +54,11 @@ namespace
 
   GUI ui;
 
-  Button btnNext(2, Pullup);
-  Button btnPrev(4, Pullup);
+  Button btnNext(kBtnNextPin, Pullup);
+  Button btnPrev(kBtnPrevPin, Pullup);
 
   ButtonVisualState settingsBtnState{true, 0, 255, true, false, 0};
+  ButtonVisualState otaBtnState{true, 0, 255, true, false, 0};
   ToggleSwitchState g_toggleState{false, 0, 0};
 
   float g_graphPhase = 0.0f;
@@ -201,6 +226,145 @@ namespace
       return ui.rgb(80, 255, 120);
     default:
       return ui.rgb(80, 255, 140);
+    }
+  }
+
+  String ipV4ToString(uint32_t ipV4)
+  {
+    if (ipV4 == 0)
+      return String("-");
+    const uint8_t a = (uint8_t)((ipV4 >> 24) & 0xFFu);
+    const uint8_t b = (uint8_t)((ipV4 >> 16) & 0xFFu);
+    const uint8_t c = (uint8_t)((ipV4 >> 8) & 0xFFu);
+    const uint8_t d = (uint8_t)(ipV4 & 0xFFu);
+    char buf[20];
+    snprintf(buf, sizeof(buf), "%u.%u.%u.%u", (unsigned)a, (unsigned)b, (unsigned)c, (unsigned)d);
+    return String(buf);
+  }
+
+  String fwVersionText()
+  {
+    const uint32_t maj = (uint32_t)PIPGUI_FIRMWARE_VER_MAJOR;
+    const uint32_t min = (uint32_t)PIPGUI_FIRMWARE_VER_MINOR;
+    const uint32_t pat = (uint32_t)PIPGUI_FIRMWARE_VER_PATCH;
+    return String(maj) + "." + String(min) + "." + String(pat);
+  }
+
+  const char *otaErrorName(OtaError e)
+  {
+    switch (e)
+    {
+    case OtaError::None:
+      return "None";
+    case OtaError::WifiNotEnabled:
+      return "WiFi disabled";
+    case OtaError::WifiNotConnected:
+      return "WiFi not connected";
+    case OtaError::HttpBeginFailed:
+      return "HTTP begin";
+    case OtaError::HttpStatusNotOk:
+      return "HTTP status";
+    case OtaError::ManifestTooLarge:
+      return "Manifest too large";
+    case OtaError::ManifestParseFailed:
+      return "Manifest parse";
+    case OtaError::PayloadSizeMismatch:
+      return "Size mismatch";
+    case OtaError::FlashLayoutInvalid:
+      return "Flash layout";
+    case OtaError::RollbackUnavailable:
+      return "Rollback unavailable";
+    case OtaError::UpdateBeginFailed:
+      return "Update begin";
+    case OtaError::UpdateWriteFailed:
+      return "Update write";
+    case OtaError::HashMismatch:
+      return "SHA mismatch";
+    case OtaError::SignatureMissing:
+      return "Sig missing";
+    case OtaError::SignatureInvalid:
+      return "Sig invalid";
+    case OtaError::UpdateEndFailed:
+      return "Update end";
+    case OtaError::TimeSyncFailed:
+      return "Time sync";
+    default:
+      return "Unknown";
+    }
+  }
+
+  const char *otaPlatformHint(uint32_t code)
+  {
+    switch (code)
+    {
+    case 0x1501:
+      return "Partition conflict";
+    case 0x1502:
+      return "OTA data invalid";
+    case 0x1503:
+      return "Invalid firmware image";
+    case 0x1504:
+      return "Anti-rollback";
+    case 0x1506:
+      return "App not confirmed";
+    default:
+      return nullptr;
+    }
+  }
+
+  String otaStateText(const OtaStatus &st)
+  {
+    switch (st.state)
+    {
+    case OtaState::Idle:
+      return String("Idle");
+    case OtaState::UpToDate:
+      return String("No updates");
+    case OtaState::WifiStarting:
+      return String("WiFi connecting...");
+    case OtaState::FetchingManifest:
+      return String("Checking update...");
+    case OtaState::UpdateAvailable:
+      return String("Update available");
+    case OtaState::Downloading:
+      return String("Downloading...");
+    case OtaState::Installing:
+      return String("Installing...");
+    case OtaState::Success:
+      return String("Installed (reboot)");
+    case OtaState::Error:
+      return String("Error");
+    default:
+      return String("?");
+    }
+  }
+
+  String otaButtonLabel(const OtaStatus &st)
+  {
+    switch (st.state)
+    {
+    case OtaState::UpToDate:
+      return String("Check update");
+    case OtaState::UpdateAvailable:
+      return String("Install update");
+    case OtaState::Downloading:
+      if (st.total > 0)
+      {
+        const uint32_t p = (st.downloaded * 100u) / st.total;
+        return String("Downloading ") + String((unsigned)p) + String("%");
+      }
+      return String("Downloading...");
+    case OtaState::Success:
+      return String("Reboot");
+    case OtaState::Error:
+      return String("Retry");
+    case OtaState::WifiStarting:
+    case OtaState::FetchingManifest:
+    case OtaState::Installing:
+      return String("Cancel");
+    case OtaState::Idle:
+    default:
+      return String("Check update");
     }
   }
 
@@ -1650,6 +1814,39 @@ SCREEN(screenScreenshotGallery, 39)
       .padding(8);
 }
 
+SCREEN(screenFirmwareUpdate, 40)
+{
+  const uint16_t bg565 = ui.rgb(10, 10, 10);
+  ui.clear(bg565);
+
+  ui.setTextStyle(H1);
+  drawCenteredText("Firmware update", 18, ui.rgb(255, 255, 255), bg565);
+
+  ui.setTextStyle(Body);
+  drawCenteredText("Prev = action   Next = back", 42, ui.rgb(180, 180, 180), bg565);
+
+  ui.setTextStyle(Body);
+  drawTextAt("WiFi:", 16, 86, ui.rgb(200, 200, 200), bg565);
+  drawTextAt("OTA:", 16, 116, ui.rgb(200, 200, 200), bg565);
+
+  ui.drawProgressBar()
+      .pos(16, 150)
+      .size(208, 14)
+      .radius(7)
+      .value(0)
+      .anim(None)
+      .baseColor(ui.rgb(20, 20, 20))
+      .fillColor(ui.rgb(40, 150, 255));
+
+  ui.drawButton()
+      .label("Check update")
+      .pos(30, 190)
+      .size(180, 48)
+      .baseColor(ui.rgb(40, 150, 255))
+      .radius(12)
+      .state(otaBtnState);
+}
+
 void updateClockDisplay(uint32_t nowMs)
 {
   static uint32_t lastMinute = 0xFFFFFFFF;
@@ -1665,32 +1862,6 @@ void updateClockDisplay(uint32_t nowMs)
   ui.setStatusBarText("pipGUI", String(buf), "");
   if (!ui.notificationActive())
     ui.updateStatusBar();
-}
-
-void maybeShowToast(uint32_t nowMs)
-{
-  static uint32_t lastToastMs = 0;
-  if (ui.toastActive() || nowMs - lastToastMs < kToastIntervalMs)
-    return;
-
-  lastToastMs = nowMs;
-  static const char *const toastMessages[] = {
-      "Settings saved",
-      "Connected",
-      "Sync complete",
-      "Ready",
-      "pipGUI",
-  };
-  constexpr uint8_t toastCount = sizeof(toastMessages) / sizeof(toastMessages[0]);
-  const uint8_t idx = (uint8_t)((nowMs / kToastIntervalMs) % toastCount);
-  const bool fromTop = (idx & 1u) != 0;
-
-  ui.showToast()
-      .text(String(toastMessages[idx]))
-      .duration(2500)
-      .fromTop(fromTop)
-      .icon(fromTop ? warning_layer0 : error_layer0, 20)
-      .show();
 }
 
 void updateBatteryStatus(uint32_t nowMs)
@@ -1721,45 +1892,46 @@ void configureListMenus()
   ui.configureList()
       .screen(screenListMenuDemo)
       .items({
-          {warning_layer0, "Main screen with widgets", "Simple home screen with status bar, overlays, and transitions", screenMain},
-          {error_layer0, "Settings and alerts preview", "Buttons, notifications, warning states, and input handling", screenSettings},
-          {warning_layer0, "Glow demo with blur and bloom", "Bloom, soft edges, layered primitives, and bright composition", screenGlowDemo},
-          {error_layer0, "Graph demo with multiple traces", "Grid, labels, and several moving lines in one viewport", screenGraph},
-          {error_layer0, "Graph small", "Compact graph with automatic scale fitting", screenGraphSmall},
-          {warning_layer0, "Graph tall", "Tall graph layout with right-side emphasis", screenGraphTall},
-          {warning_layer0, "Graph osc", "Digital oscilloscope style waveform preview", screenGraphOsc},
-          {error_layer0, "Progress demo", "Progress bars with animated fill and labels", screenProgressDemo},
-          {warning_layer0, "Progress + text", "Fresh progress styles with text overlays", screenProgressTextDemo},
-          {error_layer0, "Tile menu with icon cards", "Grid menu with icons, title, subtitle, and active marquee", screenTileMenuDemo},
-          {warning_layer0, "Tile layout", "Custom tile layout with merged cells", screenTileMenuLayoutDemo},
-          {error_layer0, "Tile 4 cols", "Four compact tiles in a single row", screenTileMenu4ColsDemo},
-          {warning_layer0, "List menu 2", "Text-focused list with active highlight panel", screenListMenuPlainDemo},
-          {warning_layer0, "ToggleSwitch", "Toggle switch interaction and state preview", screenToggleSwitchDemo},
-          {error_layer0, "Scroll dots", "Page indicator dots with animated transitions", screenScrollDotsDemo},
-          {error_layer0, "Error", "Full-screen error overlay presentation", screenErrorOverlayDemo},
-          {warning_layer0, "Warning", "Full-screen warning overlay presentation", screenWarningOverlayDemo},
-          {error_layer0, "Blur strip", "Material-style blur strip with moving content", screenBlurDemo},
-          {warning_layer0, "Screenshots", "Captured frames gallery", screenScreenshotGallery},
-          {warning_layer0, "Dither demo", "Gamma + BlueNoise", screenDitherDemo},
-          {error_layer0, "Dither Blue", "BlueNoise only", screenDitherBlueDemo},
-          {warning_layer0, "Dither Temporal", "Temporal FRC", screenDitherTemporalDemo},
-          {error_layer0, "Dither Cubes", "Two cubes + avg (16/24)", screenDitherCubesDemo},
-          {warning_layer0, "Dither Compare", "Compare 16-bit vs 24-bit", screenDitherCompareGradDemo},
-          {error_layer0, "Primitives", "Circle / Arc / Ellipse / Triangle / Squircle", screenPrimitivesDemo},
-          {warning_layer0, "Gradients", "All gradient types", screenGradientsDemo},
-          {error_layer0, "Font compare", "PSDF", screenFontCompareDemo},
-          {warning_layer0, "Font weights", "Test all weights", screenFontWeightDemo},
-          {error_layer0, "Drum roll", "Horizontal + vertical picker", screenDrumRollDemo},
-          {warning_layer0, "Circle AA", "Gupta-Sproull optimized", screenCircleDemo},
-          {error_layer0, "Test: Circles", "fillCircle + drawCircle", screenTestCircles},
-          {warning_layer0, "Test: RoundRects", "1 & 4 radius variants", screenTestRoundRects},
-          {error_layer0, "Test: Ellipses", "Wu-style AA ellipses", screenTestEllipses},
-          {warning_layer0, "Test: Triangles", "4x subpixel AA triangles", screenTestTriangles},
-          {error_layer0, "Test: Arcs+Lines", "sqrt_fraction AA", screenTestArcsAndLines},
-          {warning_layer0, "Test: All Grid", "All primitives comparison", screenTestAllPrimitivesGrid},
-          {error_layer0, "Test: RoundTriangles", "SDF AA rounded triangles", screenTestRoundTriangles},
-          {warning_layer0, "Test: Squircles", "fill/draw squircle AA", screenTestSquircles},
-          {error_layer0, "Auto text color", "BT.709 luminance test", screenAutoTextColorDemo},
+          {"Main screen with widgets", "Simple home screen with status bar, overlays, and transitions", screenMain},
+          {"Settings and alerts preview", "Buttons, notifications, warning states, and input handling", screenSettings},
+          {"Glow demo with blur and bloom", "Bloom, soft edges, layered primitives, and bright composition", screenGlowDemo},
+          {"Graph demo with multiple traces", "Grid, labels, and several moving lines in one viewport", screenGraph},
+          {"Graph small", "Compact graph with automatic scale fitting", screenGraphSmall},
+          {"Graph tall", "Tall graph layout with right-side emphasis", screenGraphTall},
+          {"Graph osc", "Digital oscilloscope style waveform preview", screenGraphOsc},
+          {"Progress demo", "Progress bars with animated fill and labels", screenProgressDemo},
+          {"Progress + text", "Fresh progress styles with text overlays", screenProgressTextDemo},
+          {"Tile menu with icon cards", "Grid menu with icons, title, subtitle, and active marquee", screenTileMenuDemo},
+          {"Tile layout", "Custom tile layout with merged cells", screenTileMenuLayoutDemo},
+          {"Tile 4 cols", "Four compact tiles in a single row", screenTileMenu4ColsDemo},
+          {"List menu 2", "Text-focused list with active highlight panel", screenListMenuPlainDemo},
+          {"ToggleSwitch", "Toggle switch interaction and state preview", screenToggleSwitchDemo},
+          {"Scroll dots", "Page indicator dots with animated transitions", screenScrollDotsDemo},
+          {"Error", "Full-screen error overlay presentation", screenErrorOverlayDemo},
+          {"Warning", "Full-screen warning overlay presentation", screenWarningOverlayDemo},
+          {"Blur strip", "Material-style blur strip with moving content", screenBlurDemo},
+          {"Screenshots", "Captured frames gallery", screenScreenshotGallery},
+          {"Firmware update", "WiFi OTA updater (signed manifest)", screenFirmwareUpdate},
+          {"Dither demo", "Gamma + BlueNoise", screenDitherDemo},
+          {"Dither Blue", "BlueNoise only", screenDitherBlueDemo},
+          {"Dither Temporal", "Temporal FRC", screenDitherTemporalDemo},
+          {"Dither Cubes", "Two cubes + avg (16/24)", screenDitherCubesDemo},
+          {"Dither Compare", "Compare 16-bit vs 24-bit", screenDitherCompareGradDemo},
+          {"Primitives", "Circle / Arc / Ellipse / Triangle / Squircle", screenPrimitivesDemo},
+          {"Gradients", "All gradient types", screenGradientsDemo},
+          {"Font compare", "PSDF", screenFontCompareDemo},
+          {"Font weights", "Test all weights", screenFontWeightDemo},
+          {"Drum roll", "Horizontal + vertical picker", screenDrumRollDemo},
+          {"Circle AA", "Gupta-Sproull optimized", screenCircleDemo},
+          {"Test: Circles", "fillCircle + drawCircle", screenTestCircles},
+          {"Test: RoundRects", "1 & 4 radius variants", screenTestRoundRects},
+          {"Test: Ellipses", "Wu-style AA ellipses", screenTestEllipses},
+          {"Test: Triangles", "4x subpixel AA triangles", screenTestTriangles},
+          {"Test: Arcs+Lines", "sqrt_fraction AA", screenTestArcsAndLines},
+          {"Test: All Grid", "All primitives comparison", screenTestAllPrimitivesGrid},
+          {"Test: RoundTriangles", "SDF AA rounded triangles", screenTestRoundTriangles},
+          {"Test: Squircles", "fill/draw squircle AA", screenTestSquircles},
+          {"Auto text color", "BT.709 luminance test", screenAutoTextColorDemo},
       })
       .parent(screenMain)
       .cardColor(ui.rgb(8, 8, 8))
@@ -1770,18 +1942,18 @@ void configureListMenus()
   ui.configureList()
       .screen(screenListMenuPlainDemo)
       .items({
-          {warning_layer0, "Back", "Return to the card-style list menu", screenListMenuDemo},
-          {error_layer0, "Main screen with widgets and overlays", "Simple home screen with status bar, overlays, and transitions", screenMain},
-          {warning_layer0, "Settings, alerts, and input handling", "Buttons, notifications, warning states, and input handling", screenSettings},
-          {warning_layer0, "Glow demo with blur, bloom, and soft shapes", "Bloom, soft edges, layered primitives, and bright composition", screenGlowDemo},
-          {error_layer0, "Graph osc", "Digital oscilloscope style waveform preview", screenGraphOsc},
-          {error_layer0, "Tile menu", "Grid menu with icons, title, and subtitle", screenTileMenuDemo},
-          {warning_layer0, "ToggleSwitch", "Toggle switch interaction and state preview", screenToggleSwitchDemo},
-          {warning_layer0, "Screenshots", "Captured frames gallery", screenScreenshotGallery},
-          {error_layer0, "Dither demo", "Gamma + BlueNoise", screenDitherDemo},
-          {warning_layer0, "Dither Cubes", "Two cubes + avg (16/24)", screenDitherCubesDemo},
-          {error_layer0, "Dither Compare", "Compare 16-bit vs 24-bit", screenDitherCompareGradDemo},
-          {warning_layer0, "Font compare", "PSDF", screenFontCompareDemo},
+          {"Back", "Return to the card-style list menu", screenListMenuDemo},
+          {"Main screen with widgets and overlays", "Simple home screen with status bar, overlays, and transitions", screenMain},
+          {"Settings, alerts, and input handling", "Buttons, notifications, warning states, and input handling", screenSettings},
+          {"Glow demo with blur, bloom, and soft shapes", "Bloom, soft edges, layered primitives, and bright composition", screenGlowDemo},
+          {"Graph osc", "Digital oscilloscope style waveform preview", screenGraphOsc},
+          {"Tile menu", "Grid menu with icons, title, and subtitle", screenTileMenuDemo},
+          {"ToggleSwitch", "Toggle switch interaction and state preview", screenToggleSwitchDemo},
+          {"Screenshots", "Captured frames gallery", screenScreenshotGallery},
+          {"Dither demo", "Gamma + BlueNoise", screenDitherDemo},
+          {"Dither Cubes", "Two cubes + avg (16/24)", screenDitherCubesDemo},
+          {"Dither Compare", "Compare 16-bit vs 24-bit", screenDitherCompareGradDemo},
+          {"Font compare", "PSDF", screenFontCompareDemo},
       })
       .parent(screenListMenuDemo)
       .cardColor(ui.rgb(8, 8, 8))
@@ -1795,8 +1967,8 @@ void configureTileMenus()
   ui.configureTile()
       .screen(screenTileMenuDemo)
       .items({
-          {warning_layer0, "Main", "Home screen", screenMain},
-          {error_layer0, "Settings", "Alerts and controls", screenSettings},
+          {"Main", "Home screen", screenMain},
+          {"Settings", "Alerts and controls", screenSettings},
           {battery_layer0, "Glow demo", "Glow shapes", screenGlowDemo},
           {battery_layer1, "Graph", "Live graphs", screenGraph},
           {battery_layer2, "Toggle", "Switch", screenToggleSwitchDemo},
@@ -1812,10 +1984,10 @@ void configureTileMenus()
   ui.configureTile()
       .screen(screenTileMenuLayoutDemo)
       .items({
-          {warning_layer0, "Back", "", screenListMenuDemo},
+          {"Back", "", screenListMenuDemo},
           {battery_layer0, "Small 1", "", screenMain},
           {battery_layer1, "Small 2", "", screenSettings},
-          {error_layer0, "Big", "Main", screenGlowDemo},
+          {"Big", "Main", screenGlowDemo},
       })
       .parent(screenListMenuDemo)
       .cardColor(ui.rgb(8, 8, 8))
@@ -1832,15 +2004,15 @@ void configureTileMenus()
   ui.configureTile()
       .screen(screenTileMenu4ColsDemo)
       .items({
-          {warning_layer0, "Back", "", screenListMenuDemo},
+          {"Back", "", screenListMenuDemo},
           {battery_layer0, "1", "", screenMain},
           {battery_layer1, "2", "", screenSettings},
           {battery_layer2, "3", "", screenGlowDemo},
-          {error_layer0, "4", "", screenGraph},
-          {warning_layer0, "5", "", screenGraphSmall},
+          {"4", "", screenGraph},
+          {"5", "", screenGraphSmall},
           {battery_layer0, "6", "", screenGraphTall},
           {battery_layer1, "7", "", screenProgressDemo},
-          {error_layer0, "8", "", screenGraphOsc},
+          {"8", "", screenGraphOsc},
       })
       .parent(screenListMenuDemo)
       .cardColor(ui.rgb(8, 8, 8))
@@ -2060,6 +2232,145 @@ void updateSettingsDemoFrame(uint32_t nowMs, bool prevPressed, bool prevDown)
       .state(settingsBtnState);
 }
 
+void updateFirmwareUpdateScreen(uint32_t nowMs, bool nextPressed, bool nextDown, bool prevPressed, bool prevDown)
+{
+  (void)nowMs;
+
+  if (nextPressed)
+  {
+#if PIPGUI_OTA
+    // If Prev is held, interpret as "rollback to previous slot". Otherwise exit the screen.
+    if (prevDown)
+    {
+      ui.otaRequestRollback();
+      return;
+    }
+
+    ui.otaCancel();
+#endif
+    ui.setScreen(screenListMenuDemo);
+    return;
+  }
+
+  const OtaStatus &st = ui.otaStatus();
+
+  const bool busy =
+      (st.state == OtaState::WifiStarting) ||
+      (st.state == OtaState::FetchingManifest) ||
+      (st.state == OtaState::Downloading) ||
+      (st.state == OtaState::Installing);
+
+  otaBtnState.enabled = true;
+  otaBtnState.loading = busy;
+  ui.updateButtonPress(otaBtnState, prevDown);
+
+  if (prevPressed)
+  {
+    if (!busy && nextDown)
+    {
+      const OtaChannel ch = ui.otaChannel();
+      ui.otaSetChannel(ch == OtaChannel::Beta ? OtaChannel::Stable : OtaChannel::Beta);
+    }
+    else if (busy)
+    {
+      ui.otaCancel();
+    }
+    else if (st.state == OtaState::UpdateAvailable)
+    {
+      ui.otaRequestInstall();
+    }
+    else if (st.state == OtaState::Success)
+    {
+      ESP.restart();
+    }
+    else
+    {
+      ui.otaRequestCheck();
+    }
+  }
+
+  String wifiText;
+  if (net::wifiConnected())
+  {
+    wifiText = String("Connected ") + ipV4ToString(net::wifiLocalIpV4());
+  }
+  else
+  {
+    switch (net::wifiState())
+    {
+    case net::WifiState::Connecting:
+      wifiText = String("Connecting...");
+      break;
+    case net::WifiState::Failed:
+      wifiText = String("Failed (retrying)");
+      break;
+    case net::WifiState::Unsupported:
+      wifiText = String("Unsupported");
+      break;
+    case net::WifiState::Off:
+    default:
+      wifiText = String("Not connected");
+      break;
+    }
+  }
+
+  String otaText = otaStateText(st);
+  if (st.state == OtaState::Error)
+  {
+    otaText += String(" (") + otaErrorName(st.error) + String(")");
+    if (st.httpCode != 0)
+      otaText += String(" http=") + String(st.httpCode);
+    if (st.platformCode != 0)
+    {
+      if ((int32_t)st.platformCode < 0)
+      {
+        otaText += String(" tls=") + String((int32_t)st.platformCode);
+      }
+      else
+      {
+        otaText += String(" code=0x") + String((unsigned)st.platformCode, HEX);
+        const char *hint = otaPlatformHint((uint32_t)st.platformCode);
+        if (hint)
+          otaText += String(" ") + String(hint);
+      }
+    }
+  }
+  else if (st.state == OtaState::UpdateAvailable)
+  {
+    otaText += String(" (") + String(st.manifest.version) + String(")");
+  }
+
+  const uint16_t bg565 = ui.rgb(10, 10, 10);
+  ui.setTextStyle(Body);
+  updateTextAt(String("FW ") + fwVersionText(), 64, 56, ui.rgb(220, 220, 220), bg565);
+  const OtaChannel ch = ui.otaChannel();
+  updateTextAt(String("Channel ") + String(ch == OtaChannel::Beta ? "Beta" : "Stable"),
+               64, 70, ui.rgb(180, 180, 180), bg565);
+  updateTextAt(wifiText, 64, 86, ui.rgb(220, 220, 220), bg565);
+  updateTextAt(otaText, 64, 116, ui.rgb(220, 220, 220), bg565);
+
+  uint8_t p = 0;
+  if (st.total > 0)
+    p = (uint8_t)min<uint32_t>(100u, (st.downloaded * 100u) / st.total);
+
+  ui.updateProgressBar()
+      .pos(16, 150)
+      .size(208, 14)
+      .radius(7)
+      .value(p)
+      .anim(None)
+      .baseColor(ui.rgb(20, 20, 20))
+      .fillColor(ui.rgb(40, 150, 255));
+
+  ui.updateButton()
+      .label(otaButtonLabel(st))
+      .pos(30, 190)
+      .size(180, 48)
+      .baseColor(ui.rgb(40, 150, 255))
+      .radius(12)
+      .state(otaBtnState);
+}
+
 void updateToggleDemo(bool nextPressed, bool prevPressed)
 {
   const bool prevVal = g_toggleState.value;
@@ -2187,7 +2498,11 @@ void handleErrorDemo(uint8_t screenId, bool nextPressed, bool prevPressed)
 
 void setup()
 {
-  Serial.begin(1000000);
+  Serial.begin(115200);
+
+#if PIPGUI_OTA
+  ui.otaConfigureChannels();
+#endif
 
   ui.configureDisplay()
       .pins({11, 12, 10, 9, 14})
@@ -2199,7 +2514,8 @@ void setup()
   ui.setStatusBarStyle(StatusBarStyleBlurGradient);
   ui.setStatusBarText("pipGUI", "00:00", "");
   ui.setStatusBarBattery(100, Bar);
-  ui.setBacklightPin(4);
+  if (kBacklightPin != 255)
+    ui.setBacklightPin(kBacklightPin);
 
   btnNext.begin();
   btnPrev.begin();
@@ -2231,7 +2547,6 @@ void loop()
   }
 
   updateClockDisplay(nowMs);
-  maybeShowToast(nowMs);
   updateBatteryStatus(nowMs);
 
   const uint8_t cur = ui.currentScreen();
@@ -2283,6 +2598,9 @@ void loop()
           ui.nextScreen();
         else
           updateSettingsDemoFrame(nowMs, prevPressed, prevDown);
+        break;
+      case screenFirmwareUpdate:
+        updateFirmwareUpdateScreen(nowMs, nextPressed, nextDown, prevPressed, prevDown);
         break;
       case screenToggleSwitchDemo:
         updateToggleDemo(nextPressed, prevPressed);

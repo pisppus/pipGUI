@@ -24,6 +24,9 @@ from psdf import (
     _best_grid,
 )
 
+def _out_icons_dir(project_dir: str) -> str:
+    return os.path.join(project_dir, "lib", "pipKit", "pipGUI", "Graphics", "Text", "Icons")
+
 
 def _file_stat_signature(path: str) -> str:
     norm_path = os.path.normcase(os.path.abspath(path))
@@ -77,7 +80,7 @@ def _project_stamp(project_dir: str, svg_files: list[str], icons_exe: str, icon_
 
 
 def _project_outputs_exist(project_dir: str) -> bool:
-    out_icons_dir = os.path.join(project_dir, "lib", "pipKit", "pipGUI", "icons")
+    out_icons_dir = _out_icons_dir(project_dir)
     return (
         os.path.isfile(os.path.join(out_icons_dir, "icons.hpp"))
         and os.path.isfile(os.path.join(out_icons_dir, "icons.cpp"))
@@ -439,7 +442,7 @@ def generate_all(project_dir: str) -> bool:
         print("[icons] No SVG files found")
         return False
 
-    out_icons_dir = os.path.join(project_dir, "lib", "pipKit", "pipGUI", "icons")
+    out_icons_dir = _out_icons_dir(project_dir)
     out_icons_hpp = os.path.join(out_icons_dir, "icons.hpp")
     out_icons_cpp = os.path.join(out_icons_dir, "icons.cpp")
     out_metrics_hpp = os.path.join(out_icons_dir, "metrics.hpp")

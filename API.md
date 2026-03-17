@@ -1319,7 +1319,9 @@ uint8_t n = ui.screenshotCount();
 - `PIPGUI_SCREENSHOT_MODE`
   - `1` — Serial стрим (PSCR)
   - `2` — запись в LittleFS (flash)
-Для режима `2` нужен LittleFS (в `platformio.ini`: `board_build.filesystem = littlefs`). Библиотека сама вызывает `LittleFS.begin(true)` при первом скриншоте/открытии галереи и создаёт структуру `/pipKit/` (включая папки `screenshots/` и `thumbnails/`).
+Для режима `2` нужен LittleFS (в `platformio.ini`: `board_build.filesystem = littlefs`). Библиотека сама вызывает `LittleFS.begin(false)` при первом скриншоте/открытии галереи и создаёт структуру `/pipKit/` (включая папки `screenshots/` и `thumbnails/`).
+
+Важно: библиотека не делает auto-format (не стирает данные). Если mount LittleFS не удался — скриншоты/галерея просто не будут работать, а причина будет выведена в `Serial`.
 
 ## 14.5. Формат PSCR (Serial)
 
@@ -1328,3 +1330,89 @@ uint8_t n = ui.screenshotCount();
 ```
 python tools/screenshots/bin/capture.py --port COM9 --baud 1000000
 ```
+
+PSCR по Serial — это простой контейнер:
+
+- Header (13 байт): `PSCR` + `w(uint16 LE)` + `h(uint16 LE)` + `format(uint8)` + `payloadSize(uint32 LE)`
+- Payload: байтовый поток QOI-opcodes (для `format = QoiRgb`)
+
+Для Serial допускается `payloadSize = 0` (приёмник декодит до восстановления `w*h` пикселей).
+
+## 14.6. Скриншоты во flash (LittleFS)
+
+В режиме `2` скриншоты сохраняются как файлы:
+
+- Full: `/pipKit/screenshots/pscr_00000001.pscr`
+- Thumbnails: `/pipKit/thumbnails/<WxH>/pscr_00000001.pscr` (имя такое же, как у full-скрина)
+
+Галерея сортирует по stamp: **новые сверху**, старые ниже.
+
+### 14.6.1. Надёжная запись (tmp → rename)
+
+Все записи делаются через временный файл:
+
+- запись в `.../pscr_XXXXXXXX.tmp`
+- `flush()` + дописывание trailer/CRC
+- `close()`
+- `rename(tmp, final)`
+
+Если на любом шаге произошёл сбой — финальный файл не создаётся, а `.tmp` удаляется. Оставшиеся `.tmp` (включая `.counter.tmp`) очищаются при сканировании директории.
+
+### 14.6.2. Формат `.pscr` (LittleFS)
+
+Файл во flash — это PSCR header + payload + trailer:
+
+- Header (13 байт): `PSCR` + `w(uint16 LE)` + `h(uint16 LE)` + `format(uint8)` + `payloadSize(uint32 LE)`
+- Payload: QOI-opcodes stream (для `format = QoiRgb`)
+- Trailer (16 байт): `PSCT` + `ver(uint8)` + `flags(uint8)` + `reserved(2)` + `payloadSize(uint32 LE)` + `crc32(payload)(uint32 LE)`
+
+Файл считается валидным только если:
+
+- `fileSize == header + payloadSize + trailer`
+- trailer присутствует и версия совпадает
+- `payloadSize` в header и trailer совпадают
+- CRC32 payload совпадает
+
+Старые файлы без trailer/CRC (созданные до добавления CRC) не поддерживаются и будут игнорироваться.
+
+---
+
+# 15. OTA (обновление прошивки по сети)
+
+> Важно: для OTA нужна A/B разметка (два OTA app-слота) в partition table.
+
+## 15.1. Build-time флаги
+
+- `PIPGUI_OTA`
+  - `0` по умолчанию
+  - `1` включает OTA модуль
+- `PIPGUI_OTA_MANIFEST_URL_STABLE` — URL на `stable` manifest.json
+- `PIPGUI_OTA_MANIFEST_URL_BETA` — URL на `beta` manifest.json
+- `PIPGUI_FIRMWARE_VER_MAJOR`, `PIPGUI_FIRMWARE_VER_MINOR`, `PIPGUI_FIRMWARE_VER_PATCH` — человекочитаемая версия `X.Y.Z`, сравнивается с `manifest.version`
+- `PIPGUI_OTA_ED25519_PUBKEY_HEX` — публичный ключ Ed25519 (32 байта, hex)
+
+## 15.2. Manifest
+
+Минимальные поля:
+
+- `version` (string `X.Y.Z`)
+- `size` (number, bytes)
+- `sha256` (hex, 64 chars)
+- `url` (https)
+- `sig_ed25519` (hex, 128 chars) — подпись Ed25519 от **manifest payload (v2)**: `version/size/sha256/url` (обязательно)
+
+## 15.3. Использование
+
+Модуль работает как state-machine и обслуживается из `GUI::loop()`. Снаружи вы вызываете только запросы:
+
+- `ui.otaConfigure(...)`
+- `ui.otaConfigureChannels(...)` — stable/beta каналы (по умолчанию Stable)
+- `ui.otaSetChannel(...)`, `ui.otaChannel()` — переключение канала (WiFi само не включает)
+- `ui.otaRequestCheck()`
+- `ui.otaRequestCheck(OtaCheckMode::AllowDowngrade)` — разрешить downgrade (для отката с beta->stable по сети)
+- `ui.otaRequestInstall()`
+- `ui.otaRequestRollback()` — мгновенный откат на другой OTA-слот (без сети)
+- `ui.otaMarkAppValid()` — если включён rollback в bootloader, вызывай после успешного старта новой прошивки
+- `ui.otaStatus()`
+
+Тулинг для генерации манифеста/подписей: `tools/ota/`.

@@ -1,4 +1,4 @@
 #pragma once
 
-#include <pipGUI/Core/API/pipGUI.hpp>
-#include <pipGUI/Icons/metrics.hpp>
+#include <pipGUI/Core/pipGUI.hpp>
+#include <pipGUI/Graphics/Text/Icons/metrics.hpp>

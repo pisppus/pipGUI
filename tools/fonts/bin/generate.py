@@ -18,6 +18,9 @@ from psdf import (
     _snake_to_camel,
 )
 
+def _out_fonts_root(project_dir: str) -> str:
+    return os.path.join(project_dir, "lib", "pipKit", "pipGUI", "Graphics", "Text", "Fonts")
+
 
 def _load_config(project_dir: str):
     """Load configuration from tools/fonts/config.py (required)."""
@@ -112,14 +115,14 @@ def _project_stamp(project_dir: str, cfg_path: str, ttf_files: list[str], msdf_e
 
 
 def _project_outputs_exist(project_dir: str, ttf_files: list[str]) -> bool:
-    fonts_metrics_path = os.path.join(project_dir, "lib", "pipKit", "pipGUI", "Fonts", "metrics.hpp")
+    fonts_metrics_path = os.path.join(_out_fonts_root(project_dir), "metrics.hpp")
     if not os.path.isfile(fonts_metrics_path):
         return False
 
     for ttf_file in ttf_files:
         font_base = os.path.splitext(os.path.basename(ttf_file))[0]
         font_folder = _font_folder_from_base(font_base)
-        out_fonts_dir = os.path.join(project_dir, "lib", "pipKit", "pipGUI", "Fonts", font_folder)
+        out_fonts_dir = os.path.join(_out_fonts_root(project_dir), font_folder)
         if not (
             os.path.isfile(os.path.join(out_fonts_dir, f"{font_folder}.hpp"))
             and os.path.isfile(os.path.join(out_fonts_dir, f"{font_folder}.cpp"))
@@ -285,7 +288,7 @@ def _gen_metrics_header(atlas: dict, font_ident: str, font_folder: str) -> str:
         )
     out.append("\n};\n")
     out.append("\n}\n}")
-    out.append("\n\n#include <pipGUI/core/api/pipGUI.hpp>")
+    out.append("\n\n#include <pipGUI/Core/pipGUI.hpp>")
     out.append("\nstatic inline pipgui::FontId registerFont_" + font_folder + "(pipgui::GUI &gui)")
     out.append("{\n")
     out.append("    return gui.registerFont(")
@@ -405,7 +408,7 @@ def generate_all(project_dir: str) -> bool:
         font_names.append(font_folder)
         font_idents.append(font_ident)
 
-        out_fonts_dir = os.path.join(project_dir, "lib", "pipKit", "pipGUI", "Fonts", font_folder)
+        out_fonts_dir = os.path.join(_out_fonts_root(project_dir), font_folder)
         out_atlas_hpp = os.path.join(out_fonts_dir, f"{font_folder}.hpp")
         out_atlas_cpp = os.path.join(out_fonts_dir, f"{font_folder}.cpp")
         out_metrics_hpp = os.path.join(out_fonts_dir, "metrics.hpp")
@@ -529,7 +532,7 @@ def generate_all(project_dir: str) -> bool:
         generated += 1
 
     if font_idents:
-        fonts_metrics_path = os.path.join(project_dir, "lib", "pipKit", "pipGUI", "Fonts", "metrics.hpp")
+        fonts_metrics_path = os.path.join(_out_fonts_root(project_dir), "metrics.hpp")
         os.makedirs(os.path.dirname(fonts_metrics_path), exist_ok=True)
         central_metrics = _gen_fonts_metrics_hpp(font_names, font_idents)
         _write_if_changed(fonts_metrics_path, central_metrics)

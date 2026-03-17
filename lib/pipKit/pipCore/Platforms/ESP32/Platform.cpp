@@ -162,4 +162,97 @@ namespace pipcore::esp32
     {
         return pgm_read_byte(addr);
     }
+
+    void Platform::wifiConfigure(const pipcore::net::WifiConfig &cfg) noexcept
+    {
+        _wifi.configure(cfg);
+    }
+
+    void Platform::wifiRequest(bool enabled) noexcept
+    {
+        _wifi.request(enabled);
+    }
+
+    void Platform::wifiService() noexcept
+    {
+        _wifi.service(nowMs());
+    }
+
+    pipcore::net::WifiState Platform::wifiState() noexcept
+    {
+        return _wifi.state();
+    }
+
+    bool Platform::wifiConnected() noexcept
+    {
+        return _wifi.connected();
+    }
+
+    uint32_t Platform::wifiLocalIpV4() noexcept
+    {
+        return _wifi.localIpV4();
+    }
+
+    void Platform::otaConfigure(const char *manifestUrl,
+                                const pipcore::ota::Options &opt,
+                                void (*cb)(const pipcore::ota::Status &, void *),
+                                void *user) noexcept
+    {
+        _ota.configure(manifestUrl, opt, cb, user);
+    }
+
+    void Platform::otaConfigureChannels(const char *stableUrl,
+                                        const char *betaUrl,
+                                        pipcore::ota::Channel initial,
+                                        const pipcore::ota::Options &opt,
+                                        void (*cb)(const pipcore::ota::Status &, void *),
+                                        void *user) noexcept
+    {
+        _ota.configureChannels(stableUrl, betaUrl, initial, opt, cb, user);
+    }
+
+    void Platform::otaSetChannel(pipcore::ota::Channel ch) noexcept
+    {
+        _ota.setChannel(ch);
+    }
+
+    pipcore::ota::Channel Platform::otaChannel() noexcept
+    {
+        return _ota.channel();
+    }
+
+    void Platform::otaRequestCheck(pipcore::ota::CheckMode mode) noexcept
+    {
+        _ota.requestCheck(mode);
+    }
+
+    void Platform::otaRequestInstall() noexcept
+    {
+        _ota.requestInstall();
+    }
+
+    void Platform::otaRequestRollback() noexcept
+    {
+        _ota.requestRollback();
+    }
+
+    void Platform::otaCancel() noexcept
+    {
+        _ota.cancel();
+    }
+
+    void Platform::otaService() noexcept
+    {
+        _ota.service(nowMs());
+    }
+
+    const pipcore::ota::Status &Platform::otaStatus() noexcept
+    {
+        return _ota.status();
+    }
+
+    void Platform::otaMarkAppValid() noexcept
+    {
+        _ota.markAppValid();
+    }
 }

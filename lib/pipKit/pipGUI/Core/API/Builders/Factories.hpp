@@ -1,6 +1,6 @@
 #pragma once
 
-#include <pipGUI/Core/API/GUI.hpp>
+#include <pipGUI/Core/GUI.hpp>
 
 namespace pipgui
 {

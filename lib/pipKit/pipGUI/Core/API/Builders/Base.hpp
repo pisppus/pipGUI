@@ -8,7 +8,7 @@
 #include <utility>
 #include <pipCore/Platform.hpp>
 #include <pipCore/Platforms/Select.hpp>
-#include <pipGUI/Core/API/Common.hpp>
+#include <pipGUI/Core/Common.hpp>
 
 namespace pipgui
 {
