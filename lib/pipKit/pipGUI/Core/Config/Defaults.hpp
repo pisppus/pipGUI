@@ -39,11 +39,12 @@
 #ifndef PIPGUI_OTA
 #define PIPGUI_OTA 0
 #endif
-#ifndef PIPGUI_OTA_MANIFEST_URL_STABLE
-#define PIPGUI_OTA_MANIFEST_URL_STABLE "https://pisppus.vercel.app/fw/stable/manifest.json"
+#ifndef PIPGUI_OTA_PROJECT_URL
+#define PIPGUI_OTA_PROJECT_URL "https://pisppus.vercel.app/fw/pipboy"
 #endif
-#ifndef PIPGUI_OTA_MANIFEST_URL_BETA
-#define PIPGUI_OTA_MANIFEST_URL_BETA "https://pisppus.vercel.app/fw/beta/manifest.json"
+
+#ifndef PIPGUI_FIRMWARE_TITLE
+#define PIPGUI_FIRMWARE_TITLE "pipGUI"
 #endif
 
 #ifndef PIPGUI_FIRMWARE_VER_MAJOR

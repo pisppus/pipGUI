@@ -29,3 +29,5 @@ tools/ota/*.key
 tools/ota/keys/
 tools/ota/out/
 fw/
+__pycache__/
+*.pyc

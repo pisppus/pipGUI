@@ -1,7 +1,7 @@
 #pragma once
 
 #include <pipGUI/Core/Common.hpp>
-#include <pipCore/Systems/Network/Wifi.hpp>
+#include <pipCore/Network/Wifi.hpp>
 
 namespace pipgui::net
 {

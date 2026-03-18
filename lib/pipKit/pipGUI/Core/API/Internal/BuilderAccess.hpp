@@ -50,6 +50,11 @@ namespace pipgui
                 gui.handleTileInput(screenId, nextDown, prevDown);
             }
 
+            static void handlePopupMenuInput(GUI &gui, bool nextDown, bool prevDown)
+            {
+                gui.handlePopupMenuInput(nextDown, prevDown);
+            }
+
             static void configureTile(GUI &gui,
                                       uint8_t screenId,
                                       uint8_t parentScreen,
@@ -499,6 +504,19 @@ namespace pipgui
                                          IconId iconId)
             {
                 gui.showNotificationInternal(title, message, buttonText, delaySeconds, type, iconId);
+            }
+
+            static void showPopupMenu(GUI &gui,
+                                      PopupMenuItemFn itemFn,
+                                      void *itemUser,
+                                      uint8_t count,
+                                      uint8_t selectedIndex,
+                                      int16_t x,
+                                      int16_t y,
+                                      int16_t w,
+                                      uint8_t maxVisible)
+            {
+                gui.showPopupMenuInternal(itemFn, itemUser, count, selectedIndex, x, y, w, maxVisible);
             }
 
             static void drawToggleSwitch(GUI &gui,

@@ -139,6 +139,38 @@ namespace pipgui
         void apply();
     };
 
+    struct PopupMenuInputFluent : detail::FluentLifetime
+    {
+        PIPGUI_DEFAULT_FLUENT_MOVE(PopupMenuInputFluent);
+        bool _nextDown;
+        bool _prevDown;
+
+        PopupMenuInputFluent(GUI *g)
+            : detail::FluentLifetime(g), _nextDown(false), _prevDown(false)
+        {
+        }
+
+        PopupMenuInputFluent &nextDown(bool v)
+        {
+            if (!canMutate())
+                return *this;
+            _nextDown = v;
+            return *this;
+        }
+
+        PopupMenuInputFluent &prevDown(bool v)
+        {
+            if (!canMutate())
+                return *this;
+            _prevDown = v;
+            return *this;
+        }
+
+        ~PopupMenuInputFluent() { apply(); }
+
+        void apply();
+    };
+
     struct ConfigureListFluent : detail::FluentLifetime
     {
         uint8_t _screenId;

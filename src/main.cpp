@@ -59,6 +59,7 @@ namespace
 
   ButtonVisualState settingsBtnState{true, 0, 255, true, false, 0};
   ButtonVisualState otaBtnState{true, 0, 255, true, false, 0};
+  ButtonVisualState otaRollbackBtnState{true, 0, 255, true, false, 0};
   ToggleSwitchState g_toggleState{false, 0, 0};
 
   float g_graphPhase = 0.0f;
@@ -148,6 +149,22 @@ namespace
         .color(fg)
         .bgColor(bg)
         .align(align);
+  }
+
+  void drawTextEllipsizedAt(const String &text, int16_t x, int16_t y, int16_t maxW, uint16_t fg565, TextAlign align = AlignLeft)
+  {
+    // Draw normal text first, then (if needed) draw an ellipsized version over it.
+    // DrawTextEllipsized draws nothing when clipping isn't needed, so this guarantees we always render something.
+    ui.drawText().text(text).pos(x, y).color(fg565).align(align);
+    if (maxW > 0)
+    {
+      ui.drawTextEllipsized()
+          .text(text)
+          .pos(x, y)
+          .maxWidth(maxW)
+          .color(fg565)
+          .align(align);
+    }
   }
 
   void drawCenteredText(const char *text, int16_t y, uint32_t fg, uint16_t bg)
@@ -250,6 +267,11 @@ namespace
     return String(maj) + "." + String(min) + "." + String(pat);
   }
 
+  const char *otaStableVersionItem(void *, uint8_t idx)
+  {
+    return ui.otaStableListVersion(idx);
+  }
+
   const char *otaErrorName(OtaError e)
   {
     switch (e)
@@ -264,10 +286,16 @@ namespace
       return "HTTP begin";
     case OtaError::HttpStatusNotOk:
       return "HTTP status";
+    case OtaError::TlsFailed:
+      return "TLS failed";
     case OtaError::ManifestTooLarge:
       return "Manifest too large";
     case OtaError::ManifestParseFailed:
       return "Manifest parse";
+    case OtaError::ManifestReplay:
+      return "Manifest replay";
+    case OtaError::UrlTooLong:
+      return "URL too long";
     case OtaError::PayloadSizeMismatch:
       return "Size mismatch";
     case OtaError::FlashLayoutInvalid:
@@ -288,6 +316,10 @@ namespace
       return "Update end";
     case OtaError::TimeSyncFailed:
       return "Time sync";
+    case OtaError::HashPipelineFailed:
+      return "Hash pipeline";
+    case OtaError::DownloadTruncated:
+      return "Download truncated";
     default:
       return "Unknown";
     }
@@ -414,6 +446,139 @@ namespace
     {
       ui.loop();
     }
+  }
+
+  uint32_t fnv1a32(const char *s)
+  {
+    uint32_t h = 2166136261u;
+    if (!s)
+      return h;
+    while (*s)
+    {
+      h ^= (uint8_t)*s++;
+      h *= 16777619u;
+    }
+    return h;
+  }
+
+  void drawWrappedText(const char *text,
+                       int16_t x,
+                       int16_t y,
+                       int16_t maxW,
+                       uint8_t maxLines,
+                       int16_t lineStep,
+                       uint32_t fg,
+                       uint16_t bg)
+  {
+    (void)bg;
+    if (!text || !text[0] || maxLines == 0 || lineStep <= 0)
+      return;
+
+    String line;
+    String word;
+    line.reserve(96);
+    word.reserve(48);
+
+    uint8_t lines = 0;
+    const uint16_t fg565 = (uint16_t)fg;
+    const uint8_t maxChars = 32;
+
+    auto flushLine = [&](bool force) {
+      if (!force && line.length() == 0)
+        return;
+      if (lines >= maxLines)
+        return;
+      drawTextEllipsizedAt(line, x, y, maxW, fg565);
+      y += lineStep;
+      ++lines;
+      line = "";
+    };
+
+    const char *p = text;
+    while (*p)
+    {
+      const char c = *p++;
+      if (c == '\r')
+        continue;
+
+      const bool isBreak = (c == '\n');
+      const bool isSpace = (c == ' ' || c == '\t');
+
+      if (!isBreak && !isSpace)
+      {
+        word += c;
+        continue;
+      }
+
+      if (isBreak)
+      {
+        if (word.length() > 0)
+        {
+          if (line.length() > 0)
+            line += ' ';
+          line += word;
+          word = "";
+        }
+        flushLine(true);
+        continue;
+      }
+
+      // Space/tab: commit word into line if any.
+      if (word.length() == 0)
+        continue;
+
+      if (line.length() == 0)
+      {
+        if (word.length() > maxChars)
+          line = word.substring(0, maxChars);
+        else
+          line = word;
+        word = "";
+        continue;
+      }
+
+      if (line.length() + 1 + word.length() <= maxChars)
+      {
+        line += ' ';
+        line += word;
+        word = "";
+        continue;
+      }
+
+      flushLine(false);
+      if (lines >= maxLines)
+        return;
+
+      if (word.length() > maxChars)
+        line = word.substring(0, maxChars);
+      else
+        line = word;
+      word = "";
+    }
+
+    if (word.length() > 0)
+    {
+      if (line.length() == 0)
+      {
+        line = (word.length() > maxChars) ? word.substring(0, maxChars) : word;
+      }
+      else
+      {
+        if (line.length() + 1 + word.length() <= maxChars)
+        {
+          line += ' ';
+          line += word;
+        }
+        else
+        {
+          flushLine(false);
+          if (lines < maxLines)
+            line = (word.length() > maxChars) ? word.substring(0, maxChars) : word;
+        }
+      }
+    }
+
+    flushLine(false);
   }
 }
 
@@ -1814,37 +1979,117 @@ SCREEN(screenScreenshotGallery, 39)
       .padding(8);
 }
 
+struct FirmwareUpdateLayout
+{
+  int16_t W = 0;
+  int16_t H = 0;
+  int16_t m = 12;
+  int16_t gap = 6;
+  int16_t cardX = 0;
+  int16_t cardW = 0;
+
+  int16_t infoY = 54;
+  int16_t infoH = 88;
+
+  int16_t notesY = 0;
+  int16_t notesH = 40;
+
+  int16_t btnH = 32;
+  int16_t btnY = 0;
+  int16_t btnW = 0;
+  int16_t btnX0 = 0;
+  int16_t btnX1 = 0;
+
+  int16_t keyX = 0;
+  int16_t valX = 0;
+  int16_t valW = 0;
+
+  int16_t rowY0 = 0;
+  int16_t rowY1 = 0;
+  int16_t rowY2 = 0;
+
+  int16_t notesLabelY = 0;
+  int16_t notesTextY = 0;
+};
+
+static FirmwareUpdateLayout calcFirmwareUpdateLayout() noexcept
+{
+  FirmwareUpdateLayout l;
+  l.W = (int16_t)ui.screenWidth();
+  l.H = (int16_t)ui.screenHeight();
+  l.cardX = l.m;
+  l.cardW = (int16_t)(l.W - l.m * 2);
+
+  l.notesY = (int16_t)(l.infoY + l.infoH + l.gap);
+
+  l.btnY = (int16_t)(l.H - l.m - l.btnH);
+  l.btnW = (int16_t)((l.cardW - l.gap) / 2);
+  l.btnX0 = l.cardX;
+  l.btnX1 = (int16_t)(l.cardX + l.btnW + l.gap);
+
+  l.keyX = (int16_t)(l.cardX + 10);
+  l.valX = (int16_t)(l.cardX + 92);
+  l.valW = (int16_t)(l.cardX + l.cardW - 10 - l.valX);
+
+  const int16_t rowStep = 22;
+  l.rowY0 = (int16_t)(l.infoY + 12);
+  l.rowY1 = (int16_t)(l.rowY0 + rowStep);
+  l.rowY2 = (int16_t)(l.rowY1 + rowStep);
+
+  l.notesLabelY = (int16_t)(l.notesY + 10);
+  l.notesTextY = (int16_t)(l.notesY + 24);
+
+  return l;
+}
+
 SCREEN(screenFirmwareUpdate, 40)
 {
   const uint16_t bg565 = ui.rgb(10, 10, 10);
   ui.clear(bg565);
 
+  const FirmwareUpdateLayout l = calcFirmwareUpdateLayout();
+
   ui.setTextStyle(H1);
-  drawCenteredText("Firmware update", 18, ui.rgb(255, 255, 255), bg565);
+  drawCenteredText(PIPGUI_FIRMWARE_TITLE, 18, ui.rgb(255, 255, 255), bg565);
 
-  ui.setTextStyle(Body);
-  drawCenteredText("Prev = action   Next = back", 42, ui.rgb(180, 180, 180), bg565);
+  ui.setTextStyle(Caption);
+  drawCenteredText("Prev=action  Next=rollback  Hold=back", 42, ui.rgb(170, 170, 170), bg565);
 
-  ui.setTextStyle(Body);
-  drawTextAt("WiFi:", 16, 86, ui.rgb(200, 200, 200), bg565);
-  drawTextAt("OTA:", 16, 116, ui.rgb(200, 200, 200), bg565);
+  const uint16_t cardBg = ui.rgb(16, 16, 16);
+  ui.fillRect().pos(l.cardX, l.infoY).size(l.cardW, l.infoH).radius({14}).color(cardBg);
+  ui.fillRect().pos(l.cardX, l.notesY).size(l.cardW, l.notesH).radius({14}).color(cardBg);
+
+  ui.setTextStyle(Caption);
+  const uint32_t keyFg = ui.rgb(150, 150, 150);
+  drawTextAt("Current", l.keyX, l.rowY0, keyFg, cardBg);
+  drawTextAt("Wi-Fi", l.keyX, l.rowY1, keyFg, cardBg);
+  drawTextAt("Update", l.keyX, l.rowY2, keyFg, cardBg);
+  drawTextAt("What's new", l.keyX, l.notesLabelY, keyFg, cardBg);
 
   ui.drawProgressBar()
-      .pos(16, 150)
-      .size(208, 14)
-      .radius(7)
+      .pos(l.cardX + 10, l.infoY + l.infoH - 16)
+      .size(l.cardW - 20, 8)
+      .radius(4)
       .value(0)
       .anim(None)
-      .baseColor(ui.rgb(20, 20, 20))
+      .baseColor(ui.rgb(18, 18, 18))
       .fillColor(ui.rgb(40, 150, 255));
 
   ui.drawButton()
       .label("Check update")
-      .pos(30, 190)
-      .size(180, 48)
+      .pos(l.btnX0, l.btnY)
+      .size(l.btnW, l.btnH)
       .baseColor(ui.rgb(40, 150, 255))
-      .radius(12)
+      .radius(11)
       .state(otaBtnState);
+
+  ui.drawButton()
+      .label("Rollback")
+      .pos(l.btnX1, l.btnY)
+      .size(l.btnW, l.btnH)
+      .baseColor(ui.rgb(40, 150, 255))
+      .radius(11)
+      .state(otaRollbackBtnState);
 }
 
 void updateClockDisplay(uint32_t nowMs)
@@ -2234,65 +2479,139 @@ void updateSettingsDemoFrame(uint32_t nowMs, bool prevPressed, bool prevDown)
 
 void updateFirmwareUpdateScreen(uint32_t nowMs, bool nextPressed, bool nextDown, bool prevPressed, bool prevDown)
 {
-  (void)nowMs;
+  (void)nextPressed;
 
-  if (nextPressed)
-  {
-#if PIPGUI_OTA
-    // If Prev is held, interpret as "rollback to previous slot". Otherwise exit the screen.
-    if (prevDown)
-    {
-      ui.otaRequestRollback();
-      return;
-    }
-
-    ui.otaCancel();
-#endif
-    ui.setScreen(screenListMenuDemo);
-    return;
-  }
+  const FirmwareUpdateLayout l = calcFirmwareUpdateLayout();
 
   const OtaStatus &st = ui.otaStatus();
-
   const bool busy =
       (st.state == OtaState::WifiStarting) ||
       (st.state == OtaState::FetchingManifest) ||
       (st.state == OtaState::Downloading) ||
       (st.state == OtaState::Installing);
 
-  otaBtnState.enabled = true;
-  otaBtnState.loading = busy;
-  ui.updateButtonPress(otaBtnState, prevDown);
-
-  if (prevPressed)
+  // Popup menu takes over input while active.
+  if (ui.popupMenuActive())
   {
-    if (!busy && nextDown)
+    ui.popupMenuInput().nextDown(nextDown).prevDown(prevDown);
+    const int16_t picked = ui.popupMenuTakeResult();
+    if (picked >= 0 && !busy)
     {
-      const OtaChannel ch = ui.otaChannel();
-      ui.otaSetChannel(ch == OtaChannel::Beta ? OtaChannel::Stable : OtaChannel::Beta);
+      const char *ver = ui.otaStableListVersion((uint8_t)picked);
+      if (ver && ver[0])
+        ui.otaRequestInstallStableVersion(ver);
     }
-    else if (busy)
+  }
+  else
+  {
+    static uint32_t nextHoldStartMs = 0;
+    static bool nextLongFired = false;
+    static bool lastNextDown = false;
+    static bool rollbackOpenPending = false;
+
+    // Next: short -> rollback menu, long -> back.
+    constexpr uint32_t kBackHoldMs = 450;
+    if (nextDown)
     {
-      ui.otaCancel();
-    }
-    else if (st.state == OtaState::UpdateAvailable)
-    {
-      ui.otaRequestInstall();
-    }
-    else if (st.state == OtaState::Success)
-    {
-      ESP.restart();
+      if (!lastNextDown)
+      {
+        nextHoldStartMs = nowMs;
+        nextLongFired = false;
+      }
+      else if (!nextLongFired && nextHoldStartMs && (nowMs - nextHoldStartMs) >= kBackHoldMs)
+      {
+        nextLongFired = true;
+        rollbackOpenPending = false;
+#if PIPGUI_OTA
+        ui.otaCancel();
+#endif
+        ui.setScreen(screenListMenuDemo);
+        return;
+      }
     }
     else
     {
-      ui.otaRequestCheck();
+      if (lastNextDown && !nextLongFired && !busy)
+      {
+        if (ui.otaStableListReady() && ui.otaStableListCount() > 0)
+        {
+          const uint8_t count = ui.otaStableListCount();
+          const uint8_t maxVisible = 7;
+          const uint8_t visible = (count < maxVisible) ? count : maxVisible;
+          const int16_t menuH = (int16_t)(16 + visible * 28);
+          ui.showPopupMenu()
+              .items(&otaStableVersionItem, nullptr, count)
+              .pos(l.btnX1, (int16_t)(l.btnY - 8 - menuH))
+              .width(l.btnW)
+              .selected(0)
+              .maxVisible(maxVisible);
+        }
+        else
+        {
+          rollbackOpenPending = true;
+          ui.otaRequestStableList();
+        }
+      }
+      nextHoldStartMs = 0;
+      nextLongFired = false;
+    }
+    lastNextDown = nextDown;
+
+    if (rollbackOpenPending && ui.otaStableListReady())
+    {
+      rollbackOpenPending = false;
+      const uint8_t count = ui.otaStableListCount();
+      if (count == 0)
+      {
+        ui.showToast().text("No previous stable").duration(1800);
+      }
+      else if (!busy)
+      {
+        const uint8_t maxVisible = 7;
+        const uint8_t visible = (count < maxVisible) ? count : maxVisible;
+        const int16_t menuH = (int16_t)(16 + visible * 28);
+        ui.showPopupMenu()
+            .items(&otaStableVersionItem, nullptr, count)
+            .pos(l.btnX1, (int16_t)(l.btnY - 8 - menuH))
+            .width(l.btnW)
+            .selected(0)
+            .maxVisible(maxVisible);
+      }
+    }
+
+    otaBtnState.enabled = true;
+    otaBtnState.loading = busy;
+    ui.updateButtonPress(otaBtnState, prevDown);
+
+    otaRollbackBtnState.enabled = !busy;
+    otaRollbackBtnState.loading = rollbackOpenPending && !ui.otaStableListReady();
+    ui.updateButtonPress(otaRollbackBtnState, nextDown);
+
+    if (prevPressed)
+    {
+      if (busy)
+      {
+        ui.otaCancel();
+      }
+      else if (st.state == OtaState::UpdateAvailable)
+      {
+        ui.otaRequestInstall();
+      }
+      else if (st.state == OtaState::Success)
+      {
+        ESP.restart();
+      }
+      else
+      {
+        ui.otaRequestCheck();
+      }
     }
   }
 
   String wifiText;
-  if (net::wifiConnected())
+  if (ui.wifiConnected())
   {
-    wifiText = String("Connected ") + ipV4ToString(net::wifiLocalIpV4());
+    wifiText = String("Connected ") + ipV4ToString(ui.wifiLocalIpV4());
   }
   else
   {
@@ -2314,61 +2633,97 @@ void updateFirmwareUpdateScreen(uint32_t nowMs, bool nextPressed, bool nextDown,
     }
   }
 
-  String otaText = otaStateText(st);
-  if (st.state == OtaState::Error)
+  String updateText = otaStateText(st);
+  if (st.state == OtaState::UpdateAvailable)
   {
-    otaText += String(" (") + otaErrorName(st.error) + String(")");
-    if (st.httpCode != 0)
-      otaText += String(" http=") + String(st.httpCode);
-    if (st.platformCode != 0)
+    const char *ch = (st.channel == OtaChannel::Beta) ? "Beta" : "Stable";
+    updateText = String(st.manifest.version);
+    if (updateText.length() == 0 && st.manifest.verMajor)
     {
-      if ((int32_t)st.platformCode < 0)
-      {
-        otaText += String(" tls=") + String((int32_t)st.platformCode);
-      }
-      else
-      {
-        otaText += String(" code=0x") + String((unsigned)st.platformCode, HEX);
-        const char *hint = otaPlatformHint((uint32_t)st.platformCode);
-        if (hint)
-          otaText += String(" ") + String(hint);
-      }
+      char vb[16];
+      snprintf(vb, sizeof(vb), "%u.%u.%u", (unsigned)st.manifest.verMajor, (unsigned)st.manifest.verMinor, (unsigned)st.manifest.verPatch);
+      updateText = String(vb);
     }
+    updateText += String(" (") + ch + String(")");
+    if (st.manifest.title[0] != '\0')
+      updateText = String(st.manifest.title) + String(" ") + updateText;
   }
-  else if (st.state == OtaState::UpdateAvailable)
+  else if (st.state == OtaState::Error)
   {
-    otaText += String(" (") + String(st.manifest.version) + String(")");
+    updateText += String(" (") + otaErrorName(st.error) + String(")");
+    if (st.httpCode != 0)
+      updateText += String(" http=") + String(st.httpCode);
   }
 
-  const uint16_t bg565 = ui.rgb(10, 10, 10);
+  const uint16_t cardBg = ui.rgb(16, 16, 16);
+  const int16_t valX = l.valX;
+  const uint32_t valFg = ui.rgb(220, 220, 220);
+  const uint32_t valFgDim = ui.rgb(180, 180, 180);
+
+  // Dynamic text must be drawn via update* builders so it isn't overwritten by the screen redraw pass.
+  // Also clear a fixed-width area to avoid leftovers when the new text is shorter (e.g. IP disappears).
+  static const char *kClearWide =
+      "                                                                                                    ";
+
+  auto clampText = [](const String &s, size_t maxChars) -> String {
+    if (s.length() <= maxChars)
+      return s;
+    if (maxChars <= 3)
+      return String("...");
+    return s.substring(0, (unsigned)(maxChars - 3)) + String("...");
+  };
+
   ui.setTextStyle(Body);
-  updateTextAt(String("FW ") + fwVersionText(), 64, 56, ui.rgb(220, 220, 220), bg565);
-  const OtaChannel ch = ui.otaChannel();
-  updateTextAt(String("Channel ") + String(ch == OtaChannel::Beta ? "Beta" : "Stable"),
-               64, 70, ui.rgb(180, 180, 180), bg565);
-  updateTextAt(wifiText, 64, 86, ui.rgb(220, 220, 220), bg565);
-  updateTextAt(otaText, 64, 116, ui.rgb(220, 220, 220), bg565);
+  ui.updateText().text(kClearWide).pos(valX, l.rowY0).color(cardBg).bgColor(cardBg);
+  ui.updateText().text(clampText(String(PIPGUI_FIRMWARE_TITLE) + " " + fwVersionText(), 40)).pos(valX, l.rowY0).color((uint16_t)valFg).bgColor(cardBg);
+  ui.updateText().text(kClearWide).pos(valX, l.rowY1).color(cardBg).bgColor(cardBg);
+  ui.updateText().text(clampText(wifiText, 40)).pos(valX, l.rowY1).color((uint16_t)valFg).bgColor(cardBg);
+  ui.updateText().text(kClearWide).pos(valX, l.rowY2).color(cardBg).bgColor(cardBg);
+  ui.updateText().text(clampText(updateText, 44)).pos(valX, l.rowY2).color((uint16_t)valFgDim).bgColor(cardBg);
+
+  ui.setTextStyle(Caption);
+  String notesText;
+  if (st.state == OtaState::UpdateAvailable || st.state == OtaState::Downloading || st.state == OtaState::Installing || st.state == OtaState::Success)
+  {
+    if (st.manifest.desc[0] != '\0')
+      notesText = String(st.manifest.desc);
+    else
+      notesText = String("No description");
+  }
+
+  const int16_t notesX = l.cardX + 10;
+  ui.updateText().text(kClearWide).pos(notesX, l.notesTextY).color(cardBg).bgColor(cardBg);
+  if (notesText.length() > 0)
+    ui.updateText().text(clampText(notesText, 56)).pos(notesX, l.notesTextY).color(ui.rgb(200, 200, 200)).bgColor(cardBg);
 
   uint8_t p = 0;
   if (st.total > 0)
     p = (uint8_t)min<uint32_t>(100u, (st.downloaded * 100u) / st.total);
 
   ui.updateProgressBar()
-      .pos(16, 150)
-      .size(208, 14)
-      .radius(7)
+      .pos(l.cardX + 10, l.infoY + l.infoH - 16)
+      .size(l.cardW - 20, 8)
+      .radius(4)
       .value(p)
       .anim(None)
-      .baseColor(ui.rgb(20, 20, 20))
+      .baseColor(ui.rgb(18, 18, 18))
       .fillColor(ui.rgb(40, 150, 255));
 
   ui.updateButton()
       .label(otaButtonLabel(st))
-      .pos(30, 190)
-      .size(180, 48)
+      .pos(l.btnX0, l.btnY)
+      .size(l.btnW, l.btnH)
       .baseColor(ui.rgb(40, 150, 255))
-      .radius(12)
+      .radius(11)
       .state(otaBtnState);
+
+  ui.updateButton()
+      .label("Rollback")
+      .pos(l.btnX1, l.btnY)
+      .size(l.btnW, l.btnH)
+      .baseColor(ui.rgb(40, 150, 255))
+      .radius(11)
+      .state(otaRollbackBtnState);
 }
 
 void updateToggleDemo(bool nextPressed, bool prevPressed)
@@ -2501,7 +2856,7 @@ void setup()
   Serial.begin(115200);
 
 #if PIPGUI_OTA
-  ui.otaConfigureChannels();
+  ui.otaConfigure();
 #endif
 
   ui.configureDisplay()
@@ -2509,6 +2864,9 @@ void setup()
       .size(240, 320);
 
   ui.begin(3, 0);
+#if PIPGUI_WIFI
+  ui.requestWiFi(true);
+#endif
   ui.setScreenAnimation(SlideX, 320);
   ui.configureStatusBar(false, 0x0000, kStatusBarHeight, Top);
   ui.setStatusBarStyle(StatusBarStyleBlurGradient);

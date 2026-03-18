@@ -1,60 +1,8 @@
-#!/usr/bin/env python3
 import argparse
 import os
-import subprocess
 import sys
 
-
-def _ensure_pynacl(verbose: bool) -> bool:
-    try:
-        import nacl.signing  # type: ignore
-
-        return True
-    except Exception:
-        pass
-
-    def _ensure_pip_available() -> bool:
-        try:
-            p = subprocess.run([sys.executable, "-m", "pip", "--version"], capture_output=True, text=True)
-            return p.returncode == 0
-        except Exception:
-            return False
-
-    if not _ensure_pip_available():
-        try:
-            import ensurepip
-
-            if verbose:
-                print("[ota] bootstrapping pip")
-            ensurepip.bootstrap(upgrade=True)
-        except Exception as e:
-            print(f"[ota] pip is not available and ensurepip failed: {e}", file=sys.stderr)
-            return False
-
-    print("[ota] python deps: installing pynacl")
-    try:
-        cmd = [sys.executable, "-m", "pip", "install", "pynacl"]
-        if not verbose:
-            cmd.append("-q")
-        p = subprocess.run(cmd, capture_output=not verbose, text=True)
-        if p.returncode != 0:
-            if not verbose:
-                err = (p.stderr or "").strip()
-                if err:
-                    print(f"[ota] pip failed: {err[:400]}", file=sys.stderr)
-            return False
-    except Exception as e:
-        print(f"[ota] pip failed: {e}", file=sys.stderr)
-        return False
-
-    try:
-        import nacl.signing  # type: ignore
-
-        return True
-    except Exception as e:
-        print(f"[ota] pynacl import failed after install: {e}", file=sys.stderr)
-        return False
-
+from _util import ensure_pynacl
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Generate an Ed25519 keypair for OTA signing.")
@@ -62,17 +10,13 @@ def main() -> int:
     args = ap.parse_args()
 
     verbose = os.environ.get("PIPGUI_TOOLS_VERBOSE", "0").strip().lower() in ("1", "true", "yes", "on")
+    ensure_pynacl(verbose)
 
-    if not _ensure_pynacl(verbose):
-        print("Missing dependency: pynacl", file=sys.stderr)
-        print("Tip: run with PlatformIO python: `pio system python tools/ota/keygen.py ...`", file=sys.stderr)
-        return 2
-
-    from nacl import signing  # type: ignore
+    from nacl import signing
 
     sk = signing.SigningKey.generate()
-    seed = sk.encode()  # 32 bytes
-    pk = sk.verify_key.encode()  # 32 bytes
+    seed = sk.encode()
+    pk = sk.verify_key.encode()
 
     priv_hex = seed.hex()
     pub_hex = pk.hex()

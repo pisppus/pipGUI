@@ -8,12 +8,14 @@ namespace pipcore
 {
     namespace net
     {
+        class Backend;
         enum class WifiState : uint8_t;
         struct WifiConfig;
     }
 
     namespace ota
     {
+        class Backend;
         enum class Channel : uint8_t;
         enum class CheckMode : uint8_t;
         struct Options;
@@ -120,45 +122,10 @@ namespace pipcore
 
         [[nodiscard]] virtual uint8_t readProgmemByte(const void *addr) noexcept { return *static_cast<const uint8_t *>(addr); }
 
-        virtual void wifiConfigure(const net::WifiConfig &) noexcept {}
-        virtual void wifiRequest(bool) noexcept {}
-        virtual void wifiService() noexcept {}
-        [[nodiscard]] virtual net::WifiState wifiState() noexcept = 0;
-        [[nodiscard]] virtual bool wifiConnected() noexcept { return false; }
-        [[nodiscard]] virtual uint32_t wifiLocalIpV4() noexcept { return 0; }
+        [[nodiscard]] virtual net::Backend *network() noexcept { return nullptr; }
+        [[nodiscard]] virtual const net::Backend *network() const noexcept { return nullptr; }
 
-        virtual void otaConfigure(const char *manifestUrl,
-                                  const ota::Options &,
-                                  void (*cb)(const ota::Status &, void *),
-                                  void *user) noexcept
-        {
-            (void)manifestUrl;
-            (void)cb;
-            (void)user;
-        }
-
-        virtual void otaConfigureChannels(const char *stableUrl,
-                                          const char *betaUrl,
-                                          ota::Channel initial,
-                                          const ota::Options &,
-                                          void (*cb)(const ota::Status &, void *),
-                                          void *user) noexcept
-        {
-            (void)stableUrl;
-            (void)betaUrl;
-            (void)initial;
-            (void)cb;
-            (void)user;
-        }
-
-        virtual void otaSetChannel(ota::Channel) noexcept {}
-        [[nodiscard]] virtual ota::Channel otaChannel() noexcept = 0;
-        virtual void otaRequestCheck(ota::CheckMode) noexcept {}
-        virtual void otaRequestInstall() noexcept {}
-        virtual void otaRequestRollback() noexcept {}
-        virtual void otaCancel() noexcept {}
-        virtual void otaService() noexcept {}
-        [[nodiscard]] virtual const ota::Status &otaStatus() noexcept = 0;
-        virtual void otaMarkAppValid() noexcept {}
+        [[nodiscard]] virtual ota::Backend *update() noexcept { return nullptr; }
+        [[nodiscard]] virtual const ota::Backend *update() const noexcept { return nullptr; }
     };
 }

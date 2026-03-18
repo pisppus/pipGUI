@@ -27,6 +27,20 @@ namespace pipcore::net
         uint32_t noSsidGraceMs = 1'000;
     };
 
+    class Backend
+    {
+    public:
+        virtual ~Backend() = default;
+
+        virtual void configure(const WifiConfig &cfg) noexcept = 0;
+        virtual void request(bool enabled) noexcept = 0;
+        virtual void service() noexcept = 0;
+
+        [[nodiscard]] virtual WifiState state() const noexcept = 0;
+        [[nodiscard]] virtual bool connected() const noexcept { return state() == WifiState::Connected; }
+        [[nodiscard]] virtual uint32_t localIpV4() const noexcept { return 0; }
+    };
+
     void wifiConfigure(const WifiConfig &cfg) noexcept;
     void wifiRequest(bool enabled) noexcept;
     void wifiService() noexcept;

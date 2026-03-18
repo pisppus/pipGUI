@@ -6,27 +6,25 @@
 
 # 1. Build-time флаги
 
-Низкий слой `pipCore` выбирает платформу и драйвер дисплея на этапе компиляции. 
+Низкий слой `pipCore` выбирает платформу и драйвер дисплея на этапе компиляции.
+Эти флаги задаются в `include/config.hpp`.
 
 - `PIPCORE_DISPLAY`
-  - пример: `-DPIPCORE_DISPLAY=ST7789`
+  - пример: `#define PIPCORE_DISPLAY ST7789`
 - `PIPCORE_PLATFORM`
-  - пример: `-DPIPCORE_PLATFORM=ESP32`
+  - пример: `#define PIPCORE_PLATFORM ESP32`
 
-Если в сборке доступен только один backend, `pipCore` может выбрать его автоматически. В текущем проекте это обычно значит:
+Пример через `include/config.hpp`:
 
-- платформа: `ESP32`
-- дисплей: `ST7789`
+```cpp
+#define PIPCORE_PLATFORM ESP32
+#define PIPCORE_DISPLAY ST7789
+```
 
-Явно задавать флаги имеет смысл, если вы хотите жёстко зафиксировать конфигурацию в `platformio.ini` и не полагаться на auto-detect.
+Если флаги не заданы, а в проекте собран ровно один backend платформы и ровно один backend дисплея, они выбираются автоматически.
+Выбор через `-D` не считается поддерживаемым путём: если нужен явный выбор, источник истины — `config.hpp`.
 
-Отдельно есть diagnostic-флаг `pipGUI` для автологирования ошибок в `Serial`:
-
-- `PIPGUI_SERIAL_ERRORS`
-  - по умолчанию: `1`
-  - чтобы выключить: `-DPIPGUI_SERIAL_ERRORS=0`
-
-Он не выбирает платформу или дисплей. Он только включает или отключает автоматический вывод ошибок `configureDisplay()`, `begin()` и display I/O в `Serial`.
+Важно: в текущем коде публичного флага `PIPGUI_SERIAL_ERRORS` нет, поэтому он не должен документироваться как рабочий API.
 
 ---
 
@@ -163,6 +161,86 @@ ui.setBacklightCallback([](uint16_t level) {
 - в конце выставляется `maxBrightness()`
 
 Если вам нужен не лимит, а отдельный публичный API вида “поставить яркость 35% прямо сейчас”, это уже другая задача и сейчас такого метода в `pipGUI` нет.
+
+---
+
+# 3. Публичный `pipCore`
+
+Ниже — то, что реально является низкоуровневым публичным API `pipCore` в текущем коде.
+
+## 3.1. Платформа
+
+Текущая выбранная платформа берётся через:
+
+```cpp
+pipcore::Platform *plat = pipcore::GetPlatform();
+```
+
+Основные публичные сущности:
+
+- `pipcore::Platform`
+- `pipcore::Display`
+- `pipcore::DisplayConfig`
+- `pipcore::PlatformError`
+- `pipcore::AllocCaps`
+
+Что умеет `Platform`:
+
+- время: `nowMs()`
+- GPIO input: `pinModeInput(...)`, `digitalRead(...)`
+- подсветка: `configureBacklightPin(...)`, `setBacklightPercent(...)`
+- память: `alloc(...)`, `free(...)`
+- дисплей: `configureDisplay(...)`, `beginDisplay(...)`, `display()`
+- heap diagnostics: `freeHeapTotal()`, `freeHeapInternal()`, `largestFreeBlock()`, `minFreeHeap()`
+- ошибки платформы: `lastError()`, `lastErrorText()`
+
+## 3.2. Кнопки
+
+Низкоуровневая кнопка в `pipCore`:
+
+```cpp
+Button btnNext(1, Pullup);
+
+btnNext.begin();
+btnNext.update();
+
+if (btnNext.wasPressed()) {
+    // edge
+}
+
+if (btnNext.isDown()) {
+    // level
+}
+```
+
+Публичные типы и методы:
+
+- `pipcore::Button`
+- `pipcore::PullMode` (`Pullup`, `Pulldown`)
+- `begin()`
+- `update()`
+- `wasPressed()`
+- `isDown()`
+
+## 3.3. Спрайты
+
+Низкоуровневый буфер рисования:
+
+```cpp
+pipcore::Sprite spr;
+spr.setPlatform(pipcore::GetPlatform());
+spr.createSprite(240, 320);
+spr.fillScreen(pipcore::Sprite::color565(0, 0, 0));
+```
+
+Основные публичные методы `pipcore::Sprite`:
+
+- lifecycle: `createSprite(...)`, `deleteSprite()`
+- размеры/буфер: `width()`, `height()`, `getBuffer()`
+- рисование: `fillScreen(...)`, `drawPixel(...)`, `pushImage(...)`, `fillRect(...)`
+- clipping: `setClipRect(...)`, `getClipRect(...)`
+- вывод: `pushSprite(...)`, `writeToDisplay(...)`
+- utility: `color565(...)`, `swap16(...)`, `u8clamp(...)`, `blend565(...)`
 
 ---
 
@@ -1381,38 +1459,59 @@ PSCR по Serial — это простой контейнер:
 
 > Важно: для OTA нужна A/B разметка (два OTA app-слота) в partition table.
 
-## 15.1. Build-time флаги
+## 15.1. Конфигурация (`config.hpp`)
 
-- `PIPGUI_OTA`
-  - `0` по умолчанию
-  - `1` включает OTA модуль
-- `PIPGUI_OTA_MANIFEST_URL_STABLE` — URL на `stable` manifest.json
-- `PIPGUI_OTA_MANIFEST_URL_BETA` — URL на `beta` manifest.json
-- `PIPGUI_FIRMWARE_VER_MAJOR`, `PIPGUI_FIRMWARE_VER_MINOR`, `PIPGUI_FIRMWARE_VER_PATCH` — человекочитаемая версия `X.Y.Z`, сравнивается с `manifest.version`
+- `PIPGUI_OTA` — `1` включает OTA модуль
+- `PIPGUI_OTA_PROJECT_URL` — HTTPS base на `/fw/<project>` (без `/index.json` в конце)
 - `PIPGUI_OTA_ED25519_PUBKEY_HEX` — публичный ключ Ed25519 (32 байта, hex)
+- `PIPGUI_FIRMWARE_TITLE` — имя прошивки (показывается в UI)
+- `PIPGUI_FIRMWARE_VER_MAJOR`, `PIPGUI_FIRMWARE_VER_MINOR`, `PIPGUI_FIRMWARE_VER_PATCH` — текущая версия `X.Y.Z`
 
 ## 15.2. Manifest
 
-Минимальные поля:
+Поля:
 
+- `title` (string) — имя прошивки (показывается в UI)
 - `version` (string `X.Y.Z`)
+- `build` (number) — монотонный номер версии, **должен совпадать с**:
+  - `build = major*1_000_000 + minor*1_000 + patch`
 - `size` (number, bytes)
 - `sha256` (hex, 64 chars)
 - `url` (https)
-- `sig_ed25519` (hex, 128 chars) — подпись Ed25519 от **manifest payload (v2)**: `version/size/sha256/url` (обязательно)
+- `desc` (string) — описание обновления (можно `""`)
+- `sig_ed25519` (hex, 128 chars) — обязательная подпись Ed25519
 
-## 15.3. Использование
+Подпись считается **не от JSON**, а от payload v5, собранного из полей манифеста:
+`prefix + title + 0x00 + version + 0x00 + build(u64 BE) + size(u32 BE) + sha256(32) + url(utf-8) + 0x00 + desc(utf-8)`.
 
-Модуль работает как state-machine и обслуживается из `GUI::loop()`. Снаружи вы вызываете только запросы:
+`prefix` = `pipgui-ota-manifest-v5`.
 
-- `ui.otaConfigure(...)`
-- `ui.otaConfigureChannels(...)` — stable/beta каналы (по умолчанию Stable)
-- `ui.otaSetChannel(...)`, `ui.otaChannel()` — переключение канала (WiFi само не включает)
-- `ui.otaRequestCheck()`
-- `ui.otaRequestCheck(OtaCheckMode::AllowDowngrade)` — разрешить downgrade (для отката с beta->stable по сети)
-- `ui.otaRequestInstall()`
-- `ui.otaRequestRollback()` — мгновенный откат на другой OTA-слот (без сети)
-- `ui.otaMarkAppValid()` — если включён rollback в bootloader, вызывай после успешного старта новой прошивки
-- `ui.otaStatus()`
+## 15.3. Использование (UI)
 
-Тулинг для генерации манифеста/подписей: `tools/ota/`.
+OTA — неблокирующая state-machine, обслуживается из `GUI::loop()`:
+
+- Инициализация (один раз на старте): `ui.otaConfigure()`
+- Проверка обновления: `ui.otaRequestCheck()`
+  - порядок: **stable -> beta** (если в stable нет апдейта, проверяется beta)
+- Установка: `ui.otaRequestInstall()`
+- История stable (rollback UI):
+  - запросить список: `ui.otaRequestStableList()`
+  - читать: `ui.otaStableListReady()`, `ui.otaStableListCount()`, `ui.otaStableListVersion(i)`
+  - установить конкретную stable-версию: `ui.otaRequestInstallStableVersion("1.2.3")`
+- Статус: `ui.otaStatus()`
+
+После установки и перезапуска прошивка стартует в режиме pending-verify (`pendingVerify = true`).
+Вы можете явно подтвердить успех через `ui.otaMarkAppValid()` после своего health-check, либо оставить это на встроенную автоматическую логику.
+
+## 15.4. Тулинг (`tools/ota/`)
+
+- Сгенерировать ключ: `python tools/ota/keygen.py` (публичный ключ вставить в `PIPGUI_OTA_ED25519_PUBKEY_HEX`)
+- Подготовить релиз (bin + manifest) в `tools/ota/out/`:
+  - stable: `python tools/ota/make_release.py --bin .pio/build/<env>/firmware.bin --channel stable --title "Pipboy OS" --version 1.3.8 --site-base https://<domain>/fw --desc "Bugfixes and improvements"`
+  - beta: `python tools/ota/make_release.py --bin .pio/build/<env>/firmware.bin --channel beta --title "Pipboy OS" --version 1.3.9 --site-base https://<domain>/fw --desc-file notes.txt`
+- Структура на сайте (после деплоя `tools/ota/out/<project>/...` в `/fw/<project>/...`):
+  - `/fw/<project>/index.json`
+  - `/fw/<project>/stable/index.json`, `/fw/<project>/beta/index.json`
+  - `/fw/<project>/<channel>/<version>/manifest.json`
+  - `/fw/<project>/<channel>/<version>/fw.bin`
+- Быстрая проверка: `python tools/ota/verify_manifest.py --manifest tools/ota/out/<project>/stable/1.3.8/manifest.json --bin tools/ota/out/<project>/stable/1.3.8/fw.bin --pubkey <PIPGUI_OTA_ED25519_PUBKEY_HEX>`

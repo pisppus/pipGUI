@@ -573,6 +573,98 @@ namespace pipgui
         void show();
     };
 
+    struct PopupMenuFluent : detail::FluentLifetime
+    {
+        PIPGUI_DEFAULT_FLUENT_MOVE(PopupMenuFluent);
+        PopupMenuItemFn _itemFn;
+        void *_itemUser;
+        uint8_t _count;
+        uint8_t _selectedIndex;
+        uint8_t _maxVisible;
+        int16_t _x;
+        int16_t _y;
+        int16_t _w;
+
+        PopupMenuFluent(GUI *g)
+            : detail::FluentLifetime(g),
+              _itemFn(nullptr),
+              _itemUser(nullptr),
+              _count(0),
+              _selectedIndex(0),
+              _maxVisible(6),
+              _x(0),
+              _y(0),
+              _w(0)
+        {
+        }
+
+        ~PopupMenuFluent() { show(); }
+
+        static const char *arrayItem(void *user, uint8_t idx)
+        {
+            const char *const *items = static_cast<const char *const *>(user);
+            if (!items)
+                return "";
+            const char *s = items[idx];
+            return s ? s : "";
+        }
+
+        PopupMenuFluent &items(const char *const *items, uint8_t count)
+        {
+            if (!canMutate())
+                return *this;
+            _itemFn = &arrayItem;
+            _itemUser = const_cast<void *>(reinterpret_cast<const void *>(items));
+            _count = count;
+            return *this;
+        }
+
+        PopupMenuFluent &items(PopupMenuItemFn fn, void *user, uint8_t count)
+        {
+            if (!canMutate())
+                return *this;
+            _itemFn = fn;
+            _itemUser = user;
+            _count = count;
+            return *this;
+        }
+
+        PopupMenuFluent &pos(int16_t x, int16_t y)
+        {
+            if (!canMutate())
+                return *this;
+            _x = x;
+            _y = y;
+            return *this;
+        }
+
+        PopupMenuFluent &width(int16_t w)
+        {
+            if (!canMutate())
+                return *this;
+            _w = w;
+            return *this;
+        }
+
+        PopupMenuFluent &selected(uint8_t idx)
+        {
+            if (!canMutate())
+                return *this;
+            _selectedIndex = idx;
+            return *this;
+        }
+
+        PopupMenuFluent &maxVisible(uint8_t v)
+        {
+            if (!canMutate())
+                return *this;
+            _maxVisible = v;
+            return *this;
+        }
+
+        void show();
+    };
+
     struct DrawIconFluent : detail::FluentLifetime
     {
         PIPGUI_DEFAULT_FLUENT_MOVE(DrawIconFluent);

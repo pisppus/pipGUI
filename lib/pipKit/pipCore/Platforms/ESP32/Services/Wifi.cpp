@@ -29,6 +29,11 @@ namespace pipcore::esp32::services
             _nextRetryMs = 0;
     }
 
+    void Wifi::service() noexcept
+    {
+        service(static_cast<uint32_t>(millis()));
+    }
+
     void Wifi::setState(pipcore::net::WifiState st) noexcept
     {
         if (_state == st)

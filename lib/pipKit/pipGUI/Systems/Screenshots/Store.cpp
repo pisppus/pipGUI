@@ -405,7 +405,6 @@ namespace pipgui
                                     {
                                         tf.close();
                                         entry.pixels = dst;
-                                        entry.timestampMs = now;
                                         entry.thumbOnFlash = true;
                                         _flags.needRedraw = 1;
                                         ++_shots.flashLoadIndex;
@@ -711,7 +710,6 @@ namespace pipgui
             }
 
             entry.pixels = dst;
-            entry.timestampMs = now;
             _flags.needRedraw = 1;
             ++_shots.flashLoadIndex;
             return;

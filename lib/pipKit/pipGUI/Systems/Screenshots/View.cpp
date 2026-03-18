@@ -23,10 +23,6 @@ namespace pipgui
         if (_render.screenWidth == 0 || _render.screenHeight == 0)
             return;
 
-#if (PIPGUI_SCREENSHOT_MODE == 2)
-        _shots.lastDrawMs = nowMs();
-#endif
-
         const bool inSprite = _flags.inSpritePass;
         pipcore::Sprite *prevActive = _render.activeSprite;
         pipcore::Sprite *spr = nullptr;

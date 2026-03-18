@@ -75,6 +75,7 @@ namespace pipgui
 
     struct ToastFluent;
     struct NotificationFluent;
+    struct PopupMenuFluent;
     struct DrawIconFluent;
     struct DrawScreenshotFluent;
 
@@ -90,6 +91,9 @@ namespace pipgui
     struct ConfigureListFluent;
     struct TileInputFluent;
     struct ConfigureTileFluent;
+    struct PopupMenuInputFluent;
+
+    using PopupMenuItemFn = const char *(*)(void *user, uint8_t idx);
 
     struct GraphArea;
     struct ListState;
@@ -153,21 +157,17 @@ namespace pipgui
         [[nodiscard]] uint32_t wifiLocalIpV4() const noexcept;
 
         // OTA (signed manifest, non-blocking state machine)
-        void otaConfigure(const char *manifestUrl = PIPGUI_OTA_MANIFEST_URL_STABLE,
-                          OtaStatusCallback cb = nullptr,
+        void otaConfigure(OtaStatusCallback cb = nullptr,
                           void *user = nullptr) noexcept;
-        void otaConfigureChannels(const char *stableUrl = PIPGUI_OTA_MANIFEST_URL_STABLE,
-                                  const char *betaUrl = PIPGUI_OTA_MANIFEST_URL_BETA,
-                                  OtaChannel initial = OtaChannel::Stable,
-                                  OtaStatusCallback cb = nullptr,
-                                  void *user = nullptr) noexcept;
-        void otaSetChannel(OtaChannel ch) noexcept;
-        [[nodiscard]] OtaChannel otaChannel() const noexcept;
 
         void otaRequestCheck() noexcept;
         void otaRequestCheck(OtaCheckMode mode) noexcept;
         void otaRequestInstall() noexcept;
-        void otaRequestRollback() noexcept;
+        void otaRequestStableList() noexcept;
+        [[nodiscard]] bool otaStableListReady() const noexcept;
+        [[nodiscard]] uint8_t otaStableListCount() const noexcept;
+        [[nodiscard]] const char *otaStableListVersion(uint8_t idx) const noexcept;
+        void otaRequestInstallStableVersion(const char *version) noexcept;
         void otaCancel() noexcept;
         void otaService() noexcept;
         void otaMarkAppValid() noexcept;
@@ -220,6 +220,17 @@ namespace pipgui
 
         [[nodiscard]] ToastFluent showToast();
         [[nodiscard]] NotificationFluent showNotification();
+        [[nodiscard]] PopupMenuFluent showPopupMenu();
+        [[nodiscard]] PopupMenuInputFluent popupMenuInput();
+        [[nodiscard]] bool popupMenuActive() const noexcept { return _flags.popupActive; }
+        [[nodiscard]] bool popupMenuHasResult() const noexcept { return _popup.resultReady; }
+        [[nodiscard]] int16_t popupMenuTakeResult() noexcept
+        {
+            if (!_popup.resultReady)
+                return -1;
+            _popup.resultReady = false;
+            return _popup.resultIndex;
+        }
 
         void drawGraphGrid(int16_t x, int16_t y, int16_t w, int16_t h,
                            uint8_t radius, GraphDirection dir, uint32_t bgColor,
@@ -520,6 +531,36 @@ namespace pipgui
             uint32_t scratchPixels = 0;
         } _toast;
 
+        struct PopupMenuState
+        {
+            PopupMenuItemFn itemFn = nullptr;
+            void *itemUser = nullptr;
+            uint8_t count = 0;
+            uint8_t selectedIndex = 0;
+            uint8_t scrollIndex = 0;
+            uint8_t maxVisible = 6;
+            int16_t x = 0;
+            int16_t y = 0;
+            int16_t w = 0;
+            uint8_t itemHeight = 28;
+            uint8_t radius = 12;
+            uint16_t bg565 = 0x0000;
+            uint16_t fg565 = 0xFFFF;
+            uint16_t selBg565 = 0x39E7;
+            uint16_t border565 = 0x0000;
+            uint32_t startMs = 0;
+            uint32_t animDurationMs = 220;
+            int16_t resultIndex = -1;
+            bool resultReady = false;
+
+            uint32_t nextHoldStartMs = 0;
+            uint32_t prevHoldStartMs = 0;
+            bool nextLongFired = false;
+            bool prevLongFired = false;
+            bool lastNextDown = false;
+            bool lastPrevDown = false;
+        } _popup;
+
         enum StatusBarDirty : uint8_t
         {
             StatusBarDirtyLeft = 1 << 0,
@@ -587,11 +628,15 @@ namespace pipgui
             unsigned statusBarConfigured : 1;
             unsigned statusBarDebugMetrics : 1;
             unsigned toastActive : 1;
+            unsigned popupActive : 1;
+            unsigned popupClosing : 1;
         } _flags = {};
 
         struct DiagnosticsState
         {
             pipcore::PlatformError lastReportedError = pipcore::PlatformError::None;
+            uint8_t otaOkFrames = 0;
+            bool otaAutoConfirmed = false;
             uint32_t screenshotHoldStartMs = 0;
             uint16_t screenshotHoldMs = 500;
             bool screenshotCaptured = false;
@@ -602,7 +647,6 @@ namespace pipgui
         struct ScreenshotEntry
         {
             uint16_t *pixels = nullptr;
-            uint32_t timestampMs = 0;
 #if (PIPGUI_SCREENSHOT_MODE == 2)
             uint32_t stamp = 0;
             char path[64] = {};
@@ -628,7 +672,6 @@ namespace pipgui
             bool thumbIndexReady = false;
             uint16_t thumbIndexW = 0;
             uint16_t thumbIndexH = 0;
-            uint32_t lastDrawMs = 0;
             fs::File scanDir;
             uint8_t *rowBuf = nullptr;
             uint32_t rowBufSize = 0;
@@ -637,7 +680,6 @@ namespace pipgui
 
         struct ScreenshotStreamState
         {
-            ScreenshotFormat format = ScreenshotFormat::QoiRgb;
             uint16_t width = 0;
             uint16_t height = 0;
             uint8_t header[13] = {};
@@ -923,6 +965,16 @@ namespace pipgui
         void renderToastOverlay(uint32_t now);
         bool computeToastBounds(uint32_t now, DirtyRect &outRect);
         void renderNotificationOverlay();
+        void renderPopupMenuOverlay(uint32_t now);
+        void showPopupMenuInternal(PopupMenuItemFn itemFn,
+                                   void *itemUser,
+                                   uint8_t count,
+                                   uint8_t selectedIndex,
+                                   int16_t x,
+                                   int16_t y,
+                                   int16_t w,
+                                   uint8_t maxVisible);
+        void handlePopupMenuInput(bool nextDown, bool prevDown);
         void showToastInternal(const String &text,
                                uint32_t durationMs,
                                bool fromTop,

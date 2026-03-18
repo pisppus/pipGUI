@@ -1,15 +1,17 @@
 #pragma once
 
+#if __has_include(<config.hpp>)
+#include <config.hpp>
+#endif
+
 #include <pipCore/Platform.hpp>
 
-#if !defined(PIPCORE_PLATFORM)
-#if defined(ESP32)
+#ifndef PIPCORE_PLATFORM
 #define PIPCORE_PLATFORM ESP32
-#endif
 #endif
 
 #ifndef PIPCORE_PLATFORM
-#error "Platform not selected. Define PIPCORE_PLATFORM (e.g., -DPIPCORE_PLATFORM=NAME) or ensure target macro (ESP32, STM32, etc.) is defined"
+#error "Platform not selected. Define PIPCORE_PLATFORM in config.hpp"
 #endif
 
 #if defined(ESP32) && (PIPCORE_PLATFORM == ESP32)

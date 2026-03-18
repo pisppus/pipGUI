@@ -244,6 +244,13 @@ namespace pipgui
         detail::BuilderAccess::showNotification(*_gui, _title, _message, _buttonText, _delaySeconds, _type, detail::valueOr(_iconId, static_cast<IconId>(0xFFFF)));
     }
 
+    void PopupMenuFluent::show()
+    {
+        if (!beginCommit())
+            return;
+        detail::BuilderAccess::showPopupMenu(*_gui, _itemFn, _itemUser, _count, _selectedIndex, _x, _y, _w, _maxVisible);
+    }
+
     template <bool IsUpdate>
     void ToggleSwitchFluentT<IsUpdate>::draw()
     {

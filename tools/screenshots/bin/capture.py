@@ -158,7 +158,7 @@ def save_rgb_images(out_dir: str, base: str, w: int, h: int, rgb: bytes):
 
 def main():
     ap = argparse.ArgumentParser(description="Capture pipGUI screenshots from serial (PSCR)")
-    ap.add_argument("--port", default="COM9", help="serial port (e.g. COM9) or 'auto'")
+    ap.add_argument("--port", default="auto", help="serial port (e.g. COM9) or 'auto'")
     ap.add_argument("--baud", type=int, default=1000000)
     ap.add_argument("--out", default=None, help="output directory")
     args = ap.parse_args()

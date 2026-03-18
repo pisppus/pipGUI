@@ -1,7 +1,7 @@
 #pragma once
 
 #include <pipCore/Platforms/ESP32/Services/Wifi.hpp>
-#include <pipCore/Systems/Update/Ota.hpp>
+#include <pipCore/Update/Ota.hpp>
 
 #include <HTTPClient.h>
 #include <Update.h>
@@ -11,43 +11,45 @@
 
 namespace pipcore::esp32::services
 {
-    class Ota
+    class Ota : public pipcore::ota::Backend
     {
     public:
         Ota() = default;
 
         void bindWifi(Wifi *wifi) noexcept { _wifi = wifi; }
 
-        void markAppValid() noexcept;
+        void markAppValid() noexcept override;
 
-        void configure(const char *manifestUrl,
-                       const pipcore::ota::Options &opt,
+        void configure(const pipcore::ota::Options &opt,
                        pipcore::ota::StatusCallback cb,
-                       void *user) noexcept;
+                       void *user) noexcept override;
 
-        void configureChannels(const char *stableUrl,
-                               const char *betaUrl,
-                               pipcore::ota::Channel initial,
-                               const pipcore::ota::Options &opt,
-                               pipcore::ota::StatusCallback cb,
-                               void *user) noexcept;
+        void requestCheck(pipcore::ota::CheckMode mode) noexcept override;
+        void requestInstall() noexcept override;
 
-        void setChannel(pipcore::ota::Channel ch) noexcept;
-        [[nodiscard]] pipcore::ota::Channel channel() const noexcept { return _st.channel; }
+        void requestStableList() noexcept override;
+        [[nodiscard]] bool stableListReady() const noexcept override { return _stableListReady; }
+        [[nodiscard]] uint8_t stableListCount() const noexcept override { return _stableListCount; }
+        [[nodiscard]] const char *stableListVersion(uint8_t idx) const noexcept override
+        {
+            return (idx < _stableListCount) ? _stableList[idx].version : "";
+        }
+        void requestInstallStableVersion(const char *version) noexcept override;
 
-        void requestCheck(pipcore::ota::CheckMode mode) noexcept;
-        void requestInstall() noexcept;
-        void requestRollback() noexcept;
-        void cancel() noexcept;
+        void cancel() noexcept override;
 
+        void service() noexcept override;
         void service(uint32_t nowMs) noexcept;
 
-        [[nodiscard]] const pipcore::ota::Status &status() const noexcept { return _st; }
+        [[nodiscard]] const pipcore::ota::Status &status() const noexcept override { return _st; }
 
     private:
         void publish() noexcept;
         void setState(pipcore::ota::State s, uint32_t nowMs) noexcept;
         void setError(pipcore::ota::Error e, uint32_t nowMs, int httpCode = 0, int platformCode = 0) noexcept;
+        void updatePendingVerify(uint32_t nowMs) noexcept;
+        void resetOperationState() noexcept;
+        void failHttpOpen(uint32_t nowMs) noexcept;
 
         void wifiAcquire() noexcept;
         void wifiRelease() noexcept;
@@ -57,6 +59,11 @@ namespace pipcore::esp32::services
         void stopHttp() noexcept;
         [[nodiscard]] bool readHttpBody() noexcept;
         [[nodiscard]] bool parseManifest(uint32_t nowMs) noexcept;
+        [[nodiscard]] bool parseProjectIndex(uint32_t nowMs,
+                                             pipcore::ota::Channel &outCh,
+                                             char *outManifestRel,
+                                             size_t outManifestRelCap) noexcept;
+        [[nodiscard]] bool parseStableIndex(uint32_t nowMs) noexcept;
         [[nodiscard]] bool verifyManifestSignature(uint32_t nowMs) noexcept;
         [[nodiscard]] bool beginFirmwareDownload(uint32_t nowMs) noexcept;
         [[nodiscard]] bool stepFirmwareDownload(uint32_t nowMs) noexcept;
@@ -72,15 +79,24 @@ namespace pipcore::esp32::services
         pipcore::ota::StatusCallback _cb = nullptr;
         void *_cbUser = nullptr;
 
-        char _manifestUrl[192] = {};
-        char _manifestUrlStable[192] = {};
-        char _manifestUrlBeta[192] = {};
+        static constexpr size_t kManifestUrlCap = pipcore::ota::kUrlCap;
+        char _projectUrl[kManifestUrlCap] = {};
+        char _fetchUrl[kManifestUrlCap] = {};
+
+        enum class JsonKind : uint8_t
+        {
+            None = 0,
+            ProjectIndex = 1,
+            ReleaseManifest = 2,
+            StableIndex = 3,
+        };
+        JsonKind _jsonKind = JsonKind::None;
 
         bool _wantCheck = false;
         pipcore::ota::CheckMode _checkMode = pipcore::ota::CheckMode::NewerOnly;
         bool _wantInstall = false;
-        bool _wantRollback = false;
         bool _wantCancel = false;
+        bool _autoInstallAfterManifest = false;
 
         bool _wifiOwned = false;
         bool _wifiNextDownload = false;
@@ -112,9 +128,24 @@ namespace pipcore::esp32::services
 
         HttpState _http = {};
 
+        uint64_t _seenBuildStable = 0;
+        bool _seenBuildStableLoaded = false;
+        uint64_t _seenBuildBeta = 0;
+        bool _seenBuildBetaLoaded = false;
+
+        struct StableListEntry
+        {
+            char version[pipcore::ota::kVersionCap] = {};
+            uint64_t build = 0;
+        };
+        static constexpr uint8_t kStableListCap = 16;
+        StableListEntry _stableList[kStableListCap] = {};
+        uint8_t _stableListCount = 0;
+        bool _stableListReady = false;
+        bool _wantStableList = false;
+        bool _wantInstallStable = false;
+        char _installStableVer[pipcore::ota::kVersionCap] = {};
+
         bool _bootInit = false;
-        bool _bootPendingVerify = false;
-        bool _bootConfirmed = false;
-        uint32_t _bootStartMs = 0;
     };
 }

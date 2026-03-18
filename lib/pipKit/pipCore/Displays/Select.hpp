@@ -1,5 +1,9 @@
 #pragma once
 
+#if __has_include(<config.hpp>)
+#include <config.hpp>
+#endif
+
 #include <pipCore/Display.hpp>
 
 #define PIPCORE_PP_CAT_IMPL(a, b) a##b
@@ -8,14 +12,12 @@
 #define PIPCORE_DISPLAY_TAG_ST7789 1
 #define PIPCORE_DISPLAY_ID(name) PIPCORE_PP_CAT(PIPCORE_DISPLAY_TAG_, name)
 
-#if !defined(PIPCORE_DISPLAY)
-#if __has_include(<pipCore/Displays/ST7789/Display.hpp>)
+#ifndef PIPCORE_DISPLAY
 #define PIPCORE_DISPLAY ST7789
-#endif
 #endif
 
 #ifndef PIPCORE_DISPLAY
-#error "Display not selected. Define PIPCORE_DISPLAY (e.g., -DPIPCORE_DISPLAY=NAME) or ensure target macro (ST7789, ILI9341, etc.) is defined"
+#error "Display not selected. Define PIPCORE_DISPLAY in config.hpp"
 #endif
 
 #if PIPCORE_DISPLAY_ID(PIPCORE_DISPLAY) == PIPCORE_DISPLAY_TAG_ST7789

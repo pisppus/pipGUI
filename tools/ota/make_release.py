@@ -4,123 +4,45 @@ import hashlib
 import json
 import os
 import shutil
-import subprocess
-import sys
 from pathlib import Path
 
-from _util import validate_esp_image
+from _util import (
+    ensure_pynacl,
+    manifest_sig_payload_v5,
+    parse_version,
+    pubkey_from_seed_ed25519,
+    read_priv_seed_hex,
+    sign_ed25519,
+    validate_esp_image,
+    version_to_build,
+)
 
 
-def _ensure_pynacl(verbose: bool) -> None:
+def _read_json(path: Path) -> dict | None:
     try:
-        import nacl.signing  # type: ignore
-
-        return
+        if not path.exists():
+            return None
+        return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
-        pass
-
-    def _ensure_pip_available() -> bool:
-        try:
-            p = subprocess.run([sys.executable, "-m", "pip", "--version"], capture_output=True, text=True)
-            return p.returncode == 0
-        except Exception:
-            return False
-
-    if not _ensure_pip_available():
-        try:
-            import ensurepip
-
-            if verbose:
-                print("[ota] bootstrapping pip")
-            ensurepip.bootstrap(upgrade=True)
-        except Exception as e:
-            raise SystemExit(f"[ota] pip is not available and ensurepip failed: {e}")
-
-    print("[ota] python deps: installing pynacl")
-    cmd = [sys.executable, "-m", "pip", "install", "pynacl"]
-    if not verbose:
-        cmd.append("-q")
-    p = subprocess.run(cmd, capture_output=not verbose, text=True)
-    if p.returncode != 0:
-        if not verbose:
-            err = (p.stderr or "").strip()
-            if err:
-                raise SystemExit(f"[ota] pip failed: {err[:400]}")
-        raise SystemExit("[ota] pip failed")
-
-    try:
-        import nacl.signing  # type: ignore
-    except Exception as e:
-        raise SystemExit(f"[ota] pynacl import failed after install: {e}")
+        return None
 
 
-def read_priv_seed_hex(path: Path) -> bytes:
-    seed_hex = path.read_text(encoding="utf-8").strip()
-    try:
-        seed = bytes.fromhex(seed_hex)
-    except ValueError as e:
-        raise SystemExit(f"Invalid hex in {path}: {e}")
-    if len(seed) != 32:
-        raise SystemExit(f"Expected 32-byte seed in {path}, got {len(seed)} bytes")
-    return seed
-
-
-def pubkey_from_seed_ed25519(priv_seed: bytes) -> bytes:
-    from nacl import signing  # type: ignore
-
-    sk = signing.SigningKey(priv_seed)
-    return sk.verify_key.encode()
-
-
-def sign_ed25519(priv_seed: bytes, message: bytes) -> bytes:
-    from nacl import signing  # type: ignore
-
-    sk = signing.SigningKey(priv_seed)
-    sig = sk.sign(message).signature
-    if len(sig) != 64:
-        raise SystemExit(f"Unexpected signature size: {len(sig)}")
-    return sig
-
-
-def parse_version(version: str) -> tuple[int, int, int]:
-    v = version.strip()
-    parts = v.split(".")
-    if len(parts) != 3:
-        raise SystemExit("--version must be in form X.Y.Z")
-    try:
-        major = int(parts[0])
-        minor = int(parts[1])
-        patch = int(parts[2])
-    except ValueError:
-        raise SystemExit("--version must be in form X.Y.Z (numbers only)")
-    if major < 0 or minor < 0 or patch < 0:
-        raise SystemExit("--version must be non-negative")
-    if minor >= 1000 or patch >= 1000 or major >= 10000:
-        raise SystemExit("--version too large (max: major<10000 minor<1000 patch<1000)")
-    return major, minor, patch
-
-
-def manifest_sig_payload_v2(version: str, size: int, sha256_hex: str, url: str) -> bytes:
-    prefix = b"pipgui-ota-manifest-v2"
-    v = version.strip()
-    if "\x00" in v:
-        raise SystemExit("Version must not contain NUL bytes")
-    if "\x00" in url:
-        raise SystemExit("URL must not contain NUL bytes")
-    sha = bytes.fromhex(sha256_hex)
-    if len(sha) != 32:
-        raise SystemExit(f"Expected sha256 to be 32 bytes, got {len(sha)}")
-    return prefix + v.encode("ascii") + b"\x00" + int(size).to_bytes(4, "big") + sha + url.encode("utf-8")
+def _write_json(path: Path, obj: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(obj, indent=2) + "\n", encoding="utf-8")
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Stage a firmware + manifest into tools/ota/out for easy deployment.")
+    ap = argparse.ArgumentParser(description="Create an OTA release folder + update index.json files.")
     ap.add_argument("--bin", required=True, help="Path to PlatformIO firmware.bin (e.g. .pio/build/<env>/firmware.bin)")
+    ap.add_argument("--project", default=None, help="Project slug used on the site (default: auto-detect)")
+    ap.add_argument("--channel", required=True, choices=["stable", "beta"], help="Release channel")
+    ap.add_argument("--title", required=True, help="Firmware title shown in UI (e.g. 'Pipboy OS')")
     ap.add_argument("--version", required=True, help="Human version X.Y.Z (required)")
     ap.add_argument("--site-base", required=True, help="Base HTTPS URL to your /fw directory, e.g. https://example.com/fw")
-    ap.add_argument("--out-dir", default="tools/ota/out", help="Output directory (manifest + staged bin)")
-    ap.add_argument("--project", default=None, help="Project name used in default firmware file name (default: auto-detect)")
-    ap.add_argument("--name", default=None, help="Firmware file name (default: <project>-<version>.bin)")
+    ap.add_argument("--out-dir", default="tools/ota/out", help="Output directory root (will create <project>/...)")
+    ap.add_argument("--desc", default="", help="Release notes text (optional). Empty means no description.")
+    ap.add_argument("--desc-file", default=None, help="Path to a text file for --desc (UTF-8). Overrides --desc.")
     ap.add_argument("--sign-key", default=None, help="Path to Ed25519 seed (hex) created by keygen.py (default: auto-detect)")
     args = ap.parse_args()
 
@@ -172,42 +94,61 @@ def main() -> int:
         return None
 
     out_dir = Path(args.out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-
     project = detect_project_name()
     if not project:
         raise SystemExit("Failed to detect project name; pass --project")
 
-    version = str(args.version).strip()
-    parse_version(version)  # validate
+    channel = str(args.channel).strip().lower()
+    if channel not in ("stable", "beta"):
+        raise SystemExit("--channel must be stable or beta")
 
-    if args.name:
-        fw_name = str(args.name)
-    else:
-        fw_name = f"{project}-{version}.bin"
-    if "/" in fw_name or "\\" in fw_name:
-        raise SystemExit("--name must be a file name (no slashes)")
+    title = str(args.title).strip()
+    if not title:
+        raise SystemExit("--title must not be empty")
+    if "\x00" in title:
+        raise SystemExit("--title contains NUL byte")
+    if len(title.encode("utf-8")) > 64:
+        raise SystemExit("--title too long (max 64 UTF-8 bytes)")
+
+    version = str(args.version).strip()
+    major, minor, patch = parse_version(version)
+    build = version_to_build(major, minor, patch)
 
     site_base = str(args.site_base).rstrip("/")
     if not site_base.startswith("https://"):
         raise SystemExit("--site-base must start with https://")
 
-    staged_bin = out_dir / fw_name
+    release_dir = out_dir / project / channel / version
+    release_dir.mkdir(parents=True, exist_ok=True)
+
+    staged_bin = release_dir / "fw.bin"
     shutil.copyfile(bin_path, staged_bin)
 
     data = staged_bin.read_bytes()
     sha_hex = hashlib.sha256(data).hexdigest()
     size = len(data)
-    url = f"{site_base}/{fw_name}"
+    url = f"{site_base}/{project}/{channel}/{version}/fw.bin"
+
+    desc = str(args.desc)
+    if args.desc_file:
+        desc = Path(args.desc_file).read_text(encoding="utf-8", errors="replace")
+    desc = desc.strip()
+    if "\x00" in desc:
+        raise SystemExit("--desc contains NUL byte")
+    if len(desc.encode("utf-8")) > 255:
+        raise SystemExit("--desc too long (max 255 UTF-8 bytes)")
 
     manifest: dict[str, object] = {
+        "title": title,
         "version": version,
+        "build": int(build),
         "size": int(size),
         "sha256": sha_hex,
         "url": url,
+        "desc": desc,
     }
 
-    _ensure_pynacl(verbose)
+    ensure_pynacl(verbose)
     seed_path = detect_sign_key()
     if seed_path is None:
         raise SystemExit(
@@ -217,17 +158,99 @@ def main() -> int:
         )
     seed = read_priv_seed_hex(seed_path)
     pub = pubkey_from_seed_ed25519(seed)
-    payload = manifest_sig_payload_v2(manifest["version"], manifest["size"], manifest["sha256"], manifest["url"])
+    payload = manifest_sig_payload_v5(
+        str(manifest["title"]),
+        str(manifest["version"]),
+        int(manifest["build"]),
+        int(manifest["size"]),
+        str(manifest["sha256"]),
+        str(manifest["url"]),
+        str(manifest["desc"]),
+    )
     sig = sign_ed25519(seed, payload)
     manifest["sig_ed25519"] = sig.hex()
 
-    (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    _write_json(release_dir / "manifest.json", manifest)
+
+    # Update channel index: /<project>/<channel>/index.json
+    chan_index_path = out_dir / project / channel / "index.json"
+    chan_index = _read_json(chan_index_path) or {}
+    releases = list(chan_index.get("releases", [])) if isinstance(chan_index.get("releases", []), list) else []
+
+    rel_manifest_path = f"{channel}/{version}/manifest.json"
+    new_entry = {"version": version, "build": int(build), "manifest": rel_manifest_path}
+
+    seen_versions: set[str] = set()
+    merged: list[dict] = []
+    merged.append(new_entry)
+    seen_versions.add(version)
+    for e in releases:
+        if not isinstance(e, dict):
+            continue
+        v = str(e.get("version", "")).strip()
+        if not v or v in seen_versions:
+            continue
+        b = int(e.get("build", 0))
+        mp = str(e.get("manifest", "")).strip()
+        if not mp:
+            mp = f"{channel}/{v}/manifest.json"
+        merged.append({"version": v, "build": b, "manifest": mp})
+        seen_versions.add(v)
+
+    merged.sort(key=lambda x: int(x.get("build", 0)), reverse=True)
+
+    chan_index_out: dict[str, object] = {
+        "project": project,
+        "channel": channel,
+        "title": title,
+        "releases": merged,
+    }
+    _write_json(chan_index_path, chan_index_out)
+
+    # Update project index: /<project>/index.json
+    proj_index_path = out_dir / project / "index.json"
+    proj_index = _read_json(proj_index_path) or {}
+
+    def _pick_latest(channel_key: str) -> dict | None:
+        p = out_dir / project / channel_key / "index.json"
+        j = _read_json(p) or {}
+        rr = j.get("releases", [])
+        if not isinstance(rr, list) or not rr:
+            return None
+        best = None
+        for e in rr:
+            if not isinstance(e, dict):
+                continue
+            if "version" not in e or "build" not in e or "manifest" not in e:
+                continue
+            if best is None or int(e.get("build", 0)) > int(best.get("build", 0)):
+                best = e
+        if best is None:
+            return None
+        return {"version": str(best["version"]), "build": int(best["build"]), "manifest": str(best["manifest"])}
+
+    stable_latest = _pick_latest("stable")
+    beta_latest = _pick_latest("beta")
+
+    proj_index_out: dict[str, object] = {
+        "project": project,
+        "title": title,
+        "stable": stable_latest or {},
+        "beta": beta_latest or {},
+    }
+    _write_json(proj_index_path, proj_index_out)
 
     print("[ok] staged:")
-    print(f"- {staged_bin}")
-    print(f"- {out_dir / 'manifest.json'}")
+    print(f"- {release_dir / 'fw.bin'}")
+    print(f"- {release_dir / 'manifest.json'}")
+    print(f"- {proj_index_path}")
+    print(f"- {chan_index_path}")
     print(f"[ota] pubkey_ed25519={pub.hex()}")
-    print(f"[info] deploy these files to your site: /fw/{fw_name} and /fw/manifest.json")
+    print("[info] deploy to:")
+    print(f"- {site_base}/{project}/index.json")
+    print(f"- {site_base}/{project}/{channel}/index.json")
+    print(f"- {site_base}/{project}/{channel}/{version}/manifest.json")
+    print(f"- {url}")
     return 0
 
 

@@ -174,7 +174,6 @@ namespace pipgui
         _shots.thumbIndexReady = false;
         _shots.thumbIndexW = 0;
         _shots.thumbIndexH = 0;
-        _shots.lastDrawMs = 0;
         if (_shots.scanDir)
             _shots.scanDir.close();
 #endif
@@ -261,7 +260,6 @@ namespace pipgui
         _shots.thumbIndexReady = false;
         _shots.thumbIndexW = 0;
         _shots.thumbIndexH = 0;
-        _shots.lastDrawMs = 0;
 #endif
         if (!_shots.entries)
             return;
@@ -479,7 +477,6 @@ namespace pipgui
                 }
             }
         }
-        entry.timestampMs = nowMs();
 #if (PIPGUI_SCREENSHOT_MODE == 2)
         entry.stamp = stamp;
         entry.thumbOnFlash = false;
@@ -548,8 +545,6 @@ namespace pipgui
         if (!_flags.spriteEnabled || !_disp.display)
             return;
 
-        const ScreenshotFormat format = ScreenshotFormat::QoiRgb;
-
         const uint16_t w = _render.screenWidth;
         const uint16_t h = _render.screenHeight;
         if (w == 0 || h == 0)
@@ -613,10 +608,9 @@ namespace pipgui
 #endif
         std::memcpy(_shotStream.buffer, buf, payloadSize);
 
-        _shotStream.format = format;
         _shotStream.width = w;
         _shotStream.height = h;
-        _shotStream.payloadSize = (format == ScreenshotFormat::QoiRgb) ? 0u : payloadSize;
+        _shotStream.payloadSize = 0;
         _shotStream.payloadOffset = 0;
         _shotStream.payloadCrc = 0;
 #if (PIPGUI_SCREENSHOT_MODE == 2)
@@ -627,19 +621,16 @@ namespace pipgui
         _shotStream.active = true;
         _shotStream.notifyOnComplete = false;
 
-        if (format == ScreenshotFormat::QoiRgb)
-        {
-            _shotStream.qoiSrc16 = reinterpret_cast<const uint16_t *>(_shotStream.buffer);
-            _shotStream.qoiSrcBE = true;
-            _shotStream.qoiPos = 0;
-            _shotStream.qoiPayloadBytes = 0;
-            _shotStream.qoiPrev = 0x000000FFu;
-            std::memset(_shotStream.qoiIndex, 0, sizeof(_shotStream.qoiIndex));
-            _shotStream.qoiRun = 0;
-            _shotStream.qoiTailOffset = 0;
-            _shotStream.qoiOutOff = 0;
-            _shotStream.qoiOutLen = 0;
-        }
+        _shotStream.qoiSrc16 = reinterpret_cast<const uint16_t *>(_shotStream.buffer);
+        _shotStream.qoiSrcBE = true;
+        _shotStream.qoiPos = 0;
+        _shotStream.qoiPayloadBytes = 0;
+        _shotStream.qoiPrev = 0x000000FFu;
+        std::memset(_shotStream.qoiIndex, 0, sizeof(_shotStream.qoiIndex));
+        _shotStream.qoiRun = 0;
+        _shotStream.qoiTailOffset = 0;
+        _shotStream.qoiOutOff = 0;
+        _shotStream.qoiOutLen = 0;
 
         _shotStream.header[0] = 'P';
         _shotStream.header[1] = 'S';
@@ -649,7 +640,7 @@ namespace pipgui
         _shotStream.header[5] = static_cast<uint8_t>((w >> 8) & 0xFFu);
         _shotStream.header[6] = static_cast<uint8_t>(h & 0xFFu);
         _shotStream.header[7] = static_cast<uint8_t>((h >> 8) & 0xFFu);
-        _shotStream.header[8] = static_cast<uint8_t>(format);
+        _shotStream.header[8] = static_cast<uint8_t>(ScreenshotFormat::QoiRgb);
         const uint32_t headerSizeField = _shotStream.payloadSize;
         _shotStream.header[9] = static_cast<uint8_t>(headerSizeField & 0xFFu);
         _shotStream.header[10] = static_cast<uint8_t>((headerSizeField >> 8) & 0xFFu);
@@ -684,7 +675,7 @@ namespace pipgui
             const bool notify = _shotStream.notifyOnComplete;
 #if (PIPGUI_SCREENSHOT_MODE == 2)
             uint32_t payloadBytes = _shotStream.payloadSize;
-            if (ok && _shotStream.file && _shotStream.format == ScreenshotFormat::QoiRgb)
+            if (ok && _shotStream.file)
             {
                 const uint32_t sz = _shotStream.qoiPayloadBytes;
                 payloadBytes = sz;
@@ -805,12 +796,6 @@ namespace pipgui
             if (wrote >= budget || _shotStream.headerOffset < sizeof(_shotStream.header))
                 return;
             budget -= wrote;
-        }
-
-        if (_shotStream.format != ScreenshotFormat::QoiRgb)
-        {
-            finish(false);
-            return;
         }
 
         const uint32_t pixelsTotal = static_cast<uint32_t>(_shotStream.width) * static_cast<uint32_t>(_shotStream.height);

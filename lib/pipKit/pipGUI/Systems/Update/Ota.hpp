@@ -1,7 +1,7 @@
 #pragma once
 
 #include <pipGUI/Core/Common.hpp>
-#include <pipCore/Systems/Update/Ota.hpp>
+#include <pipCore/Update/Ota.hpp>
 
 namespace pipgui
 {

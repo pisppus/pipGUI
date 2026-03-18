@@ -369,6 +369,16 @@ namespace pipgui
         detail::BuilderAccess::handleListInput(*_gui, _screenId, _nextDown, _prevDown);
     }
 
+    void PopupMenuInputFluent::apply()
+    {
+        if (_consumed)
+            return;
+        _consumed = true;
+        if (!_gui)
+            return;
+        detail::BuilderAccess::handlePopupMenuInput(*_gui, _nextDown, _prevDown);
+    }
+
     void GUI::begin(uint8_t rotation, uint16_t bgColor)
     {
         pipcore::Platform *plat = pipcore::GetPlatform();
@@ -487,6 +497,10 @@ namespace pipgui
             opt.currentVerMajor = static_cast<uint16_t>(PIPGUI_FIRMWARE_VER_MAJOR);
             opt.currentVerMinor = static_cast<uint16_t>(PIPGUI_FIRMWARE_VER_MINOR);
             opt.currentVerPatch = static_cast<uint16_t>(PIPGUI_FIRMWARE_VER_PATCH);
+            opt.currentBuild =
+                (static_cast<uint64_t>(PIPGUI_FIRMWARE_VER_MAJOR) * 1'000'000ull) +
+                (static_cast<uint64_t>(PIPGUI_FIRMWARE_VER_MINOR) * 1'000ull) +
+                static_cast<uint64_t>(PIPGUI_FIRMWARE_VER_PATCH);
 
 #if PIPGUI_OTA
 #if !defined(PIPGUI_OTA_ED25519_PUBKEY_HEX)
@@ -501,49 +515,13 @@ namespace pipgui
         }
     }
 
-    void GUI::otaConfigure(const char *manifestUrl, OtaStatusCallback cb, void *user) noexcept
+    void GUI::otaConfigure(OtaStatusCallback cb, void *user) noexcept
     {
 #if PIPGUI_OTA
-        pipcore::ota::configure(manifestUrl, buildOtaOptions(), cb, user);
+        pipcore::ota::configure(buildOtaOptions(), cb, user);
 #else
-        (void)manifestUrl;
         (void)cb;
         (void)user;
-#endif
-    }
-
-    void GUI::otaConfigureChannels(const char *stableUrl,
-                                   const char *betaUrl,
-                                   OtaChannel initial,
-                                   OtaStatusCallback cb,
-                                   void *user) noexcept
-    {
-#if PIPGUI_OTA
-        pipcore::ota::configureChannels(stableUrl, betaUrl, initial, buildOtaOptions(), cb, user);
-#else
-        (void)stableUrl;
-        (void)betaUrl;
-        (void)initial;
-        (void)cb;
-        (void)user;
-#endif
-    }
-
-    void GUI::otaSetChannel(OtaChannel ch) noexcept
-    {
-#if PIPGUI_OTA
-        pipcore::ota::setChannel(ch);
-#else
-        (void)ch;
-#endif
-    }
-
-    OtaChannel GUI::otaChannel() const noexcept
-    {
-#if PIPGUI_OTA
-        return pipcore::ota::channel();
-#else
-        return OtaChannel::Custom;
 #endif
     }
 
@@ -570,10 +548,47 @@ namespace pipgui
 #endif
     }
 
-    void GUI::otaRequestRollback() noexcept
+    void GUI::otaRequestStableList() noexcept
     {
 #if PIPGUI_OTA
-        pipcore::ota::requestRollback();
+        pipcore::ota::requestStableList();
+#endif
+    }
+
+    bool GUI::otaStableListReady() const noexcept
+    {
+#if PIPGUI_OTA
+        return pipcore::ota::stableListReady();
+#else
+        return false;
+#endif
+    }
+
+    uint8_t GUI::otaStableListCount() const noexcept
+    {
+#if PIPGUI_OTA
+        return pipcore::ota::stableListCount();
+#else
+        return 0;
+#endif
+    }
+
+    const char *GUI::otaStableListVersion(uint8_t idx) const noexcept
+    {
+#if PIPGUI_OTA
+        return pipcore::ota::stableListVersion(idx);
+#else
+        (void)idx;
+        return "";
+#endif
+    }
+
+    void GUI::otaRequestInstallStableVersion(const char *version) noexcept
+    {
+#if PIPGUI_OTA
+        pipcore::ota::requestInstallStableVersion(version);
+#else
+        (void)version;
 #endif
     }
 

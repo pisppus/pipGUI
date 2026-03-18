@@ -309,7 +309,7 @@ namespace pipgui
         const bool horizontal = (_screen.anim == SlideX);
         const int16_t revealPrimary = (int16_t)lroundf((horizontal ? contentW : contentH) * p);
 
-        const bool notifActive = _flags.notifActive;
+        const bool notifActive = _flags.notifActive || _flags.popupActive;
         const bool toastActive = _flags.toastActive;
         if (!notifActive && !toastActive)
         {
@@ -757,6 +757,8 @@ namespace pipgui
         renderStatusBar();
         if (_flags.notifActive)
             renderNotificationOverlay();
+        if (_flags.popupActive)
+            renderPopupMenuOverlay(now);
         if (_flags.toastActive)
             renderToastOverlay(now);
         presentSprite(0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight, "present");
@@ -780,12 +782,10 @@ namespace pipgui
 
         Debug::update();
 
-#if PIPGUI_WIFI
-        net::wifiService();
-#endif
-
 #if PIPGUI_OTA
         otaService();
+#elif PIPGUI_WIFI
+        net::wifiService();
 #endif
 
 #if PIPGUI_SCREENSHOTS
@@ -795,12 +795,54 @@ namespace pipgui
         serviceScreenshotStream();
 #endif
 
+#if PIPGUI_OTA
+        {
+            constexpr uint8_t kOtaConfirmOkFrames = 30;
+            const OtaStatus &st = otaStatus();
+            if (!st.pendingVerify)
+            {
+                _diag.otaOkFrames = 0;
+                _diag.otaAutoConfirmed = false;
+            }
+            else if (!_diag.otaAutoConfirmed)
+            {
+                pipcore::Platform *plat = pipcore::GetPlatform();
+                const bool ok = (!_flags.bootActive &&
+                                 !_flags.errorActive &&
+                                 !_flags.screenTransition &&
+                                 _disp.display &&
+                                 (!plat || plat->lastError() == pipcore::PlatformError::None));
+
+                if (ok)
+                {
+                    if (_diag.otaOkFrames < 255)
+                        ++_diag.otaOkFrames;
+                    if (_diag.otaOkFrames >= kOtaConfirmOkFrames)
+                    {
+                        otaMarkAppValid();
+                        _diag.otaOkFrames = 0;
+                        _diag.otaAutoConfirmed = !otaStatus().pendingVerify;
+                    }
+                }
+                else
+                {
+                    _diag.otaOkFrames = 0;
+                }
+            }
+        }
+#endif
+
         const auto presentOverlaysFull = [&]()
         {
             bool wroteOverlay = false;
             if (_flags.notifActive)
             {
                 renderNotificationOverlay();
+                wroteOverlay = true;
+            }
+            if (_flags.popupActive)
+            {
+                renderPopupMenuOverlay(now);
                 wroteOverlay = true;
             }
             if (_flags.toastActive)
@@ -928,7 +970,7 @@ namespace pipgui
             }
         };
 
-        if (_flags.notifActive && _flags.spriteEnabled)
+        if ((_flags.notifActive || _flags.popupActive) && _flags.spriteEnabled)
         {
             if (currentCb)
             {
@@ -951,7 +993,7 @@ namespace pipgui
                     {
                         updateList(_screen.current);
                         updateStatusBar();
-                        if (_flags.notifActive)
+                        if (_flags.notifActive || _flags.popupActive)
                             presentOverlaysFull();
                         else if (_flags.toastActive || _toast.lastRectValid)
                             serviceToast();
@@ -963,6 +1005,10 @@ namespace pipgui
                     if (_flags.notifActive)
                     {
                         renderNotificationOverlay();
+                    }
+                    if (_flags.popupActive)
+                    {
+                        renderPopupMenuOverlay(now);
                     }
                     if (_flags.toastActive)
                     {
@@ -991,6 +1037,8 @@ namespace pipgui
 
         if (_flags.notifActive && !_flags.spriteEnabled)
             renderNotificationOverlay();
+        if (_flags.popupActive && !_flags.spriteEnabled)
+            renderPopupMenuOverlay(now);
         if (!_flags.needRedraw && _dirty.count > 0 && _flags.spriteEnabled && _disp.display)
             flushDirty();
         if (_flags.toastActive || _toast.lastRectValid)

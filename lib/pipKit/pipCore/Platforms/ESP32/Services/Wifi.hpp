@@ -1,21 +1,22 @@
 #pragma once
 
-#include <pipCore/Systems/Network/Wifi.hpp>
+#include <pipCore/Network/Wifi.hpp>
 
 namespace pipcore::esp32::services
 {
-    class Wifi
+    class Wifi : public pipcore::net::Backend
     {
     public:
         Wifi() = default;
 
-        void configure(const pipcore::net::WifiConfig &cfg) noexcept;
-        void request(bool enabled) noexcept;
+        void configure(const pipcore::net::WifiConfig &cfg) noexcept override;
+        void request(bool enabled) noexcept override;
+        void service() noexcept override;
         void service(uint32_t nowMs) noexcept;
 
-        [[nodiscard]] pipcore::net::WifiState state() const noexcept { return _state; }
-        [[nodiscard]] bool connected() const noexcept { return _state == pipcore::net::WifiState::Connected; }
-        [[nodiscard]] uint32_t localIpV4() const noexcept { return _ipV4; }
+        [[nodiscard]] pipcore::net::WifiState state() const noexcept override { return _state; }
+        [[nodiscard]] bool connected() const noexcept override { return _state == pipcore::net::WifiState::Connected; }
+        [[nodiscard]] uint32_t localIpV4() const noexcept override { return _ipV4; }
 
     private:
         void setState(pipcore::net::WifiState st) noexcept;
