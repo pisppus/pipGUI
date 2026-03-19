@@ -1,6 +1,8 @@
 #pragma once
 #include <cstdint>
 
+extern const uint8_t WixMadeForDisplay[];
+
 namespace pipgui
 {
 namespace psdf_wixfor

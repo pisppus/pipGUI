@@ -1,6 +1,6 @@
 #include <pipGUI/Core/pipGUI.hpp>
-#include <pipGUI/Core/API/Internal/BuilderAccess.hpp>
-#include <pipGUI/Core/API/Internal/RuntimeState.hpp>
+#include <pipGUI/Core/Internal/GuiAccess.hpp>
+#include <pipGUI/Core/Internal/ViewModels.hpp>
 #include <pipGUI/Core/Debug.hpp>
 #include <pipGUI/Systems/Network/Wifi.hpp>
 #include <pipGUI/Graphics/Utils/Colors.hpp>
@@ -84,9 +84,10 @@ namespace pipgui
         const bool combo = nextDown && prevDown;
 
 #if PIPGUI_SCREENSHOTS
-        handleScreenshotShortcut(nextDown, prevDown);
-
-        if (combo)
+        const bool screenshotCombo = combo &&
+                                     _diag.screenshotNext == &next &&
+                                     _diag.screenshotPrev == &prev;
+        if (screenshotCombo)
         {
             (void)next.wasPressed();
             (void)prev.wasPressed();
@@ -202,9 +203,14 @@ namespace pipgui
         safeFree(plat, _blur.colR);
         safeFree(plat, _blur.colG);
         safeFree(plat, _blur.colB);
+        safeFree(plat, _blur.lookup);
         _blur.workLen = 0;
         _blur.rowCap = 0;
         _blur.colCap = 0;
+        _blur.lookupSw = 0;
+        _blur.lookupSh = 0;
+        _blur.lookupW = 0;
+        _blur.lookupH = 0;
     }
 
     void GUI::freeGraphAreas(pipcore::Platform *plat) noexcept
@@ -349,6 +355,15 @@ namespace pipgui
         clearReportedPlatformError();
     }
 
+    void GUI::configureBacklight(uint8_t pin, uint8_t channel, uint32_t freqHz, uint8_t resolutionBits)
+    {
+        pipcore::Platform *plat = pipcore::GetPlatform();
+        if (!plat)
+            return;
+        plat->configureBacklightPin(pin, channel, freqHz, resolutionBits);
+        setBacklightCallback(backlightPlatformCallback);
+    }
+
     void ConfigureDisplayFluent::apply()
     {
         if (_consumed || !_touched)
@@ -356,7 +371,37 @@ namespace pipgui
         _consumed = true;
         if (!_gui)
             return;
-        detail::BuilderAccess::configureDisplay(*_gui, _cfg);
+        detail::GuiAccess::configureDisplay(*_gui, _cfg);
+    }
+
+    void ConfigureBacklightFluent::apply()
+    {
+        if (_consumed || !_touched)
+            return;
+        _consumed = true;
+        if (!_gui)
+            return;
+        detail::GuiAccess::configureBacklight(*_gui, _pin, _channel, _freqHz, _resolutionBits);
+    }
+
+    void SetClipFluent::apply()
+    {
+        if (_consumed || !_touched)
+            return;
+        _consumed = true;
+        if (!_gui)
+            return;
+        detail::GuiAccess::setClip(*_gui, _x, _y, _w, _h);
+    }
+
+    void ShowLogoFluent::apply()
+    {
+        if (_consumed || !_touched)
+            return;
+        _consumed = true;
+        if (!_gui)
+            return;
+        detail::GuiAccess::startLogo(*_gui, _title, _subtitle, _anim, _fg, _bg, _dur, _x, _y);
     }
 
     void ListInputFluent::apply()
@@ -366,7 +411,7 @@ namespace pipgui
         _consumed = true;
         if (!_gui)
             return;
-        detail::BuilderAccess::handleListInput(*_gui, _screenId, _nextDown, _prevDown);
+        detail::GuiAccess::handleListInput(*_gui, _screenId, _nextDown, _prevDown);
     }
 
     void PopupMenuInputFluent::apply()
@@ -376,7 +421,7 @@ namespace pipgui
         _consumed = true;
         if (!_gui)
             return;
-        detail::BuilderAccess::handlePopupMenuInput(*_gui, _nextDown, _prevDown);
+        detail::GuiAccess::handlePopupMenuInput(*_gui, _nextDown, _prevDown);
     }
 
     void GUI::begin(uint8_t rotation, uint16_t bgColor)
@@ -447,6 +492,7 @@ namespace pipgui
         syncRegisteredScreens();
 
         _disp.brightnessMax = plat->loadMaxBrightnessPercent();
+        _disp.brightness = _disp.brightnessMax;
 
         initFonts();
 
@@ -455,7 +501,7 @@ namespace pipgui
     void GUI::initFonts()
     {
         if (_typo.psdfSizePx == 0)
-            _typo.psdfSizePx = _typo.bodyPx;
+            _typo.psdfSizePx = 14;
     }
 
     void GUI::setBackgroundColorCache(uint16_t color565) noexcept
@@ -618,11 +664,20 @@ namespace pipgui
         return pipcore::ota::status();
     }
 
-    void GUI::setBacklightPin(uint8_t pin, uint8_t channel, uint32_t freqHz, uint8_t resolutionBits)
+    void GUI::setBacklightCallback(BacklightCallback cb) noexcept
     {
-        pipcore::Platform *plat = pipcore::GetPlatform();
-        plat->configureBacklightPin(pin, channel, freqHz, resolutionBits);
-        setBacklightCallback(backlightPlatformCallback);
+        _disp.backlightCb = cb;
+    }
+
+    void GUI::setBrightness(uint8_t percent)
+    {
+        if (percent > 100)
+            percent = 100;
+        if (percent > _disp.brightnessMax)
+            percent = _disp.brightnessMax;
+        _disp.brightness = percent;
+        if (_disp.backlightCb)
+            _disp.backlightCb(_disp.brightness);
     }
 
     void GUI::setMaxBrightness(uint8_t percent)
@@ -630,10 +685,14 @@ namespace pipgui
         if (percent > 100)
             percent = 100;
         _disp.brightnessMax = percent;
+        if (_disp.brightness > _disp.brightnessMax)
+            _disp.brightness = _disp.brightnessMax;
         pipcore::GetPlatform()->storeMaxBrightnessPercent(_disp.brightnessMax);
+        if (_disp.backlightCb)
+            _disp.backlightCb(_disp.brightness);
     }
 
-    void GUI::setScreenAnimation(ScreenAnim anim, uint32_t durationMs)
+    void GUI::setScreenAnim(ScreenAnim anim, uint32_t durationMs)
     {
         _screen.anim = anim;
         _screen.animDurationMs = durationMs;

@@ -1,5 +1,5 @@
-#include <pipGUI/Core/pipGUI.hpp>
-#include <pipGUI/Core/API/Internal/RuntimeState.hpp>
+﻿#include <pipGUI/Core/pipGUI.hpp>
+#include <pipGUI/Core/Internal/ViewModels.hpp>
 #include <pipGUI/Core/Debug.hpp>
 #include <pipGUI/Systems/Network/Wifi.hpp>
 #include <cstring>
@@ -48,229 +48,6 @@ namespace pipgui
             return anim != ScreenAnimNone;
         }
 
-    }
-
-    void GUI::syncRegisteredScreens()
-    {
-        if (_screen.registrySynced)
-            return;
-
-        const detail::ScreenRegistration *reg = detail::ScreenRegistration::head();
-        if (!reg)
-        {
-            _screen.registrySynced = true;
-            return;
-        }
-
-        uint8_t maxOrder = 0;
-        uint8_t orderCounts[256] = {};
-        ScreenCallback orderedCallbacks[256] = {};
-
-        for (; reg; reg = reg->next)
-        {
-            if (!reg->callback)
-                continue;
-            if (reg->order > maxOrder)
-                maxOrder = reg->order;
-            if (orderCounts[reg->order] < 255)
-                ++orderCounts[reg->order];
-            orderedCallbacks[reg->order] = reg->callback;
-        }
-
-        ensureScreenState(maxOrder);
-        if (!_screen.callbacks)
-            return;
-
-        for (uint16_t i = 0; i < _screen.capacity; ++i)
-            _screen.callbacks[i] = nullptr;
-
-        for (uint16_t i = 0; i <= maxOrder; ++i)
-        {
-            if (orderCounts[i] == 1)
-                _screen.callbacks[i] = orderedCallbacks[i];
-        }
-        _screen.registrySynced = true;
-    }
-
-    void GUI::setScreenId(uint8_t id)
-    {
-        if (_screen.current != id)
-            freeBlurBuffers(platform());
-
-        _flags.screenTransition = 0;
-
-        if (id == INVALID_SCREEN_ID)
-        {
-            _screen.current = INVALID_SCREEN_ID;
-            _flags.needRedraw = 1;
-            return;
-        }
-
-        ensureScreenState(id);
-        if (id < _screen.capacity)
-            _screen.current = id;
-        else
-            _screen.current = INVALID_SCREEN_ID;
-        _flags.needRedraw = 1;
-    }
-
-    void GUI::setScreen(uint8_t id)
-    {
-        syncRegisteredScreens();
-        if (id == INVALID_SCREEN_ID || id == _screen.current)
-        {
-            setScreenId(id);
-            return;
-        }
-
-        const bool canUseOrderedDirection = (_screen.current < _screen.capacity && id < _screen.capacity);
-        const int8_t transDir = (canUseOrderedDirection && id < _screen.current) ? -1 : 1;
-        activateScreenId(id, transDir);
-    }
-
-    uint8_t GUI::currentScreen() const noexcept { return _screen.current; }
-
-    bool GUI::screenTransitionActive() const noexcept { return _flags.screenTransition; }
-
-    void GUI::requestRedraw() { _flags.needRedraw = 1; }
-
-    void GUI::activateScreenId(uint8_t id, int8_t transDir)
-    {
-        if (screenAnimationEnabled(_screen.anim) &&
-            _flags.spriteEnabled &&
-            _disp.display &&
-            !_flags.notifActive &&
-            _screen.current < _screen.capacity &&
-            _screen.callbacks &&
-            _screen.callbacks[_screen.current] &&
-            id < _screen.capacity &&
-            _screen.callbacks[id])
-        {
-            if (_screen.current != id)
-                freeBlurBuffers(platform());
-            _screen.to = id;
-            _screen.transDir = transDir;
-            _screen.animStartMs = nowMs();
-            _dirty.count = 0;
-            Debug::clearRects();
-            _flags.screenTransition = 1;
-            return;
-        }
-
-        setScreenId(id);
-    }
-
-    void GUI::renderScreenToMainSprite(ScreenCallback cb, uint8_t screenId)
-    {
-        const bool prevRender = _flags.inSpritePass;
-        pipcore::Sprite *prevActive = _render.activeSprite;
-        const uint8_t prevCurrent = _screen.current;
-
-        _flags.inSpritePass = 1;
-        _render.activeSprite = &_render.sprite;
-        if (screenId != INVALID_SCREEN_ID)
-            _screen.current = screenId;
-        clear(resolveBgColor565(_render.bgColor, _render.bgColor565));
-        if (cb)
-            cb(*this);
-
-        _screen.current = prevCurrent;
-        _render.activeSprite = prevActive;
-        _flags.inSpritePass = prevRender;
-    }
-
-    bool GUI::presentSpriteRegion(int16_t dstX, int16_t dstY,
-                                  int16_t srcX, int16_t srcY,
-                                  int16_t w, int16_t h,
-                                  const char *stage)
-    {
-        if (!_disp.display || !_flags.spriteEnabled || w <= 0 || h <= 0)
-            return false;
-
-        const auto *buf = static_cast<const uint16_t *>(_render.sprite.getBuffer());
-        const int16_t srcW = _render.sprite.width();
-        const int16_t srcH = _render.sprite.height();
-        if (!buf || srcW <= 0 || srcH <= 0)
-            return false;
-
-        if (srcX < 0)
-        {
-            dstX -= srcX;
-            w += srcX;
-            srcX = 0;
-        }
-        if (srcY < 0)
-        {
-            dstY -= srcY;
-            h += srcY;
-            srcY = 0;
-        }
-        if (dstX < 0)
-        {
-            srcX -= dstX;
-            w += dstX;
-            dstX = 0;
-        }
-        if (dstY < 0)
-        {
-            srcY -= dstY;
-            h += dstY;
-            dstY = 0;
-        }
-
-        if (srcX + w > srcW)
-            w = srcW - srcX;
-        if (srcY + h > srcH)
-            h = srcH - srcY;
-
-        if (w <= 0 || h <= 0)
-            return false;
-
-        _disp.display->writeRect565(dstX, dstY, w, h, buf + (size_t)srcY * srcW + srcX, srcW);
-        reportPlatformErrorOnce(stage);
-
-        pipcore::Platform *plat = platform();
-        return !plat || plat->lastError() == pipcore::PlatformError::None;
-    }
-
-    void GUI::nextScreen()
-    {
-        syncRegisteredScreens();
-        if (_flags.screenTransition)
-            return;
-        if (_screen.capacity == 0 || !_screen.callbacks)
-            return;
-        uint16_t cap = _screen.capacity;
-        uint16_t idx = (_screen.current < cap) ? _screen.current : 0;
-        for (uint16_t i = 0; i < cap; i++)
-        {
-            idx = (idx + 1) % cap;
-            if (_screen.callbacks[idx])
-            {
-                activateScreenId(static_cast<uint8_t>(idx), 1);
-                return;
-            }
-        }
-    }
-
-    void GUI::prevScreen()
-    {
-        syncRegisteredScreens();
-        if (_flags.screenTransition)
-            return;
-        if (_screen.capacity == 0 || !_screen.callbacks)
-            return;
-        uint16_t cap = _screen.capacity;
-        uint16_t idx = (_screen.current < cap) ? _screen.current : 0;
-        for (uint16_t i = 0; i < cap; i++)
-        {
-            idx = (idx + cap - 1) % cap;
-            if (_screen.callbacks[idx])
-            {
-                activateScreenId(static_cast<uint8_t>(idx), -1);
-                return;
-            }
-        }
     }
 
     void GUI::renderScreenTransition(uint32_t now)
@@ -382,7 +159,8 @@ namespace pipgui
             _dirty.count = 0;
             Debug::clearRects();
 
-            const auto isEmpty = [](const DirtyRect &r) { return r.w <= 0 || r.h <= 0; };
+            const auto isEmpty = [](const DirtyRect &r)
+            { return r.w <= 0 || r.h <= 0; };
             const auto rectUnion = [&](DirtyRect a, DirtyRect b) -> DirtyRect
             {
                 if (isEmpty(a))
@@ -527,7 +305,7 @@ namespace pipgui
                 DirtyRect toSrc = {};
                 if (!isEmpty(toDst) && buf && stride > 0 && sh > 0)
                 {
-                    toSrc = { (int16_t)(toDst.x - dx), (int16_t)(toDst.y - dy), toDst.w, toDst.h };
+                    toSrc = {(int16_t)(toDst.x - dx), (int16_t)(toDst.y - dy), toDst.w, toDst.h};
 
                     if (toSrc.x < 0)
                     {
@@ -577,7 +355,7 @@ namespace pipgui
                             {
                                 memcpy(toPixels + (size_t)yy * toDst.w,
                                        buf + (size_t)(toSrc.y + yy) * stride + toSrc.x,
-                                (size_t)toDst.w * sizeof(uint16_t));
+                                       (size_t)toDst.w * sizeof(uint16_t));
                             }
                         }
                         else
@@ -587,7 +365,7 @@ namespace pipgui
                     }
                 }
 
-                setClip(paint.x, paint.y, paint.w, paint.h);
+                applyClipRect(paint.x, paint.y, paint.w, paint.h);
                 const ScreenCallback fromCb = (_screen.current < _screen.capacity && _screen.callbacks)
                                                   ? _screen.callbacks[_screen.current]
                                                   : nullptr;
@@ -604,7 +382,7 @@ namespace pipgui
                     }
                 }
 
-                setClip(paint.x, paint.y, paint.w, paint.h);
+                applyClipRect(paint.x, paint.y, paint.w, paint.h);
                 if (curVisible)
                     renderToastOverlay(now);
 
@@ -698,7 +476,7 @@ namespace pipgui
             _render.activeSprite = &_render.sprite;
             _screen.current = screenId;
 
-            setClip(clipX, clipY, clipW, clipH);
+            applyClipRect(clipX, clipY, clipW, clipH);
             clear(resolveBgColor565(_render.bgColor, _render.bgColor565));
             cb(*this);
 
@@ -776,286 +554,4 @@ namespace pipgui
         }
     }
 
-    void GUI::loop()
-    {
-        uint32_t now = nowMs();
-
-        Debug::update();
-
-#if PIPGUI_OTA
-        otaService();
-#elif PIPGUI_WIFI
-        net::wifiService();
-#endif
-
-#if PIPGUI_SCREENSHOTS
-        if (_diag.screenshotNext && _diag.screenshotPrev)
-            handleScreenshotShortcut(_diag.screenshotNext->isDown(), _diag.screenshotPrev->isDown());
-
-        serviceScreenshotStream();
-#endif
-
-#if PIPGUI_OTA
-        {
-            constexpr uint8_t kOtaConfirmOkFrames = 30;
-            const OtaStatus &st = otaStatus();
-            if (!st.pendingVerify)
-            {
-                _diag.otaOkFrames = 0;
-                _diag.otaAutoConfirmed = false;
-            }
-            else if (!_diag.otaAutoConfirmed)
-            {
-                pipcore::Platform *plat = pipcore::GetPlatform();
-                const bool ok = (!_flags.bootActive &&
-                                 !_flags.errorActive &&
-                                 !_flags.screenTransition &&
-                                 _disp.display &&
-                                 (!plat || plat->lastError() == pipcore::PlatformError::None));
-
-                if (ok)
-                {
-                    if (_diag.otaOkFrames < 255)
-                        ++_diag.otaOkFrames;
-                    if (_diag.otaOkFrames >= kOtaConfirmOkFrames)
-                    {
-                        otaMarkAppValid();
-                        _diag.otaOkFrames = 0;
-                        _diag.otaAutoConfirmed = !otaStatus().pendingVerify;
-                    }
-                }
-                else
-                {
-                    _diag.otaOkFrames = 0;
-                }
-            }
-        }
-#endif
-
-        const auto presentOverlaysFull = [&]()
-        {
-            bool wroteOverlay = false;
-            if (_flags.notifActive)
-            {
-                renderNotificationOverlay();
-                wroteOverlay = true;
-            }
-            if (_flags.popupActive)
-            {
-                renderPopupMenuOverlay(now);
-                wroteOverlay = true;
-            }
-            if (_flags.toastActive)
-            {
-                renderToastOverlay(now);
-                wroteOverlay = true;
-                DirtyRect r = {};
-                const bool vis = computeToastBounds(now, r);
-                _toast.lastRect = r;
-                _toast.lastRectValid = vis;
-            }
-            if (wroteOverlay && _flags.spriteEnabled && _disp.display)
-                presentSprite(0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight, "present");
-        };
-
-        if (_flags.bootActive)
-        {
-            renderBootFrame(now);
-            presentOverlaysFull();
-            return;
-        }
-        if (_flags.errorActive)
-        {
-            renderErrorFrame(now);
-            presentOverlaysFull();
-            return;
-        }
-        if (_flags.screenTransition)
-        {
-            renderScreenTransition(now);
-            return;
-        }
-
-        ScreenCallback currentCb = (_screen.current < _screen.capacity && _screen.callbacks)
-                                       ? _screen.callbacks[_screen.current]
-                                       : nullptr;
-
-        const auto serviceToast = [&]()
-        {
-            if (_flags.notifActive)
-                return;
-            if (!_flags.spriteEnabled || !_disp.display)
-                return;
-
-            const auto isEmpty = [](const DirtyRect &r) { return r.w <= 0 || r.h <= 0; };
-            const auto rectUnion = [&](DirtyRect a, DirtyRect b) -> DirtyRect
-            {
-                if (isEmpty(a))
-                    return b;
-                if (isEmpty(b))
-                    return a;
-                const int16_t x1 = min(a.x, b.x);
-                const int16_t y1 = min(a.y, b.y);
-                const int16_t x2 = max<int16_t>(a.x + a.w, b.x + b.w);
-                const int16_t y2 = max<int16_t>(a.y + a.h, b.y + b.h);
-                return {x1, y1, (int16_t)(x2 - x1), (int16_t)(y2 - y1)};
-            };
-            const auto rectClipToScreen = [&](DirtyRect r) -> DirtyRect
-            {
-                if (isEmpty(r))
-                    return {0, 0, 0, 0};
-                int16_t x1 = r.x;
-                int16_t y1 = r.y;
-                int16_t x2 = (int16_t)(r.x + r.w);
-                int16_t y2 = (int16_t)(r.y + r.h);
-                if (x1 < 0)
-                    x1 = 0;
-                if (y1 < 0)
-                    y1 = 0;
-                if (x2 > (int16_t)_render.screenWidth)
-                    x2 = (int16_t)_render.screenWidth;
-                if (y2 > (int16_t)_render.screenHeight)
-                    y2 = (int16_t)_render.screenHeight;
-                DirtyRect out{x1, y1, (int16_t)(x2 - x1), (int16_t)(y2 - y1)};
-                if (isEmpty(out))
-                    return {0, 0, 0, 0};
-                return out;
-            };
-
-            DirtyRect curToast = {};
-            const bool curVisible = computeToastBounds(now, curToast);
-            const bool hadPrev = _toast.lastRectValid;
-            const DirtyRect prevToast = _toast.lastRect;
-
-            DirtyRect paint = {};
-            if (hadPrev && !curVisible)
-                paint = prevToast;
-            else if (!hadPrev && curVisible)
-                paint = curToast;
-            else if (hadPrev && curVisible)
-                paint = rectUnion(prevToast, curToast);
-
-            paint = rectClipToScreen(paint);
-            if (isEmpty(paint))
-            {
-                _toast.lastRect = curToast;
-                _toast.lastRectValid = curVisible;
-                if (!_flags.toastActive && !_toast.lastRectValid && _toast.scratch && platform())
-                {
-                    platform()->free(_toast.scratch);
-                    _toast.scratch = nullptr;
-                    _toast.scratchPixels = 0;
-                }
-                return;
-            }
-
-            const ClipState prevClip = _clip;
-            setClip(paint.x, paint.y, paint.w, paint.h);
-            renderScreenToMainSprite(currentCb, _screen.current);
-            renderStatusBar();
-            setClip(paint.x, paint.y, paint.w, paint.h);
-            if (curVisible)
-                renderToastOverlay(now);
-            _clip = prevClip;
-
-            presentSpriteRegion(paint.x, paint.y, paint.x, paint.y, paint.w, paint.h, "present");
-
-            _toast.lastRect = curToast;
-            _toast.lastRectValid = curVisible;
-            if (!_flags.toastActive && !_toast.lastRectValid && _toast.scratch && platform())
-            {
-                platform()->free(_toast.scratch);
-                _toast.scratch = nullptr;
-                _toast.scratchPixels = 0;
-            }
-        };
-
-        if ((_flags.notifActive || _flags.popupActive) && _flags.spriteEnabled)
-        {
-            if (currentCb)
-            {
-                renderScreenToMainSprite(currentCb, _screen.current);
-                renderStatusBar();
-            }
-            presentOverlaysFull();
-            return;
-        }
-
-        if (_flags.needRedraw && currentCb)
-        {
-            _flags.needRedraw = 0;
-            if (_flags.spriteEnabled)
-            {
-                if (_disp.display)
-                {
-                    ListState *lm = getList(_screen.current);
-                    if (lm && lm->configured && lm->itemCount > 0)
-                    {
-                        updateList(_screen.current);
-                        updateStatusBar();
-                        if (_flags.notifActive || _flags.popupActive)
-                            presentOverlaysFull();
-                        else if (_flags.toastActive || _toast.lastRectValid)
-                            serviceToast();
-                        return;
-                    }
-
-                    renderScreenToMainSprite(currentCb, _screen.current);
-                    renderStatusBar();
-                    if (_flags.notifActive)
-                    {
-                        renderNotificationOverlay();
-                    }
-                    if (_flags.popupActive)
-                    {
-                        renderPopupMenuOverlay(now);
-                    }
-                    if (_flags.toastActive)
-                    {
-                        renderToastOverlay(now);
-                        DirtyRect r = {};
-                        const bool vis = computeToastBounds(now, r);
-                        _toast.lastRect = r;
-                        _toast.lastRectValid = vis;
-                    }
-                    presentSprite(0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight, "present");
-                    _dirty.count = 0;
-                    return;
-                }
-                else
-                {
-                    currentCb(*this);
-                    renderStatusBar();
-                }
-            }
-            else
-            {
-                currentCb(*this);
-                renderStatusBar();
-            }
-        }
-
-        if (_flags.notifActive && !_flags.spriteEnabled)
-            renderNotificationOverlay();
-        if (_flags.popupActive && !_flags.spriteEnabled)
-            renderPopupMenuOverlay(now);
-        if (!_flags.needRedraw && _dirty.count > 0 && _flags.spriteEnabled && _disp.display)
-            flushDirty();
-        if (_flags.toastActive || _toast.lastRectValid)
-            serviceToast();
-
-#if PIPGUI_SCREENSHOTS && (PIPGUI_SCREENSHOT_MODE == 2)
-        serviceScreenshotGalleryFlash();
-#endif
-    }
-
-    void GUI::loopWithInput(Button &next, Button &prev)
-    {
-        next.update();
-        prev.update();
-#if PIPGUI_SCREENSHOTS
-        handleScreenshotShortcut(next.isDown(), prev.isDown());
-#endif
-        loop();
-    }
 }

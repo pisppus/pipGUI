@@ -1,11 +1,44 @@
 #include <pipGUI/Core/pipGUI.hpp>
-#include <pipGUI/Graphics/Utils/BNSD.hpp>
+#include "Blend.hpp"
+#include <pipGUI/Graphics/Utils/BlueNoise.hpp>
 #include <pipGUI/Graphics/Utils/Colors.hpp>
 #include <pipCore/Graphics/Sprite.hpp>
-#include "Blend.hpp"
+#include <cstring>
 
 namespace pipgui
 {
+    namespace
+    {
+        static inline uint16_t quantize565Swapped(Color888 color, int16_t x, int16_t y)
+        {
+            return pipcore::Sprite::swap16(detail::quantize565(color, x, y));
+        }
+
+        static inline void fillPattern32(uint16_t *dst, int16_t x, int16_t count, const uint16_t *pattern)
+        {
+            if (count <= 0)
+                return;
+
+            uint8_t patternIdx = (uint8_t)(x & 31);
+            while (count > 0 && patternIdx)
+            {
+                *dst++ = pattern[patternIdx];
+                patternIdx = (uint8_t)((patternIdx + 1) & 31);
+                --count;
+            }
+
+            while (count >= 32)
+            {
+                std::memcpy(dst, pattern, sizeof(uint16_t) * 32);
+                dst += 32;
+                count -= 32;
+            }
+
+            for (uint8_t idx = 0; count > 0; --count)
+                *dst++ = pattern[idx++];
+        }
+    }
+
     void GUI::fillRectGradientVertical(int16_t x, int16_t y, int16_t w, int16_t h, uint32_t topColor, uint32_t bottomColor)
     {
         if (x == -1)
@@ -50,9 +83,12 @@ namespace pipgui
         for (int16_t py = y0; py < y1; ++py, cr += dr, cg += dg, cb += db)
         {
             const Color888 c888 = {(uint8_t)(cr >> 16), (uint8_t)(cg >> 16), (uint8_t)(cb >> 16)};
-            uint16_t *row = buf + py * stride;
-            for (int16_t px = x0; px < x1; ++px)
-                row[px] = pipcore::Sprite::swap16(detail::quantize565(c888, px, py));
+            uint16_t pattern[32];
+            for (uint8_t idx = 0; idx < 32; ++idx)
+                pattern[idx] = quantize565Swapped(c888, idx, py);
+
+            uint16_t *dst = buf + py * stride + x0;
+            fillPattern32(dst, x0, (int16_t)(x1 - x0), pattern);
         }
 
         if (_disp.display && _flags.spriteEnabled && !_flags.inSpritePass)
@@ -101,12 +137,12 @@ namespace pipgui
 
         for (int16_t py = y0; py < y1; ++py)
         {
-            uint16_t *row = buf + py * stride;
+            uint16_t *dst = buf + py * stride + x0;
             int32_t cr = cr0, cg = cg0, cb = cb0;
-            for (int16_t px = x0; px < x1; ++px, cr += dr, cg += dg, cb += db)
+            for (int16_t px = x0; px < x1; ++px, ++dst, cr += dr, cg += dg, cb += db)
             {
                 const Color888 c = {(uint8_t)(cr >> 16), (uint8_t)(cg >> 16), (uint8_t)(cb >> 16)};
-                row[px] = pipcore::Sprite::swap16(detail::quantize565(c, px, py));
+                *dst = quantize565Swapped(c, px, py);
             }
         }
 
@@ -168,11 +204,11 @@ namespace pipgui
             int32_t cg = cgL + dg_row * dx;
             int32_t cb = cbL + db_row * dx;
 
-            uint16_t *row = buf + py * stride;
-            for (int16_t px = x0; px < x1; ++px, cr += dr_row, cg += dg_row, cb += db_row)
+            uint16_t *dst = buf + py * stride + x0;
+            for (int16_t px = x0; px < x1; ++px, ++dst, cr += dr_row, cg += dg_row, cb += db_row)
             {
                 const Color888 c888 = {(uint8_t)(cr >> 16), (uint8_t)(cg >> 16), (uint8_t)(cb >> 16)};
-                row[px] = pipcore::Sprite::swap16(detail::quantize565(c888, px, py));
+                *dst = quantize565Swapped(c888, px, py);
             }
 
             crL += drL;
@@ -230,12 +266,12 @@ namespace pipgui
 
         for (int16_t py = y0; py < y1; ++py, rr0 += dr, rg0 += dg, rb0 += db)
         {
-            uint16_t *row = buf + py * stride;
+            uint16_t *dst = buf + py * stride + x0;
             int32_t cr = rr0, cg = rg0, cb = rb0;
-            for (int16_t px = x0; px < x1; ++px, cr += dr, cg += dg, cb += db)
+            for (int16_t px = x0; px < x1; ++px, ++dst, cr += dr, cg += dg, cb += db)
             {
                 const Color888 c888 = {(uint8_t)(cr >> 16), (uint8_t)(cg >> 16), (uint8_t)(cb >> 16)};
-                row[px] = pipcore::Sprite::swap16(detail::quantize565(c888, px, py));
+                *dst = quantize565Swapped(c888, px, py);
             }
         }
 
@@ -278,38 +314,56 @@ namespace pipgui
         const int32_t dr = (int32_t)((outerColor >> 16) & 0xFF) - ri;
         const int32_t dg = (int32_t)((outerColor >> 8) & 0xFF) - gi;
         const int32_t db = (int32_t)(outerColor & 0xFF) - bi;
+        const Color888 outer888 = {
+            (uint8_t)((outerColor >> 16) & 0xFF),
+            (uint8_t)((outerColor >> 8) & 0xFF),
+            (uint8_t)(outerColor & 0xFF)};
 
-        const uint32_t r256 = (uint32_t)radius;
+        const int32_t r256 = radius;
+        const int32_t radiusSq = r256 * r256;
 
         for (int16_t py = y0; py < y1; ++py)
         {
             const int32_t ddy = (int32_t)(py - cy);
-            const uint32_t dy2 = (uint32_t)(ddy * ddy);
-            uint16_t *row = buf + py * stride;
+            const int32_t dy2 = ddy * ddy;
+            uint16_t *dst = buf + py * stride + x0;
+            int32_t ddx = (int32_t)(x0 - cx);
+            int32_t d2 = ddx * ddx + dy2;
+            int32_t dStep = ddx * 2 + 1;
+            uint16_t outerPattern[32];
+            for (uint8_t idx = 0; idx < 32; ++idx)
+                outerPattern[idx] = quantize565Swapped(outer888, idx, py);
 
-            for (int16_t px = x0; px < x1; ++px)
+            for (int16_t px = x0; px < x1; ++px, ++dst)
             {
-                const int32_t ddx = (int32_t)(px - cx);
-                const uint32_t d2 = (uint32_t)(ddx * ddx) + dy2;
-
                 int32_t t;
                 if (d2 == 0)
                 {
                     t = 0;
                 }
+                else if (d2 >= radiusSq)
+                {
+                    t = 256;
+                }
                 else
                 {
-                    const int32_t dist = (int32_t)isqrt32(d2);
-                    t = (dist << 8) / (int32_t)r256;
-                    if (t > 256)
-                        t = 256;
+                    const int32_t dist = (int32_t)isqrt32((uint32_t)d2);
+                    t = (dist << 8) / r256;
                 }
 
                 const Color888 c888 = {
                     (uint8_t)(ri + ((dr * t) >> 8)),
                     (uint8_t)(gi + ((dg * t) >> 8)),
                     (uint8_t)(bi + ((db * t) >> 8))};
-                row[px] = pipcore::Sprite::swap16(detail::quantize565(c888, px, py));
+                *dst = quantize565Swapped(c888, px, py);
+                d2 += dStep;
+                dStep += 2;
+
+                if (d2 >= radiusSq && dStep >= 0 && px + 1 < x1)
+                {
+                    fillPattern32(dst + 1, (int16_t)(px + 1), (int16_t)(x1 - (px + 1)), outerPattern);
+                    break;
+                }
             }
         }
 

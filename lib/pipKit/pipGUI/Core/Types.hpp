@@ -10,6 +10,8 @@ namespace pipgui
 {
     class GUI;
 
+    using PopupMenuItemFn = const char *(*)(void *user, uint8_t idx);
+
     struct DisplayPins
     {
         int8_t mosi = -1;

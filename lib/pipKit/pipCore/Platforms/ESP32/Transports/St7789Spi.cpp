@@ -14,7 +14,8 @@ namespace pipcore::esp32
 {
     namespace
     {
-        constexpr size_t DmaBufferBytes = 8192;
+        constexpr size_t DmaBufferBytes = 16384;
+        constexpr size_t DmaBufferFallbackBytes = 8192;
 
         [[nodiscard]] inline constexpr bool isPinValid(int8_t pin) noexcept { return pin >= 0; }
 
@@ -126,6 +127,7 @@ namespace pipcore::esp32
         _dmaNext = 0;
         _dmaInflight = 0;
         _dcLevel = -1;
+        _busAcquired = false;
         _initialized = false;
         _lastError = st7789::IoError::None;
 
@@ -201,6 +203,7 @@ namespace pipcore::esp32
 
         _dmaNext = _dmaInflight = 0;
         _dcLevel = -1;
+        _busAcquired = false;
         _initialized = false;
     }
 
@@ -238,14 +241,39 @@ namespace pipcore::esp32
         }
         _spiHandle = h;
 
-        for (int i = 0; i < 2; ++i)
+        for (size_t dmaBufSize : {DmaBufferBytes, DmaBufferFallbackBytes})
         {
-            _dmaBuf[i] = static_cast<uint8_t *>(heap_caps_aligned_alloc(4, _dmaBufSize, MALLOC_CAP_DMA | MALLOC_CAP_8BIT));
-            if (!_dmaBuf[i])
+            bool ok = true;
+            for (int i = 0; i < 2; ++i)
             {
-                deinit();
-                return fail(st7789::IoError::DmaBufferAlloc);
+                _dmaBuf[i] = static_cast<uint8_t *>(heap_caps_aligned_alloc(4, dmaBufSize, MALLOC_CAP_DMA | MALLOC_CAP_8BIT));
+                if (!_dmaBuf[i])
+                {
+                    ok = false;
+                    break;
+                }
             }
+
+            if (ok)
+            {
+                _dmaBufSize = dmaBufSize;
+                break;
+            }
+
+            for (int i = 0; i < 2; ++i)
+            {
+                if (_dmaBuf[i])
+                {
+                    heap_caps_free(_dmaBuf[i]);
+                    _dmaBuf[i] = nullptr;
+                }
+            }
+        }
+
+        if (!_dmaBuf[0] || !_dmaBuf[1])
+        {
+            deinit();
+            return fail(st7789::IoError::DmaBufferAlloc);
         }
         for (int i = 0; i < 2; ++i)
         {
@@ -259,6 +287,7 @@ namespace pipcore::esp32
         }
 
         _dmaNext = _dmaInflight = 0;
+        _busAcquired = false;
         clearError();
         return true;
     }
@@ -321,6 +350,26 @@ namespace pipcore::esp32
         return true;
     }
 
+    bool St7789Spi::acquireBus()
+    {
+        if (!_spiHandle)
+            return fail(st7789::IoError::NotReady);
+        if (_busAcquired)
+            return true;
+        if (spi_device_acquire_bus(static_cast<spi_device_handle_t>(_spiHandle), portMAX_DELAY) != ESP_OK)
+            return fail(st7789::IoError::QueueTransmit);
+        _busAcquired = true;
+        return true;
+    }
+
+    void St7789Spi::releaseBus()
+    {
+        if (!_spiHandle || !_busAcquired)
+            return;
+        spi_device_release_bus(static_cast<spi_device_handle_t>(_spiHandle));
+        _busAcquired = false;
+    }
+
     bool St7789Spi::writePixels(const void *data, size_t len)
     {
         if (!len || !_spiHandle || !_dmaBuf[0] || !_dmaBuf[1] || !_trans[0] || !_trans[1])
@@ -329,10 +378,8 @@ namespace pipcore::esp32
         if (!setDcCached(1))
             return false;
 
-        bool busAcquired = false;
-        if (spi_device_acquire_bus(static_cast<spi_device_handle_t>(_spiHandle), portMAX_DELAY) != ESP_OK)
-            return fail(st7789::IoError::QueueTransmit);
-        busAcquired = true;
+        if (!acquireBus())
+            return false;
 
         const uint8_t *p = static_cast<const uint8_t *>(data);
         size_t remaining = len;
@@ -343,8 +390,7 @@ namespace pipcore::esp32
             {
                 if (!waitQueued())
                 {
-                    if (busAcquired)
-                        spi_device_release_bus(static_cast<spi_device_handle_t>(_spiHandle));
+                    releaseBus();
                     return false;
                 }
             }
@@ -368,8 +414,7 @@ namespace pipcore::esp32
             {
                 _transInFlight[slot] = false;
                 (void)flushQueued();
-                if (busAcquired)
-                    spi_device_release_bus(static_cast<spi_device_handle_t>(_spiHandle));
+                releaseBus();
                 return fail(st7789::IoError::QueueTransmit);
             }
             _transInFlight[slot] = true;
@@ -379,12 +424,16 @@ namespace pipcore::esp32
             remaining -= n;
         }
 
-        if (busAcquired)
-            spi_device_release_bus(static_cast<spi_device_handle_t>(_spiHandle));
+        releaseBus();
         return true;
     }
 
-    bool St7789Spi::flush() { return flushQueued(); }
+    bool St7789Spi::flush()
+    {
+        const bool ok = flushQueued();
+        releaseBus();
+        return ok;
+    }
 
     bool St7789Spi::waitQueued()
     {

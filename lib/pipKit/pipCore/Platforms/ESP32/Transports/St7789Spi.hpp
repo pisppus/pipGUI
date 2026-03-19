@@ -27,6 +27,8 @@ namespace pipcore::esp32
         [[nodiscard]] bool write(const void *data, size_t len) override;
         [[nodiscard]] bool writeCommand(uint8_t cmd) override;
         [[nodiscard]] bool writePixels(const void *data, size_t len) override;
+        [[nodiscard]] bool acquireBus() override;
+        void releaseBus() override;
         [[nodiscard]] bool flush() override;
 
     private:
@@ -51,6 +53,7 @@ namespace pipcore::esp32
         int _dmaNext = 0;
         int _dmaInflight = 0;
         int8_t _dcLevel = -1;
+        bool _busAcquired = false;
         bool _initialized = false;
         st7789::IoError _lastError = st7789::IoError::None;
     };

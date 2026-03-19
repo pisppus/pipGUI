@@ -63,4 +63,7 @@ namespace pipgui
 
     inline ConfigureTileFluent GUI::configureTile() { return ConfigureTileFluent(this); }
     inline TileInputFluent GUI::tileInput(uint8_t screenId) { return TileInputFluent(this, screenId); }
+    inline ConfigureBacklightFluent GUI::setBacklight() { return ConfigureBacklightFluent(this); }
+    inline SetClipFluent GUI::setClip() { return SetClipFluent(this); }
+    inline ShowLogoFluent GUI::showLogo() { return ShowLogoFluent(this); }
 }

@@ -39,6 +39,13 @@ namespace pipcore::esp32::services
                 return ptr;
         }
 
+        if (caps == AllocCaps::PreferInternal)
+        {
+            void *ptr = heap_caps_malloc(bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+            if (ptr)
+                return ptr;
+        }
+
         return heap_caps_malloc(bytes, MALLOC_CAP_8BIT);
     }
 

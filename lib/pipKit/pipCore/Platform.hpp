@@ -32,7 +32,8 @@ namespace pipcore
     enum class AllocCaps : uint8_t
     {
         Default = 0,
-        PreferExternal = 1
+        PreferExternal = 1,
+        PreferInternal = 2
     };
 
     enum class PlatformError : uint8_t

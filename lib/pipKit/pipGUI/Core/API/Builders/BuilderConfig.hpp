@@ -106,6 +106,199 @@ namespace pipgui
         void apply();
     };
 
+    struct ConfigureBacklightFluent : detail::FluentLifetime
+    {
+        PIPGUI_DEFAULT_FLUENT_MOVE(ConfigureBacklightFluent);
+        uint8_t _pin = 255;
+        uint8_t _channel = 0;
+        uint32_t _freqHz = 5000;
+        uint8_t _resolutionBits = 12;
+        bool _touched = false;
+
+        explicit ConfigureBacklightFluent(GUI *g)
+            : detail::FluentLifetime(g)
+        {
+        }
+
+        ~ConfigureBacklightFluent() { apply(); }
+
+        ConfigureBacklightFluent &pin(uint8_t v)
+        {
+            if (!canMutate())
+                return *this;
+            _pin = v;
+            _touched = true;
+            return *this;
+        }
+
+        ConfigureBacklightFluent &channel(uint8_t v)
+        {
+            if (!canMutate())
+                return *this;
+            _channel = v;
+            _touched = true;
+            return *this;
+        }
+
+        ConfigureBacklightFluent &freq(uint32_t v)
+        {
+            if (!canMutate())
+                return *this;
+            _freqHz = v;
+            _touched = true;
+            return *this;
+        }
+
+        ConfigureBacklightFluent &resolution(uint8_t v)
+        {
+            if (!canMutate())
+                return *this;
+            _resolutionBits = v;
+            _touched = true;
+            return *this;
+        }
+
+        void apply();
+    };
+
+    struct SetClipFluent : detail::FluentLifetime
+    {
+        PIPGUI_DEFAULT_FLUENT_MOVE(SetClipFluent);
+        int16_t _x = 0;
+        int16_t _y = 0;
+        int16_t _w = 0;
+        int16_t _h = 0;
+        bool _touched = false;
+
+        explicit SetClipFluent(GUI *g)
+            : detail::FluentLifetime(g)
+        {
+        }
+
+        ~SetClipFluent() { apply(); }
+
+        SetClipFluent &pos(int16_t x, int16_t y)
+        {
+            if (!canMutate())
+                return *this;
+            _x = x;
+            _y = y;
+            _touched = true;
+            return *this;
+        }
+
+        SetClipFluent &size(int16_t w, int16_t h)
+        {
+            if (!canMutate())
+                return *this;
+            _w = w;
+            _h = h;
+            _touched = true;
+            return *this;
+        }
+
+        SetClipFluent &rect(int16_t x, int16_t y, int16_t w, int16_t h)
+        {
+            if (!canMutate())
+                return *this;
+            _x = x;
+            _y = y;
+            _w = w;
+            _h = h;
+            _touched = true;
+            return *this;
+        }
+
+        void apply();
+    };
+
+    struct ShowLogoFluent : detail::FluentLifetime
+    {
+        PIPGUI_DEFAULT_FLUENT_MOVE(ShowLogoFluent);
+        String _title;
+        String _subtitle;
+        BootAnimation _anim = None;
+        uint32_t _fg = 0xFFFFFF;
+        uint32_t _bg = 0x000000;
+        uint32_t _dur = 0;
+        int16_t _x = -1;
+        int16_t _y = -1;
+        bool _touched = false;
+
+        explicit ShowLogoFluent(GUI *g)
+            : detail::FluentLifetime(g)
+        {
+        }
+
+        ~ShowLogoFluent() { apply(); }
+
+        ShowLogoFluent &title(const String &v)
+        {
+            if (!canMutate())
+                return *this;
+            _title = v;
+            _touched = true;
+            return *this;
+        }
+
+        ShowLogoFluent &subtitle(const String &v)
+        {
+            if (!canMutate())
+                return *this;
+            _subtitle = v;
+            _touched = true;
+            return *this;
+        }
+
+        ShowLogoFluent &anim(BootAnimation v)
+        {
+            if (!canMutate())
+                return *this;
+            _anim = v;
+            _touched = true;
+            return *this;
+        }
+
+        ShowLogoFluent &fgColor(uint32_t v)
+        {
+            if (!canMutate())
+                return *this;
+            _fg = v;
+            _touched = true;
+            return *this;
+        }
+
+        ShowLogoFluent &bgColor(uint32_t v)
+        {
+            if (!canMutate())
+                return *this;
+            _bg = v;
+            _touched = true;
+            return *this;
+        }
+
+        ShowLogoFluent &duration(uint32_t v)
+        {
+            if (!canMutate())
+                return *this;
+            _dur = v;
+            _touched = true;
+            return *this;
+        }
+
+        ShowLogoFluent &pos(int16_t x, int16_t y)
+        {
+            if (!canMutate())
+                return *this;
+            _x = x;
+            _y = y;
+            _touched = true;
+            return *this;
+        }
+
+        void apply();
+    };
+
     struct ListInputFluent : detail::FluentLifetime
     {
         PIPGUI_DEFAULT_FLUENT_MOVE(ListInputFluent);

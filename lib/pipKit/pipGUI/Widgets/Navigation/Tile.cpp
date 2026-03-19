@@ -1,6 +1,6 @@
 #include <pipGUI/Core/pipGUI.hpp>
-#include <pipGUI/Core/API/Internal/BuilderAccess.hpp>
-#include <pipGUI/Core/API/Internal/RuntimeState.hpp>
+#include <pipGUI/Core/Internal/GuiAccess.hpp>
+#include <pipGUI/Core/Internal/ViewModels.hpp>
 #include <pipGUI/Graphics/Utils/Colors.hpp>
 #include <algorithm>
 
@@ -394,7 +394,7 @@ namespace pipgui
         if (_consumed || !_gui)
             return;
         _consumed = true;
-        detail::BuilderAccess::handleTileInput(*_gui, _screenId, _nextDown, _prevDown);
+        detail::GuiAccess::handleTileInput(*_gui, _screenId, _nextDown, _prevDown);
     }
 
     void ConfigureTileFluent::apply()
@@ -415,7 +415,7 @@ namespace pipgui
             _tileHeight,
             _lineGapPx,
             _contentMode};
-        detail::BuilderAccess::configureTile(*_gui, _screenId, _parentScreen, _items, _itemCount, style);
+        detail::GuiAccess::configureTile(*_gui, _screenId, _parentScreen, _items, _itemCount, style);
         if (_layoutConfigured)
         {
             TileLayoutCell layoutCells[255] = {};
@@ -424,7 +424,7 @@ namespace pipgui
             uint8_t layoutRows = 0;
             if (parseTileLayoutSpec(_layoutRowsSpec, _layoutRowCount, _itemCount, layoutCells, layoutCount, layoutCols, layoutRows))
             {
-                TileState *menu = detail::BuilderAccess::getTile(*_gui, _screenId);
+                TileState *menu = detail::GuiAccess::getTile(*_gui, _screenId);
                 if (menu)
                     applyTileLayout(*menu, layoutCols, layoutRows, layoutCells, layoutCount);
             }
@@ -881,3 +881,5 @@ namespace pipgui
         }
     }
 }
+
+

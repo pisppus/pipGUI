@@ -1,6 +1,6 @@
 #include <pipGUI/Core/pipGUI.hpp>
-#include <pipGUI/Core/API/Internal/BuilderAccess.hpp>
-#include <pipGUI/Core/API/Internal/RuntimeState.hpp>
+#include <pipGUI/Core/Internal/GuiAccess.hpp>
+#include <pipGUI/Core/Internal/ViewModels.hpp>
 #include <pipGUI/Graphics/Utils/Colors.hpp>
 #include <math.h>
 namespace pipgui
@@ -67,10 +67,10 @@ namespace pipgui
 
         if (_screenId == INVALID_SCREEN_ID)
             return;
-        ListState *menu = detail::BuilderAccess::ensureList(*_gui, _screenId);
+        ListState *menu = detail::GuiAccess::ensureList(*_gui, _screenId);
         if (!menu)
             return;
-        if (!ensureListCapacity(*menu, _itemCount, detail::BuilderAccess::platform(*_gui)))
+        if (!ensureListCapacity(*menu, _itemCount, detail::GuiAccess::platform(*_gui)))
         {
             menu->configured = false;
             return;
@@ -765,4 +765,6 @@ namespace pipgui
         return true;
     }
 }
+
+
 

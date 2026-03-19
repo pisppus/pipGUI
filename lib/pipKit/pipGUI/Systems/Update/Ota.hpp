@@ -1,6 +1,6 @@
 #pragma once
 
-#include <pipGUI/Core/Common.hpp>
+#include <pipGUI/Core/Types.hpp>
 #include <pipCore/Update/Ota.hpp>
 
 namespace pipgui
@@ -13,3 +13,4 @@ namespace pipgui
     using OtaStatus = pipcore::ota::Status;
     using OtaStatusCallback = pipcore::ota::StatusCallback;
 }
+

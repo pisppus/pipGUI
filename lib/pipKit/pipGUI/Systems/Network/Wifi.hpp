@@ -1,6 +1,6 @@
 #pragma once
 
-#include <pipGUI/Core/Common.hpp>
+#include <pipGUI/Core/Types.hpp>
 #include <pipCore/Network/Wifi.hpp>
 
 namespace pipgui::net
@@ -14,3 +14,4 @@ namespace pipgui::net
     [[nodiscard]] bool wifiConnected() noexcept;
     [[nodiscard]] uint32_t wifiLocalIpV4() noexcept;
 }
+

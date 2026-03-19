@@ -93,7 +93,7 @@ namespace pipcore
 
         [[nodiscard]] static constexpr uint32_t debounceMs() noexcept
         {
-            return 16;
+            return 12;
         }
 
         void applyPullDefaults() noexcept

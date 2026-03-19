@@ -348,20 +348,36 @@ namespace pipcore::st7789
         }
 
         uint8_t buf[4];
+        if (!_transport->acquireBus())
+            return failFromTransport(IoError::QueueTransmit);
 
         if (!sendCommand(CmdCASET))
+        {
+            _transport->releaseBus();
             return false;
+        }
         pack16BE(buf, (uint16_t)xs32, (uint16_t)xe32);
         if (!sendBytes(buf, 4))
+        {
+            _transport->releaseBus();
             return false;
+        }
 
         if (!sendCommand(CmdRASET))
+        {
+            _transport->releaseBus();
             return false;
+        }
         pack16BE(buf, (uint16_t)ys32, (uint16_t)ye32);
         if (!sendBytes(buf, 4))
+        {
+            _transport->releaseBus();
             return false;
+        }
 
-        return sendCommand(CmdRAMWR);
+        const bool ok = sendCommand(CmdRAMWR);
+        _transport->releaseBus();
+        return ok;
     }
 
     bool Driver::writePixels565(const uint16_t *pixels, size_t pixelCount, bool swapBytes)
@@ -375,7 +391,7 @@ namespace pipcore::st7789
         if (!swapBytes)
             return sendPixels(pixels, pixelCount * sizeof(uint16_t));
 
-        constexpr size_t Chunk = 1024;
+        constexpr size_t Chunk = 2048;
         alignas(4) uint16_t tmp[Chunk];
         while (pixelCount)
         {
@@ -400,7 +416,7 @@ namespace pipcore::st7789
         if (!setAddrWindow(0, 0, (uint16_t)(_width - 1U), (uint16_t)(_height - 1U)))
             return false;
 
-        constexpr size_t Chunk = 1024;
+        constexpr size_t Chunk = 2048;
         uint16_t tmp[Chunk];
         const uint16_t v = swapBytes ? bswap16(color565) : color565;
         for (size_t i = 0; i < Chunk; ++i)

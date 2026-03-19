@@ -2,7 +2,8 @@
 
 #include <pipCore/Display.hpp>
 #include <pipCore/Graphics/Sprite.hpp>
-#include <pipGUI/Core/Common.hpp>
+#include <pipGUI/Core/Types.hpp>
+#include <pipGUI/Core/Internal/GuiState.hpp>
 #include <pipGUI/Graphics/Utils/Colors.hpp>
 #include <pipGUI/Systems/Update/Ota.hpp>
 
@@ -14,6 +15,9 @@
 namespace pipgui
 {
     struct ConfigureDisplayFluent;
+    struct ConfigureBacklightFluent;
+    struct SetClipFluent;
+    struct ShowLogoFluent;
 
     struct FillRectFluent;
     struct DrawRectFluent;
@@ -102,7 +106,7 @@ namespace pipgui
 
     namespace detail
     {
-        struct BuilderAccess;
+        struct GuiAccess;
         struct TextFontGuard;
     }
 
@@ -132,12 +136,17 @@ namespace pipgui
         [[nodiscard]] pipcore::Platform *platform() const noexcept;
 
         [[nodiscard]] ConfigureDisplayFluent configureDisplay();
+        [[nodiscard]] ConfigureBacklightFluent setBacklight();
+        [[nodiscard]] SetClipFluent setClip();
+        [[nodiscard]] ShowLogoFluent showLogo();
         void configureDisplay(const pipcore::DisplayConfig &cfg);
+        void configureBacklight(uint8_t pin, uint8_t channel = 0, uint32_t freqHz = 5000, uint8_t resolutionBits = 12);
         void begin(uint8_t rotation = 0, uint16_t bgColor = 0x0000);
 
-        void setBacklightCallback(BacklightCallback cb) noexcept { _disp.backlightCb = cb; }
-        void setBacklightPin(uint8_t pin, uint8_t channel = 0, uint32_t freqHz = 5000, uint8_t resolutionBits = 12);
+        void setBacklightCallback(BacklightCallback cb) noexcept;
+        void setBrightness(uint8_t percent);
         void setMaxBrightness(uint8_t percent);
+        [[nodiscard]] uint8_t brightness() const noexcept { return _disp.brightness; }
         [[nodiscard]] uint8_t maxBrightness() const noexcept { return _disp.brightnessMax; }
 
         pipcore::Display &display();
@@ -322,8 +331,6 @@ namespace pipgui
         void setFontWeight(uint16_t weight);
         [[nodiscard]] uint16_t fontWeight() const noexcept;
 
-        void configureTextStyles(uint16_t h1Px = 24, uint16_t h2Px = 18,
-                                 uint16_t bodyPx = 14, uint16_t captionPx = 12);
         void setTextStyle(TextStyle style);
 
         [[nodiscard]] ConfigureListFluent configureList();
@@ -342,14 +349,14 @@ namespace pipgui
         void loop();
         void loopWithInput(Button &next, Button &prev);
         void requestRedraw();
-        void setScreenAnimation(ScreenAnim anim, uint32_t durationMs);
-        void setClip(int16_t x, int16_t y, int16_t w, int16_t h);
+        void setScreenAnim(ScreenAnim anim, uint32_t durationMs);
+        void applyClipRect(int16_t x, int16_t y, int16_t w, int16_t h);
         void clearClip();
 
-        void showLogo(const String &t, const String &s,
-                      BootAnimation a = None, uint32_t fg = 0xFFFFFF,
-                      uint32_t bg = 0x000000, uint32_t dur = 0,
-                      int16_t x = -1, int16_t y = -1);
+        void startLogo(const String &t, const String &s,
+                       BootAnimation a = None, uint32_t fg = 0xFFFFFF,
+                       uint32_t bg = 0x000000, uint32_t dur = 0,
+                       int16_t x = -1, int16_t y = -1);
 
         void logoTitleSizePx(uint16_t sizePx) noexcept { _typo.logoTitleSizePx = sizePx; }
         void logoSubtitleSizePx(uint16_t sizePx) noexcept { _typo.logoSubtitleSizePx = sizePx; }
@@ -375,7 +382,7 @@ namespace pipgui
         void setStatusBarStyle(StatusBarStyle style) noexcept
         {
             _status.style = style;
-            _status.dirtyMask = StatusBarDirtyAll;
+            _status.dirtyMask = detail::StatusBarDirtyAll;
         }
 
         void setStatusBarText(const String &left, const String &center, const String &right);
@@ -394,322 +401,29 @@ namespace pipgui
         [[nodiscard]] uint16_t screenHeight() const noexcept { return _render.screenHeight; }
 
     private:
-        friend struct detail::BuilderAccess;
+        friend struct detail::GuiAccess;
         friend struct detail::TextFontGuard;
-
-        struct DisplayState
-        {
-            pipcore::Display *display = nullptr;
-            pipcore::DisplayConfig cfg;
-            bool cfgConfigured = false;
-            BacklightCallback backlightCb = nullptr;
-            uint8_t brightnessMax = 100;
-        } _disp;
-
-        struct RenderState
-        {
-            pipcore::Sprite sprite;
-            pipcore::Sprite *activeSprite = nullptr;
-            uint16_t screenWidth = 0;
-            uint16_t screenHeight = 0;
-            uint32_t bgColor = 0;
-            uint16_t bgColor565 = 0;
-        } _render;
-
-        struct ClipState
-        {
-            bool enabled = false;
-            int16_t x = 0;
-            int16_t y = 0;
-            int16_t w = 0;
-            int16_t h = 0;
-        } _clip;
-
-        struct DirtyRect
-        {
-            int16_t x, y, w, h;
-        };
-
-        static constexpr uint8_t DIRTY_RECT_MAX = 8;
-
-        struct DirtyState
-        {
-            DirtyRect rects[DIRTY_RECT_MAX] = {};
-            uint8_t count = 0;
-        } _dirty;
-
-        struct ScreenState
-        {
-            ScreenCallback *callbacks = nullptr;
-            GraphArea **graphAreas = nullptr;
-            ListState **lists = nullptr;
-            TileState **tiles = nullptr;
-            uint16_t capacity = 0;
-            uint8_t current = INVALID_SCREEN_ID;
-            bool registrySynced = false;
-
-            ScreenAnim anim = None;
-            uint8_t to = 0;
-            int8_t transDir = 0;
-            uint32_t animStartMs = 0;
-            uint32_t animDurationMs = 0;
-        } _screen;
-
-        struct BootState
-        {
-            BootAnimation anim = None;
-            String title;
-            String subtitle;
-            uint32_t fgColor = 0;
-            uint32_t bgColor = 0;
-            uint32_t startMs = 0;
-            uint32_t durationMs = 0;
-            int16_t x = 0;
-            int16_t y = 0;
-        } _boot;
-
-        struct TypographyState
-        {
-            uint16_t logoTitleSizePx = 0;
-            uint16_t logoSubtitleSizePx = 0;
-            uint16_t h1Px = 24;
-            uint16_t h2Px = 18;
-            uint16_t bodyPx = 14;
-            uint16_t captionPx = 12;
-            uint16_t psdfSizePx = 0;
-            uint16_t psdfWeight = 500;
-            FontId currentFontId = static_cast<FontId>(0);
-        } _typo;
-
-        struct ErrorEntry
-        {
-            String title, detail;
-            ErrorType type;
-        };
-
-        struct ErrorState
-        {
-            ErrorEntry *entries = nullptr;
-            uint8_t count = 0;
-            uint8_t capacity = 0;
-            uint8_t currentIndex = 0;
-            uint8_t nextIndex = 0;
-            uint32_t animStartMs = 0;
-            ErrorType type = Warning;
-            String buttonText;
-            ButtonVisualState buttonState;
-        } _error;
-
-        struct NotificationState
-        {
-            String title;
-            String message;
-            String buttonText;
-            NotificationType type = NotificationType::Normal;
-            IconId iconId = static_cast<IconId>(0xFFFF);
-            uint32_t startMs = 0;
-            uint32_t animDurationMs = 0;
-            uint32_t unlockMs = 0;
-            ButtonVisualState buttonState;
-        } _notif;
-
-        struct ToastState
-        {
-            String text;
-            IconId iconId = WarningLayer0;
-            uint16_t iconSizePx = 20;
-            uint32_t startMs = 0;
-            uint32_t animDurMs = 420;
-            uint32_t displayMs = 2500;
-            bool fromTop = false;
-            int16_t textW = 0;
-            int16_t textH = 0;
-            bool textMetricsValid = false;
-            DirtyRect lastRect = {};
-            bool lastRectValid = false;
-            uint16_t *scratch = nullptr;
-            uint32_t scratchPixels = 0;
-        } _toast;
-
-        struct PopupMenuState
-        {
-            PopupMenuItemFn itemFn = nullptr;
-            void *itemUser = nullptr;
-            uint8_t count = 0;
-            uint8_t selectedIndex = 0;
-            uint8_t scrollIndex = 0;
-            uint8_t maxVisible = 6;
-            int16_t x = 0;
-            int16_t y = 0;
-            int16_t w = 0;
-            uint8_t itemHeight = 28;
-            uint8_t radius = 12;
-            uint16_t bg565 = 0x0000;
-            uint16_t fg565 = 0xFFFF;
-            uint16_t selBg565 = 0x39E7;
-            uint16_t border565 = 0x0000;
-            uint32_t startMs = 0;
-            uint32_t animDurationMs = 220;
-            int16_t resultIndex = -1;
-            bool resultReady = false;
-
-            uint32_t nextHoldStartMs = 0;
-            uint32_t prevHoldStartMs = 0;
-            bool nextLongFired = false;
-            bool prevLongFired = false;
-            bool lastNextDown = false;
-            bool lastPrevDown = false;
-        } _popup;
-
-        enum StatusBarDirty : uint8_t
-        {
-            StatusBarDirtyLeft = 1 << 0,
-            StatusBarDirtyCenter = 1 << 1,
-            StatusBarDirtyRight = 1 << 2,
-            StatusBarDirtyBattery = 1 << 3,
-            StatusBarDirtyAll = 0xFF,
-        };
-
-        struct StatusBarState
-        {
-            StatusBarPosition pos = Top;
-            StatusBarStyle style = StatusBarStyleSolid;
-            uint8_t height = 0;
-            uint32_t bg = 0x000000;
-            uint32_t fg = 0xFFFFFF;
-
-            String textLeft;
-            String textCenter;
-            String textRight;
-            StatusBarCustomCallback custom = nullptr;
-
-            uint8_t dirtyMask = 0;
-            DirtyRect lastLeft = {};
-            DirtyRect lastCenter = {};
-            DirtyRect lastRight = {};
-            DirtyRect lastBattery = {};
-
-            int8_t batteryLevel = -1;
-            BatteryStyle batteryStyle = Hidden;
-        } _status;
-
-        struct BlurState
-        {
-            uint16_t *smallIn = nullptr;
-            uint16_t *smallTmp = nullptr;
-            uint32_t *rowR = nullptr;
-            uint32_t *rowG = nullptr;
-            uint32_t *rowB = nullptr;
-            uint32_t *colR = nullptr;
-            uint32_t *colG = nullptr;
-            uint32_t *colB = nullptr;
-            uint32_t workLen = 0;
-            uint16_t rowCap = 0;
-            uint16_t colCap = 0;
-        } _blur;
-
-        struct Flags
-        {
-            unsigned spriteEnabled : 1;
-            unsigned inSpritePass : 1;
-            unsigned needRedraw : 1;
-            unsigned bootActive : 1;
-            unsigned screenTransition : 1;
-            unsigned errorActive : 1;
-            unsigned errorTransition : 1;
-            unsigned errorButtonDown : 1;
-            unsigned errorAwaitRelease : 1;
-            unsigned notifActive : 1;
-            unsigned notifButtonDown : 1;
-            unsigned notifClosing : 1;
-            unsigned notifDelayed : 1;
-            unsigned notifAwaitRelease : 1;
-            unsigned statusBarEnabled : 1;
-            unsigned statusBarConfigured : 1;
-            unsigned statusBarDebugMetrics : 1;
-            unsigned toastActive : 1;
-            unsigned popupActive : 1;
-            unsigned popupClosing : 1;
-        } _flags = {};
-
-        struct DiagnosticsState
-        {
-            pipcore::PlatformError lastReportedError = pipcore::PlatformError::None;
-            uint8_t otaOkFrames = 0;
-            bool otaAutoConfirmed = false;
-            uint32_t screenshotHoldStartMs = 0;
-            uint16_t screenshotHoldMs = 500;
-            bool screenshotCaptured = false;
-            Button *screenshotNext = nullptr;
-            Button *screenshotPrev = nullptr;
-        } _diag;
-
-        struct ScreenshotEntry
-        {
-            uint16_t *pixels = nullptr;
-#if (PIPGUI_SCREENSHOT_MODE == 2)
-            uint32_t stamp = 0;
-            char path[64] = {};
-            bool thumbOnFlash = false;
-#endif
-        };
-
-        struct ScreenshotGalleryState
-        {
-            ScreenshotEntry *entries = nullptr;
-            uint16_t thumbW = 64;
-            uint16_t thumbH = 40;
-            uint16_t padding = 6;
-            uint8_t maxShots = 12;
-            uint8_t count = 0;
-#if (PIPGUI_SCREENSHOT_MODE == 2)
-            uint8_t flashLoadIndex = 0;
-            bool fsReady = false;
-            bool fsDirsReady = false;
-            bool flashScanDone = false;
-            bool flashScanActive = false;
-            bool flashThumbsDone = false;
-            bool thumbIndexReady = false;
-            uint16_t thumbIndexW = 0;
-            uint16_t thumbIndexH = 0;
-            fs::File scanDir;
-            uint8_t *rowBuf = nullptr;
-            uint32_t rowBufSize = 0;
-#endif
-        } _shots;
-
-        struct ScreenshotStreamState
-        {
-            uint16_t width = 0;
-            uint16_t height = 0;
-            uint8_t header[13] = {};
-            uint8_t headerOffset = 0;
-            uint32_t payloadSize = 0;
-            uint32_t payloadOffset = 0;
-            uint32_t payloadCrc = 0;
-            uint8_t *buffer = nullptr;
-            uint32_t bufferSize = 0;
-            bool active = false;
-            bool headerReady = false;
-            bool notifyOnComplete = false;
-
-            const uint16_t *qoiSrc16 = nullptr;
-            bool qoiSrcBE = false;
-            uint32_t qoiPos = 0;
-            uint32_t qoiPayloadBytes = 0;
-            uint32_t qoiPrev = 0x000000FFu;
-            uint32_t qoiIndex[64] = {};
-            uint8_t qoiRun = 0;
-            uint8_t qoiTailOffset = 0;
-            uint16_t qoiOutOff = 0;
-            uint16_t qoiOutLen = 0;
-            uint8_t qoiOut[1024] = {};
-#if (PIPGUI_SCREENSHOT_MODE == 2)
-            fs::File file;
-            uint32_t stamp = 0;
-            char path[64] = {};
-#endif
-        } _shotStream;
+        using DirtyRect = detail::DirtyRect;
+        using ClipState = detail::ClipState;
+        using ScreenshotEntry = detail::ScreenshotEntry;
+        static constexpr uint8_t DIRTY_RECT_MAX = detail::DIRTY_RECT_MAX;
+        detail::DisplayState _disp;
+        detail::RenderState _render;
+        detail::ClipState _clip;
+        detail::DirtyState _dirty;
+        detail::ScreenState _screen;
+        detail::BootState _boot;
+        detail::TypographyState _typo;
+        detail::ErrorState _error;
+        detail::NotificationState _notif;
+        detail::ToastState _toast;
+        detail::PopupMenuState _popup;
+        detail::StatusBarState _status;
+        detail::BlurState _blur;
+        detail::Flags _flags = {};
+        detail::DiagnosticsState _diag;
+        detail::ScreenshotGalleryState _shots;
+        detail::ScreenshotStreamState _shotStream;
 
         uint32_t nowMs() const;
 
@@ -827,7 +541,7 @@ namespace pipgui
                                 uint16_t fg565,
                                 TextAlign align = Left);
 
-        bool ensureBlurWorkBuffers(uint32_t smallLen, int16_t sw, int16_t sh) noexcept;
+        bool ensureBlurWorkBuffers(uint32_t smallLen, int16_t sw, int16_t sh, int16_t w, int16_t h) noexcept;
         void freeBlurBuffers(pipcore::Platform *plat) noexcept;
         void drawBlurRegion(int16_t x, int16_t y, int16_t w, int16_t h,
                             uint8_t radius, BlurDirection dir,

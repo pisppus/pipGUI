@@ -6,11 +6,38 @@ namespace pipgui
 {
     namespace detail
     {
-        struct BuilderAccess
+        struct GuiAccess
         {
             static void configureDisplay(GUI &gui, const pipcore::DisplayConfig &cfg)
             {
                 gui.configureDisplay(cfg);
+            }
+
+            static void setClip(GUI &gui, int16_t x, int16_t y, int16_t w, int16_t h)
+            {
+                gui.applyClipRect(x, y, w, h);
+            }
+
+            static void startLogo(GUI &gui,
+                                  const String &title,
+                                  const String &subtitle,
+                                  BootAnimation anim,
+                                  uint32_t fg,
+                                  uint32_t bg,
+                                  uint32_t dur,
+                                  int16_t x,
+                                  int16_t y)
+            {
+                gui.startLogo(title, subtitle, anim, fg, bg, dur, x, y);
+            }
+
+            static void configureBacklight(GUI &gui,
+                                           uint8_t pin,
+                                           uint8_t channel,
+                                           uint32_t freqHz,
+                                           uint8_t resolutionBits)
+            {
+                gui.configureBacklight(pin, channel, freqHz, resolutionBits);
             }
 
             static pipcore::Platform *platform(GUI &gui)

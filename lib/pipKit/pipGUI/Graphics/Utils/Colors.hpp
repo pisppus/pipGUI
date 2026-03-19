@@ -110,23 +110,24 @@ namespace pipgui
             if (fadePx <= 0 || end <= start)
                 return 255;
 
-            float alpha = 1.0f;
+            int32_t alpha255 = 255;
+            const int32_t denom = fadePx + 1;
             if (pos < start + fadePx)
-                alpha = (float)(pos - start + 1) / (float)(fadePx + 1);
+                alpha255 = ((pos - start + 1) * 255 + (denom >> 1)) / denom;
             if (pos >= end - fadePx)
             {
-                const float rightAlpha = (float)(end - pos) / (float)(fadePx + 1);
-                if (rightAlpha < alpha)
-                    alpha = rightAlpha;
+                const int32_t rightAlpha255 = ((end - pos) * 255 + (denom >> 1)) / denom;
+                if (rightAlpha255 < alpha255)
+                    alpha255 = rightAlpha255;
             }
 
-            if (alpha <= 0.0f)
+            if (alpha255 <= 0)
                 return 0;
-            if (alpha >= 1.0f)
+            if (alpha255 >= 255)
                 return 255;
 
-            alpha = alpha * alpha * (3.0f - 2.0f * alpha);
-            return (uint8_t)(alpha * 255.0f + 0.5f);
+            const int32_t smooth255 = (alpha255 * alpha255 * (765 - 2 * alpha255) + 32512) / 65025;
+            return (uint8_t)smooth255;
         }
 
         [[nodiscard]] inline constexpr uint32_t lighten888(uint32_t c, uint8_t amount) noexcept

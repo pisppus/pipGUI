@@ -37,6 +37,8 @@ namespace pipcore::st7789
         [[nodiscard]] virtual bool write(const void *data, size_t len) = 0;
         [[nodiscard]] virtual bool writeCommand(uint8_t cmd) = 0;
         [[nodiscard]] virtual bool writePixels(const void *data, size_t len) = 0;
+        [[nodiscard]] virtual bool acquireBus() = 0;
+        virtual void releaseBus() = 0;
         [[nodiscard]] virtual bool flush() = 0;
     };
 

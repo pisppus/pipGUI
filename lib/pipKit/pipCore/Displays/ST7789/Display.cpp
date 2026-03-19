@@ -1,11 +1,14 @@
 #include <pipCore/Displays/ST7789/Display.hpp>
 #include <pipCore/Platform.hpp>
 #include <algorithm>
+#include <cstring>
 
 namespace pipcore::st7789
 {
     namespace
     {
+        constexpr size_t StageTargetPixels = 4096;
+
         [[nodiscard]] inline constexpr uint16_t bswap16(uint16_t v) noexcept { return __builtin_bswap16(v); }
 
         inline void copySwap565(uint16_t *dst, const uint16_t *src, size_t pixels) noexcept
@@ -95,12 +98,11 @@ namespace pipcore::st7789
             return;
         }
 
-        if (swap)
         {
-            const size_t need = static_cast<size_t>(cW);
+            const size_t need = std::min(totalPixels, std::max<size_t>(static_cast<size_t>(cW), StageTargetPixels));
             if (_lineBufCapPixels < need)
             {
-                uint16_t *newBuf = _platform ? static_cast<uint16_t *>(_platform->alloc(need * sizeof(uint16_t), AllocCaps::Default)) : nullptr;
+                uint16_t *newBuf = _platform ? static_cast<uint16_t *>(_platform->alloc(need * sizeof(uint16_t), AllocCaps::PreferInternal)) : nullptr;
                 if (newBuf)
                 {
                     if (_lineBuf)
@@ -111,27 +113,36 @@ namespace pipcore::st7789
             }
         }
 
+        if (_lineBuf && _lineBufCapPixels >= static_cast<size_t>(cW))
+        {
+            const size_t rowsPerBatch = std::max<size_t>(1, _lineBufCapPixels / static_cast<size_t>(cW));
+            int16_t yy = 0;
+            while (yy < cH)
+            {
+                const int16_t batchRows = static_cast<int16_t>(std::min<size_t>(rowsPerBatch, static_cast<size_t>(cH - yy)));
+                size_t off = 0;
+                for (int16_t rowIdx = 0; rowIdx < batchRows; ++rowIdx)
+                {
+                    const uint16_t *row = pixels + static_cast<size_t>(yy + rowIdx) * stridePixels;
+                    if (!swap)
+                        std::memcpy(_lineBuf + off, row, static_cast<size_t>(cW) * sizeof(uint16_t));
+                    else
+                        copySwap565(_lineBuf + off, row, static_cast<size_t>(cW));
+                    off += static_cast<size_t>(cW);
+                }
+
+                if (!_drv.writePixels565(_lineBuf, off, false))
+                    return;
+                yy = static_cast<int16_t>(yy + batchRows);
+            }
+            return;
+        }
+
         for (int16_t yy = 0; yy < cH; ++yy)
         {
             const uint16_t *row = pixels + static_cast<size_t>(yy) * stridePixels;
-            if (!swap)
-            {
-                if (!_drv.writePixels565(row, static_cast<size_t>(cW), false))
-                    return;
-                continue;
-            }
-
-            if (_lineBuf && _lineBufCapPixels >= static_cast<size_t>(cW))
-            {
-                copySwap565(_lineBuf, row, static_cast<size_t>(cW));
-                if (!_drv.writePixels565(_lineBuf, static_cast<size_t>(cW), false))
-                    return;
-            }
-            else
-            {
-                if (!_drv.writePixels565(row, static_cast<size_t>(cW), true))
-                    return;
-            }
+            if (!_drv.writePixels565(row, static_cast<size_t>(cW), swap))
+                return;
         }
     }
 }

@@ -152,6 +152,14 @@ namespace pipcore
         if (cw <= 0 || ch <= 0)
             return;
 
+        if (cw == w && rx1 == 0 && _w == w)
+        {
+            copySwap565(_buf + static_cast<size_t>(ry1) * _w,
+                        pixels565 + static_cast<size_t>(ry1 - y) * w,
+                        static_cast<size_t>(cw) * static_cast<size_t>(ch));
+            return;
+        }
+
         const uint16_t *srcLine = pixels565 + (size_t)(ry1 - y) * w + (rx1 - x);
         uint16_t *dstLine = _buf + (size_t)ry1 * _w + rx1;
 

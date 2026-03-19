@@ -1,9 +1,9 @@
-﻿#include <pipGUI/Core/pipGUI.hpp>
-#include <pipGUI/Core/API/Internal/RuntimeState.hpp>
+#include <pipGUI/Core/pipGUI.hpp>
+#include <pipGUI/Core/Internal/ViewModels.hpp>
 namespace pipgui
 {
 
-    static inline uint16_t color888To565NoBnsd(uint32_t color888)
+    static inline uint16_t color888To565NoBlueNoise(uint32_t color888)
     {
         uint8_t r = (uint8_t)((color888 >> 16) & 0xFF);
         uint8_t g = (uint8_t)((color888 >> 8) & 0xFF);
@@ -53,8 +53,8 @@ namespace pipgui
             if (w2 > 255)
                 w2 = 255;
 
-            uint16_t bg565_1 = color888To565NoBnsd(bg);
-            uint16_t fg565_1 = color888To565NoBnsd(color);
+            uint16_t bg565_1 = color888To565NoBlueNoise(bg);
+            uint16_t fg565_1 = color888To565NoBlueNoise(color);
             uint16_t bg565_2 = bg565_1;
             uint16_t fg565_2 = fg565_1;
 
@@ -732,4 +732,5 @@ namespace pipgui
         flushDirty();
     }
 }
+
 

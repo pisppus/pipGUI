@@ -8,18 +8,6 @@ namespace pipgui
     struct Color888
     {
         uint8_t r, g, b;
-
-        [[nodiscard]] static constexpr Color888 fromUint32(uint32_t c) noexcept
-        {
-            return {(uint8_t)((c >> 16) & 0xFF),
-                    (uint8_t)((c >> 8) & 0xFF),
-                    (uint8_t)(c & 0xFF)};
-        }
-
-        [[nodiscard]] constexpr uint32_t toUint32() const noexcept
-        {
-            return ((uint32_t)r << 16) | ((uint32_t)g << 8) | b;
-        }
     };
 
     namespace detail

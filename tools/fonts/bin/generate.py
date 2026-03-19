@@ -124,8 +124,7 @@ def _project_outputs_exist(project_dir: str, ttf_files: list[str]) -> bool:
         font_folder = _font_folder_from_base(font_base)
         out_fonts_dir = os.path.join(_out_fonts_root(project_dir), font_folder)
         if not (
-            os.path.isfile(os.path.join(out_fonts_dir, f"{font_folder}.hpp"))
-            and os.path.isfile(os.path.join(out_fonts_dir, f"{font_folder}.cpp"))
+            os.path.isfile(os.path.join(out_fonts_dir, f"{font_folder}.cpp"))
             and os.path.isfile(os.path.join(out_fonts_dir, "metrics.hpp"))
         ):
             return False
@@ -164,17 +163,9 @@ def is_up_to_date(project_dir: str, announce: bool = False) -> bool:
     return up_to_date
 
 
-def _gen_atlas_decl_hpp(var_name: str) -> str:
+def _gen_atlas_def_cpp(var_name: str, data: bytes) -> str:
     out = []
-    out.append("#pragma once\n\n")
-    out.append("#include <cstdint>\n\n")
-    out.append(f"extern const uint8_t {var_name}[];\n")
-    return "".join(out)
-
-
-def _gen_atlas_def_cpp(hpp_filename: str, var_name: str, data: bytes, w: int | None = None, h: int | None = None) -> str:
-    out = []
-    out.append(f"#include \"{hpp_filename}\"\n\n")
+    out.append("#include \"metrics.hpp\"\n\n")
     out.append(f"const uint8_t {var_name}[] = {{\n")
 
     for i in range(0, len(data), 16):
@@ -208,6 +199,8 @@ def _gen_metrics_header(atlas: dict, font_ident: str, font_folder: str) -> str:
     out = []
     out.append("#pragma once\n")
     out.append("#include <cstdint>\n")
+    out.append("\n")
+    out.append(f"extern const uint8_t {font_folder}[];\n")
     out.append("\n")
     out.append("namespace pipgui\n{")
     out.append(f"\nnamespace {ns_name}\n{{")
@@ -409,7 +402,6 @@ def generate_all(project_dir: str) -> bool:
         font_idents.append(font_ident)
 
         out_fonts_dir = os.path.join(_out_fonts_root(project_dir), font_folder)
-        out_atlas_hpp = os.path.join(out_fonts_dir, f"{font_folder}.hpp")
         out_atlas_cpp = os.path.join(out_fonts_dir, f"{font_folder}.cpp")
         out_metrics_hpp = os.path.join(out_fonts_dir, "metrics.hpp")
 
@@ -470,7 +462,6 @@ def generate_all(project_dir: str) -> bool:
             prev_stamp == stamp_in
             and os.path.isfile(json_path)
             and os.path.isfile(bin_path)
-            and os.path.isfile(out_atlas_hpp)
             and os.path.isfile(out_atlas_cpp)
             and os.path.isfile(out_metrics_hpp)
         )
@@ -526,9 +517,10 @@ def generate_all(project_dir: str) -> bool:
         if not os.path.isfile(os.path.join(work_dir, "atlas.png")):
             _write_png_gray8(os.path.join(work_dir, "atlas.png"), w, h, data)
 
-        hpp_filename = os.path.basename(out_atlas_hpp)
-        _write_if_changed(out_atlas_hpp, _gen_atlas_decl_hpp(font_folder))
-        _write_if_changed(out_atlas_cpp, _gen_atlas_def_cpp(hpp_filename, font_folder, data, w, h))
+        stale_hpp = os.path.join(out_fonts_dir, f"{font_folder}.hpp")
+        if os.path.isfile(stale_hpp):
+            os.remove(stale_hpp)
+        _write_if_changed(out_atlas_cpp, _gen_atlas_def_cpp(font_folder, data))
         generated += 1
 
     if font_idents:

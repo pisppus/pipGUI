@@ -32,7 +32,7 @@ namespace pipgui
 
         clear(bg565);
 
-        const uint16_t titlePx = _typo.logoTitleSizePx ? _typo.logoTitleSizePx : _typo.h1Px;
+        const uint16_t titlePx = _typo.logoTitleSizePx ? _typo.logoTitleSizePx : 24;
         const uint16_t subPx = _typo.logoSubtitleSizePx ? _typo.logoSubtitleSizePx : (uint16_t)((titlePx * 3) >> 2);
 
         // Title with KronaOne
@@ -69,7 +69,7 @@ namespace pipgui
         }
     }
 
-    void GUI::showLogo(const String &t, const String &s, BootAnimation a, uint32_t fg, uint32_t bg, uint32_t dur, int16_t x, int16_t y)
+    void GUI::startLogo(const String &t, const String &s, BootAnimation a, uint32_t fg, uint32_t bg, uint32_t dur, int16_t x, int16_t y)
     {
         _flags.bootActive = 1;
         _boot.anim = a;
@@ -160,7 +160,7 @@ namespace pipgui
             uint8_t alpha = (uint8_t)(fadeEase * 255.0f + 0.5f);
             uint32_t fgBlend = detail::blend888(_boot.bgColor, _boot.fgColor, alpha);
 
-            uint16_t baseTitlePx = _typo.logoTitleSizePx ? _typo.logoTitleSizePx : _typo.h1Px;
+            uint16_t baseTitlePx = _typo.logoTitleSizePx ? _typo.logoTitleSizePx : 24;
             uint16_t baseSubPx = _typo.logoSubtitleSizePx ? _typo.logoSubtitleSizePx : (uint16_t)((baseTitlePx * 3U) / 4U);
 
             float scale = 0.50f + 0.50f * zoomEase;
@@ -226,7 +226,7 @@ namespace pipgui
             int16_t th = 0, sh = 0, sp = 4;
             bool sub = _boot.subtitle.length() > 0;
 
-            uint16_t titlePx = _typo.logoTitleSizePx ? _typo.logoTitleSizePx : _typo.h1Px;
+            uint16_t titlePx = _typo.logoTitleSizePx ? _typo.logoTitleSizePx : 24;
             uint16_t subPx = _typo.logoSubtitleSizePx ? _typo.logoSubtitleSizePx : (uint16_t)((titlePx * 3U) / 4U);
 
             int16_t tmpW = 0;

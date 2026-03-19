@@ -440,7 +440,13 @@ namespace
 
   void runBootAnimation(GUI &ui, BootAnimation anim, uint32_t durationMs, const String &title, const String &subtitle)
   {
-    ui.showLogo(title, subtitle, anim, 0xFFFF, 0x0000, durationMs);
+    ui.showLogo()
+      .title(title)
+      .subtitle(subtitle)
+      .anim(anim)
+      .fgColor(0xFFFF)
+      .bgColor(0x0000)
+      .duration(durationMs);
     const uint32_t start = millis();
     while ((millis() - start) < durationMs)
     {
@@ -2864,22 +2870,18 @@ void setup()
       .size(240, 320);
 
   ui.begin(3, 0);
-#if PIPGUI_WIFI
-  ui.requestWiFi(true);
-#endif
-  ui.setScreenAnimation(SlideX, 320);
+  ui.setScreenAnim(SlideX, 320);
   ui.configureStatusBar(false, 0x0000, kStatusBarHeight, Top);
   ui.setStatusBarStyle(StatusBarStyleBlurGradient);
   ui.setStatusBarText("pipGUI", "00:00", "");
   ui.setStatusBarBattery(100, Bar);
   if (kBacklightPin != 255)
-    ui.setBacklightPin(kBacklightPin);
+    ui.setBacklight().pin(kBacklightPin);
 
   btnNext.begin();
   btnPrev.begin();
   ui.setScreenshotShortcut(&btnNext, &btnPrev);
 
-  ui.configureTextStyles(24, 18, 14, 12);
   ui.logoSizesPx(36, 24);
 
   runBootAnimation(ui, FadeIn, 900, "PISPPUS", "Fade in");

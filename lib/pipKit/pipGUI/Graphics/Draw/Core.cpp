@@ -1,8 +1,5 @@
 #include <pipGUI/Core/pipGUI.hpp>
 #include <pipGUI/Core/Debug.hpp>
-#include <pipGUI/Graphics/Utils/Colors.hpp>
-#include <pipCore/Graphics/Sprite.hpp>
-#include "Blend.hpp"
 
 namespace pipgui
 {
@@ -12,15 +9,26 @@ namespace pipgui
                                  int16_t x,
                                  int16_t y,
                                  int16_t w,
-                                 int16_t h)
+        int16_t h)
     {
         if (!spr)
             return;
+
+        int32_t curX = 0;
+        int32_t curY = 0;
+        int32_t curW = 0;
+        int32_t curH = 0;
+        spr->getClipRect(&curX, &curY, &curW, &curH);
+
         if (!enabled)
         {
+            if (curX == 0 && curY == 0 && curW == spr->width() && curH == spr->height())
+                return;
             spr->setClipRect(0, 0, spr->width(), spr->height());
             return;
         }
+        if (curX == x && curY == y && curW == w && curH == h)
+            return;
         spr->setClipRect(x, y, w, h);
     }
 
@@ -38,7 +46,7 @@ namespace pipgui
         return spr;
     }
 
-    void GUI::setClip(int16_t x, int16_t y, int16_t w, int16_t h)
+    void GUI::applyClipRect(int16_t x, int16_t y, int16_t w, int16_t h)
     {
         _clip.enabled = true;
         _clip.x = x;
@@ -132,25 +140,34 @@ namespace pipgui
         for (uint8_t i = 0; i < _dirty.count; ++i)
         {
             DirtyRect &dr = _dirty.rects[i];
+            int16_t drX2 = dr.x + dr.w;
+            int16_t drY2 = dr.y + dr.h;
 
-            if (x > dr.x + dr.w || x2 < dr.x || y > dr.y + dr.h || y2 < dr.y)
+            if (x >= dr.x && x2 <= drX2 && y >= dr.y && y2 <= drY2)
+                return;
+
+            if (x > drX2 || x2 < dr.x || y > drY2 || y2 < dr.y)
                 continue;
 
             int16_t nx1 = (x < dr.x) ? x : dr.x;
             int16_t ny1 = (y < dr.y) ? y : dr.y;
-            int16_t nx2 = (x2 > dr.x + dr.w) ? x2 : (dr.x + dr.w);
-            int16_t ny2 = (y2 > dr.y + dr.h) ? y2 : (dr.y + dr.h);
+            int16_t nx2 = (x2 > drX2) ? x2 : drX2;
+            int16_t ny2 = (y2 > drY2) ? y2 : drY2;
 
             dr.x = nx1;
             dr.y = ny1;
             dr.w = nx2 - nx1;
             dr.h = ny2 - ny1;
+            drX2 = nx2;
+            drY2 = ny2;
 
             for (uint8_t j = i + 1; j < _dirty.count;)
             {
                 DirtyRect &next = _dirty.rects[j];
-                bool overlap = !(dr.x > next.x + next.w || dr.x + dr.w < next.x ||
-                                 dr.y > next.y + next.h || dr.y + dr.h < next.y);
+                const int16_t nextX2 = next.x + next.w;
+                const int16_t nextY2 = next.y + next.h;
+                bool overlap = !(dr.x > nextX2 || drX2 < next.x ||
+                                 dr.y > nextY2 || drY2 < next.y);
                 if (!overlap)
                 {
                     ++j;
@@ -158,13 +175,15 @@ namespace pipgui
                 }
                 int16_t nx1 = (dr.x < next.x) ? dr.x : next.x;
                 int16_t ny1 = (dr.y < next.y) ? dr.y : next.y;
-                int16_t nx2 = (dr.x + dr.w > next.x + next.w) ? (dr.x + dr.w) : (next.x + next.w);
-                int16_t ny2 = (dr.y + dr.h > next.y + next.h) ? (dr.y + dr.h) : (next.y + next.h);
+                int16_t nx2 = (drX2 > nextX2) ? drX2 : nextX2;
+                int16_t ny2 = (drY2 > nextY2) ? drY2 : nextY2;
 
                 dr.x = nx1;
                 dr.y = ny1;
                 dr.w = nx2 - nx1;
                 dr.h = ny2 - ny1;
+                drX2 = nx2;
+                drY2 = ny2;
                 _dirty.rects[j] = _dirty.rects[--_dirty.count];
             }
             return;
