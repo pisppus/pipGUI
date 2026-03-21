@@ -1,6 +1,5 @@
 #pragma once
 
-#include <pipGUI/Core/Types.hpp>
 #include <pipCore/Network/Wifi.hpp>
 
 namespace pipgui::net

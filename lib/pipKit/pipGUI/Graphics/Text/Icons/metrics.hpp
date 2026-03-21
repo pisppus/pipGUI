@@ -1,6 +1,8 @@
 #pragma once
 #include <cstdint>
 
+extern const uint8_t icons[];
+
 namespace pipgui
 {
 namespace psdf_icons
@@ -12,11 +14,11 @@ static constexpr float NominalSizePx = 48.0f;
 
 enum IconId : uint16_t
 {
-    IconBatteryLayer0 = 0,
-    IconBatteryLayer1 = 1,
-    IconBatteryLayer2 = 2,
-    IconErrorLayer0 = 3,
-    IconWarningLayer0 = 4
+    IconBatteryL0 = 0,
+    IconBatteryL1 = 1,
+    IconBatteryL2 = 2,
+    IconError = 3,
+    IconWarning = 4
 };
 
 struct Icon
@@ -44,20 +46,15 @@ static constexpr Icon Icons[IconCount] =
 namespace pipgui
 {
 using IconId = ::pipgui::psdf_icons::IconId;
-static constexpr IconId IconBatteryLayer0 = ::pipgui::psdf_icons::IconBatteryLayer0;
-static constexpr IconId IconBatteryLayer1 = ::pipgui::psdf_icons::IconBatteryLayer1;
-static constexpr IconId IconBatteryLayer2 = ::pipgui::psdf_icons::IconBatteryLayer2;
-static constexpr IconId IconErrorLayer0 = ::pipgui::psdf_icons::IconErrorLayer0;
-static constexpr IconId IconWarningLayer0 = ::pipgui::psdf_icons::IconWarningLayer0;
+static constexpr IconId IconBatteryL0 = ::pipgui::psdf_icons::IconBatteryL0;
+static constexpr IconId IconBatteryL1 = ::pipgui::psdf_icons::IconBatteryL1;
+static constexpr IconId IconBatteryL2 = ::pipgui::psdf_icons::IconBatteryL2;
+static constexpr IconId IconError = ::pipgui::psdf_icons::IconError;
+static constexpr IconId IconWarning = ::pipgui::psdf_icons::IconWarning;
 }
 
-constexpr pipgui::IconId BatteryLayer0 = ::pipgui::psdf_icons::IconBatteryLayer0;
-constexpr pipgui::IconId battery_layer0 = ::pipgui::psdf_icons::IconBatteryLayer0;
-constexpr pipgui::IconId BatteryLayer1 = ::pipgui::psdf_icons::IconBatteryLayer1;
-constexpr pipgui::IconId battery_layer1 = ::pipgui::psdf_icons::IconBatteryLayer1;
-constexpr pipgui::IconId BatteryLayer2 = ::pipgui::psdf_icons::IconBatteryLayer2;
-constexpr pipgui::IconId battery_layer2 = ::pipgui::psdf_icons::IconBatteryLayer2;
-constexpr pipgui::IconId ErrorLayer0 = ::pipgui::psdf_icons::IconErrorLayer0;
-constexpr pipgui::IconId error_layer0 = ::pipgui::psdf_icons::IconErrorLayer0;
-constexpr pipgui::IconId WarningLayer0 = ::pipgui::psdf_icons::IconWarningLayer0;
-constexpr pipgui::IconId warning_layer0 = ::pipgui::psdf_icons::IconWarningLayer0;
+constexpr pipgui::IconId battery_l0 = ::pipgui::psdf_icons::IconBatteryL0;
+constexpr pipgui::IconId battery_l1 = ::pipgui::psdf_icons::IconBatteryL1;
+constexpr pipgui::IconId battery_l2 = ::pipgui::psdf_icons::IconBatteryL2;
+constexpr pipgui::IconId error = ::pipgui::psdf_icons::IconError;
+constexpr pipgui::IconId warning = ::pipgui::psdf_icons::IconWarning;

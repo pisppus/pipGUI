@@ -5,6 +5,7 @@
 #include <pipGUI/Core/Types.hpp>
 #include <pipGUI/Core/Internal/GuiState.hpp>
 #include <pipGUI/Graphics/Utils/Colors.hpp>
+#include <pipGUI/Systems/Network/Wifi.hpp>
 #include <pipGUI/Systems/Update/Ota.hpp>
 
 #if (PIPGUI_SCREENSHOT_MODE == 2)
@@ -18,6 +19,7 @@ namespace pipgui
     struct ConfigureBacklightFluent;
     struct SetClipFluent;
     struct ShowLogoFluent;
+    struct ShowErrorFluent;
 
     struct FillRectFluent;
     struct DrawRectFluent;
@@ -110,11 +112,6 @@ namespace pipgui
         struct TextFontGuard;
     }
 
-    enum class ScreenshotFormat : uint8_t
-    {
-        QoiRgb = 3,
-    };
-
     class GUI
     {
     public:
@@ -157,11 +154,11 @@ namespace pipgui
         void configureScreenshotGallery(uint8_t maxShots = 12, uint16_t thumbW = 64, uint16_t thumbH = 40, uint16_t padding = 6);
         [[nodiscard]] uint8_t screenshotCount() const noexcept { return _shots.count; }
         [[nodiscard]] DrawScreenshotFluent drawScreenshot();
-        void setScreenshotShortcut(Button *next, Button *prev, uint16_t holdMs = 500);
         InputState pollInput(Button &next, Button &prev);
 
         // WiFi
         void requestWiFi(bool enabled) noexcept;
+        [[nodiscard]] net::WifiState wifiState() const noexcept;
         [[nodiscard]] bool wifiConnected() const noexcept;
         [[nodiscard]] uint32_t wifiLocalIpV4() const noexcept;
 
@@ -229,6 +226,7 @@ namespace pipgui
 
         [[nodiscard]] ToastFluent showToast();
         [[nodiscard]] NotificationFluent showNotification();
+        [[nodiscard]] ShowErrorFluent showError();
         [[nodiscard]] PopupMenuFluent showPopupMenu();
         [[nodiscard]] PopupMenuInputFluent popupMenuInput();
         [[nodiscard]] bool popupMenuActive() const noexcept { return _flags.popupActive; }
@@ -278,27 +276,27 @@ namespace pipgui
         }
 
         void drawProgressText(int16_t x, int16_t y, int16_t w, int16_t h,
-                              const String &text, TextAlign align = AlignCenter,
-                              uint32_t textColor = 0xFFFFFF, uint32_t bgColor = 0x000000,
-                              uint16_t fontPx = 0);
+                              const String &text, uint16_t textColor565, uint16_t bgColor565,
+                              TextAlign align = TextAlign::Center, uint16_t fontPx = 0);
 
         void drawProgressText(int16_t x, int16_t y, int16_t w, int16_t h,
-                              const String &text, uint16_t textColor565, uint16_t bgColor565,
-                              TextAlign align = AlignCenter, uint16_t fontPx = 0)
+                              const String &text, TextAlign align = TextAlign::Center,
+                              uint32_t textColor = 0xFFFFFF, uint32_t bgColor = 0x000000,
+                              uint16_t fontPx = 0)
         {
-            drawProgressText(x, y, w, h, text, align, detail::color565To888(textColor565), detail::color565To888(bgColor565), fontPx);
+            drawProgressText(x, y, w, h, text, detail::color888To565(textColor), detail::color888To565(bgColor), align, fontPx);
         }
 
         void drawProgressPercent(int16_t x, int16_t y, int16_t w, int16_t h,
-                                 uint8_t value, TextAlign align = AlignCenter,
-                                 uint32_t textColor = 0xFFFFFF, uint32_t bgColor = 0x000000,
-                                 uint16_t fontPx = 0);
+                                 uint8_t value, uint16_t textColor565, uint16_t bgColor565,
+                                 TextAlign align = TextAlign::Center, uint16_t fontPx = 0);
 
         void drawProgressPercent(int16_t x, int16_t y, int16_t w, int16_t h,
-                                 uint8_t value, uint16_t textColor565, uint16_t bgColor565,
-                                 TextAlign align = AlignCenter, uint16_t fontPx = 0)
+                                 uint8_t value, TextAlign align = TextAlign::Center,
+                                 uint32_t textColor = 0xFFFFFF, uint32_t bgColor = 0x000000,
+                                 uint16_t fontPx = 0)
         {
-            drawProgressPercent(x, y, w, h, value, align, detail::color565To888(textColor565), detail::color565To888(bgColor565), fontPx);
+            drawProgressPercent(x, y, w, h, value, detail::color888To565(textColor), detail::color888To565(bgColor), align, fontPx);
         }
 
         void updateButtonPress(ButtonVisualState &s, bool isDown);
@@ -322,7 +320,9 @@ namespace pipgui
                             uint16_t atlasWidth, uint16_t atlasHeight,
                             float distanceRange, float nominalSizePx,
                             float ascender, float descender, float lineHeight,
-                            const void *glyphs, uint16_t glyphCount);
+                            const void *glyphs, uint16_t glyphCount,
+                            const void *kerningPairs = nullptr, uint16_t kerningPairCount = 0,
+                            int8_t tracking128 = 0);
 
         [[nodiscard]] bool setFont(FontId fontId);
         [[nodiscard]] FontId fontId() const noexcept;
@@ -350,7 +350,7 @@ namespace pipgui
         void loopWithInput(Button &next, Button &prev);
         void requestRedraw();
         void setScreenAnim(ScreenAnim anim, uint32_t durationMs);
-        void applyClipRect(int16_t x, int16_t y, int16_t w, int16_t h);
+        void applyClip(int16_t x, int16_t y, int16_t w, int16_t h);
         void clearClip();
 
         void startLogo(const String &t, const String &s,
@@ -358,22 +358,14 @@ namespace pipgui
                        uint32_t bg = 0x000000, uint32_t dur = 0,
                        int16_t x = -1, int16_t y = -1);
 
-        void logoTitleSizePx(uint16_t sizePx) noexcept { _typo.logoTitleSizePx = sizePx; }
-        void logoSubtitleSizePx(uint16_t sizePx) noexcept { _typo.logoSubtitleSizePx = sizePx; }
-        void logoSizesPx(uint16_t titleSizePx, uint16_t subtitleSizePx) noexcept
-        {
-            _typo.logoTitleSizePx = titleSizePx;
-            _typo.logoSubtitleSizePx = subtitleSizePx;
-        }
-
         void setNotificationButtonDown(bool down);
         [[nodiscard]] bool notificationActive() const noexcept;
         [[nodiscard]] bool toastActive() const;
 
-        void showError(const String &title, const String &message,
-                       ErrorType type = Warning, const String &buttonText = "OK");
         void nextError();
+        void prevError();
         [[nodiscard]] bool errorActive() const noexcept;
+        void setErrorButtonsDown(bool nextDown, bool prevDown, bool comboDown = false);
         void setErrorButtonDown(bool down);
 
         void configureStatusBar(bool enabled, uint32_t bgColor = 0x000000,
@@ -432,10 +424,11 @@ namespace pipgui
         void resetDisplayRuntime() noexcept;
         void clearReportedPlatformError();
         void reportPlatformErrorOnce(const char *stage);
-        void handleScreenshotShortcut(bool nextDown, bool prevDown);
+        void handleScreenshotShortcut(bool comboDown);
         void freeScreenshotGallery(pipcore::Platform *plat) noexcept;
+        void releaseScreenshotGalleryCache(pipcore::Platform *plat) noexcept;
         void freeScreenshotStream(pipcore::Platform *plat) noexcept;
-        void resetScreenshotStreamState(pipcore::Platform *plat, bool keepBuffer) noexcept;
+        void resetScreenshotStreamState(pipcore::Platform *plat) noexcept;
         bool ensureScreenshotGallery(pipcore::Platform *plat);
         void captureScreenshotToGallery();
         void insertShotToGalleryFrom565(const uint16_t *src565be, uint16_t w, uint16_t h, uint32_t stamp, const char *path);
@@ -526,20 +519,20 @@ namespace pipgui
                                      uint8_t fadePx);
         void drawIconInternal(uint16_t iconId, int16_t x, int16_t y, uint16_t sizePx, uint16_t fg565);
         void updateIconInternal(uint16_t iconId, int16_t x, int16_t y, uint16_t sizePx, uint16_t fg565, uint16_t bg565);
-        void drawCenteredTitle(const String &title, const String &subtitle, uint16_t fg565, uint16_t bg565);
-        void drawText(const String &text, int16_t x, int16_t y, uint16_t fg565, uint16_t bg565, TextAlign align = Left);
-        void updateText(const String &text, int16_t x, int16_t y, uint16_t fg565, uint16_t bg565, TextAlign align = Left);
+        void drawBootTitleBlock(const String &title, const String &subtitle, uint16_t fg565, uint16_t bg565);
+        void drawText(const String &text, int16_t x, int16_t y, uint16_t fg565, uint16_t bg565, TextAlign align = TextAlign::Left);
+        void updateText(const String &text, int16_t x, int16_t y, uint16_t fg565, uint16_t bg565, TextAlign align = TextAlign::Left);
         bool drawTextMarquee(const String &text,
                              int16_t x, int16_t y,
                              int16_t maxWidth,
                              uint16_t fg565,
-                             TextAlign align = Left,
+                             TextAlign align = TextAlign::Left,
                              const MarqueeTextOptions &opts = MarqueeTextOptions());
         bool drawTextEllipsized(const String &text,
                                 int16_t x, int16_t y,
                                 int16_t maxWidth,
                                 uint16_t fg565,
-                                TextAlign align = Left);
+                                TextAlign align = TextAlign::Left);
 
         bool ensureBlurWorkBuffers(uint32_t smallLen, int16_t sw, int16_t sh, int16_t w, int16_t h) noexcept;
         void freeBlurBuffers(pipcore::Platform *plat) noexcept;
@@ -702,10 +695,11 @@ namespace pipgui
                                       IconId iconId);
 
         void renderErrorFrame(uint32_t now);
+        void startError(const String &message,
+                        const String &code,
+                        ErrorType type = ErrorTypeWarning,
+                        const String &buttonText = "OK");
         bool ensureErrorCapacity(uint8_t need);
         void freeErrors(pipcore::Platform *plat) noexcept;
-        void drawErrorCard(int16_t x, int16_t y, int16_t w, int16_t h,
-                           const String &title, const String &detail,
-                           uint32_t accentColor);
     };
 }

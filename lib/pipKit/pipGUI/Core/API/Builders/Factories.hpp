@@ -48,6 +48,7 @@ namespace pipgui
 
     inline ToastFluent GUI::showToast() { return ToastFluent(this); }
     inline NotificationFluent GUI::showNotification() { return NotificationFluent(this); }
+    inline ShowErrorFluent GUI::showError() { return ShowErrorFluent(this); }
     inline PopupMenuFluent GUI::showPopupMenu() { return PopupMenuFluent(this); }
     inline PopupMenuInputFluent GUI::popupMenuInput() { return PopupMenuInputFluent(this); }
 

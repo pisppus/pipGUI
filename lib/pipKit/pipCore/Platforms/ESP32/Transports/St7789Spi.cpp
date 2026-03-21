@@ -14,8 +14,7 @@ namespace pipcore::esp32
 {
     namespace
     {
-        constexpr size_t DmaBufferBytes = 16384;
-        constexpr size_t DmaBufferFallbackBytes = 8192;
+        constexpr size_t DmaBufferBytes = 8192;
 
         [[nodiscard]] inline constexpr bool isPinValid(int8_t pin) noexcept { return pin >= 0; }
 
@@ -241,34 +240,11 @@ namespace pipcore::esp32
         }
         _spiHandle = h;
 
-        for (size_t dmaBufSize : {DmaBufferBytes, DmaBufferFallbackBytes})
+        for (int i = 0; i < 2; ++i)
         {
-            bool ok = true;
-            for (int i = 0; i < 2; ++i)
-            {
-                _dmaBuf[i] = static_cast<uint8_t *>(heap_caps_aligned_alloc(4, dmaBufSize, MALLOC_CAP_DMA | MALLOC_CAP_8BIT));
-                if (!_dmaBuf[i])
-                {
-                    ok = false;
-                    break;
-                }
-            }
-
-            if (ok)
-            {
-                _dmaBufSize = dmaBufSize;
-                break;
-            }
-
-            for (int i = 0; i < 2; ++i)
-            {
-                if (_dmaBuf[i])
-                {
-                    heap_caps_free(_dmaBuf[i]);
-                    _dmaBuf[i] = nullptr;
-                }
-            }
+            _dmaBuf[i] = static_cast<uint8_t *>(heap_caps_aligned_alloc(4, DmaBufferBytes, MALLOC_CAP_DMA | MALLOC_CAP_8BIT));
         }
+        _dmaBufSize = DmaBufferBytes;
 
         if (!_dmaBuf[0] || !_dmaBuf[1])
         {

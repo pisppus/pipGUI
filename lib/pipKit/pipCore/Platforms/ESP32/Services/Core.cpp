@@ -32,13 +32,6 @@ namespace pipcore::esp32::services
         if (bytes == 0)
             return nullptr;
 
-        if (caps == AllocCaps::PreferExternal)
-        {
-            void *ptr = heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-            if (ptr)
-                return ptr;
-        }
-
         if (caps == AllocCaps::PreferInternal)
         {
             void *ptr = heap_caps_malloc(bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);

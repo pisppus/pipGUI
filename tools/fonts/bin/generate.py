@@ -7,7 +7,9 @@ import sys
 
 sys.dont_write_bytecode = True
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_TOOLS_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if _TOOLS_DIR not in sys.path:
+    sys.path.insert(0, _TOOLS_DIR)
 from psdf import (
     _write_png_gray8,
     _fmt_f,
@@ -51,7 +53,45 @@ def _require_font_entry(cfg, ttf_base: str) -> dict:
             raise RuntimeError(f"FONTS['{ttf_base}'] missing '{k}'")
     if not isinstance(ent["glyphs"], list):
         raise RuntimeError(f"FONTS['{ttf_base}']['glyphs'] must be a list")
+    if "tracking128" in ent and not isinstance(ent["tracking128"], int):
+        raise RuntimeError(f"FONTS['{ttf_base}']['tracking128'] must be an int")
+    if "kerningPairs" in ent and not isinstance(ent["kerningPairs"], list):
+        raise RuntimeError(f"FONTS['{ttf_base}']['kerningPairs'] must be a list")
     return ent
+
+def _normalize_kerning_pairs(atlas: dict, ent: dict) -> list:
+    merged = {}
+
+    for pair in atlas.get("kerning", []):
+        if not isinstance(pair, dict):
+            continue
+        left = pair.get("unicode1", pair.get("left"))
+        right = pair.get("unicode2", pair.get("right"))
+        if left is None or right is None:
+            continue
+        adjust = pair.get("adjust256")
+        if adjust is None:
+            raw = pair.get("advance", pair.get("adjust", pair.get("kerning", 0.0)))
+            try:
+                adjust = int(float(raw) * 256.0 + (0.5 if float(raw) >= 0.0 else -0.5))
+            except Exception:
+                continue
+        merged[(int(left), int(right))] = int(adjust)
+
+    for pair in ent.get("kerningPairs", []):
+        if not isinstance(pair, dict):
+            continue
+        left = pair.get("left")
+        right = pair.get("right")
+        adjust = pair.get("adjust256")
+        if left is None or right is None or adjust is None:
+            continue
+        merged[(int(left), int(right))] = int(adjust)
+
+    items = []
+    for (left, right), adjust in sorted(merged.items()):
+        items.append({"left": left, "right": right, "adjust256": adjust})
+    return items
 def _build_charset_from_glyphs(glyphs: list) -> str:
     """Build charset.txt content from a list of ranges/singles."""
     lines = []
@@ -177,7 +217,7 @@ def _gen_atlas_def_cpp(var_name: str, data: bytes) -> str:
     return "".join(out)
 
 
-def _gen_metrics_header(atlas: dict, font_ident: str, font_folder: str) -> str:
+def _gen_metrics_header(atlas: dict, font_ident: str, font_folder: str, font_ent: dict) -> str:
     ns_name = "psdf_" + font_ident.lower().replace("made", "").replace("display", "").replace("one", "")
     if ns_name == "psdf_wix":
         ns_name = "psdf"
@@ -185,6 +225,8 @@ def _gen_metrics_header(atlas: dict, font_ident: str, font_folder: str) -> str:
     atlas_info = atlas.get("atlas", {})
     metrics = atlas.get("metrics", {})
     glyphs = atlas.get("glyphs", [])
+    kerning_pairs = _normalize_kerning_pairs(atlas, font_ent)
+    tracking128 = int(font_ent.get("tracking128", 0))
 
     width = int(atlas_info.get("width", 0))
     height = int(atlas_info.get("height", 0))
@@ -223,6 +265,12 @@ def _gen_metrics_header(atlas: dict, font_ident: str, font_folder: str) -> str:
     out.append("\n    uint16_t atlasBottom;")
     out.append("\n    uint16_t atlasRight;")
     out.append("\n    uint16_t atlasTop;")
+    out.append("\n};\n")
+
+    out.append("\nstruct KerningPair\n{")
+    out.append("\n    uint32_t left;")
+    out.append("\n    uint32_t right;")
+    out.append("\n    int16_t adjust;")
     out.append("\n};\n")
 
     items = []
@@ -280,6 +328,19 @@ def _gen_metrics_header(atlas: dict, font_ident: str, font_folder: str) -> str:
             "},"
         )
     out.append("\n};\n")
+    out.append(f"\nstatic constexpr int8_t Tracking128 = {tracking128};\n")
+    out.append(f"\nstatic constexpr uint16_t KerningPairCount = {len(kerning_pairs)};\n")
+    if kerning_pairs:
+        out.append("\nstatic const KerningPair KerningPairs[KerningPairCount] =\n{")
+        for pair in kerning_pairs:
+            out.append(
+                "\n    {"
+                f"{pair['left']}u, {pair['right']}u, {pair['adjust256']}"
+                "},"
+            )
+        out.append("\n};\n")
+    else:
+        out.append("\nstatic const KerningPair *const KerningPairs = nullptr;\n")
     out.append("\n}\n}")
     out.append("\n\n#include <pipGUI/Core/pipGUI.hpp>")
     out.append("\nstatic inline pipgui::FontId registerFont_" + font_folder + "(pipgui::GUI &gui)")
@@ -294,7 +355,10 @@ def _gen_metrics_header(atlas: dict, font_ident: str, font_folder: str) -> str:
     out.append(f"\n        pipgui::{ns_name}::Descender,")
     out.append(f"\n        pipgui::{ns_name}::LineHeight,")
     out.append(f"\n        pipgui::{ns_name}::Glyphs,")
-    out.append(f"\n        pipgui::{ns_name}::GlyphCount);")
+    out.append(f"\n        pipgui::{ns_name}::GlyphCount,")
+    out.append(f"\n        pipgui::{ns_name}::KerningPairs,")
+    out.append(f"\n        pipgui::{ns_name}::KerningPairCount,")
+    out.append(f"\n        pipgui::{ns_name}::Tracking128);")
     out.append("\n}")
     out.append("\n")
     
@@ -428,7 +492,9 @@ def generate_all(project_dir: str) -> bool:
         _write_if_changed(charset_path, charset_content)
 
         charset_preview = " | ".join([ln.strip() for ln in charset_content.splitlines() if ln.strip()][:3])
-        print(f"[fonts] {font_folder}: {charset_preview}")
+        console_encoding = sys.stdout.encoding or "utf-8"
+        safe_preview = charset_preview.encode(console_encoding, errors="backslashreplace").decode(console_encoding, errors="ignore")
+        print(f"[fonts] {font_folder}: {safe_preview}")
 
         json_path = os.path.join(work_dir, "atlas.json")
         bin_path = os.path.join(work_dir, "atlas.bin")
@@ -444,7 +510,7 @@ def generate_all(project_dir: str) -> bool:
         }
 
         stamp_in = "\n".join([
-            "fonts_psdf_cfg_v3",
+            "fonts_psdf_cfg_v4",
             _hash_file(ttf_path),
             _hash_text(charset_content),
             _hash_file(cfg_path),
@@ -495,7 +561,7 @@ def generate_all(project_dir: str) -> bool:
                 f.write(stamp_in)
 
         atlas = _read_json(json_path)
-        metrics_h = _gen_metrics_header(atlas, font_ident, font_folder)
+        metrics_h = _gen_metrics_header(atlas, font_ident, font_folder, font_ent)
         _write_if_changed(out_metrics_hpp, metrics_h)
 
         with open(bin_path, "rb") as f:

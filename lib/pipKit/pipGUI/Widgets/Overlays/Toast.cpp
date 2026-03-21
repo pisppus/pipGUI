@@ -333,10 +333,10 @@ namespace pipgui
         marqueeOpts.holdStartMs = 700;
         marqueeOpts.phaseStartMs = _toast.startMs;
 
-        if (!drawTextMarquee(_toast.text, textX, textY, textMaxW, fgColor, AlignLeft, marqueeOpts) &&
-            !drawTextEllipsized(_toast.text, textX, textY, textMaxW, fgColor, AlignLeft))
+        if (!drawTextMarquee(_toast.text, textX, textY, textMaxW, fgColor, TextAlign::Left, marqueeOpts) &&
+            !drawTextEllipsized(_toast.text, textX, textY, textMaxW, fgColor, TextAlign::Left))
         {
-            drawTextAligned(_toast.text, textX, textY, fgColor, bgColor, AlignLeft);
+            drawTextAligned(_toast.text, textX, textY, fgColor, bgColor, TextAlign::Left);
         }
 
         _flags.inSpritePass = prevRender;

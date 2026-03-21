@@ -24,7 +24,7 @@ namespace pipgui
               _text(),
               _fg565(0xFFFF),
               _bg565(0x0000),
-              _align(AlignLeft)
+              _align(TextAlign::Left)
         {
         }
 
@@ -122,7 +122,7 @@ namespace pipgui
               _weight(0),
               _text(),
               _fg565(0xFFFF),
-              _align(AlignLeft),
+              _align(TextAlign::Left),
               _opts()
         {
         }
@@ -252,7 +252,7 @@ namespace pipgui
               _weight(0),
               _text(),
               _fg565(0xFFFF),
-              _align(AlignLeft)
+              _align(TextAlign::Left)
         {
         }
 

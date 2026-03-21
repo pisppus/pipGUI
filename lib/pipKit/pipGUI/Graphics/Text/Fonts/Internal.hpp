@@ -151,9 +151,61 @@ namespace pipgui
         float lineHeight;
         const void *glyphs;
         uint16_t glyphCount;
+        const void *kerningPairs;
+        uint16_t kerningPairCount;
+        int8_t tracking128;
+    };
+
+    struct KerningPair
+    {
+        uint32_t left;
+        uint32_t right;
+        int16_t adjust;
+
+        __attribute__((always_inline)) float unpackAdjust() const { return adjust * (1.0f / 256.0f); }
     };
 
     [[nodiscard]] const FontData *fontDataForId(FontId fontId);
+
+    static inline float fontTrackingPx(const FontData *font, float sizePx)
+    {
+        if (!font || font->tracking128 == 0)
+            return 0.0f;
+        return (font->tracking128 * (1.0f / 128.0f)) * sizePx;
+    }
+
+    static inline float weightTrackingAdjustPx(uint16_t weight, float sizePx)
+    {
+        const float delta = normalizedWeightDelta(weight);
+        if (delta == 0.0f || sizePx <= 0.0f)
+            return 0.0f;
+
+        if (delta > 0.0f)
+            return -delta * sizePx * 0.012f;
+        return (-delta) * sizePx * 0.0035f;
+    }
+
+    static inline float fontKerningAdjustPx(const FontData *font, uint32_t prevCodepoint, uint32_t codepoint, float sizePx)
+    {
+        if (!font || !font->kerningPairs || font->kerningPairCount == 0 || sizePx <= 0.0f)
+            return 0.0f;
+
+        const KerningPair *pairs = (const KerningPair *)font->kerningPairs;
+        int lo = 0;
+        int hi = (int)font->kerningPairCount - 1;
+        while (lo <= hi)
+        {
+            const int mid = (lo + hi) >> 1;
+            const KerningPair &pair = pairs[mid];
+            if (pair.left == prevCodepoint && pair.right == codepoint)
+                return pair.unpackAdjust() * sizePx;
+            if (pair.left < prevCodepoint || (pair.left == prevCodepoint && pair.right < codepoint))
+                lo = mid + 1;
+            else
+                hi = mid - 1;
+        }
+        return 0.0f;
+    }
 
     static inline float weightBiasFor(uint16_t weight, float sizePx, const FontData *font)
     {
@@ -274,7 +326,7 @@ namespace pipgui
     }
 
     template <typename Fn>
-    static inline bool forEachGlyph(const char *s, int len, const FontData *font, float sizePx, Fn &&callback)
+    static inline bool forEachGlyph(const char *s, int len, const FontData *font, float sizePx, uint16_t weight, Fn &&callback)
     {
         static const FontData *s_cachedFont = nullptr;
         static uint32_t s_cachedCodepoint = 0;
@@ -282,8 +334,10 @@ namespace pipgui
 
         const float spaceAdvance = spaceWidth(font) * sizePx;
         const float lineAdvance = font->lineHeight * sizePx;
+        const float trackingAdvance = fontTrackingPx(font, sizePx) + weightTrackingAdjustPx(weight, sizePx);
         float penX = 0.0f;
         float penY = 0.0f;
+        uint32_t prevCodepoint = 0;
 
         for (int i = 0; i < len;)
         {
@@ -296,16 +350,19 @@ namespace pipgui
                     return false;
                 penX = 0.0f;
                 penY += lineAdvance;
+                prevCodepoint = 0;
                 continue;
             }
             if (codepoint == ' ')
             {
                 penX += spaceAdvance;
+                prevCodepoint = 0;
                 continue;
             }
             if (codepoint == '\t')
             {
                 penX += spaceAdvance * 4.0f;
+                prevCodepoint = 0;
                 continue;
             }
 
@@ -326,9 +383,16 @@ namespace pipgui
             if (!glyph)
                 continue;
 
+            if (prevCodepoint != 0)
+            {
+                penX += trackingAdvance;
+                penX += fontKerningAdjustPx(font, prevCodepoint, codepoint, sizePx);
+            }
+
             if (!callback(glyph, penX, penY + font->ascender * sizePx, false))
                 return false;
             penX += glyph->unpackAdvance() * sizePx;
+            prevCodepoint = codepoint;
         }
         return true;
     }

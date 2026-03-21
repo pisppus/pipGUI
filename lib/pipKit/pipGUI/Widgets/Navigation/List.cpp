@@ -111,8 +111,7 @@ namespace pipgui
             return;
 
 #if PIPGUI_SCREENSHOTS
-        if (_diag.screenshotNext && _diag.screenshotPrev &&
-            _diag.screenshotNext->isDown() && _diag.screenshotPrev->isDown())
+        if (nextDown && prevDown)
         {
             menu.nextHoldStartMs = 0;
             menu.prevHoldStartMs = 0;
@@ -501,13 +500,13 @@ namespace pipgui
             {
                 if (active)
                 {
-                    if (!drawTextMarquee(text, textX, textY, textMaxWidth, fg, AlignLeft, marqueeOpts))
-                        drawTextAligned(text, textX, textY, fg, bg, AlignLeft);
+                    if (!drawTextMarquee(text, textX, textY, textMaxWidth, fg, TextAlign::Left, marqueeOpts))
+                        drawTextAligned(text, textX, textY, fg, bg, TextAlign::Left);
                     return;
                 }
 
-                if (!drawTextEllipsized(text, textX, textY, textMaxWidth, fg, AlignLeft))
-                    drawTextAligned(text, textX, textY, fg, bg, AlignLeft);
+                if (!drawTextEllipsized(text, textX, textY, textMaxWidth, fg, TextAlign::Left))
+                    drawTextAligned(text, textX, textY, fg, bg, TextAlign::Left);
             };
 
             for (int16_t itemIndex = startIndex; itemIndex <= endIndex; ++itemIndex)
@@ -765,6 +764,5 @@ namespace pipgui
         return true;
     }
 }
-
 
 

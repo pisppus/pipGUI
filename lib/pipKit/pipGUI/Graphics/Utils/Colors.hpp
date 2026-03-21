@@ -47,6 +47,35 @@ namespace pipgui
             return ((uint32_t)cr << 16) | ((uint32_t)cg << 8) | (uint32_t)cb;
         }
 
+        [[nodiscard]] inline uint16_t lerp565(uint16_t a, uint16_t b, float t) noexcept
+        {
+            if (t <= 0.0f)
+                return a;
+            if (t >= 1.0f)
+                return b;
+
+            const uint32_t ar = (a >> 11) & 0x1F;
+            const uint32_t ag = (a >> 5) & 0x3F;
+            const uint32_t ab = a & 0x1F;
+
+            const uint32_t br = (b >> 11) & 0x1F;
+            const uint32_t bg = (b >> 5) & 0x3F;
+            const uint32_t bb = b & 0x1F;
+
+            uint32_t cr = (uint32_t)((float)ar + ((float)br - (float)ar) * t + 0.5f);
+            uint32_t cg = (uint32_t)((float)ag + ((float)bg - (float)ag) * t + 0.5f);
+            uint32_t cb = (uint32_t)((float)ab + ((float)bb - (float)ab) * t + 0.5f);
+
+            if (cr > 31U)
+                cr = 31U;
+            if (cg > 63U)
+                cg = 63U;
+            if (cb > 31U)
+                cb = 31U;
+
+            return (uint16_t)((cr << 11) | (cg << 5) | cb);
+        }
+
         [[nodiscard]] inline constexpr uint16_t blend565(uint16_t bg, uint16_t fg, uint8_t alpha) noexcept
         {
             uint32_t a = alpha + (alpha >> 7);
@@ -162,5 +191,11 @@ namespace pipgui
 
             return (lum > (uint32_t)threshold) ? 0x0000U : 0xFFFFU;
         }
+    }
+
+    namespace palette
+    {
+        inline constexpr uint16_t WarningAccent = detail::color888To565(0xFF6200u);
+        inline constexpr uint16_t ErrorAccent = detail::color888To565(0xFF0048u);
     }
 }

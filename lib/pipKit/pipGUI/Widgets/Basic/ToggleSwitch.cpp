@@ -1,80 +1,9 @@
 #include <pipGUI/Core/pipGUI.hpp>
+#include <pipGUI/Graphics/Utils/Colors.hpp>
+#include <pipGUI/Graphics/Utils/Easing.hpp>
 
 namespace pipgui
 {
-
-    static uint16_t lerpColor565Sw(uint16_t c0, uint16_t c1, float t)
-    {
-        if (t <= 0.0f)
-            return c0;
-        if (t >= 1.0f)
-            return c1;
-
-        uint32_t r0 = (c0 >> 11) & 0x1F;
-        uint32_t g0 = (c0 >> 5) & 0x3F;
-        uint32_t b0 = c0 & 0x1F;
-        uint32_t r1 = (c1 >> 11) & 0x1F;
-        uint32_t g1 = (c1 >> 5) & 0x3F;
-        uint32_t b1 = c1 & 0x1F;
-
-        uint32_t r = (uint32_t)((float)r0 + ((float)r1 - (float)r0) * t + 0.5f);
-        uint32_t g = (uint32_t)((float)g0 + ((float)g1 - (float)g0) * t + 0.5f);
-        uint32_t b = (uint32_t)((float)b0 + ((float)b1 - (float)b0) * t + 0.5f);
-
-        if (r > 31U) r = 31U;
-        if (g > 63U) g = 63U;
-        if (b > 31U) b = 31U;
-        return (uint16_t)((r << 11) | (g << 5) | b);
-    }
-
-    static uint16_t autoTextColor565Sw(uint16_t bg, uint8_t threshold = 140)
-    {
-        uint32_t r8 = ((bg >> 11) & 0x1F) * 255U / 31U;
-        uint32_t g8 = ((bg >> 5) & 0x3F) * 255U / 63U;
-        uint32_t b8 = (bg & 0x1F) * 255U / 31U;
-        uint32_t lum = (r8 * 54U + g8 * 183U + b8 * 18U) >> 8;
-        return (lum > threshold) ? (uint16_t)0x0000 : (uint16_t)0xFFFF;
-    }
-    static float cubicBezier1D(float t, float p1, float p2)
-    {
-        if (t <= 0.0f)
-            return 0.0f;
-        if (t >= 1.0f)
-            return 1.0f;
-
-        float u = 1.0f - t;
-        float tt = t * t;
-        float uu = u * u;
-        return (3.0f * uu * t * p1) + (3.0f * u * tt * p2) + (tt * t);
-    }
-
-    static float easeBezierSw(float t)
-    {
-        return cubicBezier1D(t, 0.08f, 1.00f);
-    }
-
-    static uint32_t lerpColor888Sw(uint32_t c0, uint32_t c1, float t)
-    {
-        if (t <= 0.0f)
-            return c0;
-        if (t >= 1.0f)
-            return c1;
-
-        uint8_t r0 = (uint8_t)((c0 >> 16) & 0xFF);
-        uint8_t g0 = (uint8_t)((c0 >> 8) & 0xFF);
-        uint8_t b0 = (uint8_t)(c0 & 0xFF);
-
-        uint8_t r1 = (uint8_t)((c1 >> 16) & 0xFF);
-        uint8_t g1 = (uint8_t)((c1 >> 8) & 0xFF);
-        uint8_t b1 = (uint8_t)(c1 & 0xFF);
-
-        uint8_t r = (uint8_t)(r0 + (float)((int)r1 - (int)r0) * t + 0.5f);
-        uint8_t g = (uint8_t)(g0 + (float)((int)g1 - (int)g0) * t + 0.5f);
-        uint8_t b = (uint8_t)(b0 + (float)((int)b1 - (int)b0) * t + 0.5f);
-
-        return (uint32_t)((r << 16) | (g << 8) | b);
-    }
-
     bool GUI::updateToggleSwitch(ToggleSwitchState &s, bool pressed)
     {
         bool changed = false;
@@ -186,14 +115,14 @@ namespace pipgui
 
         uint16_t inactive;
         if (inactiveColor < 0)
-            inactive = lerpColor565Sw(activeColor, (uint16_t)0x7BEF, 0.75f);
+            inactive = detail::lerp565(activeColor, (uint16_t)0x7BEF, 0.75f);
         else
             inactive = (uint16_t)inactiveColor;
 
-        float k = (float)state.pos / 255.0f;
-        float eased = easeBezierSw(k);
+        const float k = (float)state.pos / 255.0f;
+        const float eased = detail::motion::cubicBezier1D(k, 0.08f, 1.00f);
 
-        uint16_t bg = lerpColor565Sw(inactive, activeColor, eased);
+        const uint16_t bg = detail::lerp565(inactive, activeColor, eased);
         fillRoundRect(x0, y0, w, h, r, bg);
 
         int16_t pad = (int16_t)max((int16_t)3, (int16_t)(h / 8));
@@ -211,11 +140,11 @@ namespace pipgui
 
         uint16_t knob;
         if (knobColor < 0)
-            knob = autoTextColor565Sw(bg, 140);
+            knob = detail::autoTextColor(bg, 140);
         else
             knob = (uint16_t)knobColor;
 
-        uint16_t border = lerpColor565Sw(knob, bg, 0.55f);
+        const uint16_t border = detail::lerp565(knob, bg, 0.55f);
         fillCircle(cx, cy, knobR, border);
         int16_t innerR = knobR - 2;
         if (innerR < 1)

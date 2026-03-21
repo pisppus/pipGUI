@@ -1,4 +1,5 @@
 #include <pipGUI/Core/pipGUI.hpp>
+#include <pipGUI/Graphics/Utils/Easing.hpp>
 
 #include <math.h>
 
@@ -6,40 +7,6 @@ namespace pipgui
 {
     namespace
     {
-        float cubicBezierPoint(float u, float p1, float p2)
-        {
-            const float inv = 1.0f - u;
-            return 3.0f * inv * inv * u * p1 + 3.0f * inv * u * u * p2 + u * u * u;
-        }
-
-        float cubicBezierEase(float t, float x1, float y1, float x2, float y2)
-        {
-            if (t <= 0.0f)
-                return 0.0f;
-            if (t >= 1.0f)
-                return 1.0f;
-
-            float lo = 0.0f;
-            float hi = 1.0f;
-            float u = t;
-            for (uint8_t i = 0; i < 10; ++i)
-            {
-                const float x = cubicBezierPoint(u, x1, x2);
-                if (x < t)
-                    lo = u;
-                else
-                    hi = u;
-                u = (lo + hi) * 0.5f;
-            }
-
-            return cubicBezierPoint(u, y1, y2);
-        }
-
-        float popupEase(float t)
-        {
-            return cubicBezierEase(t, 0.16f, 1.0f, 0.30f, 1.0f);
-        }
-
         int16_t clampI16(int16_t v, int16_t lo, int16_t hi)
         {
             if (v < lo)
@@ -245,7 +212,7 @@ namespace pipgui
             elapsed = dur;
 
         const float t = (float)elapsed / (float)dur;
-        const float eased = popupEase(t);
+        const float eased = detail::motion::cubicBezierEase(t, 0.16f, 1.0f, 0.30f, 1.0f);
         const float visualP = _flags.popupClosing ? (1.0f - eased) : eased;
 
         if (_flags.popupClosing && elapsed >= dur)

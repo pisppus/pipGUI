@@ -21,11 +21,46 @@ def _chars(s: str) -> list:
     """Convert string to list of unicode codepoints."""
     return [ord(c) for c in s]
 
+def _kp(pair: str, adjust256: int) -> dict:
+    """Kerning pair helper. adjust256 is 1/256 em units."""
+    if not isinstance(pair, str) or len(pair) != 2:
+        raise ValueError("pair must be 2 characters")
+    return {
+        "left": ord(pair[0]),
+        "right": ord(pair[1]),
+        "adjust256": int(adjust256),
+    }
+
+WIX_KERNING = [
+    _kp("AV", -22),
+    _kp("AW", -20),
+    _kp("AY", -24),
+    _kp("FA", -10),
+    _kp("Fo", -12),
+    _kp("La", -8),
+    _kp("LT", -16),
+    _kp("LV", -14),
+    _kp("LW", -12),
+    _kp("LY", -18),
+    _kp("PA", -12),
+    _kp("Ta", -16),
+    _kp("Te", -16),
+    _kp("To", -18),
+    _kp("Ty", -16),
+    _kp("VA", -24),
+    _kp("Ve", -18),
+    _kp("Vo", -20),
+    _kp("WA", -28),
+    _kp("Wo", -16),
+    _kp("YA", -26),
+]
+
 FONTS = {
     # tools/fonts/TTF/krona-one.ttf
     "krona-one": {
         "size": 48,
         "distanceRange": 8,
+        "tracking128": 1,
         "glyphs": [
             _chars("PISPPUS"),
         ],
@@ -34,6 +69,8 @@ FONTS = {
     "WixMadeforDisplay": {
         "size": 48,
         "distanceRange": 8,
+        "tracking128": 2,
+        "kerningPairs": WIX_KERNING,
         "glyphs": [
             LATIN,
             CYRILLIC,

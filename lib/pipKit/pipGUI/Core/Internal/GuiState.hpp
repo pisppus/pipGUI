@@ -90,8 +90,6 @@ namespace pipgui::detail
 
     struct TypographyState
     {
-        uint16_t logoTitleSizePx = 0;
-        uint16_t logoSubtitleSizePx = 0;
         uint16_t psdfSizePx = 0;
         uint16_t psdfWeight = 500;
         FontId currentFontId = static_cast<FontId>(0);
@@ -99,9 +97,10 @@ namespace pipgui::detail
 
     struct ErrorEntry
     {
-        String title;
-        String detail;
-        ErrorType type = Warning;
+        String message;
+        String code;
+        ErrorType type = ErrorTypeWarning;
+        String buttonText;
     };
 
     struct ErrorState
@@ -112,9 +111,19 @@ namespace pipgui::detail
         uint8_t currentIndex = 0;
         uint8_t nextIndex = 0;
         uint32_t animStartMs = 0;
-        ErrorType type = Warning;
-        String buttonText;
+        uint32_t showStartMs = 0;
+        uint32_t contentStartMs = 0;
+        uint32_t layoutAnimStartMs = 0;
+        int8_t transitionDir = 0;
+        uint8_t layoutFromDotsVisible = 0;
+        uint8_t layoutToDotsVisible = 0;
         ButtonVisualState buttonState;
+        uint32_t nextHoldStartMs = 0;
+        uint32_t prevHoldStartMs = 0;
+        bool nextLongFired = false;
+        bool prevLongFired = false;
+        bool lastNextDown = false;
+        bool lastPrevDown = false;
     };
 
     struct NotificationState
@@ -133,7 +142,7 @@ namespace pipgui::detail
     struct ToastState
     {
         String text;
-        IconId iconId = WarningLayer0;
+        IconId iconId = warning;
         uint16_t iconSizePx = 20;
         uint32_t startMs = 0;
         uint32_t animDurMs = 420;
@@ -228,6 +237,7 @@ namespace pipgui::detail
         uint16_t lookupSh = 0;
         uint16_t lookupW = 0;
         uint16_t lookupH = 0;
+        uint32_t lastUseMs = 0;
     };
 
     struct Flags
@@ -239,6 +249,7 @@ namespace pipgui::detail
         unsigned screenTransition : 1;
         unsigned errorActive : 1;
         unsigned errorTransition : 1;
+        unsigned errorEntering : 1;
         unsigned errorButtonDown : 1;
         unsigned errorAwaitRelease : 1;
         unsigned notifActive : 1;
@@ -260,10 +271,7 @@ namespace pipgui::detail
         uint8_t otaOkFrames = 0;
         bool otaAutoConfirmed = false;
         uint32_t screenshotHoldStartMs = 0;
-        uint16_t screenshotHoldMs = 500;
         bool screenshotCaptured = false;
-        Button *screenshotNext = nullptr;
-        Button *screenshotPrev = nullptr;
     };
 
     struct ScreenshotEntry
@@ -284,6 +292,7 @@ namespace pipgui::detail
         uint16_t padding = 6;
         uint8_t maxShots = 12;
         uint8_t count = 0;
+        uint32_t lastUseMs = 0;
 #if (PIPGUI_SCREENSHOT_MODE == 2)
         uint8_t flashLoadIndex = 0;
         bool fsReady = false;
@@ -304,28 +313,24 @@ namespace pipgui::detail
     {
         uint16_t width = 0;
         uint16_t height = 0;
-        uint8_t header[13] = {};
+        uint8_t header[12] = {};
         uint8_t headerOffset = 0;
-        uint32_t payloadSize = 0;
-        uint32_t payloadOffset = 0;
         uint32_t payloadCrc = 0;
         uint8_t *buffer = nullptr;
-        uint32_t bufferSize = 0;
         bool active = false;
         bool headerReady = false;
         bool notifyOnComplete = false;
 
-        const uint16_t *qoiSrc16 = nullptr;
-        bool qoiSrcBE = false;
-        uint32_t qoiPos = 0;
-        uint32_t qoiPayloadBytes = 0;
-        uint32_t qoiPrev = 0x000000FFu;
-        uint32_t qoiIndex[64] = {};
-        uint8_t qoiRun = 0;
-        uint8_t qoiTailOffset = 0;
-        uint16_t qoiOutOff = 0;
-        uint16_t qoiOutLen = 0;
-        uint8_t qoiOut[1024] = {};
+        uint32_t encPos = 0;
+        uint32_t encPayloadBytes = 0;
+        uint16_t encPrev565 = 0;
+        uint16_t encIndex[64] = {};
+        uint16_t encLiteral565[32] = {};
+        uint8_t encRun = 0;
+        uint8_t encLiteralLen = 0;
+        uint16_t encOutOff = 0;
+        uint16_t encOutLen = 0;
+        uint8_t encOut[1024] = {};
 #if (PIPGUI_SCREENSHOT_MODE == 2)
         fs::File file;
         uint32_t stamp = 0;

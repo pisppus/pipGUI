@@ -1,20 +1,136 @@
 #include <pipGUI/Core/pipGUI.hpp>
+#include <pipGUI/Graphics/Utils/Easing.hpp>
 #include <math.h>
 
 namespace pipgui
 {
     namespace
     {
-        float easeInOutCubic(float t)
+        constexpr uint8_t kScrollDotsMaxVisibleForTaper = 7;
+        constexpr uint32_t kScrollDotsCountAnimMs = 220;
+        constexpr uint8_t kScrollDotsAnimSlotCount = 4;
+
+        struct ScrollDotsAnimState
         {
-            if (t <= 0.0f) return 0.0f;
-            if (t >= 1.0f) return 1.0f;
-            if (t < 0.5f)
-                return 4.0f * t * t * t;
-            float f = 2.0f * t - 2.0f;
-            return 0.5f * f * f * f + 1.0f;
+            bool valid = false;
+            int16_t reqX = 0;
+            int16_t reqY = 0;
+            uint8_t dotRadius = 0;
+            uint8_t spacing = 0;
+            uint8_t activeWidth = 0;
+            uint8_t prevCount = 0;
+            uint8_t count = 0;
+            uint32_t changeStartMs = 0;
+            uint32_t touchMs = 0;
+        };
+
+        ScrollDotsAnimState g_scrollDotsAnim[kScrollDotsAnimSlotCount];
+
+        static inline int16_t dotsTotalWidth(uint8_t count, uint8_t spacing, uint8_t activeWidth) noexcept
+        {
+            if (count <= 1)
+                return (int16_t)activeWidth;
+            if (count > kScrollDotsMaxVisibleForTaper)
+                return (int16_t)(kScrollDotsMaxVisibleForTaper * (int16_t)spacing);
+            return (int16_t)((count - 1) * (int16_t)spacing + (int16_t)activeWidth);
+        }
+
+        static inline int16_t dotsLeft(const GUI &gui, int16_t x, int16_t totalW) noexcept
+        {
+            return (x == center) ? (int16_t)(((int16_t)gui.screenWidth() - totalW) / 2) : x;
+        }
+
+        static ScrollDotsAnimState &scrollDotsState(GUI &gui,
+                                                    int16_t x,
+                                                    int16_t y,
+                                                    uint8_t dotRadius,
+                                                    uint8_t spacing,
+                                                    uint8_t activeWidth,
+                                                    uint8_t count,
+                                                    float &countProgress,
+                                                    uint8_t &fromCount,
+                                                    uint8_t &toCount)
+        {
+            const uint32_t now = gui.platform() ? gui.platform()->nowMs() : 0;
+            ScrollDotsAnimState *slot = nullptr;
+            ScrollDotsAnimState *oldest = &g_scrollDotsAnim[0];
+
+            for (uint8_t i = 0; i < kScrollDotsAnimSlotCount; ++i)
+            {
+                ScrollDotsAnimState &candidate = g_scrollDotsAnim[i];
+                if (!candidate.valid)
+                {
+                    slot = &candidate;
+                    break;
+                }
+                if (candidate.reqX == x &&
+                    candidate.reqY == y &&
+                    candidate.dotRadius == dotRadius &&
+                    candidate.spacing == spacing &&
+                    candidate.activeWidth == activeWidth)
+                {
+                    slot = &candidate;
+                    break;
+                }
+                if (candidate.touchMs < oldest->touchMs)
+                    oldest = &candidate;
+            }
+
+            if (!slot)
+                slot = oldest;
+
+            if (!slot->valid)
+            {
+                slot->valid = true;
+                slot->reqX = x;
+                slot->reqY = y;
+                slot->dotRadius = dotRadius;
+                slot->spacing = spacing;
+                slot->activeWidth = activeWidth;
+                slot->prevCount = count;
+                slot->count = count;
+                slot->changeStartMs = 0;
+            }
+            else
+            {
+                slot->reqX = x;
+                slot->reqY = y;
+                slot->dotRadius = dotRadius;
+                slot->spacing = spacing;
+                slot->activeWidth = activeWidth;
+                if (slot->count != count)
+                {
+                    slot->prevCount = slot->count;
+                    slot->count = count;
+                    slot->changeStartMs = now;
+                }
+            }
+
+            slot->touchMs = now;
+            fromCount = slot->prevCount;
+            toCount = slot->count;
+            countProgress = 1.0f;
+
+            if (slot->changeStartMs != 0 && slot->prevCount != slot->count)
+            {
+                const uint32_t elapsed = now - slot->changeStartMs;
+                if (elapsed >= kScrollDotsCountAnimMs)
+                {
+                    slot->prevCount = slot->count;
+                    slot->changeStartMs = 0;
+                    fromCount = slot->count;
+                    toCount = slot->count;
+                }
+                else
+                {
+                    countProgress = detail::motion::easeInOutCubic((float)elapsed / (float)kScrollDotsCountAnimMs);
+                }
+            }
+
+            return *slot;
         }
     }
+
     void GUI::updateScrollDotsImpl(int16_t x, int16_t y,
                                uint8_t count,
                                uint8_t activeIndex,
@@ -28,9 +144,6 @@ namespace pipgui
                                uint8_t spacing,
                                uint8_t activeWidth)
     {
-        if (count == 0)
-            return;
-
         if (!_flags.spriteEnabled || !_disp.display)
         {
             drawScrollDotsImpl(x, y, count, activeIndex, prevIndex, animProgress, animate, animDirection,
@@ -45,24 +158,30 @@ namespace pipgui
         if (activeWidth < (uint8_t)(dotRadius * 2 + 1))
             activeWidth = (uint8_t)(dotRadius * 2 + 1);
 
-        const uint8_t maxVisibleForTaper = 7;
-        int16_t h = (int16_t)(dotRadius * 2 + 1);
-        int16_t totalW = (count <= 1) ? (int16_t)activeWidth
-            : (count > maxVisibleForTaper) ? (int16_t)(maxVisibleForTaper * (int16_t)spacing)
-            : (int16_t)((count - 1) * (int16_t)spacing + (int16_t)activeWidth);
+        float countProgress = 1.0f;
+        uint8_t fromCount = count;
+        uint8_t toCount = count;
+        scrollDotsState(*this, x, y, dotRadius, spacing, activeWidth, count, countProgress, fromCount, toCount);
 
-        int16_t left = x;
-        if (left == center)
-            left = AutoX(totalW);
+        int16_t h = (int16_t)(dotRadius * 2 + 1);
+        const int16_t fromW = dotsTotalWidth(fromCount, spacing, activeWidth);
+        const int16_t toW = dotsTotalWidth(toCount, spacing, activeWidth);
+        const int16_t totalW = (fromCount == toCount)
+                                   ? toW
+                                   : (int16_t)(fromW + (int16_t)((float)(toW - fromW) * countProgress + (toW >= fromW ? 0.5f : -0.5f)));
 
         int16_t top = y;
         if (top == center)
             top = AutoY(h);
 
         int16_t pad = 2;
-        int16_t rx = left;
+        const int16_t oldLeft = dotsLeft(*this, x, fromW);
+        const int16_t newLeft = dotsLeft(*this, x, toW);
+        const int16_t drawLeft = dotsLeft(*this, x, totalW);
+        const int16_t rx = (oldLeft < newLeft) ? oldLeft : newLeft;
         int16_t ry = top;
-        int16_t rw = (int16_t)(totalW + pad * 2);
+        const int16_t unionRight = ((oldLeft + fromW) > (newLeft + toW)) ? (oldLeft + fromW) : (newLeft + toW);
+        int16_t rw = (int16_t)((unionRight - rx) + pad * 2);
         int16_t rh = (int16_t)(h + pad * 2);
 
         bool prevRender = _flags.inSpritePass;
@@ -76,7 +195,7 @@ namespace pipgui
             .size(rw, rh)
             .color(detail::color888To565(_render.bgColor))
             .draw();
-        drawScrollDotsImpl(left, top, count, activeIndex, prevIndex, animProgress, animate, animDirection,
+        drawScrollDotsImpl(drawLeft, top, count, activeIndex, prevIndex, animProgress, animate, animDirection,
                        activeColor, inactiveColor, dotRadius, spacing, activeWidth);
 
         _flags.inSpritePass = prevRender;
@@ -102,9 +221,6 @@ namespace pipgui
                             uint8_t spacing,
                             uint8_t activeWidth)
     {
-        if (count == 0)
-            return;
-
         if (_flags.spriteEnabled && _disp.display && !_flags.inSpritePass)
         {
             updateScrollDotsImpl(x, y, count, activeIndex, prevIndex, animProgress, animate, animDirection,
@@ -112,15 +228,23 @@ namespace pipgui
             return;
         }
 
-        if (activeIndex >= count)
-            activeIndex = (uint8_t)(count - 1);
-        if (prevIndex >= count)
-            prevIndex = activeIndex;
+        const uint8_t requestedActiveIndex = activeIndex;
 
-        if (animProgress < 0.0f)
-            animProgress = 0.0f;
-        if (animProgress > 1.0f)
-            animProgress = 1.0f;
+        if (count == 0)
+        {
+            activeIndex = 0;
+            prevIndex = 0;
+        }
+        else
+        {
+            if (activeIndex >= count)
+                activeIndex = (uint8_t)(count - 1);
+            if (prevIndex >= count)
+                prevIndex = activeIndex;
+        }
+
+        animProgress = detail::motion::clamp01(animProgress);
+        const float navProgress = animate ? detail::motion::easeInOutCubic(animProgress) : 1.0f;
 
         if (dotRadius < 1)
             dotRadius = 1;
@@ -133,9 +257,19 @@ namespace pipgui
         if (!t)
             return;
 
-        const uint8_t maxVisibleForTaper = 7;
-        const int halfWindow = (int)(maxVisibleForTaper / 2);
-        bool taper = (count > maxVisibleForTaper);
+        float countProgress = 1.0f;
+        uint8_t fromCount = count;
+        uint8_t toCount = count;
+        scrollDotsState(*this, x, y, dotRadius, spacing, activeWidth, count, countProgress, fromCount, toCount);
+        const bool countAnimating = (fromCount != toCount && countProgress < 1.0f);
+
+        if (!countAnimating && count == 0)
+            return;
+
+        const int halfWindow = (int)(kScrollDotsMaxVisibleForTaper / 2);
+        const bool taper = (count > kScrollDotsMaxVisibleForTaper);
+        const bool oldTaper = (fromCount > kScrollDotsMaxVisibleForTaper);
+        const bool canAnimateCount = countAnimating && !taper && !oldTaper;
 
         int16_t h = (int16_t)(dotRadius * 2 + 1);
         int16_t totalW;
@@ -143,7 +277,7 @@ namespace pipgui
         int16_t baseX0;
         if (taper)
         {
-            totalW = (int16_t)(maxVisibleForTaper * (int16_t)spacing);
+            totalW = (int16_t)(kScrollDotsMaxVisibleForTaper * (int16_t)spacing);
             left = x;
             if (left == center)
                 left = AutoX(totalW);
@@ -170,9 +304,98 @@ namespace pipgui
             .color(detail::color888To565(_render.bgColor))
             .draw();
 
-        if (taper)
+        if (canAnimateCount && count == 0)
         {
-            for (int slot = 0; slot < maxVisibleForTaper; slot++)
+            const int16_t oldTotalW = dotsTotalWidth(fromCount, spacing, activeWidth);
+            const int16_t oldLeft = dotsLeft(*this, x, oldTotalW);
+            const int16_t oldBaseX0 = oldLeft + (int16_t)activeWidth / 2;
+            const int16_t singleLeft = dotsLeft(*this, x, activeWidth);
+            const int16_t singleBaseX0 = singleLeft + (int16_t)activeWidth / 2;
+            const uint16_t bg565 = detail::color888To565(_render.bgColor);
+            const uint8_t survivorIndex = (fromCount > 0 && requestedActiveIndex < fromCount) ? requestedActiveIndex : 0;
+
+            if (fromCount > 1)
+            {
+                const float stageSplit = 0.58f;
+                const float phaseToSingle = (countProgress < stageSplit)
+                                                ? detail::motion::easeInOutCubic(countProgress / stageSplit)
+                                                : 1.0f;
+                const float phaseFadeOut = (countProgress > stageSplit)
+                                               ? detail::motion::easeInOutCubic((countProgress - stageSplit) / (1.0f - stageSplit))
+                                               : 0.0f;
+
+                for (uint8_t i = 0; i < fromCount; ++i)
+                {
+                    const float oldCx = (float)(oldBaseX0 + (int16_t)i * (int16_t)spacing);
+                    if (i == survivorIndex)
+                    {
+                        const float drawCx = oldCx + (float)(singleBaseX0 - oldCx) * phaseToSingle;
+                        const uint8_t alpha = (uint8_t)((1.0f - phaseFadeOut) * 255.0f + 0.5f);
+                        const uint16_t color = (alpha >= 255) ? activeColor : (uint16_t)detail::blend565(bg565, activeColor, alpha);
+                        fillCircle((int16_t)roundf(drawCx), baseY, (int16_t)dotRadius, color);
+                    }
+                    else
+                    {
+                        const float driftCx = oldCx + (float)(singleBaseX0 - oldCx) * (phaseToSingle * 0.20f);
+                        const uint8_t alpha = (uint8_t)((1.0f - phaseToSingle) * 255.0f + 0.5f);
+                        const uint16_t color = (alpha >= 255) ? inactiveColor : (uint16_t)detail::blend565(bg565, inactiveColor, alpha);
+                        if (alpha > 0)
+                            fillCircle((int16_t)roundf(driftCx), baseY, (int16_t)dotRadius, color);
+                    }
+                }
+            }
+            else
+            {
+                const float drawCx = (float)oldBaseX0 + (float)(singleBaseX0 - oldBaseX0) * countProgress;
+                const uint8_t alpha = (uint8_t)((1.0f - countProgress) * 255.0f + 0.5f);
+                const uint16_t color = (alpha >= 255) ? activeColor : (uint16_t)detail::blend565(bg565, activeColor, alpha);
+                if (alpha > 0)
+                    fillCircle((int16_t)roundf(drawCx), baseY, (int16_t)dotRadius, color);
+            }
+            return;
+        }
+        else if (canAnimateCount)
+        {
+            const int16_t oldTotalW = dotsTotalWidth(fromCount, spacing, activeWidth);
+            const int16_t oldLeft = dotsLeft(*this, x, oldTotalW);
+            const int16_t oldBaseX0 = oldLeft + (int16_t)activeWidth / 2;
+            const uint8_t maxCount = (fromCount > count) ? fromCount : count;
+            const uint16_t bg565 = detail::color888To565(_render.bgColor);
+
+            for (uint8_t i = 0; i < maxCount; ++i)
+            {
+                const bool oldVisible = i < fromCount;
+                const bool newVisible = i < count;
+                if (!oldVisible && !newVisible)
+                    continue;
+
+                float oldCx = (float)(oldBaseX0 + (int16_t)i * (int16_t)spacing);
+                float newCx = (float)(baseX0 + (int16_t)i * (int16_t)spacing);
+                float drawCx = newCx;
+                uint8_t alpha = 255;
+
+                if (oldVisible && newVisible)
+                {
+                    drawCx = oldCx + (newCx - oldCx) * countProgress;
+                }
+                else if (oldVisible)
+                {
+                    drawCx = oldCx + (float)(left - oldLeft) * countProgress;
+                    alpha = (uint8_t)((1.0f - countProgress) * 255.0f + 0.5f);
+                }
+                else
+                {
+                    drawCx = newCx - (float)(left - oldLeft) * (1.0f - countProgress);
+                    alpha = (uint8_t)(countProgress * 255.0f + 0.5f);
+                }
+
+                const uint16_t color = (alpha >= 255) ? inactiveColor : (uint16_t)detail::blend565(bg565, inactiveColor, alpha);
+                fillCircle((int16_t)roundf(drawCx), baseY, (int16_t)dotRadius, color);
+            }
+        }
+        else if (taper)
+        {
+            for (int slot = 0; slot < kScrollDotsMaxVisibleForTaper; slot++)
             {
                 int i = (int)activeIndex - halfWindow + slot;
                 if (i < 0 || i >= (int)count)
@@ -209,6 +432,9 @@ namespace pipgui
             }
         }
 
+        if (count == 0)
+            return;
+
         if (count == 1)
         {
             fillCircle(baseX0, baseY, (int16_t)dotRadius, activeColor);
@@ -217,7 +443,7 @@ namespace pipgui
 
         if (animate)
         {
-            float p = easeInOutCubic(animProgress);
+            const float p = navProgress;
             float xPrev = (float)(baseX0 + (int16_t)((int)prevIndex - (int)activeIndex) * (int16_t)spacing);
             float xCurr = (float)baseX0;
             if (!taper)

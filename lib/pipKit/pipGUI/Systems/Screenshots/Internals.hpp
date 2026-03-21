@@ -11,37 +11,22 @@
 
 namespace pipgui::screenshots::detail
 {
-    inline constexpr size_t kHdrSize = 13;
+    inline constexpr size_t kHdrSize = 12;
 
-    [[nodiscard]] inline uint8_t qoiHash(uint32_t rgba) noexcept
+    [[nodiscard]] inline uint8_t hash565(uint16_t px565) noexcept
     {
-        const uint32_t r = (rgba >> 24) & 0xFFu;
-        const uint32_t g = (rgba >> 16) & 0xFFu;
-        const uint32_t b = (rgba >> 8) & 0xFFu;
-        const uint32_t a = rgba & 0xFFu;
-        return static_cast<uint8_t>((r * 3u + g * 5u + b * 7u + a * 11u) & 63u);
+        const uint32_t r = (px565 >> 11) & 31u;
+        const uint32_t g = (px565 >> 5) & 63u;
+        const uint32_t b = px565 & 31u;
+        return static_cast<uint8_t>((r * 3u + g * 5u + b * 7u) & 63u);
     }
 
-    [[nodiscard]] inline uint32_t rgbaFrom565(uint16_t px565) noexcept
-    {
-        const uint32_t r5 = (px565 >> 11) & 31u;
-        const uint32_t g6 = (px565 >> 5) & 63u;
-        const uint32_t b5 = px565 & 31u;
-
-        const uint32_t r = (r5 << 3) | (r5 >> 2);
-        const uint32_t g = (g6 << 2) | (g6 >> 4);
-        const uint32_t b = (b5 << 3) | (b5 >> 2);
-
-        return (r << 24) | (g << 16) | (b << 8) | 255u;
-    }
-
-    [[nodiscard]] inline uint16_t rgb565FromRgba(uint32_t rgba) noexcept
-    {
-        const uint32_t r = (rgba >> 24) & 0xFFu;
-        const uint32_t g = (rgba >> 16) & 0xFFu;
-        const uint32_t b = (rgba >> 8) & 0xFFu;
-        return static_cast<uint16_t>(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
-    }
+    inline constexpr uint8_t kPacked565IndexMask = 0x3Fu;
+    inline constexpr uint8_t kPacked565RunBase = 0x40u;
+    inline constexpr uint8_t kPacked565DiffBase = 0x80u;
+    inline constexpr uint8_t kPacked565LumaBase = 0xC0u;
+    inline constexpr uint8_t kPacked565LiteralBase = 0xE0u;
+    inline constexpr uint8_t kPacked565LiteralMax = 32u;
 
     [[nodiscard]] inline uint32_t overlap16(uint32_t a0, uint32_t a1, uint32_t b0) noexcept
     {
@@ -122,10 +107,10 @@ namespace pipgui::screenshots::detail
     }
 
     [[nodiscard]] inline bool readTrailer(fs::File &f,
-                                              uint32_t headerSize,
-                                              uint32_t payloadSize,
-                                              uint32_t &outCrc32,
-                                              uint8_t &outFlags) noexcept
+                                          uint32_t headerSize,
+                                          uint32_t payloadSize,
+                                          uint32_t &outCrc32,
+                                          uint8_t &outFlags) noexcept
     {
         outCrc32 = 0;
         outFlags = 0;
@@ -133,7 +118,7 @@ namespace pipgui::screenshots::detail
         const uint32_t expectedBase = headerSize + payloadSize;
         const size_t fileSize = f.size();
         if (fileSize != static_cast<size_t>(expectedBase + kTrlSize))
-            return false; // No trailer or size mismatch.
+            return false;
 
         if (!f.seek(expectedBase))
             return false;
@@ -294,7 +279,7 @@ namespace pipgui::screenshots::detail
         return true;
     }
 
-    struct QoiReader
+    struct PayloadReader
     {
         fs::File *f = nullptr;
         uint8_t buf[256] = {};
@@ -330,130 +315,99 @@ namespace pipgui::screenshots::detail
         }
     };
 
-    [[nodiscard]] inline bool qoiNext(QoiReader &r, uint32_t index[64], uint32_t &px, uint32_t &run) noexcept
+    template <typename Sink>
+    [[nodiscard]] inline bool decodePacked565Raster(PayloadReader &r, uint32_t pixelsTotal, Sink &&sink) noexcept
     {
-        if (run)
-        {
-            --run;
-        }
-        else
+        if (pixelsTotal == 0)
+            return false;
+
+        uint16_t index[64] = {};
+        uint16_t prev = 0;
+        uint32_t pos = 0;
+        while (pos < pixelsTotal)
         {
             uint8_t b1 = 0;
             if (!r.readByte(b1))
                 return false;
 
-            if (b1 == 0xFEu)
+            const auto emit = [&](uint16_t px) noexcept -> bool
             {
-                uint8_t rr = 0, gg = 0, bb = 0;
-                if (!r.readByte(rr) || !r.readByte(gg) || !r.readByte(bb))
-                    return false;
-                px = (static_cast<uint32_t>(rr) << 24) |
-                     (static_cast<uint32_t>(gg) << 16) |
-                     (static_cast<uint32_t>(bb) << 8) |
-                     (px & 0xFFu);
-            }
-            else if (b1 == 0xFFu)
-            {
-                uint8_t rr = 0, gg = 0, bb = 0, aa = 0;
-                if (!r.readByte(rr) || !r.readByte(gg) || !r.readByte(bb) || !r.readByte(aa))
-                    return false;
-                px = (static_cast<uint32_t>(rr) << 24) |
-                     (static_cast<uint32_t>(gg) << 16) |
-                     (static_cast<uint32_t>(bb) << 8) |
-                     static_cast<uint32_t>(aa);
-            }
-            else
-            {
-                switch (b1 & 0xC0u)
+                if constexpr (std::is_convertible_v<decltype(sink(px)), bool>)
                 {
-                case 0x00u:
-                    px = index[b1 & 63u];
-                    break;
-                case 0x40u:
-                {
-                    const int dr = static_cast<int>((b1 >> 4) & 3u) - 2;
-                    const int dg = static_cast<int>((b1 >> 2) & 3u) - 2;
-                    const int db = static_cast<int>(b1 & 3u) - 2;
-                    const uint32_t rr = ((px >> 24) + dr) & 0xFFu;
-                    const uint32_t gg = ((px >> 16) + dg) & 0xFFu;
-                    const uint32_t bb = ((px >> 8) + db) & 0xFFu;
-                    px = (rr << 24) | (gg << 16) | (bb << 8) | (px & 0xFFu);
-                    break;
-                }
-                case 0x80u:
-                {
-                    uint8_t b2 = 0;
-                    if (!r.readByte(b2))
+                    if (!sink(px))
                         return false;
-                    const int dg = static_cast<int>(b1 & 63u) - 32;
-                    const int dr_dg = static_cast<int>((b2 >> 4) & 15u) - 8;
-                    const int db_dg = static_cast<int>(b2 & 15u) - 8;
-                    const uint32_t rr = ((px >> 24) + dg + dr_dg) & 0xFFu;
-                    const uint32_t gg = ((px >> 16) + dg) & 0xFFu;
-                    const uint32_t bb = ((px >> 8) + dg + db_dg) & 0xFFu;
-                    px = (rr << 24) | (gg << 16) | (bb << 8) | (px & 0xFFu);
-                    break;
                 }
-                case 0xC0u:
-                    run = static_cast<uint32_t>(b1 & 63u);
-                    break;
+                else
+                {
+                    sink(px);
                 }
-            }
-        }
+                index[hash565(px)] = px;
+                prev = px;
+                ++pos;
+                return true;
+            };
 
-        index[qoiHash(px)] = px;
-        return true;
-    }
-
-    template <typename Sink>
-    [[nodiscard]] inline bool qoiDecodeRaster(QoiReader &r, uint16_t w, uint16_t h, Sink &&sink, bool checkTail = true) noexcept
-    {
-        if (w == 0 || h == 0)
-            return false;
-
-        uint32_t index[64] = {};
-        uint32_t px = 0x000000FFu; // 0,0,0,255
-        uint32_t run = 0;
-
-        uint16_t x = 0;
-        uint16_t y = 0;
-        const uint32_t pixelsTotal = static_cast<uint32_t>(w) * static_cast<uint32_t>(h);
-        for (uint32_t i = 0; i < pixelsTotal; ++i)
-        {
-            if (!qoiNext(r, index, px, run))
-                return false;
-
-            if constexpr (std::is_convertible_v<decltype(sink(x, y, px)), bool>)
+            if (b1 < kPacked565RunBase)
             {
-                if (!sink(x, y, px))
+                if (!emit(index[b1 & kPacked565IndexMask]))
+                    return false;
+                continue;
+            }
+
+            if (b1 < kPacked565DiffBase)
+            {
+                const uint32_t count = static_cast<uint32_t>((b1 & kPacked565IndexMask) + 1u);
+                if (count > (pixelsTotal - pos))
+                    return false;
+                for (uint32_t i = 0; i < count; ++i)
+                {
+                    if (!emit(prev))
+                        return false;
+                }
+                continue;
+            }
+
+            if (b1 < kPacked565LumaBase)
+            {
+                const int pr = static_cast<int>((prev >> 11) & 31u);
+                const int pg = static_cast<int>((prev >> 5) & 63u);
+                const int pb = static_cast<int>(prev & 31u);
+                const int dr = static_cast<int>((b1 >> 4) & 3u) - 2;
+                const int dg = static_cast<int>((b1 >> 2) & 3u) - 2;
+                const int db = static_cast<int>(b1 & 3u) - 2;
+                if (!emit(static_cast<uint16_t>(((pr + dr) << 11) | ((pg + dg) << 5) | (pb + db))))
+                    return false;
+                continue;
+            }
+
+            if (b1 < kPacked565LiteralBase)
+            {
+                uint8_t b2 = 0;
+                if (!r.readByte(b2))
+                    return false;
+                const int pr = static_cast<int>((prev >> 11) & 31u);
+                const int pg = static_cast<int>((prev >> 5) & 63u);
+                const int pb = static_cast<int>(prev & 31u);
+                const int dg = static_cast<int>(b1 & 31u) - 16;
+                const int dr = dg + static_cast<int>((b2 >> 4) & 15u) - 8;
+                const int db = dg + static_cast<int>(b2 & 15u) - 8;
+                if (!emit(static_cast<uint16_t>(((pr + dr) << 11) | ((pg + dg) << 5) | (pb + db))))
+                    return false;
+                continue;
+            }
+
+            const uint32_t count = static_cast<uint32_t>((b1 & 31u) + 1u);
+            if (count > (pixelsTotal - pos))
+                return false;
+            for (uint32_t i = 0; i < count; ++i)
+            {
+                uint8_t hi = 0;
+                uint8_t lo = 0;
+                if (!r.readByte(hi) || !r.readByte(lo))
+                    return false;
+                if (!emit(static_cast<uint16_t>((static_cast<uint16_t>(hi) << 8) | lo)))
                     return false;
             }
-            else
-            {
-                sink(x, y, px);
-            }
-
-            ++x;
-            if (x == w)
-            {
-                x = 0;
-                ++y;
-            }
-        }
-
-        if (checkTail)
-        {
-            static constexpr uint8_t kTail[8] = {0, 0, 0, 0, 0, 0, 0, 1};
-            for (uint8_t i = 0; i < 8; ++i)
-            {
-                uint8_t b = 0;
-                if (!r.readByte(b) || b != kTail[i])
-                    return false;
-            }
-
-            uint8_t extra = 0;
-            if (r.readByte(extra))
-                return false;
         }
 
         return true;

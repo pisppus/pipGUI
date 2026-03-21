@@ -232,7 +232,7 @@ namespace pipgui
         pipcore::Platform *const plat = platform();
         const float padScale = sizePx * (1.0f / 128.0f);
 
-        forEachGlyph(text.c_str(), (int)text.length(), font, sizePx,
+        forEachGlyph(text.c_str(), (int)text.length(), font, sizePx, _typo.psdfWeight,
                      [&](const Glyph *g, float penX, float penY, bool nl) -> bool
                      {
                          if (nl || !g)
@@ -401,9 +401,9 @@ namespace pipgui
             return;
 
         int16_t rx = (x == -1) ? AutoX((int32_t)tw) : x;
-        if (align == AlignCenter)
+        if (align == TextAlign::Center)
             rx -= (tw + 1) / 2;
-        else if (align == AlignRight)
+        else if (align == TextAlign::Right)
             rx -= tw;
 
         int16_t ry = (y == -1) ? AutoY((int32_t)th) : y;
@@ -436,9 +436,9 @@ namespace pipgui
             return;
 
         int16_t rx = (x == -1) ? AutoX((int32_t)tw) : x;
-        if (align == AlignCenter)
+        if (align == TextAlign::Center)
             rx -= (tw + 1) / 2;
-        else if (align == AlignRight)
+        else if (align == TextAlign::Right)
             rx -= tw;
         int16_t ry = (y == -1) ? AutoY((int32_t)th) : y;
         const int16_t weightExpandX = weightExpandXPxInt(_typo.psdfWeight, (float)_typo.psdfSizePx);

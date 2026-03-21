@@ -460,7 +460,7 @@ namespace pipgui
               _text(),
               _durationMs(2500),
               _fromTop(false),
-              _iconId(WarningLayer0),
+              _iconId(warning),
               _iconSizePx(20) {}
 
         ~ToastFluent() { show(); }
@@ -567,6 +567,58 @@ namespace pipgui
             if (!canMutate())
                 return *this;
             _iconId = id;
+            return *this;
+        }
+
+        void show();
+    };
+
+    struct ShowErrorFluent : detail::FluentLifetime
+    {
+        PIPGUI_DEFAULT_FLUENT_MOVE(ShowErrorFluent);
+        String _message;
+        String _code;
+        String _buttonText;
+        ErrorType _type;
+
+        explicit ShowErrorFluent(GUI *g)
+            : detail::FluentLifetime(g),
+              _message(),
+              _code(),
+              _buttonText("OK"),
+              _type(ErrorTypeWarning) {}
+
+        ~ShowErrorFluent() { show(); }
+
+        ShowErrorFluent &message(const String &value)
+        {
+            if (!canMutate())
+                return *this;
+            _message = value;
+            return *this;
+        }
+
+        ShowErrorFluent &code(const String &value)
+        {
+            if (!canMutate())
+                return *this;
+            _code = value;
+            return *this;
+        }
+
+        ShowErrorFluent &button(const String &value)
+        {
+            if (!canMutate())
+                return *this;
+            _buttonText = value;
+            return *this;
+        }
+
+        ShowErrorFluent &type(ErrorType value)
+        {
+            if (!canMutate())
+                return *this;
+            _type = value;
             return *this;
         }
 

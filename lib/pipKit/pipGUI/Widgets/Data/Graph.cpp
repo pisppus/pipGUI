@@ -150,7 +150,7 @@ namespace pipgui
             uint16_t oldCount = area.sampleCounts[line];
             uint16_t oldHead = area.sampleHead[line];
 
-            int16_t *newBuf = (int16_t *)detail::alloc(plat, sizeof(int16_t) * desiredCap, pipcore::AllocCaps::PreferExternal);
+            int16_t *newBuf = (int16_t *)detail::alloc(plat, sizeof(int16_t) * desiredCap, pipcore::AllocCaps::Default);
             if (!newBuf)
                 return false;
 
@@ -190,7 +190,7 @@ namespace pipgui
             return false;
 
         pipcore::Platform *plat = graphPlatform();
-        int16_t *buf = (int16_t *)detail::alloc(plat, sizeof(int16_t) * area.sampleCapacity, pipcore::AllocCaps::PreferExternal);
+        int16_t *buf = (int16_t *)detail::alloc(plat, sizeof(int16_t) * area.sampleCapacity, pipcore::AllocCaps::Default);
         if (!buf)
             return false;
         for (uint16_t i = 0; i < area.sampleCapacity; ++i)
@@ -732,5 +732,4 @@ namespace pipgui
         flushDirty();
     }
 }
-
 

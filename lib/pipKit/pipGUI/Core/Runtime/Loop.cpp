@@ -1,9 +1,15 @@
-﻿#include <pipGUI/Core/pipGUI.hpp>
+#include <pipGUI/Core/pipGUI.hpp>
 #include <pipGUI/Core/Debug.hpp>
 #include <pipGUI/Systems/Network/Wifi.hpp>
 
 namespace pipgui
 {
+    namespace
+    {
+        constexpr uint32_t kIdleBlurCacheMs = 250;
+        constexpr uint32_t kIdleShotGalleryCacheMs = 250;
+    }
+
     void GUI::loop()
     {
         uint32_t now = nowMs();
@@ -17,9 +23,6 @@ namespace pipgui
 #endif
 
 #if PIPGUI_SCREENSHOTS
-        if (_diag.screenshotNext && _diag.screenshotPrev)
-            handleScreenshotShortcut(_diag.screenshotNext->isDown(), _diag.screenshotPrev->isDown());
-
         serviceScreenshotStream();
 #endif
 
@@ -179,10 +182,10 @@ namespace pipgui
             }
 
             const ClipState prevClip = _clip;
-            applyClipRect(paint.x, paint.y, paint.w, paint.h);
+            applyClip(paint.x, paint.y, paint.w, paint.h);
             renderScreenToMainSprite(currentCb, _screen.current);
             renderStatusBar();
-            applyClipRect(paint.x, paint.y, paint.w, paint.h);
+            applyClip(paint.x, paint.y, paint.w, paint.h);
             if (curVisible)
                 renderToastOverlay(now);
             _clip = prevClip;
@@ -274,14 +277,31 @@ namespace pipgui
             serviceToast();
 
 #if PIPGUI_SCREENSHOTS && (PIPGUI_SCREENSHOT_MODE == 2)
-        serviceScreenshotGalleryFlash();
+        const bool galleryHot = (_shots.lastUseMs != 0) && ((now - _shots.lastUseMs) <= kIdleShotGalleryCacheMs);
+        if (galleryHot)
+        {
+            serviceScreenshotGalleryFlash();
+        }
+        else if (_shots.lastUseMs != 0)
+        {
+            releaseScreenshotGalleryCache(platform());
+        }
 #endif
+
+        if (_blur.lastUseMs != 0 && (now - _blur.lastUseMs) > kIdleBlurCacheMs)
+        {
+            freeBlurBuffers(platform());
+            _blur.lastUseMs = 0;
+        }
     }
 
     void GUI::loopWithInput(Button &next, Button &prev)
     {
         next.update();
         prev.update();
+#if PIPGUI_SCREENSHOTS
+        handleScreenshotShortcut(next.isDown() && prev.isDown() && !_flags.errorActive);
+#endif
         loop();
     }
 }

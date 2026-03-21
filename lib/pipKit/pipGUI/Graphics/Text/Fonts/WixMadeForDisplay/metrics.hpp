@@ -29,6 +29,13 @@ struct Glyph
     uint16_t atlasTop;
 };
 
+struct KerningPair
+{
+    uint32_t left;
+    uint32_t right;
+    int16_t adjust;
+};
+
 static constexpr uint16_t GlyphCount = 163;
 
 static const Glyph Glyphs[GlyphCount] =
@@ -198,6 +205,35 @@ static const Glyph Glyphs[GlyphCount] =
     {8470u, 308, -1, -12, 127, 103, 1, 1, 61, 44},
 };
 
+static constexpr int8_t Tracking128 = 2;
+
+static constexpr uint16_t KerningPairCount = 21;
+
+static const KerningPair KerningPairs[KerningPairCount] =
+{
+    {65u, 86u, -22},
+    {65u, 87u, -20},
+    {65u, 89u, -24},
+    {70u, 65u, -10},
+    {70u, 111u, -12},
+    {76u, 84u, -16},
+    {76u, 86u, -14},
+    {76u, 87u, -12},
+    {76u, 89u, -18},
+    {76u, 97u, -8},
+    {80u, 65u, -12},
+    {84u, 97u, -16},
+    {84u, 101u, -16},
+    {84u, 111u, -18},
+    {84u, 121u, -16},
+    {86u, 65u, -24},
+    {86u, 101u, -18},
+    {86u, 111u, -20},
+    {87u, 65u, -28},
+    {87u, 111u, -16},
+    {89u, 65u, -26},
+};
+
 }
 }
 
@@ -213,5 +249,8 @@ static inline pipgui::FontId registerFont_WixMadeForDisplay(pipgui::GUI &gui){
         pipgui::psdf_wixfor::Descender,
         pipgui::psdf_wixfor::LineHeight,
         pipgui::psdf_wixfor::Glyphs,
-        pipgui::psdf_wixfor::GlyphCount);
+        pipgui::psdf_wixfor::GlyphCount,
+        pipgui::psdf_wixfor::KerningPairs,
+        pipgui::psdf_wixfor::KerningPairCount,
+        pipgui::psdf_wixfor::Tracking128);
 }

@@ -268,11 +268,47 @@ namespace pipgui
             return *this;
         }
 
+        ShowLogoFluent &fgColor(int32_t v)
+        {
+            if (!canMutate())
+                return *this;
+            _fg = (v >= 0 && static_cast<uint32_t>(v) <= 0xFFFFu) ? detail::color565To888(static_cast<uint16_t>(v)) : static_cast<uint32_t>(v);
+            _touched = true;
+            return *this;
+        }
+
+        ShowLogoFluent &fgColor(uint16_t v)
+        {
+            if (!canMutate())
+                return *this;
+            _fg = detail::color565To888(v);
+            _touched = true;
+            return *this;
+        }
+
         ShowLogoFluent &bgColor(uint32_t v)
         {
             if (!canMutate())
                 return *this;
             _bg = v;
+            _touched = true;
+            return *this;
+        }
+
+        ShowLogoFluent &bgColor(int32_t v)
+        {
+            if (!canMutate())
+                return *this;
+            _bg = (v >= 0 && static_cast<uint32_t>(v) <= 0xFFFFu) ? detail::color565To888(static_cast<uint16_t>(v)) : static_cast<uint32_t>(v);
+            _touched = true;
+            return *this;
+        }
+
+        ShowLogoFluent &bgColor(uint16_t v)
+        {
+            if (!canMutate())
+                return *this;
+            _bg = detail::color565To888(v);
             _touched = true;
             return *this;
         }

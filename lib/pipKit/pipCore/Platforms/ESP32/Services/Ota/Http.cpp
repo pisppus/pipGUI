@@ -10,7 +10,7 @@ namespace pipcore::esp32::services
         if (!url || !url[0])
             return false;
 
-        _http.client.setCACert(kRootCaGtsRootR1);
+        _http.client.setInsecure();
         _http.client.setTimeout(5000);
         _http.http.setReuse(false);
         _http.http.setConnectTimeout(5000);
@@ -20,8 +20,8 @@ namespace pipcore::esp32::services
         if (!_http.http.begin(_http.client, url))
         {
             char tmp[128];
-            const int tlsErr = _http.client.lastError(tmp, sizeof(tmp));
-            _st.platformCode = tlsErr != 0 ? tlsErr : 0;
+            const int netErr = _http.client.lastError(tmp, sizeof(tmp));
+            _st.platformCode = netErr != 0 ? netErr : 0;
             return false;
         }
 
@@ -33,8 +33,8 @@ namespace pipcore::esp32::services
             if (code <= 0)
             {
                 char tmp[128];
-                const int tlsErr = _http.client.lastError(tmp, sizeof(tmp));
-                _st.platformCode = tlsErr != 0 ? tlsErr : code;
+                const int netErr = _http.client.lastError(tmp, sizeof(tmp));
+                _st.platformCode = netErr != 0 ? netErr : code;
             }
             _http.http.end();
             return false;

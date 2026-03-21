@@ -15,7 +15,7 @@ namespace pipgui
 
             static void setClip(GUI &gui, int16_t x, int16_t y, int16_t w, int16_t h)
             {
-                gui.applyClipRect(x, y, w, h);
+                gui.applyClip(x, y, w, h);
             }
 
             static void startLogo(GUI &gui,
@@ -531,6 +531,15 @@ namespace pipgui
                                          IconId iconId)
             {
                 gui.showNotificationInternal(title, message, buttonText, delaySeconds, type, iconId);
+            }
+
+            static void showError(GUI &gui,
+                                  const String &message,
+                                  const String &code,
+                                  ErrorType type,
+                                  const String &buttonText)
+            {
+                gui.startError(message, code, type, buttonText);
             }
 
             static void showPopupMenu(GUI &gui,

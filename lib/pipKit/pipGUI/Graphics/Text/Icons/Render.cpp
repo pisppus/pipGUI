@@ -2,7 +2,6 @@
 #include <pipGUI/Core/Internal/GuiAccess.hpp>
 #include <pipGUI/Graphics/Utils/Colors.hpp>
 #include <pipGUI/Graphics/Draw/Blend.hpp>
-#include <pipGUI/Graphics/Text/Icons/icons.hpp>
 #include <pipGUI/Graphics/Text/Icons/metrics.hpp>
 
 namespace pipgui
@@ -172,7 +171,7 @@ namespace pipgui
 
         uint16_t renderSizePx = sizePx;
         int16_t inset = 0;
-        if (iconId == psdf_icons::IconErrorLayer0)
+        if (iconId == psdf_icons::IconError)
         {
             renderSizePx = (uint16_t)((sizePx * 86U) / 100U);
             if (renderSizePx == 0)

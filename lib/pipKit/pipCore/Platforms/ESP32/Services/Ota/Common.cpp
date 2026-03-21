@@ -45,8 +45,6 @@ namespace pipcore::esp32::services
             _http.shaInit = false;
         }
 
-        _http.timeSyncStarted = false;
-        _http.timeSyncStartMs = 0;
     }
 
     void Ota::setError(pipcore::ota::Error e, uint32_t nowMs, int httpCode, int platformCode) noexcept
@@ -85,18 +83,13 @@ namespace pipcore::esp32::services
         _jsonKind = JsonKind::None;
         _fetchUrl[0] = '\0';
         _autoInstallAfterManifest = false;
-        _http.timeSyncStarted = false;
-        _http.timeSyncStartMs = 0;
     }
 
     void Ota::failHttpOpen(uint32_t nowMs) noexcept
     {
         if (_st.httpCode <= 0)
         {
-            if (_st.platformCode != 0)
-                setError(pipcore::ota::Error::TlsFailed, nowMs, _st.httpCode, _st.platformCode);
-            else
-                setError(pipcore::ota::Error::HttpBeginFailed, nowMs, _st.httpCode, _st.platformCode);
+            setError(pipcore::ota::Error::HttpBeginFailed, nowMs, _st.httpCode, _st.platformCode);
             return;
         }
         setError(pipcore::ota::Error::HttpStatusNotOk, nowMs, _st.httpCode, _st.platformCode);

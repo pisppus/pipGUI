@@ -2,10 +2,17 @@
 import argparse
 import hashlib
 import json
+import os
+import sys
 import urllib.request
 from pathlib import Path
 
-from _util import ensure_pynacl, manifest_sig_payload_v5, parse_version, version_to_build
+TOOLS_DIR = Path(__file__).resolve().parents[1]
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
+
+from _menu import choose, choose_existing_path, prompt_text
+from _util import ensure_pynacl, manifest_sig_payload, parse_version, pubkey_from_seed_ed25519, read_priv_seed_hex, version_to_build
 
 def _read_manifest(src: str) -> dict:
     if src.startswith("http://") or src.startswith("https://"):
@@ -19,16 +26,83 @@ def _read_bytes(src: str) -> bytes:
         return urllib.request.urlopen(src, timeout=30).read()
     return Path(src).read_bytes()
 
+
+def _find_manifests(repo_root: Path) -> list[Path]:
+    return sorted(repo_root.glob("tools/ota/out/*/*/*/manifest.json"))
+
+
+def _find_bins(repo_root: Path) -> list[Path]:
+    return sorted(repo_root.glob("tools/ota/out/*/*/*/fw.bin"))
+
+
+def _detect_pubkey(repo_root: Path) -> str | None:
+    candidates = [
+        repo_root / "tools" / "ota" / "keys" / "ota_ed25519.key",
+        repo_root / "ota_ed25519.key",
+        repo_root / "tools" / "ota" / "ota_ed25519.key",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return pubkey_from_seed_ed25519(read_priv_seed_hex(candidate)).hex()
+    return None
+
+
+def _interactive_inputs(repo_root: Path, args: argparse.Namespace) -> tuple[str, str | None]:
+    manifest_menu: list[tuple[str, str | None]] = [(str(path), str(path)) for path in _find_manifests(repo_root)]
+    manifest_menu.append(("Manual manifest path or URL", None))
+    manifest_pick = choose("Manifest", manifest_menu, lambda item: item[0])
+    manifest_src = manifest_pick[1] or prompt_text("Manifest path or URL")
+    source_mode = choose(
+        "Firmware source",
+        ["Use firmware URL from manifest", "Choose local fw.bin", "Enter custom path or URL"],
+    )
+    bin_src = None
+    if source_mode == "Choose local fw.bin":
+        bin_src = str(choose_existing_path("Firmware binary", _find_bins(repo_root), custom_label="Manual firmware path"))
+    elif source_mode == "Enter custom path or URL":
+        bin_src = prompt_text("Firmware path or URL")
+
+    auto_pubkey = _detect_pubkey(repo_root)
+    sig_options = ["Skip signature check"]
+    if auto_pubkey:
+        sig_options.append("Use detected OTA key")
+    sig_options.append("Enter pubkey manually")
+    sig_mode = choose("Signature check", sig_options)
+    if sig_mode == "Use detected OTA key":
+        args.pubkey = auto_pubkey
+    elif sig_mode == "Enter pubkey manually":
+        args.pubkey = prompt_text("Public key hex")
+    return manifest_src, bin_src
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Verify OTA manifest.json against a firmware binary.")
-    ap.add_argument("--manifest", required=True, help="Path or HTTPS URL to manifest.json")
-    ap.add_argument("--bin", default=None, help="Path or HTTPS URL to firmware.bin (default: manifest.url)")
     ap.add_argument("--pubkey", default=None, help="Ed25519 public key hex (64 chars). If set, verifies sig_ed25519.")
-    args = ap.parse_args()
+    ap.add_argument("--interactive", action="store_true", help="Choose values from interactive menus")
+    args, extra = ap.parse_known_args()
+
+    compact = [token[2:] if token.startswith("--") else token for token in extra]
+    repo_root = Path(__file__).resolve().parents[2]
+    interactive = args.interactive or not compact
+    if interactive:
+        manifest_src, bin_src_arg = _interactive_inputs(repo_root, args)
+    else:
+        if len(compact) not in (1, 2, 3):
+            raise SystemExit(
+                "Usage:\n"
+                "  python tools/ota/verify_manifest.py\n"
+                "  python tools/ota/verify_manifest.py --tools/ota/out/<project>/stable/1.2.3/manifest.json [--tools/ota/out/<project>/stable/1.2.3/fw.bin] [--<pubkey>]"
+            )
+        manifest_src = compact[0]
+        bin_src_arg = compact[1] if len(compact) == 2 else None
+        if len(compact) == 3:
+            bin_src_arg = compact[1]
+            if args.pubkey is None:
+                args.pubkey = compact[2]
+
 
     verbose = os.environ.get("PIPGUI_TOOLS_VERBOSE", "0").strip().lower() in ("1", "true", "yes", "on")
 
-    m = _read_manifest(args.manifest)
+    m = _read_manifest(manifest_src)
     for k in ("title", "version", "build", "size", "sha256", "url", "desc"):
         if k not in m:
             raise SystemExit(f"Missing field '{k}' in manifest")
@@ -39,7 +113,7 @@ def main() -> int:
     if int(m["build"]) != expected_build:
         raise SystemExit(f"Invalid build in manifest: {m['build']} (expected {expected_build})")
 
-    bin_src = args.bin or str(m["url"])
+    bin_src = bin_src_arg or str(m["url"])
     data = _read_bytes(bin_src)
     sha = hashlib.sha256(data).hexdigest()
 
@@ -69,7 +143,7 @@ def main() -> int:
         else:
             sig = bytes.fromhex(str(sig_hex))
             try:
-                payload = manifest_sig_payload_v5(
+                payload = manifest_sig_payload(
                     str(m["title"]),
                     str(m["version"]),
                     int(m["build"]),

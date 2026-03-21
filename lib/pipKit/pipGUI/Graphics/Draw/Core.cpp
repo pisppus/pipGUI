@@ -4,12 +4,12 @@
 namespace pipgui
 {
 
-    static inline void applyClip(pipcore::Sprite *spr,
-                                 bool enabled,
-                                 int16_t x,
-                                 int16_t y,
-                                 int16_t w,
-        int16_t h)
+    static inline void applyClipState(pipcore::Sprite *spr,
+                                      bool enabled,
+                                      int16_t x,
+                                      int16_t y,
+                                      int16_t w,
+                                      int16_t h)
     {
         if (!spr)
             return;
@@ -42,11 +42,11 @@ namespace pipgui
         pipcore::Sprite *spr = (_flags.inSpritePass && _flags.spriteEnabled)
                                    ? (_render.activeSprite ? _render.activeSprite : &_render.sprite)
                                    : &_render.sprite;
-        applyClip(spr, _clip.enabled, _clip.x, _clip.y, _clip.w, _clip.h);
+        applyClipState(spr, _clip.enabled, _clip.x, _clip.y, _clip.w, _clip.h);
         return spr;
     }
 
-    void GUI::applyClipRect(int16_t x, int16_t y, int16_t w, int16_t h)
+    void GUI::applyClip(int16_t x, int16_t y, int16_t w, int16_t h)
     {
         _clip.enabled = true;
         _clip.x = x;

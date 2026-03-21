@@ -7,35 +7,35 @@
   },
   "icons": [
     {
-      "name": "BatteryLayer0",
+      "name": "BatteryL0",
       "x": 0,
       "y": 0,
       "w": 48,
       "h": 48
     },
     {
-      "name": "BatteryLayer1",
+      "name": "BatteryL1",
       "x": 0,
       "y": 48,
       "w": 48,
       "h": 48
     },
     {
-      "name": "BatteryLayer2",
+      "name": "BatteryL2",
       "x": 0,
       "y": 96,
       "w": 48,
       "h": 48
     },
     {
-      "name": "ErrorLayer0",
+      "name": "Error",
       "x": 0,
       "y": 144,
       "w": 48,
       "h": 48
     },
     {
-      "name": "WarningLayer0",
+      "name": "Warning",
       "x": 0,
       "y": 192,
       "w": 48,

@@ -29,6 +29,13 @@ struct Glyph
     uint16_t atlasTop;
 };
 
+struct KerningPair
+{
+    uint32_t left;
+    uint32_t right;
+    int16_t adjust;
+};
+
 static constexpr uint16_t GlyphCount = 4;
 
 static const Glyph Glyphs[GlyphCount] =
@@ -38,6 +45,12 @@ static const Glyph Glyphs[GlyphCount] =
     {83u, 256, -4, -15, 127, 111, 1, 1, 52, 48},
     {85u, 234, -1, -12, 119, 111, 52, 1, 97, 47},
 };
+
+static constexpr int8_t Tracking128 = 1;
+
+static constexpr uint16_t KerningPairCount = 0;
+
+static const KerningPair *const KerningPairs = nullptr;
 
 }
 }
@@ -54,5 +67,8 @@ static inline pipgui::FontId registerFont_KronaOne(pipgui::GUI &gui){
         pipgui::psdf_krona::Descender,
         pipgui::psdf_krona::LineHeight,
         pipgui::psdf_krona::Glyphs,
-        pipgui::psdf_krona::GlyphCount);
+        pipgui::psdf_krona::GlyphCount,
+        pipgui::psdf_krona::KerningPairs,
+        pipgui::psdf_krona::KerningPairCount,
+        pipgui::psdf_krona::Tracking128);
 }

@@ -15,7 +15,6 @@ namespace pipgui
     {
         if (!tf || !src565 || w == 0 || h == 0)
             return false;
-
         uint8_t hbuf[ssd::kHdrSize];
         hbuf[0] = 'P';
         hbuf[1] = 'S';
@@ -25,37 +24,95 @@ namespace pipgui
         hbuf[5] = static_cast<uint8_t>((w >> 8) & 0xFFu);
         hbuf[6] = static_cast<uint8_t>(h & 0xFFu);
         hbuf[7] = static_cast<uint8_t>((h >> 8) & 0xFFu);
-        hbuf[8] = static_cast<uint8_t>(ScreenshotFormat::QoiRgb);
+        hbuf[8] = 0;
         hbuf[9] = 0;
         hbuf[10] = 0;
         hbuf[11] = 0;
-        hbuf[12] = 0;
 
         if (tf.write(hbuf, sizeof(hbuf)) != sizeof(hbuf))
             return false;
 
-        uint32_t qoiSize = 0;
-        uint32_t qoiCrc = 0;
-        if (!detail::qoiEncode565ToFile(tf, src565, w, h, qoiSize, &qoiCrc))
+        uint32_t payloadSize = 0;
+        uint32_t payloadCrc = 0;
+        if (!detail::encodeScreenshotPayload565ToFile(tf, src565, w, h, payloadSize, &payloadCrc))
             return false;
 
-        if (!tf.seek(9))
+        if (!tf.seek(8))
             return false;
         uint8_t sz[4];
-        sz[0] = static_cast<uint8_t>(qoiSize & 0xFFu);
-        sz[1] = static_cast<uint8_t>((qoiSize >> 8) & 0xFFu);
-        sz[2] = static_cast<uint8_t>((qoiSize >> 16) & 0xFFu);
-        sz[3] = static_cast<uint8_t>((qoiSize >> 24) & 0xFFu);
+        sz[0] = static_cast<uint8_t>(payloadSize & 0xFFu);
+        sz[1] = static_cast<uint8_t>((payloadSize >> 8) & 0xFFu);
+        sz[2] = static_cast<uint8_t>((payloadSize >> 16) & 0xFFu);
+        sz[3] = static_cast<uint8_t>((payloadSize >> 24) & 0xFFu);
         if (tf.write(sz, sizeof(sz)) != sizeof(sz))
             return false;
 
-        const size_t endPos = static_cast<size_t>(ssd::kHdrSize) + static_cast<size_t>(qoiSize);
+        const size_t endPos = static_cast<size_t>(ssd::kHdrSize) + static_cast<size_t>(payloadSize);
         if (!tf.seek(endPos))
             return false;
-        if (!ssd::writeTrailer(tf, qoiSize, qoiCrc, 0))
+        if (!ssd::writeTrailer(tf, payloadSize, payloadCrc, 0))
             return false;
         tf.flush();
         return tf.size() == (endPos + ssd::kTrlSize);
+    }
+
+    static void storeShotPath(char *dst, size_t dstSize, const char *src) noexcept
+    {
+        if (!dst || dstSize == 0)
+            return;
+        dst[0] = '\0';
+        if (!src || !src[0])
+            return;
+        if (src[0] == '/')
+        {
+            std::strncpy(dst, src, dstSize - 1);
+            dst[dstSize - 1] = '\0';
+            return;
+        }
+        if (std::strchr(src, '/'))
+        {
+            dst[0] = '/';
+            if (dstSize == 1)
+                return;
+            std::strncpy(dst + 1, src, dstSize - 2);
+            dst[dstSize - 1] = '\0';
+            return;
+        }
+        std::snprintf(dst, dstSize, "%s/%s", ssd::kShotsDir, src);
+    }
+
+    static void clearGalleryCache(detail::ScreenshotGalleryState &shots, pipcore::Platform *plat) noexcept
+    {
+        for (uint8_t i = 0; i < shots.maxShots; ++i)
+        {
+            if (shots.entries[i].pixels)
+                detail::free(plat, shots.entries[i].pixels);
+            shots.entries[i] = {};
+        }
+        shots.count = 0;
+        shots.flashLoadIndex = 0;
+        shots.flashThumbsDone = false;
+        shots.thumbIndexReady = false;
+        shots.thumbIndexW = 0;
+        shots.thumbIndexH = 0;
+    }
+
+    static void dropGalleryEntryAt(detail::ScreenshotGalleryState &shots,
+                                   pipcore::Platform *plat,
+                                   uint8_t index) noexcept
+    {
+        if (index >= shots.count)
+            return;
+        if (shots.entries[index].pixels)
+        {
+            detail::free(plat, shots.entries[index].pixels);
+            shots.entries[index].pixels = nullptr;
+        }
+        for (uint8_t j = index; (j + 1u) < shots.count; ++j)
+            shots.entries[j] = shots.entries[j + 1u];
+        shots.entries[shots.count - 1u] = {};
+        --shots.count;
+        shots.flashThumbsDone = (shots.count == 0);
     }
 #endif
 
@@ -63,9 +120,7 @@ namespace pipgui
     {
 #if (PIPGUI_SCREENSHOT_MODE != 2)
         return;
-  #else
-        const uint32_t now = nowMs();
-
+#else
         if (_shotStream.active)
             return;
 
@@ -88,31 +143,6 @@ namespace pipgui
         if (!ensureScreenshotGallery(platform()))
             return;
 
-        auto storePath = [](char *dst, size_t dstSize, const char *src)
-        {
-            if (!dst || dstSize == 0)
-                return;
-            dst[0] = '\0';
-            if (!src || !src[0])
-                return;
-            if (src[0] == '/')
-            {
-                std::strncpy(dst, src, dstSize - 1);
-                dst[dstSize - 1] = '\0';
-                return;
-            }
-            if (std::strchr(src, '/'))
-            {
-                dst[0] = '/';
-                if (dstSize == 1)
-                    return;
-                std::strncpy(dst + 1, src, dstSize - 2);
-                dst[dstSize - 1] = '\0';
-                return;
-            }
-            std::snprintf(dst, dstSize, "%s/%s", ssd::kShotsDir, src);
-        };
-
         auto insertMeta = [&](const char *path, uint32_t stamp)
         {
             const uint8_t cap = _shots.maxShots;
@@ -130,7 +160,7 @@ namespace pipgui
                 }
                 _shots.entries[pos] = {};
                 _shots.entries[pos].stamp = stamp;
-                storePath(_shots.entries[pos].path, sizeof(_shots.entries[pos].path), path);
+                storeShotPath(_shots.entries[pos].path, sizeof(_shots.entries[pos].path), path);
                 _shots.count = static_cast<uint8_t>(n + 1);
                 return;
             }
@@ -140,7 +170,7 @@ namespace pipgui
 
             _shots.entries[n - 1] = {};
             _shots.entries[n - 1].stamp = stamp;
-            storePath(_shots.entries[n - 1].path, sizeof(_shots.entries[n - 1].path), path);
+            storeShotPath(_shots.entries[n - 1].path, sizeof(_shots.entries[n - 1].path), path);
             for (int i = static_cast<int>(n) - 1; i > 0; --i)
             {
                 if (_shots.entries[i - 1].stamp >= _shots.entries[i].stamp)
@@ -154,18 +184,7 @@ namespace pipgui
             if (!_shots.flashScanActive)
             {
                 _flags.needRedraw = 1;
-                for (uint8_t i = 0; i < _shots.maxShots; ++i)
-                {
-                    if (_shots.entries[i].pixels)
-                        detail::free(platform(), _shots.entries[i].pixels);
-                    _shots.entries[i] = {};
-                }
-                _shots.count = 0;
-                _shots.flashLoadIndex = 0;
-                _shots.flashThumbsDone = false;
-                _shots.thumbIndexReady = false;
-                _shots.thumbIndexW = 0;
-                _shots.thumbIndexH = 0;
+                clearGalleryCache(_shots, platform());
                 _shots.scanDir = LittleFS.open(ssd::kShotsDir);
                 if (!_shots.scanDir)
                 {
@@ -202,7 +221,7 @@ namespace pipgui
                 if (ssd::hasSuffix(base, ".tmp") && (std::strncmp(base, "pscr_", 5) == 0 || std::strcmp(base, ".counter.tmp") == 0))
                 {
                     char tmpFull[64];
-                    storePath(tmpFull, sizeof(tmpFull), base);
+                    storeShotPath(tmpFull, sizeof(tmpFull), base);
                     file.close();
                     if (tmpFull[0] != '\0')
                         LittleFS.remove(tmpFull);
@@ -257,28 +276,14 @@ namespace pipgui
         ScreenshotEntry &entry = _shots.entries[_shots.flashLoadIndex];
         if (entry.path[0] == '\0')
         {
-            // Shouldn't happen, but avoid "blank tiles" if metadata gets out of sync.
-            for (uint8_t j = _shots.flashLoadIndex; (j + 1u) < _shots.count; ++j)
-                _shots.entries[j] = _shots.entries[j + 1u];
-            _shots.entries[_shots.count - 1u] = {};
-            --_shots.count;
-            _shots.flashThumbsDone = (_shots.count == 0);
+            dropGalleryEntryAt(_shots, platform(), _shots.flashLoadIndex);
             _flags.needRedraw = 1;
             return;
         }
 
         const auto dropEntry = [&]()
         {
-            if (_shots.entries[_shots.flashLoadIndex].pixels)
-            {
-                detail::free(platform(), _shots.entries[_shots.flashLoadIndex].pixels);
-                _shots.entries[_shots.flashLoadIndex].pixels = nullptr;
-            }
-            for (uint8_t j = _shots.flashLoadIndex; (j + 1u) < _shots.count; ++j)
-                _shots.entries[j] = _shots.entries[j + 1u];
-            _shots.entries[_shots.count - 1u] = {};
-            --_shots.count;
-            _shots.flashThumbsDone = (_shots.count == 0);
+            dropGalleryEntryAt(_shots, platform(), _shots.flashLoadIndex);
             _flags.needRedraw = 1;
         };
         const auto dropEntryAndDelete = [&]()
@@ -364,25 +369,24 @@ namespace pipgui
                 if (tf)
                 {
                     bool removeThumb = false;
-                    uint8_t thead[13] = {};
+                    uint8_t thead[ssd::kHdrSize] = {};
                     if (tf.read(thead, sizeof(thead)) == sizeof(thead) &&
                         thead[0] == 'P' && thead[1] == 'S' && thead[2] == 'C' && thead[3] == 'R')
                     {
                         const uint16_t tw2 = static_cast<uint16_t>(thead[4] | (thead[5] << 8));
                         const uint16_t th2 = static_cast<uint16_t>(thead[6] | (thead[7] << 8));
-                        const uint8_t tfmt = thead[8];
                         const uint32_t tsize =
-                            static_cast<uint32_t>(thead[9]) |
-                            (static_cast<uint32_t>(thead[10]) << 8) |
-                            (static_cast<uint32_t>(thead[11]) << 16) |
-                            (static_cast<uint32_t>(thead[12]) << 24);
+                            static_cast<uint32_t>(thead[8]) |
+                            (static_cast<uint32_t>(thead[9]) << 8) |
+                            (static_cast<uint32_t>(thead[10]) << 16) |
+                            (static_cast<uint32_t>(thead[11]) << 24);
                         if (tw2 == tw && th2 == th)
                         {
                             uint32_t tcrcExpected = 0;
                             uint8_t tflags = 0;
                             (void)tflags;
                             if (!ssd::readTrailer(tf, static_cast<uint32_t>(ssd::kHdrSize), tsize,
-                                                      tcrcExpected, tflags) ||
+                                                  tcrcExpected, tflags) ||
                                 !tf.seek(ssd::kHdrSize))
                             {
                                 removeThumb = true;
@@ -391,15 +395,13 @@ namespace pipgui
                             if (!removeThumb)
                             {
                                 const size_t pixels = static_cast<size_t>(tw) * static_cast<size_t>(th);
-                                uint16_t *dst = static_cast<uint16_t *>(detail::alloc(platform(), pixels * sizeof(uint16_t), pipcore::AllocCaps::PreferExternal));
+                                uint16_t *dst = static_cast<uint16_t *>(detail::alloc(platform(), pixels * sizeof(uint16_t), pipcore::AllocCaps::Default));
                                 if (dst)
                                 {
-                                    bool ok = false;
-                                    if (tfmt == static_cast<uint8_t>(ScreenshotFormat::QoiRgb))
-                                    {
-                                        uint32_t got = 0;
-                                        ok = detail::qoiDecodeFileTo565(tf, tw, th, dst, tsize, &got) && (got == tcrcExpected);
-                                    }
+                                    uint32_t got = 0;
+                                    const bool ok =
+                                        detail::decodeScreenshotPayloadTo565(tf, tw, th, dst, tsize, &got) &&
+                                        (got == tcrcExpected);
 
                                     if (ok)
                                     {
@@ -438,7 +440,7 @@ namespace pipgui
             return;
         }
 
-        uint8_t header[13] = {};
+        uint8_t header[ssd::kHdrSize] = {};
         if (file.read(header, sizeof(header)) != sizeof(header) ||
             header[0] != 'P' || header[1] != 'S' || header[2] != 'C' || header[3] != 'R')
         {
@@ -449,12 +451,11 @@ namespace pipgui
 
         const uint16_t w = static_cast<uint16_t>(header[4] | (header[5] << 8));
         const uint16_t h = static_cast<uint16_t>(header[6] | (header[7] << 8));
-        const uint8_t fmt = header[8];
         const uint32_t payloadSize =
-            static_cast<uint32_t>(header[9]) |
-            (static_cast<uint32_t>(header[10]) << 8) |
-            (static_cast<uint32_t>(header[11]) << 16) |
-            (static_cast<uint32_t>(header[12]) << 24);
+            static_cast<uint32_t>(header[8]) |
+            (static_cast<uint32_t>(header[9]) << 8) |
+            (static_cast<uint32_t>(header[10]) << 16) |
+            (static_cast<uint32_t>(header[11]) << 24);
 
         if (w == 0 || h == 0)
         {
@@ -467,7 +468,7 @@ namespace pipgui
         uint8_t fflags = 0;
         (void)fflags;
         if (!ssd::readTrailer(file, static_cast<uint32_t>(ssd::kHdrSize), payloadSize,
-                                  fcrcExpected, fflags) ||
+                              fcrcExpected, fflags) ||
             !file.seek(ssd::kHdrSize))
         {
             file.close();
@@ -475,10 +476,9 @@ namespace pipgui
             return;
         }
 
-        if (fmt == static_cast<uint8_t>(ScreenshotFormat::QoiRgb))
         {
             const size_t dstPixels = static_cast<size_t>(tw) * static_cast<size_t>(th);
-            uint16_t *dst = static_cast<uint16_t *>(detail::alloc(platform(), dstPixels * sizeof(uint16_t), pipcore::AllocCaps::PreferExternal));
+            uint16_t *dst = static_cast<uint16_t *>(detail::alloc(platform(), dstPixels * sizeof(uint16_t), pipcore::AllocCaps::Default));
             if (!dst)
             {
                 file.close();
@@ -521,15 +521,8 @@ namespace pipgui
             std::memset(accG1, 0, (size_t)tw * sizeof(uint64_t));
             std::memset(accB1, 0, (size_t)tw * sizeof(uint64_t));
 
-            bool ok = true;
-            ssd::QoiReader qr;
-            qr.f = &file;
-            if (payloadSize == 0)
-                ok = false;
-            qr.limited = true;
-            qr.remaining = payloadSize;
-            uint32_t qcrc = ssd::crc32Init();
-            qr.crc = &qcrc;
+            bool ok = (payloadSize != 0);
+            uint32_t payloadCrc = ssd::crc32Init();
 
             const uint32_t srcW16 = static_cast<uint32_t>(w) << 16;
             const uint32_t srcH16 = static_cast<uint32_t>(h) << 16;
@@ -620,17 +613,33 @@ namespace pipgui
                 return true;
             };
 
-            const auto sink = [&](uint16_t sx, uint16_t sy, uint32_t rgba) -> bool
-            {
-                row565[sx] = ssd::rgb565FromRgba(rgba);
-                if (static_cast<uint16_t>(sx + 1u) == w)
-                    return processRow(sy);
-                return true;
-            };
-
-            ok = ok && ssd::qoiDecodeRaster(qr, w, h, sink, true);
             if (ok)
-                ok = (ssd::crc32Finish(qcrc) == fcrcExpected);
+            {
+                ssd::PayloadReader r;
+                r.f = &file;
+                r.limited = true;
+                r.remaining = payloadSize;
+                r.crc = &payloadCrc;
+
+                uint16_t sx = 0;
+                uint16_t sy = 0;
+                const auto sink = [&](uint16_t px) -> bool
+                {
+                    row565[sx] = px;
+                    ++sx;
+                    if (sx < w)
+                        return true;
+                    sx = 0;
+                    const bool rowOk = processRow(sy);
+                    ++sy;
+                    return rowOk;
+                };
+
+                ok = ssd::decodePacked565Raster(r, static_cast<uint32_t>(w) * static_cast<uint32_t>(h), sink);
+            }
+
+            if (ok)
+                ok = (ssd::crc32Finish(payloadCrc) == fcrcExpected);
 
             while (ok && dy < th)
             {
@@ -674,7 +683,6 @@ namespace pipgui
                 return;
             }
 
-            // Persist thumbnail for this (thumbW x thumbH) so next entries are instant.
             if (_shots.fsDirsReady && entry.path[0] != '\0' && thumbPath[0] != '\0')
             {
                 char tdir[64];
@@ -714,14 +722,6 @@ namespace pipgui
             ++_shots.flashLoadIndex;
             return;
         }
-
-        file.close();
-        dropEntryAndDelete();
-        return;
 #endif
     }
-
 }
-
-
-

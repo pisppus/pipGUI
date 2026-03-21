@@ -150,23 +150,6 @@ namespace pipcore::esp32::services
             if (!wifiReady())
                 return;
 
-            if (!timeIsValid())
-            {
-                if (!_http.timeSyncStarted)
-                {
-                    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
-                    _http.timeSyncStarted = true;
-                    _http.timeSyncStartMs = nowMs;
-                    return;
-                }
-                if (static_cast<uint32_t>(nowMs - _http.timeSyncStartMs) > 10'000)
-                {
-                    setError(pipcore::ota::Error::TimeSyncFailed, nowMs);
-                    return;
-                }
-                return;
-            }
-
             if (_wifiNextDownload)
             {
                 _wifiNextDownload = false;
@@ -274,8 +257,6 @@ namespace pipcore::esp32::services
             {
                 _wantInstall = false;
                 _wifiNextDownload = true;
-                _http.timeSyncStarted = false;
-                _http.timeSyncStartMs = 0;
                 wifiAcquire();
                 if (wifiReady())
                 {

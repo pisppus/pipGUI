@@ -4,6 +4,7 @@
 #include <pipGUI/Core/Config/Select.hpp>
 #include <pipCore/Input/Button.hpp>
 #include <pipGUI/Core/UiLayout.hpp>
+#include <pipGUI/Graphics/Utils/Colors.hpp>
 #include <pipGUI/Graphics/Text/Icons/metrics.hpp>
 
 namespace pipgui
@@ -43,16 +44,14 @@ namespace pipgui
     {
         BootAnimNone,
         FadeIn,
-        SlideUp,
-        LightFade,
-        ZoomIn
+        LightFade
     };
 
-    enum TextAlign : uint8_t
+    enum class TextAlign : uint8_t
     {
-        AlignLeft,
-        AlignCenter,
-        AlignRight
+        Left,
+        Center,
+        Right
     };
 
     enum FontId : uint8_t
@@ -174,7 +173,7 @@ namespace pipgui
 
             constexpr operator TextAlign() const noexcept
             {
-                return (code == TokCenter) ? AlignCenter : ((code == TokRight) ? AlignRight : AlignLeft);
+                return (code == TokCenter) ? TextAlign::Center : ((code == TokRight) ? TextAlign::Right : TextAlign::Left);
             }
 
             constexpr operator StatusBarPosition() const noexcept
@@ -205,6 +204,7 @@ namespace pipgui
         {
             constexpr operator ErrorType() const noexcept { return ErrorTypeWarning; }
             constexpr operator NotificationType() const noexcept { return NotificationType::Warning; }
+            constexpr operator uint16_t() const noexcept { return detail::color888To565(0xFF6200u); }
         };
 
         struct NormalToken
@@ -215,6 +215,7 @@ namespace pipgui
         struct ErrorToken
         {
             constexpr operator NotificationType() const noexcept { return NotificationType::Error; }
+            constexpr operator uint16_t() const noexcept { return detail::color888To565(0xFF0048u); }
         };
 
         struct PulseToken

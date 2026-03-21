@@ -79,8 +79,8 @@ namespace pipgui
 
         auto alloc565Pair = [&](uint16_t *&a, uint16_t *&b, size_t n) -> bool
         {
-            void *na = detail::alloc(plat, n * sizeof(uint16_t), pipcore::AllocCaps::PreferExternal);
-            void *nb = detail::alloc(plat, n * sizeof(uint16_t), pipcore::AllocCaps::PreferExternal);
+            void *na = detail::alloc(plat, n * sizeof(uint16_t), pipcore::AllocCaps::Default);
+            void *nb = detail::alloc(plat, n * sizeof(uint16_t), pipcore::AllocCaps::Default);
             if (!na || !nb)
             {
                 detail::free(plat, na);
@@ -176,6 +176,7 @@ namespace pipgui
             return;
         if (radius < 1)
             radius = 1;
+        _blur.lastUseMs = nowMs();
 
         if (_flags.spriteEnabled && _disp.display && !_flags.inSpritePass)
         {

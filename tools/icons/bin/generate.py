@@ -10,7 +10,7 @@ import zlib
 
 sys.dont_write_bytecode = True
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from psdf import (
     _write_png_gray8,
     _fmt_f,
@@ -57,7 +57,7 @@ def _project_stamp(project_dir: str, svg_files: list[str], icons_exe: str, icon_
         svgpathtools_sig = "missing"
 
     parts = [
-        "icons_project_cache_v1",
+        "icons_project_cache_v2",
         _hash_file(os.path.abspath(__file__)),
         _hash_file(psdf_path),
         _file_stat_signature(icons_exe),
@@ -82,8 +82,7 @@ def _project_stamp(project_dir: str, svg_files: list[str], icons_exe: str, icon_
 def _project_outputs_exist(project_dir: str) -> bool:
     out_icons_dir = _out_icons_dir(project_dir)
     return (
-        os.path.isfile(os.path.join(out_icons_dir, "icons.hpp"))
-        and os.path.isfile(os.path.join(out_icons_dir, "icons.cpp"))
+        os.path.isfile(os.path.join(out_icons_dir, "icons.cpp"))
         and os.path.isfile(os.path.join(out_icons_dir, "metrics.hpp"))
         and os.path.isfile(os.path.join(project_dir, "tools", "icons", "bin", "PSDF", "atlas.bin"))
         and os.path.isfile(os.path.join(project_dir, "tools", "icons", "bin", "PSDF", "atlas.json"))
@@ -354,17 +353,9 @@ def _msdf_transform_from_viewbox(viewbox, out_px: int):
     return scale, tx, ty
 
 
-def _gen_icons_decl_hpp() -> str:
-    out = []
-    out.append("#pragma once\n\n")
-    out.append("#include <cstdint>\n\n")
-    out.append("extern const uint8_t icons[];\n")
-    return "".join(out)
-
-
 def _gen_icons_def_cpp(data: bytes) -> str:
     out = []
-    out.append('#include "icons.hpp"\n\n')
+    out.append('#include "metrics.hpp"\n\n')
     out.append("const uint8_t icons[] = {\n")
     for i in range(0, len(data), 16):
         chunk = data[i : i + 16]
@@ -378,6 +369,7 @@ def _gen_icons_metrics_hpp(icon_names, icon_aliases, icon_boxes, atlas_w, atlas_
     out = []
     out.append("#pragma once\n")
     out.append("#include <cstdint>\n")
+    out.append("\nextern const uint8_t icons[];\n")
     out.append("\n")
     out.append("namespace pipgui\n{")
     out.append("\nnamespace psdf_icons\n{")
@@ -415,9 +407,7 @@ def _gen_icons_metrics_hpp(icon_names, icon_aliases, icon_boxes, atlas_w, atlas_
     out.append("\n")
     
     for name, alias in zip(icon_names, icon_aliases):
-        out.append(f"constexpr pipgui::IconId {name} = ::pipgui::psdf_icons::Icon{name};\n")
-        if alias != name:
-            out.append(f"constexpr pipgui::IconId {alias} = ::pipgui::psdf_icons::Icon{name};\n")
+        out.append(f"constexpr pipgui::IconId {alias} = ::pipgui::psdf_icons::Icon{name};\n")
     
     return "".join(out)
 
@@ -443,7 +433,6 @@ def generate_all(project_dir: str) -> bool:
         return False
 
     out_icons_dir = _out_icons_dir(project_dir)
-    out_icons_hpp = os.path.join(out_icons_dir, "icons.hpp")
     out_icons_cpp = os.path.join(out_icons_dir, "icons.cpp")
     out_metrics_hpp = os.path.join(out_icons_dir, "metrics.hpp")
 
@@ -481,6 +470,8 @@ def generate_all(project_dir: str) -> bool:
         if not layers:
             layers = [("layer0", None, False)]
 
+        multi_layer = len(layers) > 1
+
         base_camel = _camel_from_file(base)
 
         for layer_name, layer_svg, has_stroke in layers:
@@ -508,9 +499,13 @@ def generate_all(project_dir: str) -> bool:
 
             name_camel = base_camel
             alias_base = base.lower()
-            if layer_name != "layer0" or layer_svg is not None:
-                name_camel = base_camel + _snake_to_camel("_" + layer_name)
-                alias_base = f"{alias_base}_{layer_name.lower()}"
+            if multi_layer:
+                layer_index = 0
+                m = re.fullmatch(r"layer(\d+)", layer_name, flags=re.IGNORECASE)
+                if m:
+                    layer_index = int(m.group(1))
+                name_camel = f"{base_camel}L{layer_index}"
+                alias_base = f"{alias_base}_l{layer_index}"
 
             icon_names.append(_safe_ident(name_camel))
             icon_aliases.append(_safe_ident(alias_base))
@@ -572,7 +567,6 @@ def generate_all(project_dir: str) -> bool:
         prev_stamp == stamp_in
         and os.path.isfile(atlas_bin_path)
         and os.path.isfile(atlas_json_path)
-        and os.path.isfile(out_icons_hpp)
         and os.path.isfile(out_icons_cpp)
         and os.path.isfile(out_metrics_hpp)
     )
@@ -650,7 +644,6 @@ def generate_all(project_dir: str) -> bool:
     with open(atlas_bin_path, "rb") as f:
         atlas_data = f.read()
 
-    _write_if_changed(out_icons_hpp, _gen_icons_decl_hpp())
     _write_if_changed(out_icons_cpp, _gen_icons_def_cpp(atlas_data))
     _write_if_changed(out_metrics_hpp, _gen_icons_metrics_hpp(icon_names, icon_aliases, icon_boxes, atlas_w, atlas_h, icon_px, pxrange))
 

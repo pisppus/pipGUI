@@ -16,7 +16,7 @@ namespace pipgui
         uint16_t lines = 1;
         float maxX = 0.f, curX = 0.f;
 
-        forEachGlyph(text.c_str(), len, font, sizePx,
+        forEachGlyph(text.c_str(), len, font, sizePx, _typo.psdfWeight,
                      [&](const Glyph *g, float penX, float, bool nl) -> bool
                      {
                          if (nl)
@@ -61,9 +61,9 @@ namespace pipgui
             return false;
 
         int16_t boxX = (x == -1) ? AutoX((int32_t)maxWidth) : x;
-        if (align == AlignCenter)
+        if (align == TextAlign::Center)
             boxX -= maxWidth / 2;
-        else if (align == AlignRight)
+        else if (align == TextAlign::Right)
             boxX -= maxWidth;
 
         const int16_t boxY = (y == -1) ? AutoY((int32_t)th) : y;
@@ -132,11 +132,11 @@ namespace pipgui
 
         const int16_t drawX = (int16_t)(boxX - offsetPx + weightExpandX);
         drawTextImmediateMasked(text, drawX, boxY + weightExpandY,
-                                tw, th, fg565, 0, AlignLeft, boxX, maxWidth, kMarqueeEdgeFadePx);
+                                tw, th, fg565, 0, TextAlign::Left, boxX, maxWidth, kMarqueeEdgeFadePx);
         if (speedPxPerSec > 0 && loopPx > 0)
         {
             drawTextImmediateMasked(text, (int16_t)(drawX + loopPx), boxY + weightExpandY,
-                                    tw, th, fg565, 0, AlignLeft, boxX, maxWidth, kMarqueeEdgeFadePx);
+                                    tw, th, fg565, 0, TextAlign::Left, boxX, maxWidth, kMarqueeEdgeFadePx);
         }
 
         target->setClipRect(prevClipX, prevClipY, prevClipW, prevClipH);

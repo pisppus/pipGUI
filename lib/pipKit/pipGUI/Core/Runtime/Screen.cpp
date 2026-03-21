@@ -1,4 +1,4 @@
-﻿#include <pipGUI/Core/pipGUI.hpp>
+#include <pipGUI/Core/pipGUI.hpp>
 #include <pipGUI/Core/Internal/ViewModels.hpp>
 #include <pipGUI/Core/Debug.hpp>
 #include <pipGUI/Systems/Network/Wifi.hpp>
@@ -365,7 +365,7 @@ namespace pipgui
                     }
                 }
 
-                applyClipRect(paint.x, paint.y, paint.w, paint.h);
+                applyClip(paint.x, paint.y, paint.w, paint.h);
                 const ScreenCallback fromCb = (_screen.current < _screen.capacity && _screen.callbacks)
                                                   ? _screen.callbacks[_screen.current]
                                                   : nullptr;
@@ -382,7 +382,7 @@ namespace pipgui
                     }
                 }
 
-                applyClipRect(paint.x, paint.y, paint.w, paint.h);
+                applyClip(paint.x, paint.y, paint.w, paint.h);
                 if (curVisible)
                     renderToastOverlay(now);
 
@@ -476,7 +476,7 @@ namespace pipgui
             _render.activeSprite = &_render.sprite;
             _screen.current = screenId;
 
-            applyClipRect(clipX, clipY, clipW, clipH);
+            applyClip(clipX, clipY, clipW, clipH);
             clear(resolveBgColor565(_render.bgColor, _render.bgColor565));
             cb(*this);
 

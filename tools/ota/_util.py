@@ -142,8 +142,8 @@ def version_to_build(major: int, minor: int, patch: int) -> int:
     return (major * 1_000_000) + (minor * 1_000) + patch
 
 
-def manifest_sig_payload_v5(title: str, version: str, build: int, size: int, sha256_hex: str, url: str, desc: str) -> bytes:
-    prefix = b"pipgui-ota-manifest-v5"
+def manifest_sig_payload(title: str, version: str, build: int, size: int, sha256_hex: str, url: str, desc: str) -> bytes:
+    prefix = b"pipgui-ota-manifest"
     t = title.strip()
     v = version.strip()
     if not t:

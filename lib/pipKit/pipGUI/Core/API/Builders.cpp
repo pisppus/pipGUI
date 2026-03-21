@@ -244,6 +244,13 @@ namespace pipgui
         detail::GuiAccess::showNotification(*_gui, _title, _message, _buttonText, _delaySeconds, _type, detail::valueOr(_iconId, static_cast<IconId>(0xFFFF)));
     }
 
+    void ShowErrorFluent::show()
+    {
+        if (!beginCommit())
+            return;
+        detail::GuiAccess::showError(*_gui, _message, _code, _type, _buttonText);
+    }
+
     void PopupMenuFluent::show()
     {
         if (!beginCommit())

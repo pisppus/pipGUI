@@ -21,7 +21,7 @@ namespace pipcore
             const size_t pixels = static_cast<size_t>(w) * static_cast<size_t>(h);
             if (pixels > SIZE_MAX / sizeof(uint16_t))
                 return false;
-            _buf = static_cast<uint16_t *>(plat->alloc(pixels * sizeof(uint16_t), AllocCaps::PreferExternal));
+            _buf = static_cast<uint16_t *>(plat->alloc(pixels * sizeof(uint16_t), AllocCaps::Default));
         }
         if (!_buf)
             return false;

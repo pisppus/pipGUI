@@ -43,11 +43,6 @@ namespace pipgui
             return;
         }
 
-        // Keep this string compact: it must fit into the status bar.
-        // T  = total free heap (KB)
-        // In = internal free heap (KB)
-        // Bl = largest free block (KB)
-        // Mn = minimum free heap seen (KB)
         int written = snprintf(out, len, "T:%dk In:%dk Bl:%dk Mn:%dk",
                                (int)(_metrics.freeHeapTotal / 1024),
                                (int)(_metrics.freeHeapInternal / 1024),

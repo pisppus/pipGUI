@@ -65,9 +65,9 @@ namespace pipgui
         IconId notificationDefaultIcon(NotificationType type)
         {
             if (type == NotificationType::Error)
-                return error_layer0;
+                return error;
             if (type == NotificationType::Warning)
-                return warning_layer0;
+                return warning;
             return kAlertNoIcon;
         }
 
@@ -448,13 +448,13 @@ namespace pipgui
 
             setFontWeight(Black);
             setFontSize(titleSz);
-            drawAlertTitle(_notif.title, (int16_t)(cardX + cardW / 2), titleY, titleMaxW, titleFg565, AlignCenter);
+            drawAlertTitle(_notif.title, (int16_t)(cardX + cardW / 2), titleY, titleMaxW, titleFg565, TextAlign::Center);
 
             setFontWeight(Medium);
             setFontSize(msgSz);
             if (msgLineCount == 1)
             {
-                drawAlertBodyText(msgLines[0], (int16_t)(cardX + cardW / 2), msgY, messageMaxW, msgFg565, AlignCenter);
+                drawAlertBodyText(msgLines[0], (int16_t)(cardX + cardW / 2), msgY, messageMaxW, msgFg565, TextAlign::Center);
             }
             else
             {
@@ -465,7 +465,7 @@ namespace pipgui
                                       (int16_t)(msgY + i * (msgLineH + msgLineGap)),
                                       messageMaxW,
                                       msgFg565,
-                                      AlignCenter);
+                                      TextAlign::Center);
                 }
             }
 
@@ -502,7 +502,7 @@ namespace pipgui
                             btnTextY,
                             btnTextColor,
                             btnBg,
-                            AlignCenter);
+                            TextAlign::Center);
 
             setFontWeight(prevWeight);
             setFontSize(prevSize);

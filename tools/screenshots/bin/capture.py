@@ -1,11 +1,18 @@
 import argparse
 import os
 import struct
+import sys
 import time
+from pathlib import Path
+
+TOOLS_DIR = Path(__file__).resolve().parents[2]
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
+
+from _menu import choose, choose_existing_path, prompt_text
 
 
 MAGIC = b"PSCR"
-FMT_QOI_RGB = 3
 LOG_PREFIX = "[screenshots]"
 
 
@@ -13,68 +20,84 @@ def log(msg: str):
     print(f"{LOG_PREFIX} {msg}")
 
 
-def qoi_decode_to_rgb(w: int, h: int, read_byte) -> bytes:
+def hash_565(px: int) -> int:
+    r = (px >> 11) & 31
+    g = (px >> 5) & 63
+    b = px & 31
+    return (r * 3 + g * 5 + b * 7) & 63
+
+
+def rgb_from_565(px: int) -> tuple[int, int, int]:
+    r5 = (px >> 11) & 31
+    g6 = (px >> 5) & 63
+    b5 = px & 31
+    return (
+        ((r5 << 3) | (r5 >> 2)) & 0xFF,
+        ((g6 << 2) | (g6 >> 4)) & 0xFF,
+        ((b5 << 3) | (b5 >> 2)) & 0xFF,
+    )
+
+
+def packed565_decode_to_rgb(w: int, h: int, read_byte) -> bytes:
     pixels_total = w * h
     out = bytearray(pixels_total * 3)
-
     index = [0] * 64
-    px = 0x000000FF  # RGBA packed, initial: 0,0,0,255
-    run = 0
-
-    def qoi_hash(p: int) -> int:
-        r = (p >> 24) & 0xFF
-        g = (p >> 16) & 0xFF
-        b = (p >> 8) & 0xFF
-        a = p & 0xFF
-        return (r * 3 + g * 5 + b * 7 + a * 11) & 63
-
+    prev = 0
     o = 0
-    for _ in range(pixels_total):
-        if run:
-            run -= 1
+    pos = 0
+    while pos < pixels_total:
+        b1 = read_byte()
+
+        if b1 < 0x40:
+            px = index[b1 & 0x3F]
+            run = 1
+        elif b1 < 0x80:
+            px = prev
+            run = (b1 & 0x3F) + 1
+        elif b1 < 0xC0:
+            pr = (prev >> 11) & 31
+            pg = (prev >> 5) & 63
+            pb = prev & 31
+            dr = ((b1 >> 4) & 0x03) - 2
+            dg = ((b1 >> 2) & 0x03) - 2
+            db = (b1 & 0x03) - 2
+            px = (((pr + dr) << 11) | ((pg + dg) << 5) | (pb + db)) & 0xFFFF
+            run = 1
+        elif b1 < 0xE0:
+            b2 = read_byte()
+            pr = (prev >> 11) & 31
+            pg = (prev >> 5) & 63
+            pb = prev & 31
+            dg = (b1 & 0x1F) - 16
+            dr = dg + ((b2 >> 4) & 0x0F) - 8
+            db = dg + (b2 & 0x0F) - 8
+            px = (((pr + dr) << 11) | ((pg + dg) << 5) | (pb + db)) & 0xFFFF
+            run = 1
         else:
-            b1 = read_byte()
+            run = (b1 & 0x1F) + 1
+            for _ in range(run):
+                hi = read_byte()
+                lo = read_byte()
+                px = (hi << 8) | lo
+                r, g, b = rgb_from_565(px)
+                out[o] = r
+                out[o + 1] = g
+                out[o + 2] = b
+                o += 3
+                pos += 1
+                index[hash_565(px)] = px
+                prev = px
+            continue
 
-            if b1 == 0xFE:  # QOI_OP_RGB
-                r = read_byte()
-                g = read_byte()
-                b = read_byte()
-                px = (r << 24) | (g << 16) | (b << 8) | (px & 0xFF)
-            elif b1 == 0xFF:  # QOI_OP_RGBA
-                r = read_byte()
-                g = read_byte()
-                b = read_byte()
-                a = read_byte()
-                px = (r << 24) | (g << 16) | (b << 8) | a
-            else:
-                tag = b1 & 0xC0
-                if tag == 0x00:  # QOI_OP_INDEX
-                    px = index[b1 & 63]
-                elif tag == 0x40:  # QOI_OP_DIFF
-                    dr = ((b1 >> 4) & 3) - 2
-                    dg = ((b1 >> 2) & 3) - 2
-                    db = (b1 & 3) - 2
-                    r = ((px >> 24) + dr) & 0xFF
-                    g = ((px >> 16) + dg) & 0xFF
-                    b = ((px >> 8) + db) & 0xFF
-                    px = (r << 24) | (g << 16) | (b << 8) | (px & 0xFF)
-                elif tag == 0x80:  # QOI_OP_LUMA
-                    b2 = read_byte()
-                    dg = (b1 & 63) - 32
-                    dr_dg = ((b2 >> 4) & 15) - 8
-                    db_dg = (b2 & 15) - 8
-                    r = ((px >> 24) + dg + dr_dg) & 0xFF
-                    g = ((px >> 16) + dg) & 0xFF
-                    b = ((px >> 8) + dg + db_dg) & 0xFF
-                    px = (r << 24) | (g << 16) | (b << 8) | (px & 0xFF)
-                elif tag == 0xC0:  # QOI_OP_RUN
-                    run = b1 & 63
-
-        index[qoi_hash(px)] = px
-        out[o] = (px >> 24) & 0xFF
-        out[o + 1] = (px >> 16) & 0xFF
-        out[o + 2] = (px >> 8) & 0xFF
-        o += 3
+        for _ in range(run):
+            r, g, b = rgb_from_565(px)
+            out[o] = r
+            out[o + 1] = g
+            out[o + 2] = b
+            o += 3
+            pos += 1
+            index[hash_565(px)] = px
+            prev = px
 
     return bytes(out)
 
@@ -131,6 +154,45 @@ def open_serial(port: str, baud: int):
     return ser
 
 
+def list_serial_ports() -> list[tuple[str, str]]:
+    try:
+        import serial.tools.list_ports
+    except Exception:
+        return []
+    ports = []
+    for port in serial.tools.list_ports.comports():
+        desc = port.description or "Unknown device"
+        ports.append((port.device, desc))
+    ports.sort(key=lambda item: item[0])
+    return ports
+
+
+def interactive_args(default_out: str) -> tuple[str, int, str]:
+    port_options = [("Auto detect", "auto")]
+    port_options.extend((f"{device} ({desc})", device) for device, desc in list_serial_ports())
+    selected_port = choose("Serial port", port_options, lambda item: item[0])[1]
+
+    baud = choose("Baud rate", [1000000, 921600, 460800, 230400], lambda item: str(item))
+
+    out_mode = choose(
+        "Output directory",
+        [
+            ("Default captures folder", default_out),
+            ("Choose existing folder", None),
+            ("Enter custom folder", ""),
+        ],
+        lambda item: item[0],
+    )
+    if out_mode[1] is None:
+        existing_dirs = sorted(path for path in Path(default_out).parent.glob("*") if path.is_dir())
+        out_dir = str(choose_existing_path("Capture folder", existing_dirs, custom_label="Manual folder path"))
+    elif out_mode[1] == "":
+        out_dir = prompt_text("Capture folder", default=default_out)
+    else:
+        out_dir = out_mode[1]
+    return selected_port, int(baud), out_dir
+
+
 def read_exact(ser, n: int) -> bytes:
     chunks = []
     got = 0
@@ -161,10 +223,15 @@ def main():
     ap.add_argument("--port", default="auto", help="serial port (e.g. COM9) or 'auto'")
     ap.add_argument("--baud", type=int, default=1000000)
     ap.add_argument("--out", default=None, help="output directory")
+    ap.add_argument("--interactive", action="store_true", help="Choose values from interactive menus")
     args = ap.parse_args()
 
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    out_dir = args.out or os.path.join(base_dir, "captures")
+    default_out = os.path.join(base_dir, "captures")
+    if args.interactive or len(sys.argv) == 1:
+        args.port, args.baud, out_dir = interactive_args(default_out)
+    else:
+        out_dir = args.out or default_out
     os.makedirs(out_dir, exist_ok=True)
 
     try:
@@ -188,18 +255,14 @@ def main():
         if bytes(window) != MAGIC:
             continue
 
-        rest = read_exact(ser, 2 + 2 + 1 + 4)
-        w, h, fmt, payload_size = struct.unpack("<HHBI", rest)
+        rest = read_exact(ser, 2 + 2 + 4)
+        w, h, payload_size = struct.unpack("<HHI", rest)
 
         if w == 0 or h == 0:
-            log(f"invalid header: w={w} h={h} fmt={fmt} size={payload_size}")
+            log(f"invalid header: w={w} h={h} size={payload_size}")
             continue
 
-        if fmt != FMT_QOI_RGB:
-            log(f"unsupported fmt: {fmt} (expected {FMT_QOI_RGB})")
-            continue
-
-        log(f"capture {w}x{h} qoi bytes={payload_size}")
+        log(f"capture {w}x{h} packed565 bytes={payload_size}")
 
         payload = read_exact(ser, payload_size) if payload_size else b""
 
@@ -220,15 +283,15 @@ def main():
                 def read_byte():
                     nonlocal p
                     if p >= len(payload):
-                        raise EOFError("qoi payload too small")
+                        raise EOFError("packed565 payload too small")
                     b = payload[p]
                     p += 1
                     return b
 
-                rgb = qoi_decode_to_rgb(w, h, read_byte)
+                rgb = packed565_decode_to_rgb(w, h, read_byte)
             else:
                 reader = SerialByteReader(ser)
-                rgb = qoi_decode_to_rgb(w, h, reader.read_byte)
+                rgb = packed565_decode_to_rgb(w, h, reader.read_byte)
         except Exception as e:
             log(f"decode failed: {e}")
             continue

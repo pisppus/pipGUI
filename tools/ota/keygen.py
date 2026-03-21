@@ -1,13 +1,31 @@
 import argparse
 import os
 import sys
+from pathlib import Path
 
+TOOLS_DIR = Path(__file__).resolve().parents[1]
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
+
+from _menu import choose, prompt_text
 from _util import ensure_pynacl
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Generate an Ed25519 keypair for OTA signing.")
     ap.add_argument("--out", default="tools/ota/keys/ota_ed25519.key", help="Output private key file (hex, 32 bytes seed).")
+    ap.add_argument("--interactive", action="store_true", help="Choose output path from interactive menus")
     args = ap.parse_args()
+
+    if args.interactive or len(sys.argv) == 1:
+        choice = choose(
+            "Key output",
+            [
+                "Default: tools/ota/keys/ota_ed25519.key",
+                "Custom path",
+            ],
+        )
+        if choice == "Custom path":
+            args.out = prompt_text("Output path", default=args.out)
 
     verbose = os.environ.get("PIPGUI_TOOLS_VERBOSE", "0").strip().lower() in ("1", "true", "yes", "on")
     ensure_pynacl(verbose)

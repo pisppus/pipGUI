@@ -1,126 +1,91 @@
 #include <pipGUI/Core/pipGUI.hpp>
+#include <pipGUI/Graphics/Utils/Colors.hpp>
+#include <pipGUI/Graphics/Utils/Easing.hpp>
 
 namespace pipgui
 {
-
-    static float easeOutCubicBtn(float t)
+    namespace
     {
-        float u = 1.0f - t;
-        return 1.0f - u * u * u;
-    }
+        constexpr uint32_t kMaxAnimDtMs = 100U;
+        constexpr float kFadeSpeed = 600.0f;
+        constexpr float kDisabledReleaseSpeed = 1200.0f;
+        constexpr float kPressSpeed = 1600.0f;
+        constexpr float kReleaseSpeed = 1400.0f;
+        constexpr float kPressedScale = 0.05f;
+        constexpr float kMinScale = 0.85f;
 
-    static uint16_t lerpColor565Btn(uint16_t c0, uint16_t c1, float t)
-    {
-        if (t <= 0.0f)
-            return c0;
-        if (t >= 1.0f)
-            return c1;
-        uint8_t r0 = (c0 >> 11) & 0x1F;
-        uint8_t g0 = (c0 >> 5) & 0x3F;
-        uint8_t b0 = c0 & 0x1F;
-        uint8_t r1 = (c1 >> 11) & 0x1F;
-        uint8_t g1 = (c1 >> 5) & 0x3F;
-        uint8_t b1 = c1 & 0x1F;
-        uint8_t r = (uint8_t)(r0 + (r1 - r0) * t + 0.5f);
-        uint8_t g = (uint8_t)(g0 + (g1 - g0) * t + 0.5f);
-        uint8_t b = (uint8_t)(b0 + (b1 - b0) * t + 0.5f);
-        return (uint16_t)((r << 11) | (g << 5) | b);
-    }
+        [[nodiscard]] uint32_t clampAnimDt(uint32_t now, uint32_t last) noexcept
+        {
+            if (last == 0 || now <= last)
+                return 0;
+            const uint32_t dt = now - last;
+            return dt > kMaxAnimDtMs ? kMaxAnimDtMs : dt;
+        }
 
-    static uint16_t autoTextColor565Btn(uint16_t bg, uint8_t threshold = 140)
-    {
-        uint32_t r8 = ((bg >> 11) & 0x1F) * 255U / 31U;
-        uint32_t g8 = ((bg >> 5) & 0x3F) * 255U / 63U;
-        uint32_t b8 = (bg & 0x1F) * 255U / 31U;
-        uint32_t lum = (r8 * 54U + g8 * 183U + b8 * 18U) >> 8;
-        return (lum > threshold) ? (uint16_t)0x0000 : (uint16_t)0xFFFF;
+        [[nodiscard]] uint8_t animStep(float unitsPerSecond, uint32_t dtMs) noexcept
+        {
+            if (dtMs == 0)
+                return 0;
+            const uint8_t step = static_cast<uint8_t>(unitsPerSecond * (static_cast<float>(dtMs) / 1000.0f) + 0.5f);
+            return step > 0 ? step : 1;
+        }
+
+        void approachLevel(uint8_t &value, uint8_t target, uint8_t step) noexcept
+        {
+            if (step == 0 || value == target)
+                return;
+            if (value < target)
+            {
+                const uint16_t next = static_cast<uint16_t>(value) + step;
+                value = next > target ? target : static_cast<uint8_t>(next);
+                return;
+            }
+            value = value > step ? static_cast<uint8_t>(value - step) : 0;
+            if (value < target)
+                value = target;
+        }
+
+        [[nodiscard]] int16_t resolveAxis(int16_t v, int16_t extent, int16_t total) noexcept
+        {
+            return v == center ? static_cast<int16_t>((total - extent) / 2) : v;
+        }
+
+        [[nodiscard]] String loadingLabel(const String &label, bool loading, uint32_t now) noexcept
+        {
+            if (!loading)
+                return label;
+
+            String out = label;
+            const uint8_t phase = static_cast<uint8_t>((now / 300U) % 6U);
+            const uint8_t dots = phase <= 3U ? phase : static_cast<uint8_t>(6U - phase);
+            for (uint8_t i = 0; i < dots; ++i)
+                out += '.';
+            return out;
+        }
     }
 
     void GUI::updateButtonPress(ButtonVisualState &s, bool isDown)
     {
-        uint32_t now = nowMs();
+        const uint32_t now = nowMs();
+        const uint32_t dt = clampAnimDt(now, s.lastUpdateMs);
+        const bool visualEnabled = s.enabled && !s.loading;
 
-        uint32_t last = s.lastUpdateMs;
-        uint32_t dt = 0;
-        if (last == 0 || now <= last)
+        if (visualEnabled != s.prevEnabled)
         {
-            s.lastUpdateMs = now;
-        }
-        else
-        {
-            dt = now - last;
-            if (dt > 100U)
-                dt = 100U;
+            s.fadeLevel = visualEnabled ? 0 : 255;
+            s.prevEnabled = visualEnabled;
         }
 
-        bool visEnabled = s.enabled && !s.loading;
+        approachLevel(s.fadeLevel, visualEnabled ? 255 : 0, animStep(kFadeSpeed, dt));
 
-        if (visEnabled != s.prevEnabled)
+        if (!visualEnabled)
         {
-            s.fadeLevel = visEnabled ? 0 : 255;
-            s.prevEnabled = visEnabled;
-        }
-
-        uint8_t targetFade = visEnabled ? 255 : 0;
-
-        if (dt > 0 && s.fadeLevel != targetFade)
-        {
-            float speed = 600.0f;
-            uint8_t step = (uint8_t)(speed * (float)dt / 1000.0f + 0.5f);
-            if (step < 1)
-                step = 1;
-
-            if (s.fadeLevel < targetFade)
-            {
-                uint16_t nv = (uint16_t)s.fadeLevel + step;
-                s.fadeLevel = (nv > targetFade) ? targetFade : (uint8_t)nv;
-            }
-            else
-            {
-                if (s.fadeLevel > step)
-                    s.fadeLevel = (uint8_t)(s.fadeLevel - step);
-                else
-                    s.fadeLevel = 0;
-                if (s.fadeLevel < targetFade)
-                    s.fadeLevel = targetFade;
-            }
-        }
-
-        if (!visEnabled)
-        {
-            if (dt > 0 && s.pressLevel > 0)
-            {
-                float speedRelease = 1200.0f;
-                uint8_t step = (uint8_t)(speedRelease * (float)dt / 1000.0f + 0.5f);
-                if (step < 1)
-                    step = 1;
-                s.pressLevel = (s.pressLevel > step) ? (uint8_t)(s.pressLevel - step) : 0;
-            }
+            approachLevel(s.pressLevel, 0, animStep(kDisabledReleaseSpeed, dt));
             s.lastUpdateMs = now;
             return;
         }
 
-        if (dt > 0)
-        {
-            if (isDown)
-            {
-                float speedPress = 1600.0f;
-                uint8_t step = (uint8_t)(speedPress * (float)dt / 1000.0f + 0.5f);
-                if (step < 1)
-                    step = 1;
-                uint16_t nv = (uint16_t)s.pressLevel + step;
-                s.pressLevel = (nv > 255U) ? 255U : (uint8_t)nv;
-            }
-            else if (s.pressLevel > 0)
-            {
-                float speedRelease = 1400.0f;
-                uint8_t step = (uint8_t)(speedRelease * (float)dt / 1000.0f + 0.5f);
-                if (step < 1)
-                    step = 1;
-                s.pressLevel = (s.pressLevel > step) ? (uint8_t)(s.pressLevel - step) : 0;
-            }
-        }
-
+        approachLevel(s.pressLevel, isDown ? 255 : 0, animStep(isDown ? kPressSpeed : kReleaseSpeed, dt));
         s.lastUpdateMs = now;
     }
 
@@ -137,21 +102,18 @@ namespace pipgui
         }
 
         auto t = getDrawTarget();
+        if (!t)
+            return;
 
-        int16_t x0 = x;
-        int16_t y0 = y;
+        const int16_t x0 = resolveAxis(x, w, _render.screenWidth);
+        const int16_t y0 = resolveAxis(y, h, _render.screenHeight);
 
-        if (x0 == center)
-            x0 = (_render.screenWidth - w) / 2;
-        if (y0 == center)
-            y0 = (_render.screenHeight - h) / 2;
+        float sc = 1.0f - kPressedScale * (state.pressLevel / 255.0f);
+        if (sc < kMinScale)
+            sc = kMinScale;
 
-        float sc = 1.0f - 0.05f * (state.pressLevel / 255.0f);
-        if (sc < 0.85f)
-            sc = 0.85f;
-
-        int16_t bw = (w * sc) > 4 ? (int16_t)(w * sc) : 4;
-        int16_t bh = (h * sc) > 4 ? (int16_t)(h * sc) : 4;
+        const int16_t bw = (w * sc) > 4 ? static_cast<int16_t>(w * sc) : 4;
+        const int16_t bh = (h * sc) > 4 ? static_cast<int16_t>(h * sc) : 4;
         int16_t bx = x0 + (w - bw) / 2;
         int16_t by = y0 + (h - bh) / 2;
 
@@ -159,107 +121,80 @@ namespace pipgui
         if (br < 1)
             br = 1;
 
-        uint16_t mainColor = baseColor;
-        uint16_t autoPressedBg = (uint16_t)detail::blend565(mainColor, (uint16_t)0x0000, 56);
-        uint16_t autoDisabledBg = (uint16_t)detail::blend565(mainColor, (uint16_t)0x7BEF, 160);
+        const uint16_t pressedBg = static_cast<uint16_t>(detail::blend565(baseColor, static_cast<uint16_t>(0x0000), 56));
+        const uint16_t disabledBg = static_cast<uint16_t>(detail::blend565(baseColor, static_cast<uint16_t>(0x7BEF), 160));
+        const uint16_t activeBg = state.pressLevel > 0 ? pressedBg : baseColor;
 
-        uint16_t activeBg = (state.pressLevel > 0 ? autoPressedBg : mainColor);
-        uint16_t disabledBg = autoDisabledBg;
-
-        uint16_t bg;
-
+        uint16_t bg = activeBg;
         if (state.fadeLevel == 0)
-        {
             bg = disabledBg;
-        }
-        else if (state.fadeLevel >= 255)
+        else if (state.fadeLevel < 255)
         {
-            bg = activeBg;
-        }
-        else
-        {
-            float k = (float)state.fadeLevel / 255.0f;
-            float eased = easeOutCubicBtn(k);
-            uint8_t a = (uint8_t)(eased * 255.0f + 0.5f);
-            bg = (uint16_t)detail::blend565(disabledBg, activeBg, a);
+            const float eased = detail::motion::easeOutCubic(static_cast<float>(state.fadeLevel) / 255.0f);
+            const uint8_t a = static_cast<uint8_t>(eased * 255.0f + 0.5f);
+            bg = static_cast<uint16_t>(detail::blend565(disabledBg, activeBg, a));
         }
 
         fillRoundRect(bx, by, bw, bh, (uint8_t)br, bg);
 
-        // Pick readable text color against current button background.
-        uint16_t fgActive = autoTextColor565Btn(bg, 140);
+        const uint16_t fgActive = detail::autoTextColor(bg, 140);
+        const bool disabledVis = !state.enabled || state.fadeLevel < 40;
+        const uint16_t fg = disabledVis
+                                ? (fgActive == 0xFFFF ? static_cast<uint16_t>(0x8410) : static_cast<uint16_t>(0x630C))
+                                : fgActive;
 
-        bool disabledVis = !state.enabled || (state.fadeLevel < 40);
-        uint16_t fg;
-        if (disabledVis)
-        {
-            fg = (fgActive == 0xFFFF) ? (uint16_t)0x8410 : (uint16_t)0x630C;
-        }
-        else
-        {
-            fg = fgActive;
-        }
+        const String labelToDraw = loadingLabel(label, state.loading, nowMs());
 
-        String labelToDraw = label;
-        if (state.loading)
-        {
-            uint32_t now = nowMs();
-            const uint32_t stepMs = 300U;
-            uint16_t fg565 = detail::color888To565(fg);
-            uint16_t bg565 = detail::color888To565(bg);
-            uint8_t phase = (uint8_t)((now / stepMs) % 6U);
-            uint8_t dots = (phase <= 3U) ? phase : (uint8_t)(6U - phase);
-            for (uint8_t i = 0; i < dots; ++i)
-            {
-                labelToDraw += '.';
-            }
-        }
+        constexpr int16_t paddingX = 6;
+        constexpr int16_t paddingY = 2;
+        const int16_t maxW = (bw - paddingX * 2) > 4 ? static_cast<int16_t>(bw - paddingX * 2) : 4;
+        const int16_t maxH = (bh - paddingY * 2) > 4 ? static_cast<int16_t>(bh - paddingY * 2) : 4;
 
-        int16_t paddingX = 6;
-        int16_t paddingY = 2;
-        int16_t maxW = (bw - paddingX * 2) > 4 ? (int16_t)(bw - paddingX * 2) : 4;
-        int16_t maxH = (bh - paddingY * 2) > 4 ? (int16_t)(bh - paddingY * 2) : 4;
-
-        int16_t textMaxW = maxW;
-
-        uint16_t px = (bh * 0.55f) > 8 ? (uint16_t)(bh * 0.55f) : 8;
-        uint16_t maxPx = (bh * 0.8f) > 8 ? (uint16_t)(bh * 0.8f) : 8;
-
+        uint16_t px = (bh * 0.55f) > 8 ? static_cast<uint16_t>(bh * 0.55f) : 8;
+        const uint16_t maxPx = (bh * 0.8f) > 8 ? static_cast<uint16_t>(bh * 0.8f) : 8;
         if (px > maxPx)
             px = maxPx;
 
         int16_t tw = 0;
         int16_t th = 0;
+        const uint16_t prevSize = fontSize();
+        const uint16_t prevWeight = fontWeight();
 
-        setFontSize(px);
-        measureText(labelToDraw, tw, th);
-
-        if (tw > textMaxW || th > maxH)
+        const auto fitLabel = [&](uint16_t &sizePx, int16_t &outW, int16_t &outH)
         {
-            float scaleX = (tw > 0) ? ((float)textMaxW / (float)tw) : 1.0f;
-            float scaleY = (th > 0) ? ((float)maxH / (float)th) : 1.0f;
-            float scale = (scaleX < scaleY) ? scaleX : scaleY;
+            setFontWeight(Medium);
+            setFontSize(sizePx);
+            measureText(labelToDraw, outW, outH);
 
-            if (scale < 1.0f)
-            {
-                uint16_t newPx = (px * scale) > 7 ? (uint16_t)(px * scale) : 7;
-                setFontSize(newPx);
-                measureText(labelToDraw, tw, th);
-                px = newPx;
-            }
-        }
+            if (outW <= maxW && outH <= maxH)
+                return;
 
-        int16_t contentW = tw;
-        int16_t contentX = bx + (bw - contentW) / 2;
+            const float scaleX = outW > 0 ? (static_cast<float>(maxW) / static_cast<float>(outW)) : 1.0f;
+            const float scaleY = outH > 0 ? (static_cast<float>(maxH) / static_cast<float>(outH)) : 1.0f;
+            const float scale = scaleX < scaleY ? scaleX : scaleY;
+            if (scale >= 1.0f)
+                return;
 
-        int16_t tx = contentX;
+            const uint16_t nextPx = (sizePx * scale) > 7.0f ? static_cast<uint16_t>(sizePx * scale) : 7;
+            if (nextPx == sizePx)
+                return;
+
+            sizePx = nextPx;
+            setFontSize(sizePx);
+            measureText(labelToDraw, outW, outH);
+        };
+
+        fitLabel(px, tw, th);
 
         int16_t ty = by + (bh - th) / 2;
-        if (ty - 3 >= by)
-            ty -= 3;
+        if (ty < by)
+            ty = by;
 
+        setFontWeight(Medium);
         setFontSize(px);
-        drawTextAligned(labelToDraw, tx, ty, fg, bg, AlignLeft);
+        drawTextAligned(labelToDraw, (int16_t)(bx + bw / 2), ty, fg, bg, TextAlign::Center);
+        setFontWeight(prevWeight);
+        setFontSize(prevSize);
     }
 
     void GUI::updateButton(const String &label,
@@ -277,10 +212,8 @@ namespace pipgui
         int16_t rx = x;
         int16_t ry = y;
 
-        if (rx == center)
-            rx = (int16_t)((_render.screenWidth - w) / 2);
-        if (ry == center)
-            ry = (int16_t)((_render.screenHeight - h) / 2);
+        rx = resolveAxis(rx, w, _render.screenWidth);
+        ry = resolveAxis(ry, h, _render.screenHeight);
 
         int16_t pad = 2;
 
@@ -306,5 +239,4 @@ namespace pipgui
             flushDirty();
         }
     }
-
 }

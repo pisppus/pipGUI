@@ -16,7 +16,9 @@ namespace pipgui
         psdf_wixfor::DistanceRange, psdf_wixfor::NominalSizePx,
         psdf_wixfor::Ascender, psdf_wixfor::Descender,
         psdf_wixfor::LineHeight,
-        psdf_wixfor::Glyphs, psdf_wixfor::GlyphCount};
+        psdf_wixfor::Glyphs, psdf_wixfor::GlyphCount,
+        psdf_wixfor::KerningPairs, psdf_wixfor::KerningPairCount,
+        psdf_wixfor::Tracking128};
 
     static const FontData fontKronaOne = {
         ::KronaOne,
@@ -24,7 +26,9 @@ namespace pipgui
         psdf_krona::DistanceRange, psdf_krona::NominalSizePx,
         psdf_krona::Ascender, psdf_krona::Descender,
         psdf_krona::LineHeight,
-        psdf_krona::Glyphs, psdf_krona::GlyphCount};
+        psdf_krona::Glyphs, psdf_krona::GlyphCount,
+        psdf_krona::KerningPairs, psdf_krona::KerningPairCount,
+        psdf_krona::Tracking128};
 
     static const FontData *g_fontRegistry[8] = {
         &fontWixMadeForDisplay, &fontKronaOne,
@@ -41,7 +45,9 @@ namespace pipgui
                              uint16_t atlasWidth, uint16_t atlasHeight,
                              float distanceRange, float nominalSizePx,
                              float ascender, float descender, float lineHeight,
-                             const void *glyphs, uint16_t glyphCount)
+                             const void *glyphs, uint16_t glyphCount,
+                             const void *kerningPairs, uint16_t kerningPairCount,
+                             int8_t tracking128)
     {
         if (g_fontCount >= 8)
             return (FontId)255;
@@ -49,7 +55,8 @@ namespace pipgui
         static FontData registry[8];
         FontData *font = &registry[g_fontCount - 2];
         *font = {atlasData, atlasWidth, atlasHeight, distanceRange, nominalSizePx,
-                 ascender, descender, lineHeight, glyphs, glyphCount};
+                 ascender, descender, lineHeight, glyphs, glyphCount,
+                 kerningPairs, kerningPairCount, tracking128};
 
         const FontId newId = (FontId)g_fontCount;
         g_fontRegistry[g_fontCount++] = font;

@@ -121,9 +121,6 @@ namespace pipcore::esp32::services
             mbedtls_sha256_context sha = {};
             bool shaInit = false;
             bool updateStarted = false;
-
-            bool timeSyncStarted = false;
-            uint32_t timeSyncStartMs = 0;
         };
 
         HttpState _http = {};

@@ -22,6 +22,7 @@ namespace pipgui
 #else
         if (_render.screenWidth == 0 || _render.screenHeight == 0)
             return;
+        _shots.lastUseMs = nowMs();
 
         const bool inSprite = _flags.inSpritePass;
         pipcore::Sprite *prevActive = _render.activeSprite;
@@ -178,11 +179,11 @@ namespace pipgui
                 {
                     const int16_t tx = static_cast<int16_t>(x + (int32_t)w / 2);
                     const int16_t ty = static_cast<int16_t>(y + (int32_t)(h - mth) / 2);
-                    drawTextAligned(msg, tx, ty, fg565, 0, AlignCenter);
+                    drawTextAligned(msg, tx, ty, fg565, 0, TextAlign::Center);
                 }
                 else
                 {
-                    drawTextAligned(msg, static_cast<int16_t>(x + (int32_t)w / 2), static_cast<int16_t>(y + (int32_t)h / 2), fg565, 0, AlignCenter);
+                    drawTextAligned(msg, static_cast<int16_t>(x + (int32_t)w / 2), static_cast<int16_t>(y + (int32_t)h / 2), fg565, 0, TextAlign::Center);
                 }
                 break;
             }
@@ -337,6 +338,3 @@ namespace pipgui
 #endif
     }
 }
-
-
-

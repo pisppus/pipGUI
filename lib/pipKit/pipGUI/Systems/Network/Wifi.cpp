@@ -1,3 +1,4 @@
+#include <pipGUI/Core/Config/Select.hpp>
 #include <pipGUI/Systems/Network/Wifi.hpp>
 
 namespace pipgui::net

@@ -1,19 +1,9 @@
 #include <pipGUI/Core/pipGUI.hpp>
+#include <pipGUI/Graphics/Utils/Easing.hpp>
 #include <math.h>
 
 namespace pipgui
 {
-    static float easeInOutCubic(float t)
-    {
-        if (t <= 0.0f) return 0.0f;
-        if (t >= 1.0f) return 1.0f;
-        if (t < 0.5f)
-            return 4.0f * t * t * t;
-        float f = 2.0f * t - 2.0f;
-        return 0.5f * f * f * f + 1.0f;
-    }
-
-
     void GUI::drawDrumRollHorizontal(int16_t x, int16_t y, int16_t w, int16_t h,
                                      const String *options, uint8_t count,
                                      uint8_t selectedIndex, uint8_t prevIndex, float animProgress,
@@ -25,8 +15,7 @@ namespace pipgui
             selectedIndex = (uint8_t)(count - 1);
         if (prevIndex >= count)
             prevIndex = selectedIndex;
-        if (animProgress < 0.0f) animProgress = 0.0f;
-        if (animProgress > 1.0f) animProgress = 1.0f;
+        animProgress = detail::motion::clamp01(animProgress);
 
         uint16_t savePx = _typo.psdfSizePx;
         if (fontPx > 0)
@@ -50,7 +39,7 @@ namespace pipgui
         if (slotW < 8)
             slotW = 8;
 
-        float eased = easeInOutCubic(animProgress);
+        const float eased = detail::motion::easeInOutCubic(animProgress);
         float currentIndex = (float)prevIndex + ((float)selectedIndex - (float)prevIndex) * eased;
         float offsetX = (float)(x + w / 2) - (currentIndex + 0.5f) * (float)slotW;
 
@@ -86,7 +75,7 @@ namespace pipgui
             uint16_t bg565 = detail::color888To565(bgColor);
             if (alpha < 255)
                 fg565 = detail::blend565(bg565, fg565, alpha);
-            drawTextAligned(options[i], tx, baseY, fg565, bg565, AlignLeft);
+            drawTextAligned(options[i], tx, baseY, fg565, bg565, TextAlign::Left);
         }
 
         if (spr)
@@ -105,8 +94,7 @@ namespace pipgui
             selectedIndex = (uint8_t)(count - 1);
         if (prevIndex >= count)
             prevIndex = selectedIndex;
-        if (animProgress < 0.0f) animProgress = 0.0f;
-        if (animProgress > 1.0f) animProgress = 1.0f;
+        animProgress = detail::motion::clamp01(animProgress);
 
         uint16_t savePx = _typo.psdfSizePx;
         if (fontPx > 0)
@@ -130,7 +118,7 @@ namespace pipgui
         if (slotH < 8)
             slotH = 8;
 
-        float eased = easeInOutCubic(animProgress);
+        const float eased = detail::motion::easeInOutCubic(animProgress);
         float currentIndex = (float)prevIndex + ((float)selectedIndex - (float)prevIndex) * eased;
         float offsetY = (float)(y + h / 2) - (currentIndex + 0.5f) * (float)slotH;
 
@@ -166,7 +154,7 @@ namespace pipgui
             uint16_t bg565 = detail::color888To565(bgColor);
             if (alpha < 255)
                 fg565 = detail::blend565(bg565, fg565, alpha);
-            drawTextAligned(options[i], baseX, ty, fg565, bg565, AlignCenter);
+            drawTextAligned(options[i], baseX, ty, fg565, bg565, TextAlign::Center);
         }
 
         if (spr)

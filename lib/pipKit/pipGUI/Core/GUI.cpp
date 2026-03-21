@@ -84,10 +84,8 @@ namespace pipgui
         const bool combo = nextDown && prevDown;
 
 #if PIPGUI_SCREENSHOTS
-        const bool screenshotCombo = combo &&
-                                     _diag.screenshotNext == &next &&
-                                     _diag.screenshotPrev == &prev;
-        if (screenshotCombo)
+        handleScreenshotShortcut(combo && !_flags.errorActive);
+        if (combo && !_flags.errorActive)
         {
             (void)next.wasPressed();
             (void)prev.wasPressed();
@@ -211,6 +209,7 @@ namespace pipgui
         _blur.lookupSh = 0;
         _blur.lookupW = 0;
         _blur.lookupH = 0;
+        _blur.lastUseMs = 0;
     }
 
     void GUI::freeGraphAreas(pipcore::Platform *plat) noexcept
@@ -434,6 +433,11 @@ namespace pipgui
 
 #if PIPGUI_STATUS_BAR
         _flags.statusBarDebugMetrics = (PIPGUI_STATUS_BAR_DEBUG_METRICS_DEFAULT != 0);
+        if (_flags.statusBarDebugMetrics)
+        {
+            Debug::init();
+            _status.dirtyMask = detail::StatusBarDirtyAll;
+        }
 #endif
 
 #if PIPGUI_DEBUG_DIRTY_RECTS
@@ -523,6 +527,11 @@ namespace pipgui
     void GUI::requestWiFi(bool enabled) noexcept
     {
         net::wifiRequest(enabled);
+    }
+
+    net::WifiState GUI::wifiState() const noexcept
+    {
+        return net::wifiState();
     }
 
     bool GUI::wifiConnected() const noexcept

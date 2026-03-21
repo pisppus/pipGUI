@@ -115,6 +115,17 @@ uint8_t now = ui.brightness();
 - значение ограничивается `maxBrightness()`
 - текущее значение не сохраняется в prefs
 
+### Низкоуровневые helpers подсветки и дисплея
+
+```cpp
+bool ok = ui.displayReady();
+ui.setBacklightCallback(myBacklightFn);
+```
+
+- `displayReady()` показывает, что backend дисплея уже поднят и готов к выводу
+- `setBacklightCallback(...)` позволяет подставить свой callback для управления подсветкой
+- обычно этот API не нужен, если хватает `setBacklight()`
+
 ---
 
 # 3. Базовые helpers
@@ -126,17 +137,36 @@ ui.screenWidth();   // ширина вашего экрана
 ui.screenHeight();  // высота вашего экрана
 ```
 
+- `screenWidth()` и `screenHeight()` возвращают уже активный логический размер экрана
+- удобно для центровки, адаптивных отступов и расчёта layout без хардкода
+
 ## 3.2. Цвет
 
 ```cpp
 ui.rgb(255, 255, 255);
 ```
 
+- переводит обычный `RGB888` в внутренний `RGB565`
+- это основной helper для всех цветов в fluent API
+
+Для повторно используемых системных accent-цветов есть короткие semantic-токены:
+
+```cpp
+Warning; // #FF6200
+Error;   // #FF0048
+```
+
+- их можно передавать в `color(...)`, `fillColor(...)`, `bgColor(...)` и другие места, где ожидается `RGB565`
+- те же токены уже используются и как semantic-type в API уведомлений/ошибок, так что отдельный namespace для цветов не нужен
+
 ## 3.3. Очистка экрана
 
 ```cpp
 ui.clear(ui.rgb(0, 0, 0));
 ```
+
+- очищает весь текущий draw target указанным цветом
+- обычно используется в начале screen-callback перед остальной отрисовкой
 
 ## 3.4. Клип
 
@@ -150,11 +180,51 @@ ui.setClip()
 ui.clearClip();
 ```
 
+- `setClip()` ограничивает всю последующую отрисовку прямоугольной областью
+- удобно для локальных redraw, списков, анимаций и виджетов в карточках
+- `clearClip()` возвращает обычную отрисовку без ограничений
+
+Если прямоугольник уже посчитан вручную, можно выставить clip напрямую:
+
+```cpp
+ui.applyClip(10, 20, 120, 80);
+```
+
+## 4. Логотип
+
+```cpp
+ui.showLogo()
+    .title("PISPPUS")
+    .subtitle("Digital Thermometer")
+    .anim(FadeIn)
+    .fgColor(ui.rgb(255, 255, 255))
+    .bgColor(ui.rgb(0, 0, 0))
+    .duration(1800)
+    .pos(center, 40);
+```
+
+`showLogo()` запускает полноэкранную boot-анимацию с логотипом.
+Размер текста библиотека подбирает сама под текущее разрешение экрана.
+
+Параметры:
+
+- `title` и `subtitle` — строки логотипа;
+- `anim(...)` — `None`, `FadeIn`, `LightFade`;
+- `fgColor` и `bgColor` — цвета логотипа и фона; можно передавать как `ui.rgb(...)`, так и `RGB565`
+- `duration(...)` — длительность анимации;
+- `pos(x, y)` — позиция.
+
+Что делают анимации:
+
+- `None` - просто сразу показывает логотип без анимации
+- `FadeIn` - плавно проявляет текст из цвета фона
+- `LightFade` - плавно поднимает яркость подсветки; для неё backlight должен быть заранее настроен
+
 ---
 
-# 4. Экраны и цикл
+# 5. Экраны и цикл
 
-## 4.1. Регистрация экранов
+## 5.1. Регистрация экранов
 
 Экраны регистрируются через макрос `SCREEN(name, order)`:
 
@@ -189,7 +259,7 @@ SCREEN(ScreenSettings, 1)
 ui.setScreen(ScreenHome);
 ```
 
-## 4.2. Основной цикл
+## 5.2. Основной цикл
 
 Базовый вариант:
 
@@ -224,16 +294,33 @@ void loop()
 Если `loopWithInput(...)` не используется, вызывайте `btn.update()` сами в начале каждого `loop()`.
 После этого `wasPressed()` и `isDown()` читают уже обновлённое состояние кнопки.
 
-## 4.3. Управление экранами
+Если нужен готовый snapshot ввода для собственного state-machine:
+
+```cpp
+GUI::InputState input = ui.pollInput(btnNext, btnPrev);
+```
+
+В `InputState` есть поля:
+
+- `nextDown`
+- `prevDown`
+- `nextPressed`
+- `prevPressed`
+- `comboDown`
+
+## 5.3. Управление экранами
 
 ```cpp
 ui.setScreen(ScreenHome);
+uint8_t cur = ui.currentScreen();
 ui.nextScreen();
 ui.prevScreen();
 ui.screenTransitionActive();
 ```
 
-## 4.4. Принудительная перерисовка
+- `currentScreen()` возвращает id текущего активного экрана
+
+## 5.4. Принудительная перерисовка
 
 ```cpp
 ui.requestRedraw();
@@ -241,7 +328,7 @@ ui.requestRedraw();
 
 Нужно, когда вы изменили данные экрана извне и хотите гарантированно перерисовать следующий кадр.
 
-## 4.5. Анимация переходов
+## 5.5. Анимация переходов
 
 ```cpp
 ui.setScreenAnim(SlideX, 250);
@@ -255,23 +342,31 @@ ui.setScreenAnim(SlideX, 250);
 
 ---
 
-# 5. Текст, шрифты и иконки
+# 6. Текст, шрифты и иконки
 
-## 5.1. Встроенные шрифты
+## 6.1. Встроенные шрифты
 
 Выбирать шрифт можно так:
 
 ```cpp
 ui.setFont(WixMadeForDisplay);
+ui.setFontSize(18);
 ```
 
 Доступны встроенные в библиотеку:
 - `WixMadeForDisplay`
 - `KronaOne`
 
+Что за что отвечает:
+
+- `setFont(...)` выбирает семейство шрифта
+- `setFontSize(...)` задаёт текущий размер в пикселях
+- `setFontWeight(...)` задаёт насыщенность начертания для PSDF-рендера
+
 Текущие значения можно читать:
 
 ```cpp
+ui.fontId();      // текущий FontId
 ui.fontSize();    // текущий размер шрифта
 ui.fontWeight();  // текущая толщина шрифта
 ```
@@ -290,7 +385,7 @@ ui.setFontWeight(Semibold);
 - `Bold`
 - `Black`
 
-## 5.2. Текстовые стили
+## 6.2. Текстовые стили
 
 ```cpp
 ui.setTextStyle(H1);
@@ -298,12 +393,12 @@ ui.setTextStyle(H1);
 
 `TextStyle`:
 
-- `H1`
-- `H2`
-- `Body`
-- `Caption`
+- `H1` - крупный заголовок
+- `H2` - подзаголовок или вторичный заголовок
+- `Body` - основной текст интерфейса
+- `Caption` - мелкие подписи и пояснения
 
-## 5.3. Обычный текст
+## 6.3. Обычный текст
 
 ```cpp
 ui.drawText()
@@ -314,8 +409,17 @@ ui.drawText()
     .text("Hello")
     .color(ui.rgb(255, 255, 255))
     .bgColor(ui.rgb(0, 0, 0))
-    .align(AlignCenter)
+    .align(Center)
 ```
+
+Что задают параметры:
+
+- `pos(x, y)` - точка привязки текста
+- `font(...)`, `size(...)`, `weight(...)` - конкретный шрифт, размер и насыщенность
+- `text(...)` - сама строка
+- `color(...)` - цвет текста
+- `bgColor(...)` - фон под текстом; особенно полезен для `updateText()`, чтобы корректно затирать старое значение
+- `align(...)` - выравнивание относительно точки `pos(...)`
 
 Для in-place обновления есть такой же builder:
 
@@ -324,10 +428,13 @@ ui.updateText()
     .pos(center, 32)
     .text("Updated")
     .color(ui.rgb(255, 255, 255))
-    .align(AlignCenter)
+    .align(Center)
 ```
 
-## 5.4. Бегущая строка и многоточие
+- `drawText()` рисует текст как есть
+- `updateText()` сначала чистит прошлую область и потом рисует новое значение на том же месте
+
+## 6.4. Бегущая строка и многоточие
 
 ```cpp
 ui.drawTextMarquee()
@@ -339,6 +446,12 @@ ui.drawTextMarquee()
     .holdStart(700)
 ```
 
+- `maxWidth(...)` задаёт ширину области, внутри которой строка должна уместиться
+- `speed(...)` задаёт скорость прокрутки в пикселях в секунду
+- `holdStart(...)` задаёт паузу перед началом движения
+- `phaseStart(...)` позволяет стартовать marquee не с нуля, если нужна синхронизация
+- `align(...)` определяет якорь строки внутри области
+
 ```cpp
 ui.drawTextEllipsized()
     .pos(20, 110)
@@ -347,56 +460,52 @@ ui.drawTextEllipsized()
     .color(ui.rgb(255, 255, 255))
 ```
 
-## 5.5. Иконки
+- `drawTextEllipsized()` обрезает строку по `maxWidth(...)` и добавляет многоточие
+
+## 6.5. Иконки
 
 ```cpp
 ui.drawIcon()
     .pos(20, 20)
     .size(18)
-    .icon(WarningLayer0)
+    .icon(warning)
     .color(ui.rgb(255, 255, 255))
     .bgColor(ui.rgb(0, 0, 0))
 ```
 
 Иконки берутся из вашего набора `IconId`.
 
-## 5.6. Логотип
+Что задают параметры:
+
+- `pos(...)` - позиция иконки
+- `size(...)` - итоговый размер в пикселях
+- `icon(...)` - конкретный `IconId`
+- `color(...)` - основной цвет слоя
+- `bgColor(...)` - фон под иконкой, полезен для чистого обновления поверх уже нарисованного интерфейса
+
+Если иконка многослойная, слои можно рисовать отдельно разными цветами:
 
 ```cpp
-ui.logoSizesPx(36, 20);
+ui.drawIcon()
+    .pos(200, 10)
+    .size(18)
+    .icon(battery_l0)
+    .color(ui.rgb(255, 255, 255));
 
-ui.showLogo()
-    .title("PISPPUS")
-    .subtitle("Digital Thermometer")
-    .anim(ZoomIn)
-    .fgColor(ui.rgb(255, 255, 255))
-    .bgColor(ui.rgb(0, 0, 0))
-    .duration(1800)
-    .pos(center, 40);
-```
-
-Параметры:
-
-- `title` и `subtitle` — строки логотипа;
-- `animation` — `None`, `FadeIn`, `SlideUp`, `LightFade`, `ZoomIn`;
-- `fgColor` и `bgColor` — цвета;
-- `durationMs` — длительность анимации;
-- `x`, `y` — позиция.
-
-Отдельно можно настроить размеры:
-
-```cpp
-ui.logoTitleSizePx(36);
-ui.logoSubtitleSizePx(20);
+ui.drawIcon()
+    .pos(200, 10)
+    .size(18)
+    .icon(battery_l1)
+    .color(ui.rgb(0, 200, 120));
 ```
 
 ---
 
-# 6. Фигуры
+# 7. Фигуры
 
 Приставка fill - это фигуры с заливкой, draw - с контуром
 
-## 6.1 Линия
+## 7.1 Линия
 
 ```cpp
 ui.drawLine()
@@ -405,12 +514,10 @@ ui.drawLine()
     .color(ui.rgb(255, 255, 255))
 ```
 
-Для fluent API `draw()` / `show()` / `apply()` не обязательны:
+- `from(...)` и `to(...)` задают начало и конец линии
+- `color(...)` задаёт цвет линии
 
-- fluent-объект сам коммитится в конце выражения
-- явный `draw()` нужен только если вы хотите сделать commit сразу или подчеркнуть это в коде
-
-## 6.2 Прямоугольник
+## 7.2 Прямоугольник
 
 ```cpp
 ui.fillRect()
@@ -431,8 +538,10 @@ ui.drawRect()
 
 - `radius({r})` — один радиус для всех углов;
 - `radius({tl, tr, br, bl})` — отдельные радиусы по углам.
+- `pos(...)` и `size(...)` задают левый верхний угол и размер
+- `fillRect()` рисует сплошную фигуру, `drawRect()` только контур
 
-## 6.3 Круг
+## 7.3 Круг
 
 ```cpp
 ui.fillCircle()
@@ -448,7 +557,11 @@ ui.drawCircle()
     .color(ui.rgb(255, 255, 255))
 ```
 
-## 6.4 Треугольник
+- `pos(...)` - центр круга
+- `radius(...)` - радиус
+- `fillCircle()` рисует диск, `drawCircle()` только окружность
+
+## 7.4 Треугольник
 
 ```cpp
 ui.fillTriangle()
@@ -466,7 +579,11 @@ ui.drawTriangle()
     .color(ui.rgb(255, 255, 255))
 ```
 
-## 6.5 Скруглённый треугольник
+- `point0/1/2(...)` задают три вершины
+- `radius(...)` можно добавить для скругления углов
+- `fillTriangle()` заливает фигуру, `drawTriangle()` рисует контур
+
+## 7.5 Скруглённый треугольник
 
 ```cpp
 ui.fillTriangle()
@@ -477,7 +594,9 @@ ui.fillTriangle()
     .color(ui.rgb(0, 120, 255))
 ```
 
-## 6.6 Дуга
+- `radius(...)` здесь задаёт степень скругления вершин
+
+## 7.6 Дуга
 
 ```cpp
 ui.drawArc()
@@ -488,7 +607,11 @@ ui.drawArc()
     .color(ui.rgb(80, 255, 120))
 ```
 
-## 6.7 Эллипс
+- `pos(...)` - центр дуги
+- `radius(...)` - радиус
+- `startDeg(...)` и `endDeg(...)` задают углы в градусах
+
+## 7.7 Эллипс
 
 ```cpp
 ui.fillEllipse()
@@ -506,7 +629,10 @@ ui.drawEllipse()
     .color(ui.rgb(255, 255, 255))
 ```
 
-## 6.8 Сквиркль
+- `radiusX(...)` и `radiusY(...)` задают полуоси
+- `fillEllipse()` заливает фигуру, `drawEllipse()` рисует контур
+
+## 7.8 Сквиркль
 
 ```cpp
 ui.fillSquircle()
@@ -515,9 +641,22 @@ ui.fillSquircle()
     .color(ui.rgb(255, 128, 0))
 ```
 
-# 7. Градиенты
+```cpp
+ui.drawSquircle()
+    .pos(150, 160)
+    .radius(26)
+    .color(ui.rgb(255, 255, 255))
+```
 
-## 7.1 Вертикальный
+- `pos(...)` - центр фигуры
+- `radius(...)` - базовый размер сквиркля
+- `fillSquircle()` рисует заливку, `drawSquircle()` только контур
+
+# 8. Градиенты
+
+У всех градиентов `pos(...)` и `size(...)` задают прямоугольную область рисования.
+
+## 8.1. Вертикальный
 
 ```cpp
 ui.gradientVertical()
@@ -527,7 +666,9 @@ ui.gradientVertical()
     .bottomColor(ui.rgb(0, 87, 250))
 ```
 
-## 7.2 Горизонтальный
+- цвет плавно меняется сверху вниз
+
+## 8.2. Горизонтальный
 
 ```cpp
 ui.gradientHorizontal()
@@ -537,7 +678,9 @@ ui.gradientHorizontal()
     .rightColor(ui.rgb(80, 255, 120))
 ```
 
-## 7.3 4 угла
+- цвет плавно меняется слева направо
+
+## 8.3. 4 угла
 
 ```cpp
 ui.gradientCorners()
@@ -549,7 +692,10 @@ ui.gradientCorners()
     .bottomRightColor(ui.rgb(255, 128, 0))
 ```
 
-## 7.4 Диагональный
+- каждая вершина прямоугольника получает свой цвет
+- внутри идёт двунаправленная интерполяция между четырьмя углами
+
+## 8.4. Диагональный
 
 ```cpp
 ui.gradientDiagonal()
@@ -559,7 +705,9 @@ ui.gradientDiagonal()
     .bottomRightColor(ui.rgb(30, 30, 30))
 ```
 
-## 7.5 Радиальный
+- плавный переход по диагонали от верхнего левого к нижнему правому углу
+
+## 8.5. Радиальный
 
 ```cpp
 ui.gradientRadial()
@@ -571,9 +719,13 @@ ui.gradientRadial()
     .outerColor(ui.rgb(0, 87, 250))
 ```
 
-# 8. Эффекты
+- `center(...)` задаёт центр градиента в координатах экрана
+- `radius(...)` задаёт радиус перехода
+- `innerColor(...)` и `outerColor(...)` задают цвета в центре и на периферии
 
-## 8.1 Blur
+# 9. Эффекты
+
+## 9.1. Blur
 
 ```cpp
 ui.drawBlur()
@@ -600,8 +752,10 @@ ui.updateBlur()
 
 - `materialStrength(...)` задаёт силу цветного материала поверх blur
 - `materialColor(...)` задаёт цвет материала в `RGB565`; `-1` значит взять текущий цвет фона библиотеки
+- `direction(...)` задаёт направление усиления blur-материала
+- `gradient(true)` делает материал не плоским, а с мягким переходом
 
-## 8.2. Glow
+## 9.2. Glow
 
 Круг:
 
@@ -632,11 +786,20 @@ ui.drawGlowRect()
 
 Для in-place обновления есть `updateGlowCircle()` и `updateGlowRect()`.
 
+Что задают параметры glow:
+
+- `fillColor(...)` - цвет самой фигуры
+- `bgColor(...)` - цвет фона под фигурой, нужен для чистого in-place обновления
+- `glowColor(...)` - цвет свечения
+- `glowSize(...)` - толщина зоны свечения
+- `glowStrength(...)` - интенсивность свечения
+- `anim(...)` и `pulsePeriodMs(...)` - анимация свечения
+
 ---
 
-# 8. Виджеты
+# 10. Виджеты
 
-## 8.1. Scroll dots
+## 10.1. Scroll dots
 
 ```cpp
 ui.drawScrollDots()
@@ -657,7 +820,7 @@ ui.drawScrollDots()
 
 Есть и `updateScrollDots()` с теми же параметрами.
 
-## 8.2. Универсальная кнопка
+## 10.2. Универсальная кнопка
 
 Состояние:
 
@@ -686,7 +849,7 @@ ui.drawButton()
 
 Для частичного обновления есть `updateButton()`.
 
-## 8.3. Toggle switch
+## 10.3. Toggle switch
 
 Состояние:
 
@@ -716,7 +879,7 @@ ui.drawToggleSwitch()
 
 `inactiveColor(...)` и `knobColor(...)` задаются по желанию.
 
-## 8.4. Прогресс-бар
+## 10.4. Прогресс-бар
 
 ```cpp
 ui.drawProgressBar()
@@ -730,19 +893,32 @@ ui.drawProgressBar()
     .draw();
 ```
 
+Для локального обновления без полной перерисовки есть `updateProgressBar()`:
+
+```cpp
+ui.updateProgressBar()
+    .pos(20, 220)
+    .size(180, 16)
+    .value(65)
+    .baseColor(ui.rgb(30, 30, 30))
+    .fillColor(ui.rgb(0, 120, 255))
+    .radius(8)
+    .anim(Shimmer);
+```
+
 Текст над прогрессом:
 
 ```cpp
 ui.drawProgressText(20, 246, 180, 20, "Downloading",
                     ui.rgb(255, 255, 255), ui.rgb(0, 0, 0),
-                    AlignCenter, 14);
+                    Center, 14);
 
 ui.drawProgressPercent(20, 268, 180, 20, 65,
                        ui.rgb(255, 255, 255), ui.rgb(0, 0, 0),
-                       AlignCenter, 14);
+                       Center, 14);
 ```
 
-## 8.5. Круговой прогресс-бар
+## 10.5. Круговой прогресс-бар
 
 ```cpp
 ui.drawCircularProgressBar()
@@ -756,7 +932,9 @@ ui.drawCircularProgressBar()
     .draw();
 ```
 
-## 8.6. Drum roll
+Тот же принцип есть и у `updateCircularProgressBar()`, когда индикатор надо обновлять in-place.
+
+## 10.6. Drum roll
 
 Горизонтальный:
 
@@ -778,9 +956,9 @@ ui.drawDrumRollHorizontal(
 
 ---
 
-# 9. Списки и плитки
+# 11. Списки и плитки
 
-## 9.1. Списочное меню
+## 11.1. Списочное меню
 
 Конфигурация:
 
@@ -832,7 +1010,7 @@ SCREEN(ScreenMainMenu, 1)
 - `Cards`
 - `Plain`
 
-## 9.2. Плиточное меню
+## 11.2. Плиточное меню
 
 Конфигурация:
 
@@ -881,7 +1059,7 @@ SCREEN(ScreenTiles, 2)
 - `TextOnly`
 - `TextSubtitle`
 
-## 9.3. Кастомная раскладка плиток
+## 11.3. Кастомная раскладка плиток
 
 Если стандартной сетки мало, можно описать layout строками:
 
@@ -906,7 +1084,7 @@ ui.configureTile()
 
 ---
 
-# 10. Графики
+# 12. Графики
 
 Фон и сетка:
 
@@ -940,6 +1118,9 @@ ui.drawGraphLine(
 
 Есть и `updateGraphGrid(...)` / `updateGraphLine(...)`.
 
+- `drawGraphLine(...)` добавляет новую точку в уже настроенный график
+- `updateGraphLine(...)` подходит для in-place обновления, когда графику нужно самому зачистить и перерисовать нужную область
+
 Режимы направления:
 
 - `LeftToRight`
@@ -948,9 +1129,9 @@ ui.drawGraphLine(
 
 ---
 
-# 11. Статус-бар
+# 13. Статус-бар
 
-## 11.1. Включение
+## 13.1. Включение
 
 ```cpp
 ui.configureStatusBar(
@@ -966,7 +1147,7 @@ ui.configureStatusBar(
 - `Top`
 - `Bottom`
 
-## 11.2. Стиль
+## 13.2. Стиль
 
 ```cpp
 ui.setStatusBarStyle(StatusBarStyleSolid);
@@ -974,7 +1155,7 @@ ui.setStatusBarStyle(StatusBarStyleSolid);
 ui.setStatusBarStyle(StatusBarStyleBlurGradient);
 ```
 
-## 11.3. Текст
+## 13.3. Текст
 
 ```cpp
 ui.setStatusBarText(
@@ -984,7 +1165,7 @@ ui.setStatusBarText(
 );
 ```
 
-## 11.4. Батарея
+## 13.4. Батарея
 
 ```cpp
 ui.setStatusBarBattery(87, Numeric);
@@ -1000,7 +1181,7 @@ ui.setStatusBarBattery(-1, Hidden);
 - `WarningBar`
 - `ErrorBar`
 
-## 11.5. Кастомная дорисовка
+## 13.5. Кастомная дорисовка
 
 ```cpp
 void statusBarCustom(GUI &ui, int16_t x, int16_t y, int16_t w, int16_t h)
@@ -1025,9 +1206,9 @@ ui.renderStatusBar();
 
 ---
 
-# 12. Уведомления, toast, ошибки
+# 14. Уведомления, toast, ошибки
 
-## 12.1. Toast
+## 14.1. Toast
 
 ```cpp
 ui.showToast()
@@ -1043,7 +1224,7 @@ ui.showToast()
 bool active = ui.toastActive();
 ```
 
-## 12.2. Notification
+## 14.2. Notification
 
 ```cpp
 ui.showNotification()
@@ -1068,7 +1249,7 @@ bool active = ui.notificationActive();
 ui.setNotificationButtonDown(btnOk.isDown());
 ```
 
-## 12.3. Popup menu
+## 14.3. Popup menu
 
 ```cpp
 ui.showPopupMenu()
@@ -1097,24 +1278,48 @@ if (ui.popupMenuActive())
 - `popupMenuHasResult()` сообщает, что выбор уже готов
 - `popupMenuTakeResult()` возвращает индекс и одновременно сбрасывает флаг результата
 
-## 12.4. Ошибки
+Можно использовать и более короткий паттерн без `popupMenuHasResult()`:
+
+- `popupMenuTakeResult() == -1` — результата пока нет
+- `popupMenuTakeResult() >= 0` — это индекс выбранного пункта
+
+## 14.4. Ошибки
 
 ```cpp
-ui.showError("Low battery", "Please charge device", Warning, "OK");
-ui.showError("LittleFS mount failed", "Code: 0xLFS", Error, "Retry");
+ui.showError()
+    .message("Low battery")
+    .code("0xLOWBAT")
+    .type(Warning)
+    .button("OK");
+
+ui.showError()
+    .message("LittleFS mount failed")
+    .code("0xLFS")
+    .type(Error)
+    .button("Retry");
 ```
 
 Управление:
 
 ```cpp
-bool active = ui.errorActive();
-ui.setErrorButtonDown(btnOk.isDown());
-ui.nextError();
+ui.nextError();                                                                 // переключает на следующую ошибку
+ui.prevError();                                                                 // переключает на предыдущую ошибку
+ui.errorActive();                                                               // сообщает, активен ли сейчас error overlay
+ui.setErrorButtonDown(btnOk.isDown());                                          // короткий совместимый wrapper для простого сценария с одной кнопкой
+ui.setErrorButtonsDown(btnNext.isDown(), btnPrev.isDown(), btnCombo.isDown());  // полный input API для error overlay
 ```
+
+Поведение:
+
+- если ошибок несколько, первой показывается последняя добавленная
+- header берется из `type(...)`: `Warning` или `Error/Crash`
+- пользователь задает только `message(...)` и `code(...)`; строка `Code:` собирается библиотекой сама
+- `Warning` можно закрыть
+- `Error` не закрывается пользовательской кнопкой
 
 ---
 
-# 13. Layout helpers
+# 15. Layout helpers
 
 Это лёгкие helper-ы для раскладки UI без тяжёлой layout-системы.
 
@@ -1126,7 +1331,7 @@ UiRect   rect{0, 0, 240, 320};
 UiInsets insets{10, 10, 10, 10};
 ```
 
-## 13.1. Slicing API
+## 15.1. Slicing API
 
 ```cpp
 UiRect root{0, 0, 240, 320};
@@ -1149,7 +1354,7 @@ UiRect content = work;
 - `placeInside(...)`
 - `centerIn(...)`
 
-## 13.2. Flow API
+## 15.2. Flow API
 
 ```cpp
 UiSize sizes[3] = {{40, 20}, {60, 20}, {40, 20}};
@@ -1167,7 +1372,7 @@ flowColumn(area, sizes, out, 3, 8, Center, Center);
 - `layout::SpaceBetween`
 - `layout::SpaceEvenly`
 
-## 13.3. Cursor-based API
+## 15.3. Cursor-based API
 
 ```cpp
 UiFlowRow<3> row(area, 10, layout::SpaceEvenly, Center);
@@ -1194,200 +1399,234 @@ row.finish();
 
 ---
 
-# 14. Скриншоты
+# 16. Скриншоты
 
-## 14.1. Быстрый старт
-
-Минимум для работы:
-
-```cpp
-ui.setScreenshotShortcut(&btnNext, &btnPrev, 500);
-```
-
-Теперь удержание двух кнопок 500мс делает скрин. В момент удержания UI не реагирует на кнопки. После завершения будет toast "Screenshot saved".
-
-## 14.2. Программный запуск
-
-```cpp
-bool ok = ui.startScreenshot(); // асинхронно, не блокирует GUI
-```
-
-Если запускаете вручную — тост можно показать своим кодом (встроенный тост ставится только при захвате через shortcut).
-
-## 14.3. Галерея миниатюр
-
-```cpp
-ui.configureScreenshotGallery(12, 64, 40, 6);
-
-SCREEN(ScreenScreenshots, 10)
-{
-    ui.clear(ui.rgb(10, 10, 10));
-    ui.drawScreenshot()
-        .pos(8, 28)
-        .size(224, 284)
-        .grid(3, 5)
-        .padding(8);
-}
-```
-
-Поведение зависит от `PIPGUI_SCREENSHOT_MODE`.
-
-В режиме `1` (Serial) миниатюры создаются из текущего sprite и живут только в RAM (после перезагрузки не сохраняются).
-
-В режиме `2` (LittleFS) скрины сохраняются во flash в `/pipKit/screenshots/`. Галерея показывает миниатюры: для каждого размера (`thumbW x thumbH`) она один раз генерирует и сохраняет их в `/pipKit/thumbnails/<WxH>/` (Area resampling), а при следующих входах читает готовые без повторной генерации.
-
-Количество можно узнать так:
-
-```cpp
-uint8_t n = ui.screenshotCount();
-```
-
-## 14.4. Build-time флаги
+## 16.1. Build-time флаги
 
 - `PIPGUI_SCREENSHOTS`
   - `1` по умолчанию
   - `0` полностью выключает систему скриншотов
 - `PIPGUI_SCREENSHOT_MODE`
-  - `1` — Serial стрим (PSCR)
-  - `2` — запись в LittleFS (flash)
-Для режима `2` нужен LittleFS (в `platformio.ini`: `board_build.filesystem = littlefs`). Библиотека сама вызывает `LittleFS.begin(false)` при первом скриншоте/открытии галереи и создаёт структуру `/pipKit/` (включая папки `screenshots/` и `thumbnails/`).
+  - `1` — serial capture
+  - `2` — запись в LittleFS
 
-Важно: библиотека не делает auto-format (не стирает данные). Если mount LittleFS не удался — скриншоты/галерея просто не будут работать, а причина будет выведена в `Serial`.
+Для режима `2` нужен LittleFS. Библиотека сама создаёт `/pipKit/`, `/pipKit/screenshots/` и `/pipKit/thumbnails/`.
 
-## 14.5. Формат PSCR (Serial)
+## 16.2. Serial capture
 
-Для захвата на ПК используйте скрипт:
+Скрипт на ПК:
 
+```bash
+python tools/screenshots/bin/capture.py
 ```
+
+Что важно:
+
+- serial header теперь фиксированный: magic `PSCR`, затем `width`, `height`, `payloadSize`
+- формат payload один: lossless `Packed565`
+- отдельного поля `format` в header больше нет
+- при запуске без параметров tool покажет меню: port, baud и output directory
+
+Быстрый прямой запуск тоже можно:
+
+```bash
 python tools/screenshots/bin/capture.py --port COM9 --baud 1000000
 ```
 
-PSCR по Serial — это простой контейнер:
+## 16.3. Скриншоты во flash (LittleFS)
 
-- Header (13 байт): `PSCR` + `w(uint16 LE)` + `h(uint16 LE)` + `format(uint8)` + `payloadSize(uint32 LE)`
-- Payload: байтовый поток QOI-opcodes (для `format = QoiRgb`)
+В режиме `2` сохраняются:
 
-Для Serial допускается `payloadSize = 0` (приёмник декодит до восстановления `w*h` пикселей).
+- full screenshot: `/pipKit/screenshots/pscr_00000001.pscr`
+- thumbnail: `/pipKit/thumbnails/<WxH>/pscr_00000001.pscr`
 
-## 14.6. Скриншоты во flash (LittleFS)
+Галерея показывает новые сверху.
 
-В режиме `2` скриншоты сохраняются как файлы:
-
-- Full: `/pipKit/screenshots/pscr_00000001.pscr`
-- Thumbnails: `/pipKit/thumbnails/<WxH>/pscr_00000001.pscr` (имя такое же, как у full-скрина)
-
-Галерея сортирует по stamp: **новые сверху**, старые ниже.
-
-### 14.6.1. Надёжная запись (tmp → rename)
-
-Все записи делаются через временный файл:
-
-- запись в `.../pscr_XXXXXXXX.tmp`
-- `flush()` + дописывание trailer/CRC
-- `close()`
-- `rename(tmp, final)`
-
-Если на любом шаге произошёл сбой — финальный файл не создаётся, а `.tmp` удаляется. Оставшиеся `.tmp` (включая `.counter.tmp`) очищаются при сканировании директории.
-
-### 14.6.2. Формат `.pscr` (LittleFS)
-
-Файл во flash — это PSCR header + payload + trailer:
-
-- Header (13 байт): `PSCR` + `w(uint16 LE)` + `h(uint16 LE)` + `format(uint8)` + `payloadSize(uint32 LE)`
-- Payload: QOI-opcodes stream (для `format = QoiRgb`)
-- Trailer (16 байт): `PSCT` + `ver(uint8)` + `flags(uint8)` + `reserved(2)` + `payloadSize(uint32 LE)` + `crc32(payload)(uint32 LE)`
-
-Файл считается валидным только если:
-
-- `fileSize == header + payloadSize + trailer`
-- trailer присутствует и версия совпадает
-- `payloadSize` в header и trailer совпадают
-- CRC32 payload совпадает
-
-Старые файлы без trailer/CRC (созданные до добавления CRC) не поддерживаются и будут игнорироваться.
-
----
-
-# 15. Wi‑Fi
-
-Минимальное управление:
+## 16.4. Запуск скриншота
 
 ```cpp
-ui.requestWiFi(true);
-
-if (ui.wifiConnected())
-{
-    uint32_t ip = ui.wifiLocalIpV4();
-}
+bool started = ui.startScreenshot();
 ```
 
-- `requestWiFi(true)` запускает подключение
-- `requestWiFi(false)` останавливает Wi‑Fi
-- `wifiConnected()` возвращает текущее состояние
-- `wifiLocalIpV4()` возвращает IPv4 в packed `uint32_t`
+- `startScreenshot()` запускает захват асинхронно
+- если snapshot-buffer не удалось выделить, функция вернёт `false`
+- built-in shortcut фиксированный: удержание `Next + Prev` `300 ms`
+- shortcut настраивать нельзя и отдельного API для него больше нет
+
+## 16.5. Галерея миниатюр
+
+Настройка кеша и thumb-геометрии:
+
+```cpp
+ui.configureScreenshotGallery(
+    12, // maxShots: сколько screenshot entries держать в галерее
+    64, // thumbW: ширина одной миниатюры
+    40, // thumbH: высота одной миниатюры
+    6   // padding: внутренний отступ между миниатюрами
+);
+```
+
+Отрисовка галереи:
+
+```cpp
+ui.drawScreenshot()
+    .pos(8, 28)     // x, y области галереи
+    .size(224, 284) // w, h области галереи
+    .grid(3, 5)     // cols, rows видимой сетки
+    .padding(8);    // отступ между ячейками в самой сетке
+```
+
+Что делает `drawScreenshot()`:
+
+- рисует текущую screenshot gallery в заданной области
+- сам берёт entries из внутреннего screenshot store
+- в serial mode просто покажет пустое состояние, если gallery backend не используется
+
+Дополнительно:
+
+```cpp
+uint8_t count = ui.screenshotCount();
+```
 
 ---
 
-# 16. OTA в `pipGUI` и tooling
+# 17. Wi‑Fi
 
-> Важно: для OTA нужна A/B разметка (два OTA app-слота) в partition table.
+## 17.1. Build-time флаги
 
-## 16.1. Конфигурация (`config.hpp`)
+- `PIPGUI_WIFI`
+  - `1` — `GUI::loop()` обслуживает standalone Wi‑Fi wrapper
+  - `0` — standalone Wi‑Fi path не обслуживается автоматически
+- `PIPGUI_WIFI_SSID`
+- `PIPGUI_WIFI_PASSWORD`
 
-- `PIPGUI_OTA` — `1` включает OTA модуль
-- `PIPGUI_OTA_PROJECT_URL` — HTTPS base на `/fw/<project>` (без `/index.json` в конце)
-- `PIPGUI_OTA_ED25519_PUBKEY_HEX` — публичный ключ Ed25519 (32 байта, hex)
-- `PIPGUI_FIRMWARE_TITLE` — имя прошивки (показывается в UI)
-- `PIPGUI_FIRMWARE_VER_MAJOR`, `PIPGUI_FIRMWARE_VER_MINOR`, `PIPGUI_FIRMWARE_VER_PATCH` — текущая версия `X.Y.Z`
+Важно:
 
-## 16.2. Manifest
+- OTA продолжает работать и при `PIPGUI_WIFI = 0`
+- у OTA свой runtime-path, он не зависит от standalone Wi‑Fi servicing в `GUI::loop()`
 
-Поля:
+## 17.2. API
 
-- `title` (string) — имя прошивки (показывается в UI)
-- `version` (string `X.Y.Z`)
-- `build` (number) — монотонный номер версии, **должен совпадать с**:
-  - `build = major*1_000_000 + minor*1_000 + patch`
-- `size` (number, bytes)
-- `sha256` (hex, 64 chars)
-- `url` (https)
-- `desc` (string) — описание обновления (можно `""`)
-- `sig_ed25519` (hex, 128 chars) — обязательная подпись Ed25519
+```cpp
+ui.requestWiFi(true);   // включить или выключить standalone Wi‑Fi request
+ui.wifiState();         // текущее состояние backend-а
+ui.wifiConnected();     // true только в Connected
+ui.wifiLocalIpV4();     // IPv4 как packed uint32_t
+```
 
-Подпись считается **не от JSON**, а от payload v5, собранного из полей манифеста:
-`prefix + title + 0x00 + version + 0x00 + build(u64 BE) + size(u32 BE) + sha256(32) + url(utf-8) + 0x00 + desc(utf-8)`.
+---
 
-`prefix` = `pipgui-ota-manifest-v5`.
+# 18. OTA
 
-## 16.3. Использование (UI)
+> Для OTA нужна A/B partition table с двумя OTA app-слотами.
 
-OTA — неблокирующая state-machine, обслуживается из `GUI::loop()`:
+## 18.1. Тулинг (`tools/ota/`)
 
-- Инициализация (один раз на старте): `ui.otaConfigure()`
-- Проверка обновления: `ui.otaRequestCheck()`
-  - порядок: **stable -> beta** (если в stable нет апдейта, проверяется beta)
-- Установка: `ui.otaRequestInstall()`
-- История stable (rollback UI):
-  - запросить список: `ui.otaRequestStableList()`
-  - читать: `ui.otaStableListReady()`, `ui.otaStableListCount()`, `ui.otaStableListVersion(i)`
-  - установить конкретную stable-версию: `ui.otaRequestInstallStableVersion("1.2.3")`
-- Статус: `ui.otaStatus()`
+Сгенерировать ключ:
 
-После установки и перезапуска прошивка стартует в режиме pending-verify (`pendingVerify = true`).
-Вы можете явно подтвердить успех через `ui.otaMarkAppValid()` после своего health-check, либо оставить это на встроенную автоматическую логику.
+```bash
+python tools/ota/keygen.py
+```
 
-## 16.4. Тулинг (`tools/ota/`)
+Если запустить без параметров, tool покажет меню и даст выбрать путь сохранения числом.
 
-- Сгенерировать ключ: `python tools/ota/keygen.py` (публичный ключ вставить в `PIPGUI_OTA_ED25519_PUBKEY_HEX`)
-- Подготовить релиз (bin + manifest) в `tools/ota/out/`:
-  - stable: `python tools/ota/make_release.py --bin .pio/build/<env>/firmware.bin --channel stable --title "Pipboy OS" --version 1.3.8 --site-base https://<domain>/fw --desc "Bugfixes and improvements"`
-  - beta: `python tools/ota/make_release.py --bin .pio/build/<env>/firmware.bin --channel beta --title "Pipboy OS" --version 1.3.9 --site-base https://<domain>/fw --desc-file notes.txt`
-- Структура на сайте (после деплоя `tools/ota/out/<project>/...` в `/fw/<project>/...`):
-  - `/fw/<project>/index.json`
-  - `/fw/<project>/stable/index.json`, `/fw/<project>/beta/index.json`
-  - `/fw/<project>/<channel>/<version>/manifest.json`
-  - `/fw/<project>/<channel>/<version>/fw.bin`
-- Быстрая проверка: `python tools/ota/verify_manifest.py --manifest tools/ota/out/<project>/stable/1.3.8/manifest.json --bin tools/ota/out/<project>/stable/1.3.8/fw.bin --pubkey <PIPGUI_OTA_ED25519_PUBKEY_HEX>`
+Сделать stable release:
 
+```bash
+python tools/ota/make_release.py
+```
 
+Сделать beta release:
 
+```bash
+python tools/ota/make_release.py --beta --interactive
+```
+
+Проверка manifest + bin:
+
+```bash
+python tools/ota/verify_manifest.py
+```
+
+При запуске без параметров tool покажет меню: manifest, firmware source и signature check.
+
+## 18.2. Конфигурация
+
+- `PIPGUI_OTA` — `1` включает OTA subsystem
+- `PIPGUI_OTA_PROJECT_URL` — base URL на `/fw/<project>`
+- `PIPGUI_OTA_ED25519_PUBKEY_HEX` — обязательный Ed25519 public key в hex
+- `PIPGUI_FIRMWARE_TITLE` — имя прошивки для UI
+- `PIPGUI_FIRMWARE_VER_MAJOR`, `PIPGUI_FIRMWARE_VER_MINOR`, `PIPGUI_FIRMWARE_VER_PATCH` — текущая версия
+
+## 18.3. Использование
+
+Типы `OtaChannel`, `OtaCheckMode`, `OtaState`, `OtaError`, `OtaManifest`, `OtaStatus`, `OtaStatusCallback` экспортируются из `pipGUI/Systems/Update/Ota.hpp`.
+
+### Базовый lifecycle
+
+```cpp
+ui.otaConfigure();
+ui.otaRequestCheck();
+const OtaStatus& st = ui.otaStatus();
+```
+
+- `otaConfigure()` вызывается один раз на старте
+- `otaRequestCheck()` запускает проверку обновления
+- `otaStatus()` возвращает live status state-machine
+
+### Проверка и установка
+
+```cpp
+ui.otaRequestCheck();
+ui.otaRequestCheck(OtaCheckMode::NewerOnly);
+ui.otaRequestCheck(OtaCheckMode::AllowDowngrade);
+ui.otaRequestInstall();
+ui.otaCancel();
+```
+
+- порядок каналов: `stable -> beta`
+- если в `stable` ничего нового нет, backend проверяет `beta`
+- `otaCancel()` отменяет текущую OTA-операцию
+
+### История stable-версий
+
+```cpp
+ui.otaRequestStableList();
+bool ready = ui.otaStableListReady();
+uint8_t count = ui.otaStableListCount();
+const char* ver = ui.otaStableListVersion(i);
+ui.otaRequestInstallStableVersion("1.2.3");
+```
+
+### Дополнительно
+
+```cpp
+ui.otaService();
+ui.otaMarkAppValid();
+```
+
+- `otaService()` публичный, но обычно вручную не нужен: `GUI::loop()` уже его вызывает сам
+- после reboot в `pendingVerify` можно явно подтвердить новую прошивку через `otaMarkAppValid()`
+
+### Ошибки `OtaError`
+
+- `None`
+- `WifiNotEnabled`
+- `WifiNotConnected`
+- `HttpBeginFailed`
+- `HttpStatusNotOk`
+- `ManifestTooLarge`
+- `ManifestParseFailed`
+- `ManifestReplay`
+- `SignatureMissing`
+- `SignatureInvalid`
+- `FlashLayoutInvalid`
+- `RollbackUnavailable`
+- `UpdateBeginFailed`
+- `UpdateWriteFailed`
+- `HashPipelineFailed`
+- `DownloadTruncated`
+- `PayloadSizeMismatch`
+- `HashMismatch`
+- `UpdateEndFailed`
+- `UrlTooLong`
