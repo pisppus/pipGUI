@@ -468,8 +468,8 @@ namespace pipgui
                 fillSpanClip(s, py, x0, x1, c);
         };
 
-        if (rTL == rTR && rTR == rBR && rBR == rBL && h > (int16_t)(rTL * 2))
-        {
+          if (rTL == rTR && rTR == rBR && rBR == rBL && h >= (int16_t)(rTL * 2))
+          {
             int32_t rr = (int32_t)rTL;
             if (rr > w / 2)
                 rr = w / 2;
@@ -480,6 +480,13 @@ namespace pipgui
             const int16_t hh = (int16_t)(h - 2 * rr);
             if (hh > 0)
                 spr->fillRect(x, yy, w, hh, color565);
+            else
+            {
+                const int16_t midY = static_cast<int16_t>(y + rr - 1);
+                const int16_t midH = static_cast<int16_t>((h & 1) ? 1 : 2);
+                if (midH > 0)
+                    spr->fillRect(x, midY, w, midH, color565);
+            }
 
             const int32_t hx = (hh > 0) ? hh - 1 : 0;
             const int32_t xx = x + rr;

@@ -36,8 +36,8 @@ namespace pipgui
     struct FillEllipseFluent;
     struct DrawTriangleFluent;
     struct FillTriangleFluent;
-    struct DrawSquircleFluent;
-    struct FillSquircleFluent;
+    struct DrawSquircleRectFluent;
+    struct FillSquircleRectFluent;
 
     template <bool IsUpdate>
     struct BlurRegionFluentT;
@@ -198,8 +198,16 @@ namespace pipgui
         [[nodiscard]] FillEllipseFluent fillEllipse();
         [[nodiscard]] DrawTriangleFluent drawTriangle();
         [[nodiscard]] FillTriangleFluent fillTriangle();
-        [[nodiscard]] DrawSquircleFluent drawSquircle();
-        [[nodiscard]] FillSquircleFluent fillSquircle();
+        [[nodiscard]] DrawSquircleRectFluent drawSquircleRect();
+        [[nodiscard]] FillSquircleRectFluent fillSquircleRect();
+        void drawSquircleRect(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radius, uint16_t color);
+        void drawSquircleRect(int16_t x, int16_t y, int16_t w, int16_t h,
+                              uint8_t radiusTL, uint8_t radiusTR, uint8_t radiusBR, uint8_t radiusBL,
+                              uint16_t color);
+        void fillSquircleRect(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radius, uint16_t color);
+        void fillSquircleRect(int16_t x, int16_t y, int16_t w, int16_t h,
+                              uint8_t radiusTL, uint8_t radiusTR, uint8_t radiusBR, uint8_t radiusBL,
+                              uint16_t color);
 
         [[nodiscard]] DrawBlurFluent drawBlur();
         [[nodiscard]] UpdateBlurFluent updateBlur();
@@ -299,7 +307,6 @@ namespace pipgui
             drawProgressPercent(x, y, w, h, value, detail::color888To565(textColor), detail::color888To565(bgColor), align, fontPx);
         }
 
-        void updateButtonPress(ButtonVisualState &s, bool isDown);
         bool updateToggleSwitch(ToggleSwitchState &s, bool pressed);
 
         [[nodiscard]] DrawIconFluent drawIcon();
@@ -414,6 +421,7 @@ namespace pipgui
         detail::BlurState _blur;
         detail::Flags _flags = {};
         detail::DiagnosticsState _diag;
+        detail::ButtonCacheState _buttonCache;
         detail::ScreenshotGalleryState _shots;
         detail::ScreenshotStreamState _shotStream;
 
@@ -444,6 +452,10 @@ namespace pipgui
                                  const char *stage);
 
         pipcore::Sprite *getDrawTarget();
+        detail::ButtonState &resolveButtonState(const String &label, int16_t x, int16_t y,
+                                               int16_t w, int16_t h, uint16_t baseColor, uint8_t radius,
+                                               IconId iconId);
+        void stepButtonState(detail::ButtonState &s, bool isDown);
         void flushDirty();
         void invalidateRect(int16_t x, int16_t y, int16_t w, int16_t h);
 
@@ -475,8 +487,6 @@ namespace pipgui
                                int16_t x1, int16_t y1,
                                int16_t x2, int16_t y2,
                                uint8_t radius, uint16_t color);
-        void drawSquircle(int16_t cx, int16_t cy, int16_t r, uint16_t color);
-        void fillSquircle(int16_t cx, int16_t cy, int16_t r, uint16_t color);
         void drawRoundRect(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radius, uint16_t color565);
         void drawRoundRect(int16_t x, int16_t y, int16_t w, int16_t h,
                            uint8_t radiusTL, uint8_t radiusTR, uint8_t radiusBR, uint8_t radiusBL,
@@ -597,9 +607,11 @@ namespace pipgui
                                        bool doFlush = true);
 
         void drawButton(const String &label, int16_t x, int16_t y, int16_t w,
-                        int16_t h, uint16_t baseColor, uint8_t radius, const ButtonVisualState &state);
+                        int16_t h, uint16_t baseColor, uint8_t radius,
+                        IconId iconId, const detail::ButtonState &state);
         void updateButton(const String &label, int16_t x, int16_t y, int16_t w,
-                          int16_t h, uint16_t baseColor, uint8_t radius, const ButtonVisualState &state);
+                          int16_t h, uint16_t baseColor, uint8_t radius,
+                          IconId iconId, const detail::ButtonState &state);
         void drawToggleSwitch(int16_t x, int16_t y, int16_t w, int16_t h,
                               ToggleSwitchState &state, uint16_t activeColor,
                               int32_t inactiveColor = -1, int32_t knobColor = -1);

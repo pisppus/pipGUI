@@ -57,10 +57,10 @@ namespace
   Button btnNext(kBtnNextPin, Pullup);
   Button btnPrev(kBtnPrevPin, Pullup);
 
-  ButtonVisualState settingsBtnState{true, 0, 255, true, false, 0};
-  ButtonVisualState otaBtnState{true, 0, 255, true, false, 0};
-  ButtonVisualState otaRollbackBtnState{true, 0, 255, true, false, 0};
   ToggleSwitchState g_toggleState{false, 0, 0};
+
+  uint8_t g_buttonsDemoStyle = 0;
+  uint8_t g_buttonsDemoSize = 1;
 
   float g_graphPhase = 0.0f;
   uint32_t g_lastGraphUpdateMs = 0;
@@ -114,7 +114,7 @@ namespace
 
   String settingsButtonLabel(uint32_t nowMs)
   {
-    if (!settingsBtnState.loading || g_settingsLoadingUntil == 0 || nowMs >= g_settingsLoadingUntil)
+    if (g_settingsLoadingUntil == 0 || nowMs >= g_settingsLoadingUntil)
       return String("Show modal");
 
     const uint32_t remainingMs = g_settingsLoadingUntil - nowMs;
@@ -415,6 +415,7 @@ void configureListMenus()
           {"Tile 4 cols", "Four compact tiles in a single row", tileMenu4Cols},
           {"List menu 2", "Text-focused list with active highlight panel", listMenuPlain},
           {"ToggleSwitch", "Toggle switch interaction and state preview", toggleSwitch},
+          {"Buttons", "Different button forms, sizes and states", buttonsDemo},
           {"Scroll dots", "Page indicator dots with animated transitions", scrollDots},
           {"Error", "Full-screen error overlay presentation", errorOverlay},
           {"Warning", "Full-screen warning overlay presentation", warningOverlay},
@@ -633,6 +634,9 @@ void loop()
         break;
       case toggleSwitch:
         updateToggleDemo(nextPressed, prevPressed);
+        break;
+      case buttonsDemo:
+        updateButtonsDemo(nowMs, nextPressed, nextDown, prevPressed, prevDown, comboDown);
         break;
       case scrollDots:
         updateScrollDotsDemo(nowMs, nextPressed, prevPressed);

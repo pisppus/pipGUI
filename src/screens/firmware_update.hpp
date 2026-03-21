@@ -99,14 +99,12 @@ SCREEN(firmwareUpdate, 40)
       .pos(l.btnX0, l.btnY)
       .size(l.btnW, l.btnH)
       .baseColor(ui.rgb(40, 150, 255))
-      .radius(11)
-      .state(otaBtnState);
+      .radius(11);
 
   ui.drawButton()
       .label("Rollback")
       .pos(l.btnX1, l.btnY)
       .size(l.btnW, l.btnH)
       .baseColor(ui.rgb(40, 150, 255))
-      .radius(11)
-      .state(otaRollbackBtnState);
+      .radius(11);
 }

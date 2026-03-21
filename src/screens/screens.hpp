@@ -23,6 +23,7 @@
 #include "drum_roll.hpp"
 #include "progress_text.hpp"
 #include "popup_menu_demo.hpp"
+#include "buttons_demo.hpp"
 #include "circle.hpp"
 #include "test_circles.hpp"
 #include "test_round_rects.hpp"

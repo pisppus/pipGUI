@@ -199,18 +199,14 @@ void updateProgressDemoFrame(uint32_t nowMs)
 
 void updateSettingsDemoFrame(uint32_t nowMs, bool prevPressed, bool prevDown)
 {
-  ui.updateButtonPress(settingsBtnState, prevDown);
-
-  if (settingsBtnState.loading && g_settingsLoadingUntil != 0 && nowMs >= g_settingsLoadingUntil)
-  {
-    settingsBtnState.loading = false;
+  bool loading = (g_settingsLoadingUntil != 0 && nowMs < g_settingsLoadingUntil);
+  if (g_settingsLoadingUntil != 0 && nowMs >= g_settingsLoadingUntil)
     g_settingsLoadingUntil = 0;
-  }
 
-  if (prevPressed && !settingsBtnState.loading)
+  if (prevPressed && !loading)
   {
-    settingsBtnState.loading = true;
     g_settingsLoadingUntil = nowMs + kSettingsLoadingDurationMs;
+    loading = true;
     ui.showNotification()
         .title("Sync paused")
         .message("Cloud sync is paused.\nConfirm changes to continue.")
@@ -226,12 +222,14 @@ void updateSettingsDemoFrame(uint32_t nowMs, bool prevPressed, bool prevDown)
       .size(120, 44)
       .baseColor(ui.rgb(40, 150, 255))
       .radius(10)
-      .state(settingsBtnState);
+      .loading(loading)
+      .down(prevDown);
 }
 
 void updateFirmwareUpdateScreen(uint32_t nowMs, bool nextPressed, bool nextDown, bool prevPressed, bool prevDown)
 {
   (void)nextPressed;
+  static bool rollbackOpenPending = false;
 
   const FirmwareUpdateLayout l = calcFirmwareUpdateLayout();
   if (ui.wifiState() == net::WifiState::Off)
@@ -260,8 +258,6 @@ void updateFirmwareUpdateScreen(uint32_t nowMs, bool nextPressed, bool nextDown,
     static uint32_t nextHoldStartMs = 0;
     static bool nextLongFired = false;
     static bool lastNextDown = false;
-    static bool rollbackOpenPending = false;
-
     constexpr uint32_t kBackHoldMs = 450;
     if (nextDown)
     {
@@ -330,14 +326,6 @@ void updateFirmwareUpdateScreen(uint32_t nowMs, bool nextPressed, bool nextDown,
             .maxVisible(maxVisible);
       }
     }
-
-    otaBtnState.enabled = true;
-    otaBtnState.loading = busy;
-    ui.updateButtonPress(otaBtnState, prevDown);
-
-    otaRollbackBtnState.enabled = !busy;
-    otaRollbackBtnState.loading = rollbackOpenPending && !ui.otaStableListReady();
-    ui.updateButtonPress(otaRollbackBtnState, nextDown);
 
     if (prevPressed)
     {
@@ -465,7 +453,9 @@ void updateFirmwareUpdateScreen(uint32_t nowMs, bool nextPressed, bool nextDown,
       .size(l.btnW, l.btnH)
       .baseColor(ui.rgb(40, 150, 255))
       .radius(11)
-      .state(otaBtnState);
+      .enabled(true)
+      .loading(busy)
+      .down(prevDown);
 
   ui.updateButton()
       .label("Rollback")
@@ -473,7 +463,9 @@ void updateFirmwareUpdateScreen(uint32_t nowMs, bool nextPressed, bool nextDown,
       .size(l.btnW, l.btnH)
       .baseColor(ui.rgb(40, 150, 255))
       .radius(11)
-      .state(otaRollbackBtnState);
+      .enabled(!busy)
+      .loading(rollbackOpenPending && !ui.otaStableListReady())
+      .down(nextDown);
 }
 
 void updateToggleDemo(bool nextPressed, bool prevPressed)
@@ -506,6 +498,143 @@ void updateToggleDemo(bool nextPressed, bool prevPressed)
         .bgColor(bg565)
         .align(Center);
   }
+}
+
+void updateButtonsDemo(uint32_t nowMs, bool nextPressed, bool nextDown, bool prevPressed, bool prevDown, bool comboDown)
+{
+  struct DemoPreset
+  {
+    int16_t heroW;
+    int16_t heroH;
+    int16_t wideW;
+    int16_t miniW;
+    int16_t miniH;
+  };
+
+  constexpr DemoPreset kSizePresets[] = {
+      {82, 30, 156, 52, 26},
+      {98, 34, 184, 62, 28},
+      {112, 38, 212, 74, 32},
+  };
+  constexpr uint8_t kSizePresetCount = static_cast<uint8_t>(sizeof(kSizePresets) / sizeof(kSizePresets[0]));
+
+  struct DemoStyle
+  {
+    const char *name;
+    uint16_t primary;
+    uint16_t secondary;
+    uint16_t accent;
+    uint8_t heroRadius;
+    uint8_t wideRadius;
+      uint8_t miniRadius;
+  };
+
+  const DemoStyle kStyles[] = {
+      {"Rounded", ui.rgb(0, 87, 250), ui.rgb(255, 0, 72), ui.rgb(255, 128, 0), 10, 12, 8},
+      {"Pill", ui.rgb(40, 150, 255), ui.rgb(255, 98, 0), ui.rgb(0, 200, 120), 18, 18, 14},
+      {"Card", ui.rgb(98, 54, 255), ui.rgb(255, 64, 128), ui.rgb(255, 196, 0), 6, 8, 4},
+  };
+  constexpr uint8_t kStyleCount = static_cast<uint8_t>(sizeof(kStyles) / sizeof(kStyles[0]));
+
+  static uint32_t comboHoldStartMs = 0;
+  if (comboDown)
+  {
+    if (comboHoldStartMs == 0)
+      comboHoldStartMs = nowMs;
+    else if ((nowMs - comboHoldStartMs) >= 450U)
+    {
+      comboHoldStartMs = 0;
+      ui.setScreen(listMenu);
+      return;
+    }
+  }
+  else
+  {
+    comboHoldStartMs = 0;
+  }
+
+  bool layoutChanged = false;
+  if (nextPressed && !prevDown)
+  {
+    g_buttonsDemoStyle = static_cast<uint8_t>((g_buttonsDemoStyle + 1) % kStyleCount);
+    layoutChanged = true;
+  }
+  if (prevPressed && !nextDown)
+  {
+    g_buttonsDemoSize = static_cast<uint8_t>((g_buttonsDemoSize + 1) % kSizePresetCount);
+    layoutChanged = true;
+  }
+  if (layoutChanged)
+    ui.requestRedraw();
+
+  const DemoPreset &size = kSizePresets[g_buttonsDemoSize];
+  const DemoStyle &style = kStyles[g_buttonsDemoStyle];
+  const uint16_t bg565 = ui.rgb(10, 10, 10);
+  const uint16_t line565 = ui.rgb(145, 145, 145);
+  const uint16_t hint565 = ui.rgb(95, 95, 95);
+  const int16_t sw = static_cast<int16_t>(ui.screenWidth());
+
+  ui.setTextStyle(Caption);
+  ui.updateText().text("                              ").pos(24, 76).color(bg565).bgColor(bg565);
+  ui.updateText().text(String("Style: ") + style.name).pos(24, 76).color(line565).bgColor(bg565);
+  ui.updateText().text("                              ").pos(138, 76).color(bg565).bgColor(bg565);
+  ui.updateText().text(String("Size: ") + String((unsigned)(g_buttonsDemoSize + 1))).pos(138, 76).color(line565).bgColor(bg565);
+
+  ui.updateButton()
+      .label("NEXT")
+      .pos(18, 98)
+      .size(size.heroW, size.heroH)
+      .baseColor(style.primary)
+      .radius(style.heroRadius)
+      .icon(warning)
+      .down(nextDown);
+
+  ui.updateButton()
+      .label("PREV")
+      .pos(static_cast<int16_t>(sw - 18 - size.heroW), 98)
+      .size(size.heroW, size.heroH)
+      .baseColor(style.secondary)
+      .radius(style.heroRadius)
+      .icon(error)
+      .down(prevDown);
+
+  ui.updateButton()
+      .label("Loading")
+      .pos(center, 146)
+      .size(size.wideW, size.heroH)
+      .baseColor(style.accent)
+      .radius(style.wideRadius)
+      .icon(battery_l1)
+      .loading(true)
+      .down(comboDown);
+
+  ui.updateButton()
+      .label("Disabled")
+      .pos(center, 192)
+      .size(size.wideW, size.heroH)
+      .baseColor(style.primary)
+      .radius(style.wideRadius)
+      .icon(battery_l0)
+      .enabled(false);
+
+  ui.updateButton()
+      .label("XS")
+      .pos(28, 242)
+      .size(size.miniW, size.miniH)
+      .baseColor(style.secondary)
+      .radius(style.miniRadius)
+      .icon(warning);
+
+  ui.updateButton()
+      .label("")
+      .pos(static_cast<int16_t>(sw - 28 - size.wideW), 242)
+      .size(size.wideW, size.miniH)
+      .baseColor(style.primary)
+      .radius(static_cast<uint8_t>(size.miniH / 2))
+      .icon(error);
+
+  ui.setTextStyle(Caption);
+  ui.updateText().text("Press Next/Prev, tap to switch style/size").pos(center, 286).color(hint565).bgColor(bg565).align(Center);
 }
 
 void updateScrollDotsDemo(uint32_t nowMs, bool nextPressed, bool prevPressed)

@@ -333,7 +333,10 @@ namespace pipgui
             _render.activeSprite = prevActive;
             _flags.inSpritePass = 0;
             if (spr && w > 0 && h > 0)
-                presentSprite(x, y, w, h, "present");
+            {
+                invalidateRect(x, y, w, h);
+                flushDirty();
+            }
         }
 #endif
     }

@@ -209,7 +209,7 @@ namespace pipgui
                 _flags.errorButtonDown = 0;
                 _error.lastNextDown = false;
                 _error.lastPrevDown = false;
-                updateButtonPress(_error.buttonState, false);
+                stepButtonState(_error.buttonState, false);
             }
             return;
         }
@@ -217,7 +217,7 @@ namespace pipgui
         const uint32_t now = nowMs();
         const bool wasButtonDown = _flags.errorButtonDown;
         _flags.errorButtonDown = dismissible && comboDown;
-        updateButtonPress(_error.buttonState, _flags.errorButtonDown);
+        stepButtonState(_error.buttonState, _flags.errorButtonDown);
 
         if (wasButtonDown && !_flags.errorButtonDown)
         {

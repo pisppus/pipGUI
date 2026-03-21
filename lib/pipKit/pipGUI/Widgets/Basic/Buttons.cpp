@@ -14,6 +14,17 @@ namespace pipgui
         constexpr float kPressedScale = 0.05f;
         constexpr float kMinScale = 0.85f;
 
+        struct ButtonFrame
+        {
+            int16_t centerX;
+            int16_t centerY;
+            int16_t x;
+            int16_t y;
+            int16_t w;
+            int16_t h;
+            int16_t radius;
+        };
+
         [[nodiscard]] uint32_t clampAnimDt(uint32_t now, uint32_t last) noexcept
         {
             if (last == 0 || now <= last)
@@ -50,6 +61,55 @@ namespace pipgui
             return v == center ? static_cast<int16_t>((total - extent) / 2) : v;
         }
 
+        [[nodiscard]] ButtonFrame resolveButtonFrame(int16_t x, int16_t y, int16_t w, int16_t h,
+                                                     uint8_t radius, uint8_t pressLevel,
+                                                     int16_t screenW, int16_t screenH) noexcept
+        {
+            const int16_t x0 = resolveAxis(x, w, screenW);
+            const int16_t y0 = resolveAxis(y, h, screenH);
+            const int16_t centerX = static_cast<int16_t>(x0 + w / 2);
+            const int16_t centerY = static_cast<int16_t>(y0 + h / 2);
+
+            float scale = 1.0f - kPressedScale * (pressLevel / 255.0f);
+            if (scale < kMinScale)
+                scale = kMinScale;
+
+            const int16_t outW = (w * scale) > 4 ? static_cast<int16_t>(w * scale) : 4;
+            const int16_t outH = (h * scale) > 4 ? static_cast<int16_t>(h * scale) : 4;
+            int16_t outR = static_cast<int16_t>(radius * scale + 0.5f);
+            if (outR < 1)
+                outR = 1;
+
+            return {
+                centerX,
+                centerY,
+                static_cast<int16_t>(centerX - outW / 2),
+                static_cast<int16_t>(centerY - outH / 2),
+                outW,
+                outH,
+                outR,
+            };
+        }
+
+        [[nodiscard]] uint16_t resolveButtonTextColor(uint16_t bg, const detail::ButtonState &state, uint16_t fgActive) noexcept
+        {
+            if (state.loading)
+                return fgActive;
+
+            if (!state.enabled)
+                return static_cast<uint16_t>(detail::blend565(bg, fgActive, 132));
+
+            if (state.fadeLevel < 255)
+                return static_cast<uint16_t>(detail::blend565(bg, fgActive, 224));
+
+            return fgActive;
+        }
+
+        void fillButtonBody(GUI &gui, const ButtonFrame &frame, uint16_t color565)
+        {
+            gui.fillSquircleRect(frame.x, frame.y, frame.w, frame.h, frame.radius, color565);
+        }
+
         [[nodiscard]] String loadingLabel(const String &label, bool loading, uint32_t now) noexcept
         {
             if (!loading)
@@ -62,9 +122,16 @@ namespace pipgui
                 out += '.';
             return out;
         }
+
+        [[nodiscard]] uint16_t resolveButtonIconSize(int16_t buttonH, bool hasLabel) noexcept
+        {
+            const float ratio = hasLabel ? 0.48f : 0.58f;
+            const uint16_t sizePx = static_cast<uint16_t>(buttonH * ratio + 0.5f);
+            return sizePx > 6 ? sizePx : 6;
+        }
     }
 
-    void GUI::updateButtonPress(ButtonVisualState &s, bool isDown)
+    void GUI::stepButtonState(detail::ButtonState &s, bool isDown)
     {
         const uint32_t now = nowMs();
         const uint32_t dt = clampAnimDt(now, s.lastUpdateMs);
@@ -93,36 +160,23 @@ namespace pipgui
                          int16_t x, int16_t y, int16_t w, int16_t h,
                          uint16_t baseColor,
                          uint8_t radius,
-                         const ButtonVisualState &state)
+                         IconId iconId,
+                         const detail::ButtonState &state)
     {
         if (_flags.spriteEnabled && _disp.display && !_flags.inSpritePass)
         {
-            updateButton(label, x, y, w, h, baseColor, radius, state);
+            updateButton(label, x, y, w, h, baseColor, radius, iconId, state);
             return;
         }
 
-        auto t = getDrawTarget();
-        if (!t)
+        if (!getDrawTarget())
             return;
 
-        const int16_t x0 = resolveAxis(x, w, _render.screenWidth);
-        const int16_t y0 = resolveAxis(y, h, _render.screenHeight);
+        const ButtonFrame frame = resolveButtonFrame(x, y, w, h, radius, state.pressLevel, _render.screenWidth, _render.screenHeight);
 
-        float sc = 1.0f - kPressedScale * (state.pressLevel / 255.0f);
-        if (sc < kMinScale)
-            sc = kMinScale;
-
-        const int16_t bw = (w * sc) > 4 ? static_cast<int16_t>(w * sc) : 4;
-        const int16_t bh = (h * sc) > 4 ? static_cast<int16_t>(h * sc) : 4;
-        int16_t bx = x0 + (w - bw) / 2;
-        int16_t by = y0 + (h - bh) / 2;
-
-        int16_t br = (int16_t)(radius * sc + 0.5f);
-        if (br < 1)
-            br = 1;
-
-        const uint16_t pressedBg = static_cast<uint16_t>(detail::blend565(baseColor, static_cast<uint16_t>(0x0000), 56));
-        const uint16_t disabledBg = static_cast<uint16_t>(detail::blend565(baseColor, static_cast<uint16_t>(0x7BEF), 160));
+        const uint16_t surfaceBg = _render.bgColor565;
+        const uint16_t pressedBg = static_cast<uint16_t>(detail::blend565(surfaceBg, baseColor, 190));
+        const uint16_t disabledBg = static_cast<uint16_t>(detail::blend565(surfaceBg, baseColor, 76));
         const uint16_t activeBg = state.pressLevel > 0 ? pressedBg : baseColor;
 
         uint16_t bg = activeBg;
@@ -135,28 +189,29 @@ namespace pipgui
             bg = static_cast<uint16_t>(detail::blend565(disabledBg, activeBg, a));
         }
 
-        fillRoundRect(bx, by, bw, bh, (uint8_t)br, bg);
+        fillButtonBody(*this, frame, bg);
 
         const uint16_t fgActive = detail::autoTextColor(bg, 140);
-        const bool disabledVis = !state.enabled || state.fadeLevel < 40;
-        const uint16_t fg = disabledVis
-                                ? (fgActive == 0xFFFF ? static_cast<uint16_t>(0x8410) : static_cast<uint16_t>(0x630C))
-                                : fgActive;
+        const uint16_t fg = resolveButtonTextColor(bg, state, fgActive);
 
         const String labelToDraw = loadingLabel(label, state.loading, nowMs());
+        const bool hasText = labelToDraw.length() > 0;
+        const bool hasIcon = (iconId != static_cast<IconId>(0xFFFF) && iconId < psdf_icons::IconCount);
 
         constexpr int16_t paddingX = 6;
         constexpr int16_t paddingY = 2;
-        const int16_t maxW = (bw - paddingX * 2) > 4 ? static_cast<int16_t>(bw - paddingX * 2) : 4;
-        const int16_t maxH = (bh - paddingY * 2) > 4 ? static_cast<int16_t>(bh - paddingY * 2) : 4;
+        const int16_t maxW = (frame.w - paddingX * 2) > 4 ? static_cast<int16_t>(frame.w - paddingX * 2) : 4;
+        const int16_t maxH = (frame.h - paddingY * 2) > 4 ? static_cast<int16_t>(frame.h - paddingY * 2) : 4;
 
-        uint16_t px = (bh * 0.55f) > 8 ? static_cast<uint16_t>(bh * 0.55f) : 8;
-        const uint16_t maxPx = (bh * 0.8f) > 8 ? static_cast<uint16_t>(bh * 0.8f) : 8;
+        uint16_t px = (frame.h * 0.55f) > 8 ? static_cast<uint16_t>(frame.h * 0.55f) : 8;
+        const uint16_t maxPx = (frame.h * 0.8f) > 8 ? static_cast<uint16_t>(frame.h * 0.8f) : 8;
         if (px > maxPx)
             px = maxPx;
 
         int16_t tw = 0;
         int16_t th = 0;
+        const uint16_t resolvedIconSize = hasIcon ? resolveButtonIconSize(frame.h, hasText) : 0;
+        const int16_t iconGap = (hasIcon && hasText) ? static_cast<int16_t>(resolvedIconSize > 16 ? 7 : 5) : 0;
         const uint16_t prevSize = fontSize();
         const uint16_t prevWeight = fontWeight();
 
@@ -166,10 +221,14 @@ namespace pipgui
             setFontSize(sizePx);
             measureText(labelToDraw, outW, outH);
 
-            if (outW <= maxW && outH <= maxH)
+            const int16_t availW = hasIcon && hasText
+                                       ? static_cast<int16_t>(maxW - resolvedIconSize - iconGap)
+                                       : maxW;
+
+            if (outW <= availW && outH <= maxH)
                 return;
 
-            const float scaleX = outW > 0 ? (static_cast<float>(maxW) / static_cast<float>(outW)) : 1.0f;
+            const float scaleX = outW > 0 ? (static_cast<float>((availW > 4) ? availW : 4) / static_cast<float>(outW)) : 1.0f;
             const float scaleY = outH > 0 ? (static_cast<float>(maxH) / static_cast<float>(outH)) : 1.0f;
             const float scale = scaleX < scaleY ? scaleX : scaleY;
             if (scale >= 1.0f)
@@ -184,15 +243,34 @@ namespace pipgui
             measureText(labelToDraw, outW, outH);
         };
 
-        fitLabel(px, tw, th);
+        if (hasText)
+            fitLabel(px, tw, th);
 
-        int16_t ty = by + (bh - th) / 2;
-        if (ty < by)
-            ty = by;
+        const int16_t iconY = static_cast<int16_t>(frame.centerY - resolvedIconSize / 2);
+        int16_t textY = static_cast<int16_t>(frame.centerY - th / 2);
+        if (textY < frame.y)
+            textY = frame.y;
 
-        setFontWeight(Medium);
-        setFontSize(px);
-        drawTextAligned(labelToDraw, (int16_t)(bx + bw / 2), ty, fg, bg, TextAlign::Center);
+        if (hasIcon && !hasText)
+        {
+            const int16_t iconX = static_cast<int16_t>(frame.centerX - resolvedIconSize / 2);
+            drawIconInternal(iconId, iconX, iconY, resolvedIconSize, fg);
+        }
+        else if (hasText)
+        {
+            const int16_t contentW = hasIcon ? static_cast<int16_t>(resolvedIconSize + iconGap + tw) : tw;
+            const int16_t contentX = static_cast<int16_t>(frame.centerX - contentW / 2);
+
+            if (hasIcon)
+                drawIconInternal(iconId, contentX, iconY, resolvedIconSize, fg);
+
+            setFontWeight(Medium);
+            setFontSize(px);
+            const int16_t textCenterX = hasIcon
+                                            ? static_cast<int16_t>(contentX + resolvedIconSize + iconGap + tw / 2)
+                                            : frame.centerX;
+            drawTextAligned(labelToDraw, textCenterX, textY, fg, bg, TextAlign::Center);
+        }
         setFontWeight(prevWeight);
         setFontSize(prevSize);
     }
@@ -201,21 +279,18 @@ namespace pipgui
                            int16_t x, int16_t y, int16_t w, int16_t h,
                            uint16_t baseColor,
                            uint8_t radius,
-                           const ButtonVisualState &state)
+                           IconId iconId,
+                           const detail::ButtonState &state)
     {
         if (!_flags.spriteEnabled || !_disp.display)
         {
-            drawButton(label, x, y, w, h, baseColor, radius, state);
+            drawButton(label, x, y, w, h, baseColor, radius, iconId, state);
             return;
         }
 
-        int16_t rx = x;
-        int16_t ry = y;
-
-        rx = resolveAxis(rx, w, _render.screenWidth);
-        ry = resolveAxis(ry, h, _render.screenHeight);
-
-        int16_t pad = 2;
+        const int16_t rx = resolveAxis(x, w, _render.screenWidth);
+        const int16_t ry = resolveAxis(y, h, _render.screenHeight);
+        constexpr int16_t pad = 2;
 
         bool prevRender = _flags.inSpritePass;
         pipcore::Sprite *prevActive = _render.activeSprite;
@@ -226,9 +301,9 @@ namespace pipgui
         fillRect()
             .pos((int16_t)(rx - pad), (int16_t)(ry - pad))
             .size((int16_t)(w + pad * 2), (int16_t)(h + pad * 2))
-            .color(detail::color888To565(_render.bgColor))
+            .color(_render.bgColor565)
             .draw();
-        drawButton(label, x, y, w, h, baseColor, radius, state);
+        drawButton(label, x, y, w, h, baseColor, radius, iconId, state);
 
         _flags.inSpritePass = prevRender;
         _render.activeSprite = prevActive;

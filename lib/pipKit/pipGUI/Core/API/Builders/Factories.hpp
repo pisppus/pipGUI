@@ -20,8 +20,8 @@ namespace pipgui
     inline FillEllipseFluent GUI::fillEllipse() { return FillEllipseFluent(this); }
     inline DrawTriangleFluent GUI::drawTriangle() { return DrawTriangleFluent(this); }
     inline FillTriangleFluent GUI::fillTriangle() { return FillTriangleFluent(this); }
-    inline DrawSquircleFluent GUI::drawSquircle() { return DrawSquircleFluent(this); }
-    inline FillSquircleFluent GUI::fillSquircle() { return FillSquircleFluent(this); }
+    inline DrawSquircleRectFluent GUI::drawSquircleRect() { return DrawSquircleRectFluent(this); }
+    inline FillSquircleRectFluent GUI::fillSquircleRect() { return FillSquircleRectFluent(this); }
 
     inline DrawBlurFluent GUI::drawBlur() { return DrawBlurFluent(this); }
     inline UpdateBlurFluent GUI::updateBlur() { return UpdateBlurFluent(this); }

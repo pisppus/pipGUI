@@ -13,6 +13,5 @@ SCREEN(settings, 1)
       .pos(60, 20)
       .size(120, 44)
       .baseColor(ui.rgb(40, 150, 255))
-      .radius(10)
-      .state(settingsBtnState);
+      .radius(10);
 }

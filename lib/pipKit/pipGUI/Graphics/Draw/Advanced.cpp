@@ -4,6 +4,75 @@ namespace pipgui
 {
     namespace
     {
+        static inline uint8_t clampSquircleRadius(int16_t w, int16_t h, uint8_t radius) noexcept
+        {
+            const int16_t maxRadius = ((w < h) ? w : h) / 2;
+            return (radius > maxRadius) ? static_cast<uint8_t>(maxRadius) : radius;
+        }
+
+        static inline bool isFullSquareSquircleRect(int16_t w, int16_t h,
+                                                    uint8_t rTL, uint8_t rTR, uint8_t rBR, uint8_t rBL) noexcept
+        {
+            return w == h &&
+                   rTL == rTR && rTR == rBR && rBR == rBL &&
+                   w == static_cast<int16_t>(rTL * 2 + 1);
+        }
+
+        static inline void fillSurfaceRect(const Surface565 &s, const Color565 &c,
+                                           int16_t x, int16_t y, int16_t w, int16_t h) noexcept
+        {
+            if (w <= 0 || h <= 0)
+                return;
+            if (x > s.clipR || x + w - 1 < s.clipX || y > s.clipB || y + h - 1 < s.clipY)
+                return;
+
+            const bool noClip = (x >= s.clipX && y >= s.clipY &&
+                                 x + w - 1 <= s.clipR && y + h - 1 <= s.clipB);
+            if (noClip)
+            {
+                for (int16_t py = y, pyEnd = static_cast<int16_t>(y + h - 1); py <= pyEnd; ++py)
+                    fillSpanFast(s, py, x, static_cast<int16_t>(x + w - 1), c);
+                return;
+            }
+
+            const int16_t py0 = (y < s.clipY) ? static_cast<int16_t>(s.clipY) : y;
+            const int16_t py1 = (y + h - 1 > s.clipB) ? static_cast<int16_t>(s.clipB) : static_cast<int16_t>(y + h - 1);
+            for (int16_t py = py0; py <= py1; ++py)
+                fillSpanClip(s, py, x, static_cast<int16_t>(x + w - 1), c);
+        }
+
+        template <typename AccT>
+        static inline void fillSquircleCorner(const Surface565 &s, const Color565 &c, const uint8_t *gamma,
+                                              int16_t cx, int16_t cy, uint8_t radius,
+                                              int16_t clipX, int16_t clipY, int16_t clipW, int16_t clipH)
+        {
+            if (radius == 0 || clipW <= 0 || clipH <= 0)
+                return;
+
+            Surface565 corner = s;
+            corner.clipX = clipX;
+            corner.clipY = clipY;
+            corner.clipR = static_cast<int32_t>(clipX + clipW - 1);
+            corner.clipB = static_cast<int32_t>(clipY + clipH - 1);
+            squircleRaster<true, AccT>(corner, c, cx, cy, radius, gamma, false);
+        }
+
+        template <typename AccT>
+        static inline void drawSquircleCorner(const Surface565 &s, const Color565 &c, const uint8_t *gamma,
+                                              int16_t cx, int16_t cy, uint8_t radius,
+                                              int16_t clipX, int16_t clipY, int16_t clipW, int16_t clipH)
+        {
+            if (radius == 0 || clipW <= 0 || clipH <= 0)
+                return;
+
+            Surface565 corner = s;
+            corner.clipX = clipX;
+            corner.clipY = clipY;
+            corner.clipR = static_cast<int32_t>(clipX + clipW - 1);
+            corner.clipB = static_cast<int32_t>(clipY + clipH - 1);
+            squircleRaster<false, AccT>(corner, c, cx, cy, radius, gamma, false);
+        }
+
         static inline float distanceSqToSegmentProjected(float dx, float dy,
                                                          float ex, float ey,
                                                          float invLen,
@@ -615,57 +684,171 @@ namespace pipgui
             invalidateRect(minX, minY, maxX - minX + 1, maxY - minY + 1);
     }
 
-    void GUI::fillSquircle(int16_t cx, int16_t cy, int16_t r, uint16_t color)
+    void GUI::fillSquircleRect(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radius, uint16_t color)
     {
-        if (r <= 0 || !_flags.spriteEnabled)
-            return;
-
-        auto spr = getDrawTarget();
-        Surface565 s;
-        if (!getSurface565(spr, s))
-            return;
-        if (cx + r < s.clipX || cx - r > s.clipR || cy + r < s.clipY || cy - r > s.clipB)
-            return;
-
-        const Color565 c = makeColor565(color);
-        const uint8_t *gamma = gammaTable();
-        const bool noClip = (cx - r - 1 >= s.clipX && cx + r + 1 <= s.clipR &&
-                             cy - r - 1 >= s.clipY && cy + r + 1 <= s.clipB);
-
-        if (r <= 255)
-            squircleRaster<true, uint32_t>(s, c, cx, cy, r, gamma, noClip);
-        else
-            squircleRaster<true, uint64_t>(s, c, cx, cy, r, gamma, noClip);
-
-        if (_disp.display && !_flags.inSpritePass)
-            invalidateRect(cx - r - 1, cy - r - 1, r * 2 + 3, r * 2 + 3);
+        fillSquircleRect(x, y, w, h, radius, radius, radius, radius, color);
     }
 
-    void GUI::drawSquircle(int16_t cx, int16_t cy, int16_t r, uint16_t color)
+    void GUI::fillSquircleRect(int16_t x, int16_t y, int16_t w, int16_t h,
+                               uint8_t radiusTL, uint8_t radiusTR, uint8_t radiusBR, uint8_t radiusBL,
+                               uint16_t color)
     {
-        if (r <= 0 || !_flags.spriteEnabled)
+        if (!_flags.spriteEnabled || w <= 0 || h <= 0)
             return;
 
         auto spr = getDrawTarget();
         Surface565 s;
         if (!getSurface565(spr, s))
             return;
-        if (cx + r + 2 < s.clipX || cx - r - 2 > s.clipR ||
-            cy + r + 2 < s.clipY || cy - r - 2 > s.clipB)
+        if (x > s.clipR || x + w - 1 < s.clipX || y > s.clipB || y + h - 1 < s.clipY)
             return;
+
+        const uint8_t rTL = clampSquircleRadius(w, h, radiusTL);
+        const uint8_t rTR = clampSquircleRadius(w, h, radiusTR);
+        const uint8_t rBR = clampSquircleRadius(w, h, radiusBR);
+        const uint8_t rBL = clampSquircleRadius(w, h, radiusBL);
+
+        if (rTL <= 1 && rTR <= 1 && rBR <= 1 && rBL <= 1)
+        {
+            fillRect(x, y, w, h, color);
+            return;
+        }
 
         const Color565 c = makeColor565(color);
         const uint8_t *gamma = gammaTable();
-        const bool noClip = (cx - r - 1 >= s.clipX && cx + r + 1 <= s.clipR &&
-                             cy - r - 1 >= s.clipY && cy + r + 1 <= s.clipB);
 
-        if (r <= 255)
-            squircleRaster<false, uint32_t>(s, c, cx, cy, r, gamma, noClip);
-        else
-            squircleRaster<false, uint64_t>(s, c, cx, cy, r, gamma, noClip);
+        if (isFullSquareSquircleRect(w, h, rTL, rTR, rBR, rBL))
+        {
+            const int16_t r = rTL;
+            const int16_t cx = static_cast<int16_t>(x + r);
+            const int16_t cy = static_cast<int16_t>(y + r);
+            const bool noClip = (cx - r - 1 >= s.clipX && cx + r + 1 <= s.clipR &&
+                                 cy - r - 1 >= s.clipY && cy + r + 1 <= s.clipB);
+            squircleRaster<true, uint32_t>(s, c, cx, cy, r, gamma, noClip);
+            if (_disp.display && !_flags.inSpritePass)
+                invalidateRect(cx - r - 1, cy - r - 1, r * 2 + 3, r * 2 + 3);
+            return;
+        }
+
+        const int16_t leftInset = (rTL > rBL) ? rTL : rBL;
+        const int16_t rightInset = (rTR > rBR) ? rTR : rBR;
+        const int16_t topInset = (rTL > rTR) ? rTL : rTR;
+        const int16_t bottomInset = (rBL > rBR) ? rBL : rBR;
+
+        fillSurfaceRect(s, c, static_cast<int16_t>(x + leftInset), y,
+                        static_cast<int16_t>(w - leftInset - rightInset), h);
+        fillSurfaceRect(s, c, static_cast<int16_t>(x + rTL), y,
+                        static_cast<int16_t>(w - rTL - rTR), topInset);
+        fillSurfaceRect(s, c, static_cast<int16_t>(x + rBL), static_cast<int16_t>(y + h - bottomInset),
+                        static_cast<int16_t>(w - rBL - rBR), bottomInset);
+        fillSurfaceRect(s, c, x, static_cast<int16_t>(y + rTL),
+                        leftInset, static_cast<int16_t>(h - rTL - rBL));
+        fillSurfaceRect(s, c, static_cast<int16_t>(x + w - rightInset), static_cast<int16_t>(y + rTR),
+                        rightInset, static_cast<int16_t>(h - rTR - rBR));
+
+        if (rTL > 0)
+            fillSquircleCorner<uint32_t>(s, c, gamma, static_cast<int16_t>(x + rTL), static_cast<int16_t>(y + rTL),
+                                         rTL, x, y, rTL, rTL);
+        if (rTR > 0)
+        {
+            const int16_t cx = static_cast<int16_t>(x + w - rTR - 1);
+            fillSquircleCorner<uint32_t>(s, c, gamma, cx, static_cast<int16_t>(y + rTR),
+                                         rTR, static_cast<int16_t>(x + w - rTR), y, rTR, rTR);
+        }
+        if (rBR > 0)
+        {
+            const int16_t cx = static_cast<int16_t>(x + w - rBR - 1);
+            const int16_t cy = static_cast<int16_t>(y + h - rBR - 1);
+            fillSquircleCorner<uint32_t>(s, c, gamma, cx, cy,
+                                         rBR, static_cast<int16_t>(x + w - rBR), static_cast<int16_t>(y + h - rBR), rBR, rBR);
+        }
+        if (rBL > 0)
+        {
+            const int16_t cy = static_cast<int16_t>(y + h - rBL - 1);
+            fillSquircleCorner<uint32_t>(s, c, gamma, static_cast<int16_t>(x + rBL), cy,
+                                         rBL, x, static_cast<int16_t>(y + h - rBL), rBL, rBL);
+        }
 
         if (_disp.display && !_flags.inSpritePass)
-            invalidateRect(cx - r - 2, cy - r - 2, r * 2 + 5, r * 2 + 5);
+            invalidateRect(x, y, w, h);
+    }
+
+    void GUI::drawSquircleRect(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radius, uint16_t color)
+    {
+        drawSquircleRect(x, y, w, h, radius, radius, radius, radius, color);
+    }
+
+    void GUI::drawSquircleRect(int16_t x, int16_t y, int16_t w, int16_t h,
+                               uint8_t radiusTL, uint8_t radiusTR, uint8_t radiusBR, uint8_t radiusBL,
+                               uint16_t color)
+    {
+        if (!_flags.spriteEnabled || w <= 0 || h <= 0)
+            return;
+
+        auto spr = getDrawTarget();
+        Surface565 s;
+        if (!getSurface565(spr, s))
+            return;
+        if (x > s.clipR || x + w - 1 < s.clipX || y > s.clipB || y + h - 1 < s.clipY)
+            return;
+
+        const uint8_t rTL = clampSquircleRadius(w, h, radiusTL);
+        const uint8_t rTR = clampSquircleRadius(w, h, radiusTR);
+        const uint8_t rBR = clampSquircleRadius(w, h, radiusBR);
+        const uint8_t rBL = clampSquircleRadius(w, h, radiusBL);
+
+        if (rTL <= 1 && rTR <= 1 && rBR <= 1 && rBL <= 1)
+        {
+            drawRoundRect(x, y, w, h, 0, color);
+            return;
+        }
+
+        const Color565 c = makeColor565(color);
+        const uint8_t *gamma = gammaTable();
+
+        if (isFullSquareSquircleRect(w, h, rTL, rTR, rBR, rBL))
+        {
+            const int16_t r = rTL;
+            const int16_t cx = static_cast<int16_t>(x + r);
+            const int16_t cy = static_cast<int16_t>(y + r);
+            const bool noClip = (cx - r - 1 >= s.clipX && cx + r + 1 <= s.clipR &&
+                                 cy - r - 1 >= s.clipY && cy + r + 1 <= s.clipB);
+            squircleRaster<false, uint32_t>(s, c, cx, cy, r, gamma, noClip);
+            if (_disp.display && !_flags.inSpritePass)
+                invalidateRect(cx - r - 2, cy - r - 2, r * 2 + 5, r * 2 + 5);
+            return;
+        }
+
+        fillSurfaceRect(s, c, static_cast<int16_t>(x + rTL), y, static_cast<int16_t>(w - rTL - rTR), 1);
+        fillSurfaceRect(s, c, static_cast<int16_t>(x + rBL), static_cast<int16_t>(y + h - 1), static_cast<int16_t>(w - rBL - rBR), 1);
+        fillSurfaceRect(s, c, x, static_cast<int16_t>(y + rTL), 1, static_cast<int16_t>(h - rTL - rBL));
+        fillSurfaceRect(s, c, static_cast<int16_t>(x + w - 1), static_cast<int16_t>(y + rTR), 1, static_cast<int16_t>(h - rTR - rBR));
+
+        if (rTL > 0)
+            drawSquircleCorner<uint32_t>(s, c, gamma, static_cast<int16_t>(x + rTL), static_cast<int16_t>(y + rTL),
+                                         rTL, x, y, rTL + 1, rTL + 1);
+        if (rTR > 0)
+        {
+            const int16_t cx = static_cast<int16_t>(x + w - rTR - 1);
+            drawSquircleCorner<uint32_t>(s, c, gamma, cx, static_cast<int16_t>(y + rTR),
+                                         rTR, static_cast<int16_t>(x + w - rTR - 1), y, rTR + 1, rTR + 1);
+        }
+        if (rBR > 0)
+        {
+            const int16_t cx = static_cast<int16_t>(x + w - rBR - 1);
+            const int16_t cy = static_cast<int16_t>(y + h - rBR - 1);
+            drawSquircleCorner<uint32_t>(s, c, gamma, cx, cy,
+                                         rBR, static_cast<int16_t>(x + w - rBR - 1), static_cast<int16_t>(y + h - rBR - 1), rBR + 1, rBR + 1);
+        }
+        if (rBL > 0)
+        {
+            const int16_t cy = static_cast<int16_t>(y + h - rBL - 1);
+            drawSquircleCorner<uint32_t>(s, c, gamma, static_cast<int16_t>(x + rBL), cy,
+                                         rBL, x, static_cast<int16_t>(y + h - rBL - 1), rBL + 1, rBL + 1);
+        }
+
+        if (_disp.display && !_flags.inSpritePass)
+            invalidateRect(x - 1, y - 1, w + 2, h + 2);
     }
 
 }

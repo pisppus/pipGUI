@@ -85,14 +85,26 @@ namespace pipgui
         int16_t _x, _y, _w, _h;
         uint16_t _baseColor;
         uint8_t _radius;
-        const ButtonVisualState *_state;
+        IconId _iconId;
+        bool _enabled;
+        bool _loading;
+        bool _down;
+        bool _enabledSet;
+        bool _loadingSet;
+        bool _downSet;
         ButtonFluentT(GUI *g)
             : detail::FluentLifetime(g),
               _label(),
               _x(0), _y(0), _w(0), _h(0),
               _baseColor(0),
               _radius(6),
-              _state(nullptr)
+              _iconId(static_cast<IconId>(0xFFFF)),
+              _enabled(true),
+              _loading(false),
+              _down(false),
+              _enabledSet(false),
+              _loadingSet(false),
+              _downSet(false)
         {
         }
 
@@ -140,11 +152,38 @@ namespace pipgui
             return *this;
         }
 
-        ButtonFluentT &state(const ButtonVisualState &s)
+        ButtonFluentT &icon(IconId id)
         {
             if (!canMutate())
                 return *this;
-            _state = &s;
+            _iconId = id;
+            return *this;
+        }
+
+        ButtonFluentT &enabled(bool v)
+        {
+            if (!canMutate())
+                return *this;
+            _enabled = v;
+            _enabledSet = true;
+            return *this;
+        }
+
+        ButtonFluentT &loading(bool v)
+        {
+            if (!canMutate())
+                return *this;
+            _loading = v;
+            _loadingSet = true;
+            return *this;
+        }
+
+        ButtonFluentT &down(bool v)
+        {
+            if (!canMutate())
+                return *this;
+            _down = v;
+            _downSet = true;
             return *this;
         }
 

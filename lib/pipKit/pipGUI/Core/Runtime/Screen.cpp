@@ -539,9 +539,8 @@ namespace pipgui
             renderPopupMenuOverlay(now);
         if (_flags.toastActive)
             renderToastOverlay(now);
-        presentSprite(0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight, "present");
-
-        _dirty.count = 0;
+        invalidateRect(0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight);
+        flushDirty();
         Debug::clearRects();
 
         if (el >= dur)

@@ -533,11 +533,14 @@ namespace pipgui
         {
             const String label = currentEntry.buttonText.length() ? currentEntry.buttonText : String("OK");
             drawButton(label, layout.buttonX, buttonY, layout.buttonW, layout.buttonH,
-                       theme.accent565, layout.buttonRadius, _error.buttonState);
+                       theme.accent565, layout.buttonRadius, static_cast<IconId>(0xFFFF), _error.buttonState);
         }
 
         if (_flags.spriteEnabled && _disp.display)
-            presentSprite(0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight, "present");
+        {
+            invalidateRect(0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight);
+            flushDirty();
+        }
 
         static_cast<void>(setFont(prevFont));
         setFontSize(prevSize);

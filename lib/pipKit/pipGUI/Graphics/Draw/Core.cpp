@@ -231,7 +231,7 @@ namespace pipgui
     {
         if (_dirty.count == 0)
             return;
-        if (_flags.bootActive || _flags.screenTransition || _flags.errorActive || _flags.notifActive || _flags.toastActive)
+        if (_flags.screenTransition || _flags.errorActive || _flags.notifActive || _flags.toastActive)
         {
             _flags.needRedraw = 1;
             _dirty.count = 0;

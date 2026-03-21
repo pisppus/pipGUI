@@ -635,22 +635,26 @@ ui.drawEllipse()
 ## 7.8 Сквиркль
 
 ```cpp
-ui.fillSquircle()
-    .pos(80, 160)
-    .radius(26)
+ui.fillSquircleRect()
+    .pos(54, 134)
+    .size(52, 52)
+    .radius({26})
     .color(ui.rgb(255, 128, 0))
 ```
 
 ```cpp
-ui.drawSquircle()
-    .pos(150, 160)
-    .radius(26)
+ui.drawSquircleRect()
+    .pos(124, 134)
+    .size(52, 52)
+    .radius({26})
     .color(ui.rgb(255, 255, 255))
 ```
 
-- `pos(...)` - центр фигуры
-- `radius(...)` - базовый размер сквиркля
-- `fillSquircle()` рисует заливку, `drawSquircle()` только контур
+- `pos(...)` - левый верхний угол области
+- `size(...)` - размер прямоугольного squircle
+- `radius({r})` - один радиус на все углы
+- `radius({tl, tr, br, bl})` - отдельные радиусы по углам
+- `fillSquircleRect()` рисует заливку, `drawSquircleRect()` только контур
 
 # 8. Градиенты
 
@@ -822,19 +826,9 @@ ui.drawScrollDots()
 
 ## 10.2. Универсальная кнопка
 
-Состояние:
+Кнопка сама держит внутреннее анимационное состояние. Снаружи для нее больше не нужен отдельный state-объект.
 
-```cpp
-static ButtonVisualState saveBtn{};
-```
-
-Обновление анимации:
-
-```cpp
-ui.updateButtonPress(saveBtn, isDown);
-```
-
-Отрисовка:
+Обычная отрисовка:
 
 ```cpp
 ui.drawButton()
@@ -843,11 +837,40 @@ ui.drawButton()
     .size(120, 40)
     .baseColor(ui.rgb(0, 120, 255))
     .radius(10)
-    .state(saveBtn)
     .draw();
 ```
 
-Для частичного обновления есть `updateButton()`.
+Обновление с состоянием кнопки:
+
+```cpp
+ui.updateButton()
+    .label("Save")
+    .pos(center, 180)
+    .size(120, 40)
+    .baseColor(ui.rgb(0, 120, 255))
+    .radius(10)
+    .icon(warning)
+    .enabled(true)
+    .loading(false)
+    .down(isDown)
+    .draw();
+```
+
+Параметры fluent API кнопки:
+
+- `label(...)` - текст внутри кнопки
+- `pos(x, y)` - позиция левого верхнего угла;
+- `size(w, h)` - размер кнопки
+- `baseColor(...)` - основной цвет кнопки
+- `radius(...)` - squircle-радиус кнопки
+- `icon(...)` - иконка внутри кнопки
+- `enabled(bool)` - активное или disabled-состояние
+- `loading(bool)` - loading-состояние
+- `down(bool)` - текущее физическое нажатие для press-анимации
+
+`drawButton()` и `updateButton()` используют один и тот же API. Для обычных статичных экранов достаточно `drawButton()`. Для анимируемой или интерактивной кнопки используй `updateButton()`.
+
+Если заданы и текст, и иконка, иконка рисуется слева от текста как единый центрированный блок. Если текст пустой, иконка рисуется по центру кнопки.
 
 ## 10.3. Toggle switch
 

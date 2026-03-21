@@ -13,6 +13,16 @@
 
 namespace pipgui::detail
 {
+    struct ButtonState
+    {
+        bool enabled = false;
+        uint8_t pressLevel = 0;
+        uint8_t fadeLevel = 0;
+        bool prevEnabled = false;
+        bool loading = false;
+        uint32_t lastUpdateMs = 0;
+    };
+
     struct DisplayState
     {
         pipcore::Display *display = nullptr;
@@ -117,7 +127,7 @@ namespace pipgui::detail
         int8_t transitionDir = 0;
         uint8_t layoutFromDotsVisible = 0;
         uint8_t layoutToDotsVisible = 0;
-        ButtonVisualState buttonState;
+        ButtonState buttonState;
         uint32_t nextHoldStartMs = 0;
         uint32_t prevHoldStartMs = 0;
         bool nextLongFired = false;
@@ -136,7 +146,7 @@ namespace pipgui::detail
         uint32_t startMs = 0;
         uint32_t animDurationMs = 0;
         uint32_t unlockMs = 0;
-        ButtonVisualState buttonState;
+        ButtonState buttonState;
     };
 
     struct ToastState
@@ -272,6 +282,21 @@ namespace pipgui::detail
         bool otaAutoConfirmed = false;
         uint32_t screenshotHoldStartMs = 0;
         bool screenshotCaptured = false;
+    };
+
+    struct ButtonCacheEntry
+    {
+        uint32_t key = 0;
+        uint32_t lastUseMs = 0;
+        bool used = false;
+        ButtonState state{};
+    };
+
+    inline constexpr uint8_t BUTTON_CACHE_MAX = 16;
+
+    struct ButtonCacheState
+    {
+        ButtonCacheEntry entries[BUTTON_CACHE_MAX] = {};
     };
 
     struct ScreenshotEntry

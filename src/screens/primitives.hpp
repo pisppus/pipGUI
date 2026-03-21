@@ -43,14 +43,16 @@ SCREEN(primitives, 23)
       .radius(6)
       .color(ui.rgb(255, 255, 255));
 
-  ui.fillSquircle()
-      .pos(70, 135)
-      .radius(26)
+  ui.fillSquircleRect()
+      .pos(44, 109)
+      .size(52, 52)
+      .radius({26})
       .color(ui.rgb(255, 128, 0));
 
-  ui.drawSquircle()
-      .pos(70, 135)
-      .radius(26)
+  ui.drawSquircleRect()
+      .pos(44, 109)
+      .size(52, 52)
+      .radius({26})
       .color(ui.rgb(255, 255, 255));
 
   ui.fillRect()

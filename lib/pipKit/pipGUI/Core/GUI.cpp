@@ -19,6 +19,29 @@ namespace pipgui
 
     namespace
     {
+        uint32_t hashButtonKey(const String &label, int16_t x, int16_t y, int16_t w, int16_t h,
+                               uint16_t baseColor, uint8_t radius, IconId iconId) noexcept
+        {
+            uint32_t hash = 2166136261u;
+            auto mix = [&](uint32_t v)
+            {
+                hash ^= v;
+                hash *= 16777619u;
+            };
+
+            for (size_t i = 0; i < label.length(); ++i)
+                mix(static_cast<uint8_t>(label[i]));
+
+            mix(static_cast<uint16_t>(x));
+            mix(static_cast<uint16_t>(y));
+            mix(static_cast<uint16_t>(w));
+            mix(static_cast<uint16_t>(h));
+            mix(baseColor);
+            mix(radius);
+            mix(static_cast<uint16_t>(iconId));
+            return hash ? hash : 1u;
+        }
+
         class NullDisplay final : public pipcore::Display
         {
         public:
@@ -72,6 +95,38 @@ namespace pipgui
 
         pipcore::Platform *plat = pipcore::GetPlatform();
         return !plat || plat->lastError() == pipcore::PlatformError::None;
+    }
+
+    detail::ButtonState &GUI::resolveButtonState(const String &label, int16_t x, int16_t y,
+                                                 int16_t w, int16_t h, uint16_t baseColor, uint8_t radius,
+                                                 IconId iconId)
+    {
+        const uint32_t key = hashButtonKey(label, x, y, w, h, baseColor, radius, iconId);
+        const uint32_t now = nowMs();
+        detail::ButtonCacheEntry *best = &_buttonCache.entries[0];
+
+        for (uint8_t i = 0; i < detail::BUTTON_CACHE_MAX; ++i)
+        {
+            detail::ButtonCacheEntry &entry = _buttonCache.entries[i];
+            if (entry.used && entry.key == key)
+            {
+                entry.lastUseMs = now;
+                return entry.state;
+            }
+            if (!entry.used)
+                best = &entry;
+            else if (best->used && entry.lastUseMs < best->lastUseMs)
+                best = &entry;
+        }
+
+        best->used = true;
+        best->key = key;
+        best->lastUseMs = now;
+        best->state = {};
+        best->state.enabled = true;
+        best->state.prevEnabled = true;
+        best->state.fadeLevel = 255;
+        return best->state;
     }
 
     GUI::InputState GUI::pollInput(Button &next, Button &prev)
@@ -489,8 +544,8 @@ namespace pipgui
             _flags.inSpritePass = 1;
             clear(bgColor);
             _flags.inSpritePass = prevRender;
-            presentSprite(0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight, "present");
-            _dirty.count = 0;
+            invalidateRect(0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight);
+            flushDirty();
         }
 
         syncRegisteredScreens();

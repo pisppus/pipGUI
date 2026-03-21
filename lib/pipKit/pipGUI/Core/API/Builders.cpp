@@ -154,18 +154,24 @@ namespace pipgui
             detail::GuiAccess::fillTriangle(*_gui, _x0, _y0, _x1, _y1, _x2, _y2, _color);
     }
 
-    void DrawSquircleFluent::draw()
+    void DrawSquircleRectFluent::draw()
     {
         if (!beginCommit())
             return;
-        detail::GuiAccess::drawSquircle(*_gui, _cx, _cy, _r, _color);
+        if (_perCorner)
+            detail::GuiAccess::drawSquircleRect(*_gui, _x, _y, _w, _h, _radiusTL, _radiusTR, _radiusBR, _radiusBL, _color);
+        else
+            detail::GuiAccess::drawSquircleRect(*_gui, _x, _y, _w, _h, _radius, _color);
     }
 
-    void FillSquircleFluent::draw()
+    void FillSquircleRectFluent::draw()
     {
         if (!beginCommit())
             return;
-        detail::GuiAccess::fillSquircle(*_gui, _cx, _cy, _r, _color);
+        if (_perCorner)
+            detail::GuiAccess::fillSquircleRect(*_gui, _x, _y, _w, _h, _radiusTL, _radiusTR, _radiusBR, _radiusBL, _color);
+        else
+            detail::GuiAccess::fillSquircleRect(*_gui, _x, _y, _w, _h, _radius, _color);
     }
 
     template <bool IsUpdate>
@@ -275,11 +281,15 @@ namespace pipgui
     template <bool IsUpdate>
     void ButtonFluentT<IsUpdate>::draw()
     {
-        if (!_state || !beginCommit())
+        if (!beginCommit())
             return;
+        detail::ButtonState &state = detail::GuiAccess::resolveButtonState(*_gui, _label, _x, _y, _w, _h, _baseColor, _radius, _iconId);
+        state.enabled = _enabledSet ? _enabled : true;
+        state.loading = _loadingSet ? _loading : false;
+        detail::GuiAccess::stepButtonState(*_gui, state, _downSet ? _down : false);
         detail::callByMode<IsUpdate>(
-            [&] { detail::GuiAccess::updateButton(*_gui, _label, _x, _y, _w, _h, _baseColor, _radius, *_state); },
-            [&] { detail::GuiAccess::drawButton(*_gui, _label, _x, _y, _w, _h, _baseColor, _radius, *_state); });
+            [&] { detail::GuiAccess::updateButton(*_gui, _label, _x, _y, _w, _h, _baseColor, _radius, _iconId, state); },
+            [&] { detail::GuiAccess::drawButton(*_gui, _label, _x, _y, _w, _h, _baseColor, _radius, _iconId, state); });
     }
     template void ButtonFluentT<false>::draw();
     template void ButtonFluentT<true>::draw();

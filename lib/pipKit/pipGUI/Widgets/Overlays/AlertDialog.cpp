@@ -124,14 +124,14 @@ namespace pipgui
             {
                 _flags.notifAwaitRelease = 0;
                 _flags.notifButtonDown = 0;
-                updateButtonPress(_notif.buttonState, false);
+                stepButtonState(_notif.buttonState, false);
             }
             return;
         }
 
         const bool was = _flags.notifButtonDown;
         _flags.notifButtonDown = effectiveDown;
-        updateButtonPress(_notif.buttonState, effectiveDown);
+        stepButtonState(_notif.buttonState, effectiveDown);
 
         if (_flags.notifActive && !_flags.notifClosing && was && !effectiveDown)
         {

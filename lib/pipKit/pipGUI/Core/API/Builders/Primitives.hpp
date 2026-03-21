@@ -765,30 +765,57 @@ namespace pipgui
         void draw();
     };
 
-    struct DrawSquircleFluent : detail::FluentLifetime
+    struct DrawSquircleRectFluent : detail::FluentLifetime
     {
-        PIPGUI_DEFAULT_FLUENT_MOVE(DrawSquircleFluent);
-        int16_t _cx, _cy;
-        int16_t _r;
+        PIPGUI_DEFAULT_FLUENT_MOVE(DrawSquircleRectFluent);
+        int16_t _x, _y, _w, _h;
+        uint8_t _radius;
+        uint8_t _radiusTL, _radiusTR, _radiusBR, _radiusBL;
+        bool _perCorner;
         uint16_t _color;
-        DrawSquircleFluent(GUI *g) : detail::FluentLifetime(g), _cx(0), _cy(0), _r(0), _color(0) {}
-        ~DrawSquircleFluent() { draw(); }
-        DrawSquircleFluent &pos(int16_t cx, int16_t cy)
+        DrawSquircleRectFluent(GUI *g)
+            : detail::FluentLifetime(g),
+              _x(0), _y(0), _w(0), _h(0),
+              _radius(0), _radiusTL(0), _radiusTR(0), _radiusBR(0), _radiusBL(0),
+              _perCorner(false), _color(0) {}
+        ~DrawSquircleRectFluent() { draw(); }
+        DrawSquircleRectFluent &pos(int16_t x, int16_t y)
         {
             if (!canMutate())
                 return *this;
-            _cx = cx;
-            _cy = cy;
+            _x = x;
+            _y = y;
             return *this;
         }
-        DrawSquircleFluent &radius(int16_t r)
+        DrawSquircleRectFluent &size(int16_t w, int16_t h)
         {
             if (!canMutate())
                 return *this;
-            _r = r;
+            _w = w;
+            _h = h;
             return *this;
         }
-        DrawSquircleFluent &color(uint16_t c)
+        DrawSquircleRectFluent &radius(std::initializer_list<uint8_t> radii)
+        {
+            if (!canMutate())
+                return *this;
+            if (radii.size() == 1)
+            {
+                _radius = *radii.begin();
+                _perCorner = false;
+            }
+            else if (radii.size() == 4)
+            {
+                auto it = radii.begin();
+                _radiusTL = *it++;
+                _radiusTR = *it++;
+                _radiusBR = *it++;
+                _radiusBL = *it++;
+                _perCorner = true;
+            }
+            return *this;
+        }
+        DrawSquircleRectFluent &color(uint16_t c)
         {
             if (!canMutate())
                 return *this;
@@ -798,30 +825,57 @@ namespace pipgui
         void draw();
     };
 
-    struct FillSquircleFluent : detail::FluentLifetime
+    struct FillSquircleRectFluent : detail::FluentLifetime
     {
-        PIPGUI_DEFAULT_FLUENT_MOVE(FillSquircleFluent);
-        int16_t _cx, _cy;
-        int16_t _r;
+        PIPGUI_DEFAULT_FLUENT_MOVE(FillSquircleRectFluent);
+        int16_t _x, _y, _w, _h;
+        uint8_t _radius;
+        uint8_t _radiusTL, _radiusTR, _radiusBR, _radiusBL;
+        bool _perCorner;
         uint16_t _color;
-        FillSquircleFluent(GUI *g) : detail::FluentLifetime(g), _cx(0), _cy(0), _r(0), _color(0) {}
-        ~FillSquircleFluent() { draw(); }
-        FillSquircleFluent &pos(int16_t cx, int16_t cy)
+        FillSquircleRectFluent(GUI *g)
+            : detail::FluentLifetime(g),
+              _x(0), _y(0), _w(0), _h(0),
+              _radius(0), _radiusTL(0), _radiusTR(0), _radiusBR(0), _radiusBL(0),
+              _perCorner(false), _color(0) {}
+        ~FillSquircleRectFluent() { draw(); }
+        FillSquircleRectFluent &pos(int16_t x, int16_t y)
         {
             if (!canMutate())
                 return *this;
-            _cx = cx;
-            _cy = cy;
+            _x = x;
+            _y = y;
             return *this;
         }
-        FillSquircleFluent &radius(int16_t r)
+        FillSquircleRectFluent &size(int16_t w, int16_t h)
         {
             if (!canMutate())
                 return *this;
-            _r = r;
+            _w = w;
+            _h = h;
             return *this;
         }
-        FillSquircleFluent &color(uint16_t c)
+        FillSquircleRectFluent &radius(std::initializer_list<uint8_t> radii)
+        {
+            if (!canMutate())
+                return *this;
+            if (radii.size() == 1)
+            {
+                _radius = *radii.begin();
+                _perCorner = false;
+            }
+            else if (radii.size() == 4)
+            {
+                auto it = radii.begin();
+                _radiusTL = *it++;
+                _radiusTR = *it++;
+                _radiusBR = *it++;
+                _radiusBL = *it++;
+                _perCorner = true;
+            }
+            return *this;
+        }
+        FillSquircleRectFluent &color(uint16_t c)
         {
             if (!canMutate())
                 return *this;

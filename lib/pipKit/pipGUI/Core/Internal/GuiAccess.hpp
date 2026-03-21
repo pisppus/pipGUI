@@ -308,14 +308,28 @@ namespace pipgui
                 gui.fillRoundTriangle(x0, y0, x1, y1, x2, y2, radius, color);
             }
 
-            static void drawSquircle(GUI &gui, int16_t cx, int16_t cy, int16_t r, uint16_t color)
+            static void drawSquircleRect(GUI &gui, int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radius, uint16_t color)
             {
-                gui.drawSquircle(cx, cy, r, color);
+                gui.drawSquircleRect(x, y, w, h, radius, color);
             }
 
-            static void fillSquircle(GUI &gui, int16_t cx, int16_t cy, int16_t r, uint16_t color)
+            static void drawSquircleRect(GUI &gui, int16_t x, int16_t y, int16_t w, int16_t h,
+                                         uint8_t radiusTL, uint8_t radiusTR, uint8_t radiusBR, uint8_t radiusBL,
+                                         uint16_t color)
             {
-                gui.fillSquircle(cx, cy, r, color);
+                gui.drawSquircleRect(x, y, w, h, radiusTL, radiusTR, radiusBR, radiusBL, color);
+            }
+
+            static void fillSquircleRect(GUI &gui, int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radius, uint16_t color)
+            {
+                gui.fillSquircleRect(x, y, w, h, radius, color);
+            }
+
+            static void fillSquircleRect(GUI &gui, int16_t x, int16_t y, int16_t w, int16_t h,
+                                         uint8_t radiusTL, uint8_t radiusTR, uint8_t radiusBR, uint8_t radiusBL,
+                                         uint16_t color)
+            {
+                gui.fillSquircleRect(x, y, w, h, radiusTL, radiusTR, radiusBR, radiusBL, color);
             }
 
             static void drawBlurRegion(GUI &gui,
@@ -589,9 +603,10 @@ namespace pipgui
                                    int16_t h,
                                    uint16_t baseColor,
                                    uint8_t radius,
-                                   const ButtonVisualState &state)
+                                   IconId iconId,
+                                   const ButtonState &state)
             {
-                gui.drawButton(label, x, y, w, h, baseColor, radius, state);
+                gui.drawButton(label, x, y, w, h, baseColor, radius, iconId, state);
             }
 
             static void updateButton(GUI &gui,
@@ -602,9 +617,28 @@ namespace pipgui
                                      int16_t h,
                                      uint16_t baseColor,
                                      uint8_t radius,
-                                     const ButtonVisualState &state)
+                                     IconId iconId,
+                                     const ButtonState &state)
             {
-                gui.updateButton(label, x, y, w, h, baseColor, radius, state);
+                gui.updateButton(label, x, y, w, h, baseColor, radius, iconId, state);
+            }
+
+            static ButtonState &resolveButtonState(GUI &gui,
+                                                   const String &label,
+                                                   int16_t x,
+                                                   int16_t y,
+                                                   int16_t w,
+                                                   int16_t h,
+                                                   uint16_t baseColor,
+                                                   uint8_t radius,
+                                                   IconId iconId)
+            {
+                return gui.resolveButtonState(label, x, y, w, h, baseColor, radius, iconId);
+            }
+
+            static void stepButtonState(GUI &gui, ButtonState &state, bool isDown)
+            {
+                gui.stepButtonState(state, isDown);
             }
 
             static void drawProgressBar(GUI &gui,

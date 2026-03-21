@@ -130,7 +130,10 @@ namespace pipgui
             _render.activeSprite = prevActive;
 
             if (useSprite && _disp.display)
-                presentSprite(0, 0, static_cast<int16_t>(_render.screenWidth), static_cast<int16_t>(_render.screenHeight), "present");
+            {
+                invalidateRect(0, 0, static_cast<int16_t>(_render.screenWidth), static_cast<int16_t>(_render.screenHeight));
+                flushDirty();
+            }
         };
 
         auto draw = [&](uint32_t fg888)

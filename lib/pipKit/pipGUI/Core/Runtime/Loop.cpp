@@ -86,7 +86,10 @@ namespace pipgui
                 _toast.lastRectValid = vis;
             }
             if (wroteOverlay && _flags.spriteEnabled && _disp.display)
-                presentSprite(0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight, "present");
+            {
+                invalidateRect(0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight);
+                flushDirty();
+            }
         };
 
         if (_flags.bootActive)
@@ -250,8 +253,8 @@ namespace pipgui
                         _toast.lastRect = r;
                         _toast.lastRectValid = vis;
                     }
-                    presentSprite(0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight, "present");
-                    _dirty.count = 0;
+                    invalidateRect(0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight);
+                    flushDirty();
                     return;
                 }
                 else
