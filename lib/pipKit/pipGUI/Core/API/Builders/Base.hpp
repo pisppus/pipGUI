@@ -152,8 +152,20 @@ namespace pipgui
             explicit FluentLifetime(GUI *gui) noexcept
                 : _gui(gui), _consumed(false) {}
 
-            FluentLifetime(const FluentLifetime &) = delete;
-            FluentLifetime &operator=(const FluentLifetime &) = delete;
+            FluentLifetime(const FluentLifetime &other) noexcept
+                : _gui(other._gui), _consumed(false)
+            {
+            }
+
+            FluentLifetime &operator=(const FluentLifetime &other) noexcept
+            {
+                if (this != &other)
+                {
+                    _gui = other._gui;
+                    _consumed = false;
+                }
+                return *this;
+            }
 
             FluentLifetime(FluentLifetime &&other) noexcept
                 : _gui(std::exchange(other._gui, nullptr)),
@@ -249,6 +261,23 @@ namespace pipgui
                 size_t i = 0;
                 for (const U &item : items)
                     copy[i++] = item;
+
+                data = copy;
+                return data;
+            }
+
+            [[nodiscard]] T *copyFromPtr(const T *items, size_t count) noexcept
+            {
+                reset();
+                if (!items || count == 0)
+                    return nullptr;
+
+                T *copy = static_cast<T *>(alloc(plat, sizeof(T) * count, pipcore::AllocCaps::Default));
+                if (!copy)
+                    return nullptr;
+
+                for (size_t i = 0; i < count; ++i)
+                    copy[i] = items[i];
 
                 data = copy;
                 return data;

@@ -240,13 +240,6 @@ namespace pipgui
     using BacklightCallback = void (*)(uint16_t level);
     using StatusBarCustomCallback = void (*)(GUI &ui, int16_t x, int16_t y, int16_t w, int16_t h);
 
-    struct ToggleSwitchState
-    {
-        bool value = false;
-        uint8_t pos = 0;
-        uint32_t lastUpdateMs = 0;
-    };
-
     struct ListItemDef
     {
         const char *title;

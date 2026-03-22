@@ -478,7 +478,9 @@ namespace pipgui
 
             applyClip(clipX, clipY, clipW, clipH);
             clear(resolveBgColor565(_render.bgColor, _render.bgColor565));
+            beginGraphFrame(screenId);
             cb(*this);
+            endGraphFrame(screenId);
 
             _clip = prevClip;
             _screen.current = prevCurrent;

@@ -184,10 +184,10 @@ ui.clearClip();
 - удобно для локальных redraw, списков, анимаций и виджетов в карточках
 - `clearClip()` возвращает обычную отрисовку без ограничений
 
-Если прямоугольник уже посчитан вручную, можно выставить clip напрямую:
+Если прямоугольник уже посчитан вручную, можно передать его одной fluent-операцией:
 
 ```cpp
-ui.applyClip(10, 20, 120, 80);
+ui.setClip().rect(10, 20, 120, 80);
 ```
 
 ## 4. Логотип
@@ -815,7 +815,7 @@ ui.drawScrollDots()
     .animate(true)
     .animDirection(1)
     .activeColor(ui.rgb(0, 87, 250))
-    .inactiveColor(ui.rgb(60, 60, 60))
+    .inactiveColor(ui.rgb(60, 60, 60)) 
     .dotRadius(3)
     .spacing(14)
     .activeWidth(18)
@@ -824,9 +824,33 @@ ui.drawScrollDots()
 
 Есть и `updateScrollDots()` с теми же параметрами.
 
-## 10.2. Универсальная кнопка
+## 10.2. Наследование стиля fluent
 
-Кнопка сама держит внутреннее анимационное состояние. Снаружи для нее больше не нужен отдельный state-объект.
+У fluent-объектов есть `derive()`. Это позволяет собрать базовый стиль один раз, а потом сделать на его основе несколько вариантов без копирования всей цепочки.
+
+Пример:
+
+```cpp
+auto base = ui.drawButton()
+    .size(120, 40)
+    .baseColor(ui.rgb(0, 120, 255))
+    .radius(10);
+
+auto compact = base.derive()
+    .size(96, 34);
+
+base
+    .label("Main")
+    .pos(20, 160);
+
+compact
+    .label("Mini")
+    .pos(20, 210);
+```
+
+После `derive()` исходный fluent становится шаблоном и сам больше не коммитится. Рисуется уже производная цепочка или финальная донастройка исходного объекта.
+
+## 10.3. Универсальная кнопка
 
 Обычная отрисовка:
 
@@ -836,8 +860,7 @@ ui.drawButton()
     .pos(center, 180)
     .size(120, 40)
     .baseColor(ui.rgb(0, 120, 255))
-    .radius(10)
-    .draw();
+    .radius(10);
 ```
 
 Обновление с состоянием кнопки:
@@ -850,59 +873,70 @@ ui.updateButton()
     .baseColor(ui.rgb(0, 120, 255))
     .radius(10)
     .icon(warning)
-    .enabled(true)
-    .loading(false)
+    .mode(true, false)
     .down(isDown)
-    .draw();
+;
 ```
 
-Параметры fluent API кнопки:
+Параметры:
 
 - `label(...)` - текст внутри кнопки
 - `pos(x, y)` - позиция левого верхнего угла;
 - `size(w, h)` - размер кнопки
-- `baseColor(...)` - основной цвет кнопки
+- `baseColor(...)` - основной цвет кнопки 
 - `radius(...)` - squircle-радиус кнопки
 - `icon(...)` - иконка внутри кнопки
-- `enabled(bool)` - активное или disabled-состояние
-- `loading(bool)` - loading-состояние
+- `mode(enabled, loading)` - сразу задает активное и loading-состояние
 - `down(bool)` - текущее физическое нажатие для press-анимации
 
 `drawButton()` и `updateButton()` используют один и тот же API. Для обычных статичных экранов достаточно `drawButton()`. Для анимируемой или интерактивной кнопки используй `updateButton()`.
 
 Если заданы и текст, и иконка, иконка рисуется слева от текста как единый центрированный блок. Если текст пустой, иконка рисуется по центру кнопки.
 
-## 10.3. Toggle switch
+## 10.4. Toggle switch
 
-Состояние:
-
-```cpp
-static ToggleSwitchState sw{};
-```
-
-Обновление логики:
+Снаружи нужен только обычный `bool`:
 
 ```cpp
-// btn.update() уже вызван в этом кадре
-bool changed = ui.updateToggleSwitch(sw, btn.wasPressed());
-if (changed)
-    ui.requestRedraw();
+bool wifiEnabled = false;
+bool changed = false;
 ```
 
 Отрисовка:
 
 ```cpp
+ui.updateToggleSwitch()
+    .pos(center, 140)
+    .size(78, 36)
+    .value(wifiEnabled)                // текущий bool; библиотека сама обновит его при нажатии
+    .pressed(btn.wasPressed())         // событие нажатия этого кадра
+    .changed(changed)                  // сюда вернется true, если значение переключилось
+    .enabled(!wifiBusy)                // можно временно отключить ввод, пока идет внешняя операция
+    .activeColor(ui.rgb(21, 180, 110));
+```
+
+Дополнительно можно задать:
+
+- `inactiveColor(...)` - цвет выключенного track
+- `knobColor(...)` - цвет бегунка
+- `enabled(false)` - временно делает переключатель неактивным, но сохраняет текущее состояние
+
+`drawToggleSwitch()` и `updateToggleSwitch()` используют один и тот же fluent API. Разница только в режиме вывода:
+
+- `drawToggleSwitch()` - обычная отрисовка
+- `updateToggleSwitch()` - локальный dirty-update
+
+Если хочется просто показать состояние без ввода, можно не передавать `pressed(...)` и `changed(...)`:
+
+```cpp
 ui.drawToggleSwitch()
     .pos(center, 140)
     .size(78, 36)
-    .state(sw)
-    .activeColor(ui.rgb(21, 180, 110))
-    .draw();
+    .value(wifiEnabled)
+    .activeColor(ui.rgb(21, 180, 110));
 ```
 
-`inactiveColor(...)` и `knobColor(...)` задаются по желанию.
-
-## 10.4. Прогресс-бар
+## 10.5. Прогресс-бар
 
 ```cpp
 ui.drawProgressBar()
@@ -941,7 +975,7 @@ ui.drawProgressPercent(20, 268, 180, 20, 65,
                        Center, 14);
 ```
 
-## 10.5. Круговой прогресс-бар
+## 10.6. Круговой прогресс-бар
 
 ```cpp
 ui.drawCircularProgressBar()
@@ -957,7 +991,7 @@ ui.drawCircularProgressBar()
 
 Тот же принцип есть и у `updateCircularProgressBar()`, когда индикатор надо обновлять in-place.
 
-## 10.6. Drum roll
+## 10.7. Drum roll
 
 Горизонтальный:
 
@@ -988,7 +1022,7 @@ ui.drawDrumRollHorizontal(
 ```cpp
 ui.configureList()
     .screen(ScreenMainMenu)
-    .parent(ScreenHome)
+    .parent(ScreenHome) 
     .items({
         {"Settings", "Device configuration", ScreenSettings},
         {"About",    "Firmware info",        ScreenAbout},
@@ -1109,40 +1143,85 @@ ui.configureTile()
 
 # 12. Графики
 
-Фон и сетка:
+## Фон и сетка:
 
 ```cpp
-ui.drawGraphGrid(
-    10, 50, 220, 120,
-    8,
-    LeftToRight,
-    ui.rgb(10, 10, 10),
-    ui.rgb(40, 40, 40),
-    1.0f
-);
+ui.drawGraphGrid()
+    .pos(10, 50)
+    .size(220, 120)
+    .radius(8)
+    .direction(LeftToRight)
+    .bgColor(ui.rgb(10, 10, 10))
+    .speed(1.0f);
 ```
 
-Auto-scale:
+- цвет сетки вычисляется автоматически из `bgColor()`
+
+## Линия графика:
 
 ```cpp
-ui.setGraphAutoScale(true);
+ui.drawGraphLine()
+    .line(0)
+    .value(sensorValue)
+    .color(ui.rgb(0, 255, 140))
+    .range(0, 100);
 ```
 
-Линия графика:
+- `drawGraphLine()` добавляет новую точку в уже настроенный график
+- `updateGraphLine()` подходит для in-place обновления, когда графику нужно самому зачистить и перерисовать нужную область
+
+## Auto-scale:
 
 ```cpp
-ui.drawGraphLine(
-    0,                  // index линии
-    sensorValue,
-    ui.rgb(0, 255, 140),
-    0, 100
-);
+ui.setGraphScale(true);
 ```
 
-Есть и `updateGraphGrid(...)` / `updateGraphLine(...)`.
+- `setGraphScale(true)` включает автоматический диапазон по данным, auto-scale применяется ко всем buffered-линиям графика
 
-- `drawGraphLine(...)` добавляет новую точку в уже настроенный график
-- `updateGraphLine(...)` подходит для in-place обновления, когда графику нужно самому зачистить и перерисовать нужную область
+## Пакетная отрисовка готового массива:
+
+```cpp
+int16_t samples[] = {10, 15, 12, 18, 20, 17};
+
+ui.drawGraphSamples()
+    .line(0)
+    .samples(samples, 6)
+    .color(ui.rgb(0, 255, 140))
+    .range(0, 100);
+```
+
+- `drawGraphSamples()` рисует переданный массив сразу, не накапливает внутреннюю историю точек. Для streaming-режима с накоплением используйте `drawGraphLine()`
+
+Осциллограф можно настроить отдельно:
+
+```cpp
+ui.configGraphScope()
+    .screen(ScreenGraph)
+    .rate(2000)
+    .timebase(100)
+    .visible(0);
+```
+
+Чтение текущих настроек:
+
+```cpp
+uint16_t hz = ui.graphRate(ScreenGraph);
+uint16_t timeMs = ui.graphTimebase(ScreenGraph);
+uint16_t visible = ui.graphSamplesVisible(ScreenGraph);
+```
+
+Что важно по lifecycle:
+
+- `drawGraphGrid()` задаёт активную область графика и должен вызываться в screen-callback этого экрана
+- buffered-график (`drawGraphLine()`) живёт только пока экран реально рисует граф в текущих кадрах
+- если экран перестал вызывать graph API или вы ушли на другой screen, внутренние буферы графа освобождаются
+- при возврате граф начинает собирать историю заново
+
+Что важно по режимам:
+
+- `LeftToRight` и `RightToLeft` используют rolling-history
+- `Oscilloscope` использует фиксированное окно видимых samples
+- если `visibleSamples == 0`, окно для `Oscilloscope` вычисляется из `sampleRateHz * timebaseMs`
 
 Режимы направления:
 

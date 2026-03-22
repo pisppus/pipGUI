@@ -8,14 +8,24 @@ namespace pipgui
     {
         PIPGUI_DEFAULT_FLUENT_MOVE(ToggleSwitchFluentT);
         int16_t _x, _y, _w, _h;
-        ToggleSwitchState *_state;
+        bool *_value;
+        bool *_changed;
+        bool _pressed;
+        bool _enabled;
+        bool _pressedSet;
+        bool _enabledSet;
         uint16_t _activeColor;
         std::optional<uint16_t> _inactiveColor;
         std::optional<uint16_t> _knobColor;
         ToggleSwitchFluentT(GUI *g)
             : detail::FluentLifetime(g),
               _x(0), _y(0), _w(0), _h(0),
-              _state(nullptr),
+              _value(nullptr),
+              _changed(nullptr),
+              _pressed(false),
+              _enabled(true),
+              _pressedSet(false),
+              _enabledSet(false),
               _activeColor(0),
               _inactiveColor(std::nullopt),
               _knobColor(std::nullopt)
@@ -42,11 +52,37 @@ namespace pipgui
             return *this;
         }
 
-        ToggleSwitchFluentT &state(ToggleSwitchState &s)
+        ToggleSwitchFluentT &value(bool &v)
         {
             if (!canMutate())
                 return *this;
-            _state = &s;
+            _value = &v;
+            return *this;
+        }
+
+        ToggleSwitchFluentT &pressed(bool v)
+        {
+            if (!canMutate())
+                return *this;
+            _pressed = v;
+            _pressedSet = true;
+            return *this;
+        }
+
+        ToggleSwitchFluentT &enabled(bool v = true)
+        {
+            if (!canMutate())
+                return *this;
+            _enabled = v;
+            _enabledSet = true;
+            return *this;
+        }
+
+        ToggleSwitchFluentT &changed(bool &v)
+        {
+            if (!canMutate())
+                return *this;
+            _changed = &v;
             return *this;
         }
 
@@ -89,8 +125,7 @@ namespace pipgui
         bool _enabled;
         bool _loading;
         bool _down;
-        bool _enabledSet;
-        bool _loadingSet;
+        bool _modeSet;
         bool _downSet;
         ButtonFluentT(GUI *g)
             : detail::FluentLifetime(g),
@@ -102,8 +137,7 @@ namespace pipgui
               _enabled(true),
               _loading(false),
               _down(false),
-              _enabledSet(false),
-              _loadingSet(false),
+              _modeSet(false),
               _downSet(false)
         {
         }
@@ -160,21 +194,13 @@ namespace pipgui
             return *this;
         }
 
-        ButtonFluentT &enabled(bool v)
+        ButtonFluentT &mode(bool enabled = true, bool loading = false)
         {
             if (!canMutate())
                 return *this;
-            _enabled = v;
-            _enabledSet = true;
-            return *this;
-        }
-
-        ButtonFluentT &loading(bool v)
-        {
-            if (!canMutate())
-                return *this;
-            _loading = v;
-            _loadingSet = true;
+            _enabled = enabled;
+            _loading = loading;
+            _modeSet = true;
             return *this;
         }
 
@@ -482,6 +508,248 @@ namespace pipgui
             _activeWidth = w;
             return *this;
         }
+        void draw();
+    };
+
+    template <bool IsUpdate>
+    struct GraphGridFluentT : detail::FluentLifetime
+    {
+        PIPGUI_DEFAULT_FLUENT_MOVE(GraphGridFluentT);
+        int16_t _x, _y, _w, _h;
+        uint8_t _radius;
+        GraphDirection _dir;
+        uint32_t _bgColor;
+        float _speed;
+
+        GraphGridFluentT(GUI *g)
+            : detail::FluentLifetime(g),
+              _x(0), _y(0), _w(0), _h(0),
+              _radius(0),
+              _dir(LeftToRight),
+              _bgColor(0),
+              _speed(1.0f)
+        {
+        }
+
+        ~GraphGridFluentT() { draw(); }
+
+        GraphGridFluentT &pos(int16_t x, int16_t y)
+        {
+            if (!canMutate())
+                return *this;
+            _x = x;
+            _y = y;
+            return *this;
+        }
+
+        GraphGridFluentT &size(int16_t w, int16_t h)
+        {
+            if (!canMutate())
+                return *this;
+            _w = w;
+            _h = h;
+            return *this;
+        }
+
+        GraphGridFluentT &radius(uint8_t r)
+        {
+            if (!canMutate())
+                return *this;
+            _radius = r;
+            return *this;
+        }
+
+        GraphGridFluentT &direction(GraphDirection dir)
+        {
+            if (!canMutate())
+                return *this;
+            _dir = dir;
+            return *this;
+        }
+
+        GraphGridFluentT &bgColor(uint32_t c)
+        {
+            if (!canMutate())
+                return *this;
+            _bgColor = c;
+            return *this;
+        }
+
+        GraphGridFluentT &bgColor(uint16_t c)
+        {
+            if (!canMutate())
+                return *this;
+            _bgColor = detail::color565To888(c);
+            return *this;
+        }
+
+        GraphGridFluentT &bgColor565(uint16_t c)
+        {
+            if (!canMutate())
+                return *this;
+            _bgColor = detail::color565To888(c);
+            return *this;
+        }
+
+        GraphGridFluentT &speed(float v)
+        {
+            if (!canMutate())
+                return *this;
+            _speed = v;
+            return *this;
+        }
+
+        void draw();
+    };
+
+    template <bool IsUpdate>
+    struct GraphLineFluentT : detail::FluentLifetime
+    {
+        PIPGUI_DEFAULT_FLUENT_MOVE(GraphLineFluentT);
+        uint8_t _lineIndex;
+        int16_t _value;
+        uint32_t _color;
+        int16_t _valueMin;
+        int16_t _valueMax;
+
+        GraphLineFluentT(GUI *g)
+            : detail::FluentLifetime(g),
+              _lineIndex(0),
+              _value(0),
+              _color(0),
+              _valueMin(0),
+              _valueMax(1)
+        {
+        }
+
+        ~GraphLineFluentT() { draw(); }
+
+        GraphLineFluentT &line(uint8_t idx)
+        {
+            if (!canMutate())
+                return *this;
+            _lineIndex = idx;
+            return *this;
+        }
+
+        GraphLineFluentT &value(int16_t v)
+        {
+            if (!canMutate())
+                return *this;
+            _value = v;
+            return *this;
+        }
+
+        GraphLineFluentT &color(uint32_t c)
+        {
+            if (!canMutate())
+                return *this;
+            _color = c;
+            return *this;
+        }
+
+        GraphLineFluentT &color(uint16_t c)
+        {
+            if (!canMutate())
+                return *this;
+            _color = detail::color565To888(c);
+            return *this;
+        }
+
+        GraphLineFluentT &color565(uint16_t c)
+        {
+            if (!canMutate())
+                return *this;
+            _color = detail::color565To888(c);
+            return *this;
+        }
+
+        GraphLineFluentT &range(int16_t vmin, int16_t vmax)
+        {
+            if (!canMutate())
+                return *this;
+            _valueMin = vmin;
+            _valueMax = vmax;
+            return *this;
+        }
+
+        void draw();
+    };
+
+    template <bool IsUpdate>
+    struct GraphSamplesFluentT : detail::FluentLifetime
+    {
+        PIPGUI_DEFAULT_FLUENT_MOVE(GraphSamplesFluentT);
+        uint8_t _lineIndex;
+        const int16_t *_samples;
+        uint16_t _sampleCount;
+        uint32_t _color;
+        int16_t _valueMin;
+        int16_t _valueMax;
+
+        GraphSamplesFluentT(GUI *g)
+            : detail::FluentLifetime(g),
+              _lineIndex(0),
+              _samples(nullptr),
+              _sampleCount(0),
+              _color(0),
+              _valueMin(0),
+              _valueMax(1)
+        {
+        }
+
+        ~GraphSamplesFluentT() { draw(); }
+
+        GraphSamplesFluentT &line(uint8_t idx)
+        {
+            if (!canMutate())
+                return *this;
+            _lineIndex = idx;
+            return *this;
+        }
+
+        GraphSamplesFluentT &samples(const int16_t *samples, uint16_t count)
+        {
+            if (!canMutate())
+                return *this;
+            _samples = samples;
+            _sampleCount = count;
+            return *this;
+        }
+
+        GraphSamplesFluentT &color(uint32_t c)
+        {
+            if (!canMutate())
+                return *this;
+            _color = c;
+            return *this;
+        }
+
+        GraphSamplesFluentT &color(uint16_t c)
+        {
+            if (!canMutate())
+                return *this;
+            _color = detail::color565To888(c);
+            return *this;
+        }
+
+        GraphSamplesFluentT &color565(uint16_t c)
+        {
+            if (!canMutate())
+                return *this;
+            _color = detail::color565To888(c);
+            return *this;
+        }
+
+        GraphSamplesFluentT &range(int16_t vmin, int16_t vmax)
+        {
+            if (!canMutate())
+                return *this;
+            _valueMin = vmin;
+            _valueMax = vmax;
+            return *this;
+        }
+
         void draw();
     };
 

@@ -23,6 +23,21 @@ namespace pipgui::detail
         uint32_t lastUpdateMs = 0;
     };
 
+    struct ToggleState
+    {
+        bool initialized = false;
+        bool value = false;
+        bool enabled = true;
+        uint8_t pos = 0;
+        uint8_t animFrom = 0;
+        uint8_t animTo = 0;
+        uint32_t animStartMs = 0;
+        uint8_t enabledLevel = 255;
+        uint8_t enabledAnimFrom = 255;
+        uint8_t enabledAnimTo = 255;
+        uint32_t enabledAnimStartMs = 0;
+    };
+
     struct DisplayState
     {
         pipcore::Display *display = nullptr;
@@ -297,6 +312,36 @@ namespace pipgui::detail
     struct ButtonCacheState
     {
         ButtonCacheEntry entries[BUTTON_CACHE_MAX] = {};
+    };
+
+    struct TextCacheEntry
+    {
+        uint32_t key = 0;
+        uint32_t lastUseMs = 0;
+        bool used = false;
+        DirtyRect rect{};
+    };
+
+    inline constexpr uint8_t TEXT_CACHE_MAX = 24;
+
+    struct TextCacheState
+    {
+        TextCacheEntry entries[TEXT_CACHE_MAX] = {};
+    };
+
+    struct ToggleCacheEntry
+    {
+        uint32_t key = 0;
+        uint32_t lastUseMs = 0;
+        bool used = false;
+        ToggleState state{};
+    };
+
+    inline constexpr uint8_t TOGGLE_CACHE_MAX = 16;
+
+    struct ToggleCacheState
+    {
+        ToggleCacheEntry entries[TOGGLE_CACHE_MAX] = {};
     };
 
     struct ScreenshotEntry

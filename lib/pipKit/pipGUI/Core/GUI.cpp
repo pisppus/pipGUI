@@ -22,15 +22,13 @@ namespace pipgui
         uint32_t hashButtonKey(const String &label, int16_t x, int16_t y, int16_t w, int16_t h,
                                uint16_t baseColor, uint8_t radius, IconId iconId) noexcept
         {
+            (void)label;
             uint32_t hash = 2166136261u;
             auto mix = [&](uint32_t v)
             {
                 hash ^= v;
                 hash *= 16777619u;
             };
-
-            for (size_t i = 0; i < label.length(); ++i)
-                mix(static_cast<uint8_t>(label[i]));
 
             mix(static_cast<uint16_t>(x));
             mix(static_cast<uint16_t>(y));
@@ -39,6 +37,26 @@ namespace pipgui
             mix(baseColor);
             mix(radius);
             mix(static_cast<uint16_t>(iconId));
+            return hash ? hash : 1u;
+        }
+
+        uint32_t hashToggleKey(int16_t x, int16_t y, int16_t w, int16_t h,
+                               uint16_t activeColor, int32_t inactiveColor, int32_t knobColor) noexcept
+        {
+            uint32_t hash = 2166136261u;
+            auto mix = [&](uint32_t v)
+            {
+                hash ^= v;
+                hash *= 16777619u;
+            };
+
+            mix(static_cast<uint16_t>(x));
+            mix(static_cast<uint16_t>(y));
+            mix(static_cast<uint16_t>(w));
+            mix(static_cast<uint16_t>(h));
+            mix(activeColor);
+            mix(static_cast<uint32_t>(inactiveColor));
+            mix(static_cast<uint32_t>(knobColor));
             return hash ? hash : 1u;
         }
 
@@ -126,6 +144,34 @@ namespace pipgui
         best->state.enabled = true;
         best->state.prevEnabled = true;
         best->state.fadeLevel = 255;
+        return best->state;
+    }
+
+    detail::ToggleState &GUI::resolveToggleState(int16_t x, int16_t y, int16_t w, int16_t h,
+                                                 uint16_t activeColor, int32_t inactiveColor, int32_t knobColor)
+    {
+        const uint32_t key = hashToggleKey(x, y, w, h, activeColor, inactiveColor, knobColor);
+        const uint32_t now = nowMs();
+        detail::ToggleCacheEntry *best = &_toggleCache.entries[0];
+
+        for (uint8_t i = 0; i < detail::TOGGLE_CACHE_MAX; ++i)
+        {
+            detail::ToggleCacheEntry &entry = _toggleCache.entries[i];
+            if (entry.used && entry.key == key)
+            {
+                entry.lastUseMs = now;
+                return entry.state;
+            }
+            if (!entry.used)
+                best = &entry;
+            else if (best->used && entry.lastUseMs < best->lastUseMs)
+                best = &entry;
+        }
+
+        best->used = true;
+        best->key = key;
+        best->lastUseMs = now;
+        best->state = {};
         return best->state;
     }
 
@@ -286,6 +332,9 @@ namespace pipgui
                 a->samples = nullptr;
             }
 
+            safeFree(plat, a->lineColors565);
+            safeFree(plat, a->lineValueMins);
+            safeFree(plat, a->lineValueMaxs);
             safeFree(plat, a->sampleCounts);
             safeFree(plat, a->sampleHead);
 

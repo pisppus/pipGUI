@@ -34,6 +34,13 @@ namespace pipgui
     inline DrawScrollDotsFluent GUI::drawScrollDots() { return DrawScrollDotsFluent(this); }
     inline UpdateScrollDotsFluent GUI::updateScrollDots() { return UpdateScrollDotsFluent(this); }
 
+    inline DrawGraphGridFluent GUI::drawGraphGrid() { return DrawGraphGridFluent(this); }
+    inline UpdateGraphGridFluent GUI::updateGraphGrid() { return UpdateGraphGridFluent(this); }
+    inline DrawGraphLineFluent GUI::drawGraphLine() { return DrawGraphLineFluent(this); }
+    inline UpdateGraphLineFluent GUI::updateGraphLine() { return UpdateGraphLineFluent(this); }
+    inline DrawGraphSamplesFluent GUI::drawGraphSamples() { return DrawGraphSamplesFluent(this); }
+    inline UpdateGraphSamplesFluent GUI::updateGraphSamples() { return UpdateGraphSamplesFluent(this); }
+
     inline DrawToggleSwitchFluent GUI::drawToggleSwitch() { return DrawToggleSwitchFluent(this); }
     inline UpdateToggleSwitchFluent GUI::updateToggleSwitch() { return UpdateToggleSwitchFluent(this); }
 
@@ -51,6 +58,7 @@ namespace pipgui
     inline ShowErrorFluent GUI::showError() { return ShowErrorFluent(this); }
     inline PopupMenuFluent GUI::showPopupMenu() { return PopupMenuFluent(this); }
     inline PopupMenuInputFluent GUI::popupMenuInput() { return PopupMenuInputFluent(this); }
+    inline ConfigGraphScopeFluent GUI::configGraphScope() { return ConfigGraphScopeFluent(this); }
 
     inline DrawIconFluent GUI::drawIcon() { return DrawIconFluent(this); }
     inline DrawScreenshotFluent GUI::drawScreenshot() { return DrawScreenshotFluent(this); }

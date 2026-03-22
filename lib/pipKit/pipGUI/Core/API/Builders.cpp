@@ -200,6 +200,42 @@ namespace pipgui
     template void ScrollDotsFluentT<true>::draw();
 
     template <bool IsUpdate>
+    void GraphGridFluentT<IsUpdate>::draw()
+    {
+        if (!beginCommit())
+            return;
+        detail::callByMode<IsUpdate>(
+            [&] { detail::GuiAccess::updateGraphGrid(*_gui, _x, _y, _w, _h, _radius, _dir, _bgColor, _speed); },
+            [&] { detail::GuiAccess::drawGraphGrid(*_gui, _x, _y, _w, _h, _radius, _dir, _bgColor, _speed); });
+    }
+    template void GraphGridFluentT<false>::draw();
+    template void GraphGridFluentT<true>::draw();
+
+    template <bool IsUpdate>
+    void GraphLineFluentT<IsUpdate>::draw()
+    {
+        if (!beginCommit())
+            return;
+        detail::callByMode<IsUpdate>(
+            [&] { detail::GuiAccess::updateGraphLine(*_gui, _lineIndex, _value, _color, _valueMin, _valueMax); },
+            [&] { detail::GuiAccess::drawGraphLine(*_gui, _lineIndex, _value, _color, _valueMin, _valueMax); });
+    }
+    template void GraphLineFluentT<false>::draw();
+    template void GraphLineFluentT<true>::draw();
+
+    template <bool IsUpdate>
+    void GraphSamplesFluentT<IsUpdate>::draw()
+    {
+        if (!beginCommit())
+            return;
+        detail::callByMode<IsUpdate>(
+            [&] { detail::GuiAccess::updateGraphSamples(*_gui, _lineIndex, _samples, _sampleCount, _color, _valueMin, _valueMax); },
+            [&] { detail::GuiAccess::drawGraphSamples(*_gui, _lineIndex, _samples, _sampleCount, _color, _valueMin, _valueMax); });
+    }
+    template void GraphSamplesFluentT<false>::draw();
+    template void GraphSamplesFluentT<true>::draw();
+
+    template <bool IsUpdate>
     void GlowCircleFluentT<IsUpdate>::draw()
     {
         if (!beginCommit())
@@ -267,13 +303,18 @@ namespace pipgui
     template <bool IsUpdate>
     void ToggleSwitchFluentT<IsUpdate>::draw()
     {
-        if (!_state || !beginCommit())
+        if (!_value || !beginCommit())
             return;
         const int32_t inactiveColor = detail::optionalColor32(_inactiveColor);
         const int32_t knobColor = detail::optionalColor32(_knobColor);
+        detail::ToggleState &state = detail::GuiAccess::resolveToggleState(*_gui, _x, _y, _w, _h, _activeColor, inactiveColor, knobColor);
+        state.enabled = _enabledSet ? _enabled : true;
+        const bool changed = detail::GuiAccess::stepToggleState(*_gui, state, *_value, _pressedSet ? _pressed : false);
+        if (_changed)
+            *_changed = changed;
         detail::callByMode<IsUpdate>(
-            [&] { detail::GuiAccess::updateToggleSwitch(*_gui, _x, _y, _w, _h, *_state, _activeColor, inactiveColor, knobColor); },
-            [&] { detail::GuiAccess::drawToggleSwitch(*_gui, _x, _y, _w, _h, *_state, _activeColor, inactiveColor, knobColor); });
+            [&] { detail::GuiAccess::updateToggleSwitch(*_gui, _x, _y, _w, _h, state, _activeColor, inactiveColor, knobColor); },
+            [&] { detail::GuiAccess::drawToggleSwitch(*_gui, _x, _y, _w, _h, state, _activeColor, inactiveColor, knobColor); });
     }
     template void ToggleSwitchFluentT<false>::draw();
     template void ToggleSwitchFluentT<true>::draw();
@@ -284,8 +325,8 @@ namespace pipgui
         if (!beginCommit())
             return;
         detail::ButtonState &state = detail::GuiAccess::resolveButtonState(*_gui, _label, _x, _y, _w, _h, _baseColor, _radius, _iconId);
-        state.enabled = _enabledSet ? _enabled : true;
-        state.loading = _loadingSet ? _loading : false;
+        state.enabled = _modeSet ? _enabled : true;
+        state.loading = _modeSet ? _loading : false;
         detail::GuiAccess::stepButtonState(*_gui, state, _downSet ? _down : false);
         detail::callByMode<IsUpdate>(
             [&] { detail::GuiAccess::updateButton(*_gui, _label, _x, _y, _w, _h, _baseColor, _radius, _iconId, state); },

@@ -4,66 +4,147 @@
 
 namespace pipgui
 {
-    bool GUI::updateToggleSwitch(ToggleSwitchState &s, bool pressed)
+    namespace
     {
-        bool changed = false;
-        if (pressed)
+        constexpr uint16_t kToggleAnimMs = 200;
+        constexpr uint16_t kToggleEnabledAnimMs = 150;
+        constexpr int16_t kToggleUpdatePad = 3;
+
+        [[nodiscard]] inline uint8_t toggleTarget(bool value) noexcept
         {
-            s.value = !s.value;
+            return value ? 255U : 0U;
+        }
+
+        [[nodiscard]] inline uint32_t elapsedMs(uint32_t now, uint32_t then) noexcept
+        {
+            return (now >= then) ? (now - then) : 0U;
+        }
+
+        [[nodiscard]] inline uint8_t lerpByte(uint8_t from, uint8_t to, float t) noexcept
+        {
+            if (from == to)
+                return from;
+            const float value = (float)from + ((float)to - (float)from) * t;
+            int16_t rounded = (int16_t)(value + 0.5f);
+            if (rounded < 0)
+                rounded = 0;
+            if (rounded > 255)
+                rounded = 255;
+            return (uint8_t)rounded;
+        }
+
+        [[nodiscard]] inline uint16_t resolveInactiveTrackColor(uint16_t bg565,
+                                                                uint16_t activeColor,
+                                                                int32_t inactiveColor) noexcept
+        {
+            if (inactiveColor >= 0)
+                return (uint16_t)inactiveColor;
+            return detail::blend565(bg565, activeColor, 40);
+        }
+
+        [[nodiscard]] inline uint16_t resolveKnobFillColor(uint16_t track565,
+                                                           int32_t knobColor) noexcept
+        {
+            if (knobColor >= 0)
+                return (uint16_t)knobColor;
+            return detail::blend565WithWhite(track565, 220);
+        }
+    }
+
+    bool GUI::stepToggleState(detail::ToggleState &state, bool &value, bool pressed)
+    {
+        const uint32_t now = nowMs();
+        bool changed = false;
+
+        if (!state.initialized)
+        {
+            const uint8_t target = toggleTarget(value);
+            const uint8_t enabledTarget = state.enabled ? 255U : 0U;
+            state.initialized = true;
+            state.value = value;
+            state.pos = target;
+            state.animFrom = target;
+            state.animTo = target;
+            state.animStartMs = now;
+            state.enabledLevel = enabledTarget;
+            state.enabledAnimFrom = enabledTarget;
+            state.enabledAnimTo = enabledTarget;
+            state.enabledAnimStartMs = now;
+        }
+
+        const uint8_t enabledTarget = state.enabled ? 255U : 0U;
+        if (enabledTarget != state.enabledAnimTo)
+        {
+            state.enabledAnimFrom = state.enabledLevel;
+            state.enabledAnimTo = enabledTarget;
+            state.enabledAnimStartMs = now;
             changed = true;
         }
 
-        uint32_t now = nowMs();
-        uint32_t last = s.lastUpdateMs;
-        uint32_t dt = 0;
-
-        if (last == 0 || now <= last)
+        if (pressed && state.enabled)
         {
-            uint8_t target = s.value ? 255U : 0U;
-            if (s.pos != target)
+            value = !value;
+            changed = true;
+        }
+
+        if (value != state.value)
+        {
+            state.value = value;
+            state.animFrom = state.pos;
+            state.animTo = toggleTarget(value);
+            state.animStartMs = now;
+            changed = true;
+        }
+
+        if (state.pos != state.animTo)
+        {
+            const float t = detail::motion::clamp01((float)elapsedMs(now, state.animStartMs) / (float)kToggleAnimMs);
+            const float eased = detail::motion::easeInOutCubic(t);
+            const uint8_t nextPos = lerpByte(state.animFrom, state.animTo, eased);
+            if (nextPos != state.pos)
             {
-                s.pos = target;
+                state.pos = nextPos;
                 changed = true;
             }
-            s.lastUpdateMs = now;
+
+            if (t >= 1.0f)
+            {
+                state.pos = state.animTo;
+                state.animFrom = state.animTo;
+            }
         }
         else
         {
-            dt = now - last;
-            if (dt > 100U)
-                dt = 100U;
+            state.animFrom = state.animTo;
         }
 
-        uint8_t target = s.value ? 255U : 0U;
-
-        if (dt > 0 && s.pos != target)
+        if (state.enabledLevel != state.enabledAnimTo)
         {
-            float speed = 900.0f;
-            uint8_t step = (uint8_t)(speed * (float)dt / 1000.0f + 0.5f);
-            if (step < 1)
-                step = 1;
-
-            if (s.pos < target)
+            const float t = detail::motion::clamp01((float)elapsedMs(now, state.enabledAnimStartMs) / (float)kToggleEnabledAnimMs);
+            const float eased = detail::motion::easeInOutCubic(t);
+            const uint8_t nextLevel = lerpByte(state.enabledAnimFrom, state.enabledAnimTo, eased);
+            if (nextLevel != state.enabledLevel)
             {
-                uint16_t nv = (uint16_t)s.pos + step;
-                s.pos = (nv >= target) ? target : (uint8_t)nv;
-            }
-            else
-            {
-                s.pos = (s.pos > step) ? (uint8_t)(s.pos - step) : 0U;
-                if (s.pos < target)
-                    s.pos = target;
+                state.enabledLevel = nextLevel;
+                changed = true;
             }
 
-            changed = true;
+            if (t >= 1.0f)
+            {
+                state.enabledLevel = state.enabledAnimTo;
+                state.enabledAnimFrom = state.enabledAnimTo;
+            }
+        }
+        else
+        {
+            state.enabledAnimFrom = state.enabledAnimTo;
         }
 
-        s.lastUpdateMs = now;
         return changed;
     }
 
     void GUI::drawToggleSwitch(int16_t x, int16_t y, int16_t w, int16_t h,
-                               ToggleSwitchState &state,
+                               detail::ToggleState &state,
                                uint16_t activeColor,
                                int32_t inactiveColor,
                                int32_t knobColor)
@@ -77,8 +158,6 @@ namespace pipgui
             return;
         }
 
-        auto t = getDrawTarget();
-
         int16_t x0 = x;
         int16_t y0 = y;
 
@@ -89,11 +168,12 @@ namespace pipgui
                 availW = w;
             x0 = (availW - w) / 2;
         }
+
         if (y0 == center)
         {
             int16_t top = 0;
             int16_t availH = _render.screenHeight;
-            int16_t sb = statusBarHeight();
+            const int16_t sb = statusBarHeight();
             if (_flags.statusBarEnabled && sb > 0)
             {
                 if (_status.pos == Top)
@@ -106,56 +186,50 @@ namespace pipgui
                     availH -= sb;
                 }
             }
+
             if (availH < h)
                 availH = h;
             y0 = top + (availH - h) / 2;
         }
 
-        uint8_t r = (uint8_t)(h / 2);
-
-        uint16_t inactive;
-        if (inactiveColor < 0)
-            inactive = detail::lerp565(activeColor, (uint16_t)0x7BEF, 0.75f);
-        else
-            inactive = (uint16_t)inactiveColor;
-
+        const uint8_t r = (uint8_t)(h / 2);
+        const uint16_t bg565 = _render.bgColor565;
+        const uint16_t inactive565 = resolveInactiveTrackColor(bg565, activeColor, inactiveColor);
         const float k = (float)state.pos / 255.0f;
-        const float eased = detail::motion::cubicBezier1D(k, 0.08f, 1.00f);
+        uint16_t track565 = detail::lerp565(inactive565, activeColor, k);
 
-        const uint16_t bg = detail::lerp565(inactive, activeColor, eased);
-        fillRoundRect(x0, y0, w, h, r, bg);
+        int16_t pad = h / 6;
+        if (pad < 4)
+            pad = 4;
 
-        int16_t pad = (int16_t)max((int16_t)3, (int16_t)(h / 8));
         int16_t knobR = (h / 2) - pad;
         if (knobR < 2)
             knobR = 2;
 
-        int16_t leftCx = x0 + pad + knobR;
+        const int16_t leftCx = x0 + pad + knobR;
         int16_t rightCx = x0 + w - pad - knobR;
         if (rightCx < leftCx)
             rightCx = leftCx;
 
-        int16_t cx = leftCx + (int16_t)((rightCx - leftCx) * eased + 0.5f);
-        int16_t cy = y0 + h / 2;
+        const int16_t cx = leftCx + (int16_t)((rightCx - leftCx) * k + 0.5f);
+        const int16_t cy = y0 + h / 2;
+        uint16_t knob565 = resolveKnobFillColor(track565, knobColor);
+        const uint8_t trackAlpha = lerpByte(68, 255, (float)state.enabledLevel / 255.0f);
+        const uint8_t knobAlpha = lerpByte(84, 255, (float)state.enabledLevel / 255.0f);
+        track565 = detail::blend565(bg565, track565, trackAlpha);
+        knob565 = detail::blend565(bg565, knob565, knobAlpha);
+        fillRoundRect(x0, y0, w, h, r, track565);
+        const uint16_t border565 = detail::blend565(track565, knob565, 80);
 
-        uint16_t knob;
-        if (knobColor < 0)
-            knob = detail::autoTextColor(bg, 140);
-        else
-            knob = (uint16_t)knobColor;
-
-        const uint16_t border = detail::lerp565(knob, bg, 0.55f);
-        fillCircle(cx, cy, knobR, border);
-        int16_t innerR = knobR - 2;
-        if (innerR < 1)
-            innerR = knobR - 1;
+        fillCircle(cx, cy, knobR, border565);
+        int16_t innerR = knobR - 1;
         if (innerR < 1)
             innerR = 1;
-        fillCircle(cx, cy, innerR, knob);
+        fillCircle(cx, cy, innerR, knob565);
     }
 
     void GUI::updateToggleSwitch(int16_t x, int16_t y, int16_t w, int16_t h,
-                                 ToggleSwitchState &state,
+                                 detail::ToggleState &state,
                                  uint16_t activeColor,
                                  int32_t inactiveColor,
                                  int32_t knobColor)
@@ -166,30 +240,33 @@ namespace pipgui
             return;
         }
 
-        if (state.lastUpdateMs == 0)
-            state.pos = state.value ? 255U : 0U;
+        if (!state.initialized)
+        {
+            const uint8_t target = toggleTarget(state.value);
+            state.initialized = true;
+            state.pos = target;
+            state.animFrom = target;
+            state.animTo = target;
+            state.animStartMs = nowMs();
+        }
 
         int16_t rx = x;
         int16_t ry = y;
-
         if (rx == center)
             rx = AutoX(w);
         if (ry == center)
             ry = AutoY(h);
 
-        int16_t pad = 2;
-
-        bool prevRender = _flags.inSpritePass;
-        pipcore::Sprite *prevActive = _render.activeSprite;
+        const bool prevRender = _flags.inSpritePass;
+        pipcore::Sprite *const prevActive = _render.activeSprite;
 
         _flags.inSpritePass = 1;
         _render.activeSprite = &_render.sprite;
 
         fillRect()
-            .pos((int16_t)(rx - pad), (int16_t)(ry - pad))
-            .size((int16_t)(w + pad * 2), (int16_t)(h + pad * 2))
-            .color((uint16_t)detail::color888To565(_render.bgColor))
-            .draw();
+            .pos((int16_t)(rx - kToggleUpdatePad), (int16_t)(ry - kToggleUpdatePad))
+            .size((int16_t)(w + kToggleUpdatePad * 2), (int16_t)(h + kToggleUpdatePad * 2))
+            .color(_render.bgColor565);
         drawToggleSwitch(x, y, w, h, state, activeColor, inactiveColor, knobColor);
 
         _flags.inSpritePass = prevRender;
@@ -197,7 +274,10 @@ namespace pipgui
 
         if (!prevRender)
         {
-            invalidateRect((int16_t)(rx - pad), (int16_t)(ry - pad), (int16_t)(w + pad * 2), (int16_t)(h + pad * 2));
+            invalidateRect((int16_t)(rx - kToggleUpdatePad),
+                           (int16_t)(ry - kToggleUpdatePad),
+                           (int16_t)(w + kToggleUpdatePad * 2),
+                           (int16_t)(h + kToggleUpdatePad * 2));
             flushDirty();
         }
     }

@@ -75,15 +75,26 @@ SCREEN(firmwareUpdate, 40)
   ui.drawText().text("Prev=action  Next=rollback  Hold=back").pos(-1, 42).color(ui.rgb(170, 170, 170)).bgColor(bg565).align(Center);
 
   const uint16_t cardBg = ui.rgb(16, 16, 16);
-  ui.fillRect().pos(l.cardX, l.infoY).size(l.cardW, l.infoH).radius({14}).color(cardBg);
-  ui.fillRect().pos(l.cardX, l.notesY).size(l.cardW, l.notesH).radius({14}).color(cardBg);
+  auto cardRect = ui.fillRect()
+                      .pos(l.cardX, l.infoY)
+                      .size(l.cardW, l.infoH)
+                      .radius({14})
+                      .color(cardBg);
+  cardRect.derive()
+      .pos(l.cardX, l.notesY)
+      .size(l.cardW, l.notesH);
 
   ui.setTextStyle(Caption);
   const uint32_t keyFg = ui.rgb(150, 150, 150);
-  ui.drawText().text("Current").pos(l.keyX, l.rowY0).color(keyFg).bgColor(cardBg).align(Left);
-  ui.drawText().text("Wi-Fi").pos(l.keyX, l.rowY1).color(keyFg).bgColor(cardBg).align(Left);
-  ui.drawText().text("Update").pos(l.keyX, l.rowY2).color(keyFg).bgColor(cardBg).align(Left);
-  ui.drawText().text("What's new").pos(l.keyX, l.notesLabelY).color(keyFg).bgColor(cardBg).align(Left);
+  auto keyText = ui.drawText()
+                     .pos(l.keyX, l.rowY0)
+                     .color(keyFg)
+                     .bgColor(cardBg)
+                     .align(Left);
+  keyText.derive().text("Current");
+  keyText.derive().text("Wi-Fi").pos(l.keyX, l.rowY1);
+  keyText.derive().text("Update").pos(l.keyX, l.rowY2);
+  keyText.derive().text("What's new").pos(l.keyX, l.notesLabelY);
 
   ui.drawProgressBar()
       .pos(l.cardX + 10, l.infoY + l.infoH - 16)
@@ -94,17 +105,11 @@ SCREEN(firmwareUpdate, 40)
       .baseColor(ui.rgb(18, 18, 18))
       .fillColor(ui.rgb(40, 150, 255));
 
-  ui.drawButton()
-      .label("Check update")
-      .pos(l.btnX0, l.btnY)
-      .size(l.btnW, l.btnH)
-      .baseColor(ui.rgb(40, 150, 255))
-      .radius(11);
-
-  ui.drawButton()
-      .label("Rollback")
-      .pos(l.btnX1, l.btnY)
-      .size(l.btnW, l.btnH)
-      .baseColor(ui.rgb(40, 150, 255))
-      .radius(11);
+  auto actionButton = ui.drawButton()
+                          .label("Check update")
+                          .pos(l.btnX0, l.btnY)
+                          .size(l.btnW, l.btnH)
+                          .baseColor(ui.rgb(40, 150, 255))
+                          .radius(11);
+  actionButton.derive().label("Rollback").pos(l.btnX1, l.btnY);
 }

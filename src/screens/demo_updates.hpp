@@ -112,10 +112,10 @@ void updateGraphScreen(uint8_t screenId, uint32_t nowMs)
   updateGraphDemo();
 
   if (screenId != graphOsc)
-    ui.updateGraphLine(0, g_graphV1, ui.rgb(255, 80, 80), -110, 110);
+    ui.updateGraphLine().line(0).value(g_graphV1).color(ui.rgb(255, 80, 80)).range(-110, 110);
 
-  ui.updateGraphLine(1, g_graphV2, ui.rgb(80, 255, 120), -110, 110);
-  ui.updateGraphLine(2, g_graphV3, ui.rgb(100, 160, 255), -110, 110);
+  ui.updateGraphLine().line(1).value(g_graphV2).color(ui.rgb(80, 255, 120)).range(-110, 110);
+  ui.updateGraphLine().line(2).value(g_graphV3).color(ui.rgb(100, 160, 255)).range(-110, 110);
 }
 
 void updateProgressDemoFrame(uint32_t nowMs)
@@ -197,13 +197,20 @@ void updateProgressDemoFrame(uint32_t nowMs)
       .doFlush(true);
 }
 
-void updateSettingsDemoFrame(uint32_t nowMs, bool prevPressed, bool prevDown)
+void updateSettingsDemoFrame(uint32_t nowMs, bool buttonPressed, bool buttonDown)
 {
+  static bool settingsAwaitRelease = true;
+  if (settingsAwaitRelease)
+  {
+    if (!buttonDown)
+      settingsAwaitRelease = false;
+  }
+
   bool loading = (g_settingsLoadingUntil != 0 && nowMs < g_settingsLoadingUntil);
   if (g_settingsLoadingUntil != 0 && nowMs >= g_settingsLoadingUntil)
     g_settingsLoadingUntil = 0;
 
-  if (prevPressed && !loading)
+  if (!settingsAwaitRelease && buttonPressed && !loading)
   {
     g_settingsLoadingUntil = nowMs + kSettingsLoadingDurationMs;
     loading = true;
@@ -222,8 +229,8 @@ void updateSettingsDemoFrame(uint32_t nowMs, bool prevPressed, bool prevDown)
       .size(120, 44)
       .baseColor(ui.rgb(40, 150, 255))
       .radius(10)
-      .loading(loading)
-      .down(prevDown);
+      .mode(true, loading)
+      .down(!settingsAwaitRelease && buttonDown);
 }
 
 void updateFirmwareUpdateScreen(uint32_t nowMs, bool nextPressed, bool nextDown, bool prevPressed, bool prevDown)
@@ -447,52 +454,55 @@ void updateFirmwareUpdateScreen(uint32_t nowMs, bool nextPressed, bool nextDown,
       .baseColor(ui.rgb(18, 18, 18))
       .fillColor(ui.rgb(40, 150, 255));
 
-  ui.updateButton()
-      .label(otaButtonLabel(st))
-      .pos(l.btnX0, l.btnY)
-      .size(l.btnW, l.btnH)
-      .baseColor(ui.rgb(40, 150, 255))
-      .radius(11)
-      .enabled(true)
-      .loading(busy)
+  auto otaButton = ui.updateButton()
+                       .label(otaButtonLabel(st))
+                       .pos(l.btnX0, l.btnY)
+                       .size(l.btnW, l.btnH)
+                       .baseColor(ui.rgb(40, 150, 255))
+                       .radius(11);
+  otaButton.derive()
+      .mode(true, busy)
       .down(prevDown);
-
-  ui.updateButton()
+  otaButton.derive()
       .label("Rollback")
       .pos(l.btnX1, l.btnY)
-      .size(l.btnW, l.btnH)
-      .baseColor(ui.rgb(40, 150, 255))
-      .radius(11)
-      .enabled(!busy)
-      .loading(rollbackOpenPending && !ui.otaStableListReady())
+      .mode(!busy, rollbackOpenPending && !ui.otaStableListReady())
       .down(nextDown);
 }
 
 void updateToggleDemo(bool nextPressed, bool prevPressed)
 {
-  const bool prevVal = g_toggleState.value;
-  const bool changed = ui.updateToggleSwitch(g_toggleState, nextPressed);
+  const bool prevVal = g_toggleValue;
+  bool changed = false;
 
   if (prevPressed)
     ui.setScreen(listMenu);
 
-  if (!changed)
-    return;
-
+  const uint32_t nowMs = millis();
+  const bool toggleEnabled = (g_toggleLockedUntil == 0 || nowMs >= g_toggleLockedUntil);
   const uint16_t bg565 = ui.rgb(10, 10, 10);
   const uint16_t active = ui.rgb(21, 180, 110);
 
   ui.updateToggleSwitch()
       .pos(center, 150)
       .size(78, 36)
-      .state(g_toggleState)
+      .value(g_toggleValue)
+      .pressed(nextPressed)
+      .changed(changed)
+      .enabled(toggleEnabled)
       .activeColor(active);
 
-  if (prevVal != g_toggleState.value)
+  if (!changed)
+    return;
+
+  if (prevVal != g_toggleValue)
   {
+    if (g_toggleValue)
+      g_toggleLockedUntil = nowMs + 700U;
+
     ui.setTextStyle(Body);
     ui.updateText()
-        .text(g_toggleState.value ? "ON" : "OFF")
+        .text(g_toggleValue ? "ON..." : "OFF")
         .pos(-1, 105)
         .color(ui.rgb(200, 200, 200))
         .bgColor(bg565)
@@ -580,42 +590,35 @@ void updateButtonsDemo(uint32_t nowMs, bool nextPressed, bool nextDown, bool pre
   ui.updateText().text("                              ").pos(138, 76).color(bg565).bgColor(bg565);
   ui.updateText().text(String("Size: ") + String((unsigned)(g_buttonsDemoSize + 1))).pos(138, 76).color(line565).bgColor(bg565);
 
-  ui.updateButton()
-      .label("NEXT")
-      .pos(18, 98)
-      .size(size.heroW, size.heroH)
-      .baseColor(style.primary)
-      .radius(style.heroRadius)
-      .icon(warning)
-      .down(nextDown);
-
-  ui.updateButton()
-      .label("PREV")
+  auto heroButton = ui.updateButton()
+                        .label("NEXT")
+                        .pos(18, 98)
+                        .size(size.heroW, size.heroH)
+                        .baseColor(style.primary)
+                        .radius(style.heroRadius)
+                        .icon(warning);
+  heroButton.derive().down(nextDown);
+  heroButton.derive()
+      .label("")
       .pos(static_cast<int16_t>(sw - 18 - size.heroW), 98)
-      .size(size.heroW, size.heroH)
       .baseColor(style.secondary)
-      .radius(style.heroRadius)
       .icon(error)
       .down(prevDown);
 
-  ui.updateButton()
-      .label("Loading")
-      .pos(center, 146)
-      .size(size.wideW, size.heroH)
-      .baseColor(style.accent)
-      .radius(style.wideRadius)
-      .icon(battery_l1)
-      .loading(true)
-      .down(comboDown);
-
-  ui.updateButton()
+  auto wideButton = ui.updateButton()
+                        .label("Loading")
+                        .pos(center, 146)
+                        .size(size.wideW, size.heroH)
+                        .baseColor(style.accent)
+                        .radius(style.wideRadius)
+                        .icon(battery_l1);
+  wideButton.derive().mode(true, true).down(comboDown);
+  wideButton.derive()
       .label("Disabled")
       .pos(center, 192)
-      .size(size.wideW, size.heroH)
       .baseColor(style.primary)
-      .radius(style.wideRadius)
       .icon(battery_l0)
-      .enabled(false);
+      .mode(false, false);
 
   ui.updateButton()
       .label("XS")
@@ -758,6 +761,15 @@ void updatePopupMenuDemo(bool nextPressed, bool nextDown, bool prevPressed, bool
     ui.setScreen(listMenu);
     return;
   }
+
+  ui.updateButton()
+      .label("Open menu")
+      .pos(center, 228)
+      .size(180, 32)
+      .baseColor(ui.rgb(0, 87, 250))
+      .radius(10)
+      .mode(true, false)
+      .down(nextDown);
 
   if (!nextPressed)
     return;

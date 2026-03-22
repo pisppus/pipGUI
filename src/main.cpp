@@ -57,7 +57,8 @@ namespace
   Button btnNext(kBtnNextPin, Pullup);
   Button btnPrev(kBtnPrevPin, Pullup);
 
-  ToggleSwitchState g_toggleState{false, 0, 0};
+  bool g_toggleValue = false;
+  uint32_t g_toggleLockedUntil = 0;
 
   uint8_t g_buttonsDemoStyle = 0;
   uint8_t g_buttonsDemoSize = 1;
@@ -406,7 +407,7 @@ void configureListMenus()
           {"Graph demo with multiple traces", "Grid, labels, and several moving lines in one viewport", graph},
           {"Graph small", "Compact graph with automatic scale fitting", graphSmall},
           {"Graph tall", "Tall graph layout with right-side emphasis", graphTall},
-          {"Graph osc", "Digital oscilloscope style waveform preview", graphOsc},
+          {"Graph osc", "Live full-buffer oscilloscope preview", graphOsc},
           {"Progress demo", "Progress bars with animated fill and labels", progress},
           {"Progress + text", "Fresh progress styles with text overlays", progressText},
           {"Popup menu", "Overlay menu with button-driven navigation and selection", popupMenuDemo},
@@ -451,7 +452,7 @@ void configureListMenus()
           {"Main screen with widgets and overlays", "Simple home screen with status bar, overlays, and transitions", mainMenu},
           {"Settings, alerts, and input handling", "Buttons, notifications, warning states, and input handling", settings},
           {"Glow demo with blur, bloom, and soft shapes", "Bloom, soft edges, layered primitives, and bright composition", glow},
-          {"Graph osc", "Digital oscilloscope style waveform preview", graphOsc},
+          {"Graph osc", "Live full-buffer oscilloscope preview", graphOsc},
           {"Tile menu", "Grid menu with icons, title, and subtitle", tileMenu},
           {"ToggleSwitch", "Toggle switch interaction and state preview", toggleSwitch},
           {"Screenshots", "Captured frames gallery", screenshotGallery},
@@ -624,10 +625,10 @@ void loop()
         updatePopupMenuDemo(nextPressed, nextDown, prevPressed, prevDown);
         break;
       case settings:
-        if (nextPressed)
-          ui.nextScreen();
+        if (prevPressed)
+          ui.setScreen(listMenu);
         else
-          updateSettingsDemoFrame(nowMs, prevPressed, prevDown);
+          updateSettingsDemoFrame(nowMs, nextPressed, nextDown);
         break;
       case firmwareUpdate:
         updateFirmwareUpdateScreen(nowMs, nextPressed, nextDown, prevPressed, prevDown);

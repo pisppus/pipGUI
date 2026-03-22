@@ -4,6 +4,55 @@ namespace pipgui
 {
     namespace
     {
+        [[nodiscard]] uint32_t hashTextUpdateKey(int16_t x, int16_t y,
+                                                 TextAlign align,
+                                                 FontId fontId,
+                                                 uint16_t sizePx,
+                                                 uint16_t weight) noexcept
+        {
+            uint32_t hash = 2166136261u;
+            auto mix = [&](uint32_t value)
+            {
+                hash ^= value;
+                hash *= 16777619u;
+            };
+
+            mix((uint16_t)x);
+            mix((uint16_t)y);
+            mix((uint8_t)align);
+            mix((uint8_t)fontId);
+            mix(sizePx);
+            mix(weight);
+            return hash ? hash : 1u;
+        }
+
+        [[nodiscard]] detail::TextCacheEntry &resolveTextCacheEntry(detail::TextCacheState &cache,
+                                                                    uint32_t key,
+                                                                    uint32_t now) noexcept
+        {
+            detail::TextCacheEntry *best = &cache.entries[0];
+
+            for (uint8_t i = 0; i < detail::TEXT_CACHE_MAX; ++i)
+            {
+                detail::TextCacheEntry &entry = cache.entries[i];
+                if (entry.used && entry.key == key)
+                {
+                    entry.lastUseMs = now;
+                    return entry;
+                }
+                if (!entry.used)
+                    best = &entry;
+                else if (best->used && entry.lastUseMs < best->lastUseMs)
+                    best = &entry;
+            }
+
+            best->used = true;
+            best->key = key;
+            best->lastUseMs = now;
+            best->rect = {};
+            return *best;
+        }
+
         struct AlphaLut
         {
             uint8_t values[256];
@@ -450,20 +499,47 @@ namespace pipgui
         }
 
         constexpr int16_t pad = 4;
+        const int16_t newX = rx - pad;
+        const int16_t newY = ry - pad;
+        const int16_t newW = tw + pad * 2;
+        const int16_t newH = th + pad * 2;
+        const uint32_t now = nowMs();
+        detail::TextCacheEntry &cacheEntry = resolveTextCacheEntry(
+            _textCache,
+            hashTextUpdateKey(x, y, align, _typo.currentFontId, _typo.psdfSizePx, _typo.psdfWeight),
+            now);
+
+        int16_t clearX = newX;
+        int16_t clearY = newY;
+        int16_t clearW = newW;
+        int16_t clearH = newH;
+        if (cacheEntry.rect.w > 0 && cacheEntry.rect.h > 0)
+        {
+            const int16_t minX = std::min(clearX, cacheEntry.rect.x);
+            const int16_t minY = std::min(clearY, cacheEntry.rect.y);
+            const int16_t maxX = std::max<int16_t>((int16_t)(clearX + clearW), (int16_t)(cacheEntry.rect.x + cacheEntry.rect.w));
+            const int16_t maxY = std::max<int16_t>((int16_t)(clearY + clearH), (int16_t)(cacheEntry.rect.y + cacheEntry.rect.h));
+            clearX = minX;
+            clearY = minY;
+            clearW = maxX - minX;
+            clearH = maxY - minY;
+        }
 
         bool prevRender = _flags.inSpritePass;
         pipcore::Sprite *prevActive = _render.activeSprite;
         _flags.inSpritePass = 1;
         _render.activeSprite = &_render.sprite;
 
-        fillRect().pos(rx - pad, ry - pad).size(tw + pad * 2, th + pad * 2).color(bg565).draw();
+        fillRect().pos(clearX, clearY).size(clearW, clearH).color(bg565).draw();
         drawTextImmediate(text, rx, ry, tw, th, fg565, bg565, align);
 
         _flags.inSpritePass = prevRender;
         _render.activeSprite = prevActive;
 
+        cacheEntry.rect = {newX, newY, newW, newH};
+
         if (!prevRender)
-            invalidateRect(rx - pad, ry - pad, tw + pad * 2, th + pad * 2);
+            invalidateRect(clearX, clearY, clearW, clearH);
     }
 
 }

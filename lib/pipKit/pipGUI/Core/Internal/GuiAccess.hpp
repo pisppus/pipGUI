@@ -82,6 +82,15 @@ namespace pipgui
                 gui.handlePopupMenuInput(nextDown, prevDown);
             }
 
+            static void configGraphScope(GUI &gui,
+                                         uint8_t screenId,
+                                         uint16_t sampleRateHz,
+                                         uint16_t timebaseMs,
+                                         uint16_t visibleSamples)
+            {
+                gui.configGraphScope(screenId, sampleRateHz, timebaseMs, visibleSamples);
+            }
+
             static void configureTile(GUI &gui,
                                       uint8_t screenId,
                                       uint8_t parentScreen,
@@ -422,6 +431,74 @@ namespace pipgui
                     activeWidth);
             }
 
+            static void drawGraphGrid(GUI &gui,
+                                      int16_t x,
+                                      int16_t y,
+                                      int16_t w,
+                                      int16_t h,
+                                      uint8_t radius,
+                                      GraphDirection dir,
+                                      uint32_t bgColor,
+                                      float speed)
+            {
+                gui.drawGraphGrid(x, y, w, h, radius, dir, bgColor, speed);
+            }
+
+            static void updateGraphGrid(GUI &gui,
+                                        int16_t x,
+                                        int16_t y,
+                                        int16_t w,
+                                        int16_t h,
+                                        uint8_t radius,
+                                        GraphDirection dir,
+                                        uint32_t bgColor,
+                                        float speed)
+            {
+                gui.updateGraphGrid(x, y, w, h, radius, dir, bgColor, speed);
+            }
+
+            static void drawGraphLine(GUI &gui,
+                                      uint8_t lineIndex,
+                                      int16_t value,
+                                      uint32_t color,
+                                      int16_t valueMin,
+                                      int16_t valueMax)
+            {
+                gui.drawGraphLine(lineIndex, value, color, valueMin, valueMax);
+            }
+
+            static void updateGraphLine(GUI &gui,
+                                        uint8_t lineIndex,
+                                        int16_t value,
+                                        uint32_t color,
+                                        int16_t valueMin,
+                                        int16_t valueMax)
+            {
+                gui.updateGraphLine(lineIndex, value, color, valueMin, valueMax);
+            }
+
+            static void drawGraphSamples(GUI &gui,
+                                         uint8_t lineIndex,
+                                         const int16_t *samples,
+                                         uint16_t sampleCount,
+                                         uint32_t color,
+                                         int16_t valueMin,
+                                         int16_t valueMax)
+            {
+                gui.drawGraphSamples(lineIndex, samples, sampleCount, color, valueMin, valueMax);
+            }
+
+            static void updateGraphSamples(GUI &gui,
+                                           uint8_t lineIndex,
+                                           const int16_t *samples,
+                                           uint16_t sampleCount,
+                                           uint32_t color,
+                                           int16_t valueMin,
+                                           int16_t valueMax)
+            {
+                gui.updateGraphSamples(lineIndex, samples, sampleCount, color, valueMin, valueMax);
+            }
+
             static void drawGlowCircle(GUI &gui,
                                        int16_t x,
                                        int16_t y,
@@ -574,7 +651,7 @@ namespace pipgui
                                          int16_t y,
                                          int16_t w,
                                          int16_t h,
-                                         ToggleSwitchState &state,
+                                         ToggleState &state,
                                          uint16_t activeColor,
                                          int32_t inactiveColor,
                                          int32_t knobColor)
@@ -587,12 +664,29 @@ namespace pipgui
                                            int16_t y,
                                            int16_t w,
                                            int16_t h,
-                                           ToggleSwitchState &state,
+                                           ToggleState &state,
                                            uint16_t activeColor,
                                            int32_t inactiveColor,
                                            int32_t knobColor)
             {
                 gui.updateToggleSwitch(x, y, w, h, state, activeColor, inactiveColor, knobColor);
+            }
+
+            static ToggleState &resolveToggleState(GUI &gui,
+                                                   int16_t x,
+                                                   int16_t y,
+                                                   int16_t w,
+                                                   int16_t h,
+                                                   uint16_t activeColor,
+                                                   int32_t inactiveColor,
+                                                   int32_t knobColor)
+            {
+                return gui.resolveToggleState(x, y, w, h, activeColor, inactiveColor, knobColor);
+            }
+
+            static bool stepToggleState(GUI &gui, ToggleState &state, bool &value, bool pressed)
+            {
+                return gui.stepToggleState(state, value, pressed);
             }
 
             static void drawButton(GUI &gui,

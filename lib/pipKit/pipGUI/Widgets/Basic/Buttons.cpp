@@ -1,4 +1,5 @@
 #include <pipGUI/Core/pipGUI.hpp>
+#include <pipGUI/Core/Internal/GuiAccess.hpp>
 #include <pipGUI/Graphics/Utils/Colors.hpp>
 #include <pipGUI/Graphics/Utils/Easing.hpp>
 
@@ -107,7 +108,7 @@ namespace pipgui
 
         void fillButtonBody(GUI &gui, const ButtonFrame &frame, uint16_t color565)
         {
-            gui.fillSquircleRect(frame.x, frame.y, frame.w, frame.h, frame.radius, color565);
+            detail::GuiAccess::fillSquircleRect(gui, frame.x, frame.y, frame.w, frame.h, frame.radius, color565);
         }
 
         [[nodiscard]] String loadingLabel(const String &label, bool loading, uint32_t now) noexcept
@@ -136,6 +137,15 @@ namespace pipgui
         const uint32_t now = nowMs();
         const uint32_t dt = clampAnimDt(now, s.lastUpdateMs);
         const bool visualEnabled = s.enabled && !s.loading;
+
+        if (s.lastUpdateMs == 0)
+        {
+            s.prevEnabled = visualEnabled;
+            s.fadeLevel = visualEnabled ? 255 : 0;
+            s.pressLevel = 0;
+            s.lastUpdateMs = now;
+            return;
+        }
 
         if (visualEnabled != s.prevEnabled)
         {

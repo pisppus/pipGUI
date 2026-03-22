@@ -17,7 +17,12 @@ namespace pipgui
         int16_t innerH = 0;
 
         uint32_t bgColor = 0;
-        uint32_t gridColor = 0;
+        uint16_t bgColor565 = 0;
+        uint16_t oscSampleRateHz = 0;
+        uint16_t oscTimebaseMs = 0;
+        uint16_t oscVisibleSamples = 0;
+        uint32_t drawEpoch = 0;
+        uint32_t oscClearEpoch = 0;
 
         uint8_t gridCellsX = 0;
         uint8_t gridCellsY = 0;
@@ -25,6 +30,7 @@ namespace pipgui
         uint8_t radius = 0;
         GraphDirection direction = LeftToRight;
         float speed = 0.0f;
+        bool frameUsed = false;
         bool autoScaleEnabled = false;
         bool autoScaleInitialized = false;
         int16_t autoMin = 0;
@@ -34,6 +40,9 @@ namespace pipgui
         uint16_t lineCount = 0;
         uint16_t sampleCapacity = 0;
         int16_t **samples = nullptr;
+        uint16_t *lineColors565 = nullptr;
+        int16_t *lineValueMins = nullptr;
+        int16_t *lineValueMaxs = nullptr;
         uint16_t *sampleCounts = nullptr;
         uint16_t *sampleHead = nullptr;
     };

@@ -400,6 +400,61 @@ namespace pipgui
         void apply();
     };
 
+    struct ConfigGraphScopeFluent : detail::FluentLifetime
+    {
+        PIPGUI_DEFAULT_FLUENT_MOVE(ConfigGraphScopeFluent);
+        uint8_t _screenId = INVALID_SCREEN_ID;
+        uint16_t _sampleRateHz = 0;
+        uint16_t _timebaseMs = 0;
+        uint16_t _visibleSamples = 0;
+        bool _touched = false;
+
+        explicit ConfigGraphScopeFluent(GUI *g)
+            : detail::FluentLifetime(g)
+        {
+        }
+
+        ~ConfigGraphScopeFluent() { apply(); }
+
+        ConfigGraphScopeFluent &screen(uint8_t screenId)
+        {
+            if (!canMutate())
+                return *this;
+            _screenId = screenId;
+            _touched = true;
+            return *this;
+        }
+
+        ConfigGraphScopeFluent &rate(uint16_t hz)
+        {
+            if (!canMutate())
+                return *this;
+            _sampleRateHz = hz;
+            _touched = true;
+            return *this;
+        }
+
+        ConfigGraphScopeFluent &timebase(uint16_t ms)
+        {
+            if (!canMutate())
+                return *this;
+            _timebaseMs = ms;
+            _touched = true;
+            return *this;
+        }
+
+        ConfigGraphScopeFluent &visible(uint16_t samples)
+        {
+            if (!canMutate())
+                return *this;
+            _visibleSamples = samples;
+            _touched = true;
+            return *this;
+        }
+
+        void apply();
+    };
+
     struct ConfigureListFluent : detail::FluentLifetime
     {
         uint8_t _screenId;
@@ -455,6 +510,33 @@ namespace pipgui
                 _mode = other._mode;
             }
             return *this;
+        }
+
+        ConfigureListFluent derive()
+        {
+            ConfigureListFluent copy(_gui);
+            copy._screenId = _screenId;
+            copy._itemCount = _itemCount;
+            copy._parentScreen = _parentScreen;
+            copy._cardColor = _cardColor;
+            copy._cardActiveColor = _cardActiveColor;
+            copy._radius = _radius;
+            copy._cardWidth = _cardWidth;
+            copy._cardHeight = _cardHeight;
+            copy._mode = _mode;
+
+            if (_ownedItems.data && _itemCount > 0)
+            {
+                ListItemDef *itemsCopy = copy._ownedItems.copyFromPtr(_ownedItems.data, _itemCount);
+                copy._items = itemsCopy;
+            }
+            else
+            {
+                copy._items = _items;
+            }
+
+            _consumed = true;
+            return copy;
         }
 
         ConfigureListFluent &screen(uint8_t screenId)
@@ -659,6 +741,48 @@ namespace pipgui
                 _contentMode = other._contentMode;
             }
             return *this;
+        }
+
+        ConfigureTileFluent derive()
+        {
+            ConfigureTileFluent copy(_gui);
+            copy._screenId = _screenId;
+            copy._itemCount = _itemCount;
+            copy._layoutRowCount = _layoutRowCount;
+            copy._layoutConfigured = _layoutConfigured;
+            copy._parentScreen = _parentScreen;
+            copy._cardColor = _cardColor;
+            copy._cardActiveColor = _cardActiveColor;
+            copy._radius = _radius;
+            copy._spacing = _spacing;
+            copy._columns = _columns;
+            copy._tileWidth = _tileWidth;
+            copy._tileHeight = _tileHeight;
+            copy._lineGapPx = _lineGapPx;
+            copy._contentMode = _contentMode;
+
+            if (_ownedItems.data && _itemCount > 0)
+            {
+                TileItemDef *itemsCopy = copy._ownedItems.copyFromPtr(_ownedItems.data, _itemCount);
+                copy._items = itemsCopy;
+            }
+            else
+            {
+                copy._items = _items;
+            }
+
+            if (_ownedLayoutRowsSpec.data && _layoutRowCount > 0)
+            {
+                const char **rowsCopy = copy._ownedLayoutRowsSpec.copyFromPtr(_ownedLayoutRowsSpec.data, _layoutRowCount);
+                copy._layoutRowsSpec = rowsCopy;
+            }
+            else
+            {
+                copy._layoutRowsSpec = _layoutRowsSpec;
+            }
+
+            _consumed = true;
+            return copy;
         }
 
         ConfigureTileFluent &screen(uint8_t screenId)

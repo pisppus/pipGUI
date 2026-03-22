@@ -79,11 +79,27 @@ namespace pipgui
     using DrawScrollDotsFluent = ScrollDotsFluentT<false>;
     using UpdateScrollDotsFluent = ScrollDotsFluentT<true>;
 
+    template <bool IsUpdate>
+    struct GraphGridFluentT;
+    using DrawGraphGridFluent = GraphGridFluentT<false>;
+    using UpdateGraphGridFluent = GraphGridFluentT<true>;
+
+    template <bool IsUpdate>
+    struct GraphLineFluentT;
+    using DrawGraphLineFluent = GraphLineFluentT<false>;
+    using UpdateGraphLineFluent = GraphLineFluentT<true>;
+
+    template <bool IsUpdate>
+    struct GraphSamplesFluentT;
+    using DrawGraphSamplesFluent = GraphSamplesFluentT<false>;
+    using UpdateGraphSamplesFluent = GraphSamplesFluentT<true>;
+
     struct ToastFluent;
     struct NotificationFluent;
     struct PopupMenuFluent;
     struct DrawIconFluent;
     struct DrawScreenshotFluent;
+    struct ConfigGraphScopeFluent;
 
     template <bool IsUpdate>
     struct TextFluentT;
@@ -136,8 +152,6 @@ namespace pipgui
         [[nodiscard]] ConfigureBacklightFluent setBacklight();
         [[nodiscard]] SetClipFluent setClip();
         [[nodiscard]] ShowLogoFluent showLogo();
-        void configureDisplay(const pipcore::DisplayConfig &cfg);
-        void configureBacklight(uint8_t pin, uint8_t channel = 0, uint32_t freqHz = 5000, uint8_t resolutionBits = 12);
         void begin(uint8_t rotation = 0, uint16_t bgColor = 0x0000);
 
         void setBacklightCallback(BacklightCallback cb) noexcept;
@@ -200,14 +214,6 @@ namespace pipgui
         [[nodiscard]] FillTriangleFluent fillTriangle();
         [[nodiscard]] DrawSquircleRectFluent drawSquircleRect();
         [[nodiscard]] FillSquircleRectFluent fillSquircleRect();
-        void drawSquircleRect(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radius, uint16_t color);
-        void drawSquircleRect(int16_t x, int16_t y, int16_t w, int16_t h,
-                              uint8_t radiusTL, uint8_t radiusTR, uint8_t radiusBR, uint8_t radiusBL,
-                              uint16_t color);
-        void fillSquircleRect(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radius, uint16_t color);
-        void fillSquircleRect(int16_t x, int16_t y, int16_t w, int16_t h,
-                              uint8_t radiusTL, uint8_t radiusTR, uint8_t radiusBR, uint8_t radiusBL,
-                              uint16_t color);
 
         [[nodiscard]] DrawBlurFluent drawBlur();
         [[nodiscard]] UpdateBlurFluent updateBlur();
@@ -219,6 +225,12 @@ namespace pipgui
 
         [[nodiscard]] DrawScrollDotsFluent drawScrollDots();
         [[nodiscard]] UpdateScrollDotsFluent updateScrollDots();
+        [[nodiscard]] DrawGraphGridFluent drawGraphGrid();
+        [[nodiscard]] UpdateGraphGridFluent updateGraphGrid();
+        [[nodiscard]] DrawGraphLineFluent drawGraphLine();
+        [[nodiscard]] UpdateGraphLineFluent updateGraphLine();
+        [[nodiscard]] DrawGraphSamplesFluent drawGraphSamples();
+        [[nodiscard]] UpdateGraphSamplesFluent updateGraphSamples();
 
         [[nodiscard]] DrawToggleSwitchFluent drawToggleSwitch();
         [[nodiscard]] UpdateToggleSwitchFluent updateToggleSwitch();
@@ -237,6 +249,7 @@ namespace pipgui
         [[nodiscard]] ShowErrorFluent showError();
         [[nodiscard]] PopupMenuFluent showPopupMenu();
         [[nodiscard]] PopupMenuInputFluent popupMenuInput();
+        [[nodiscard]] ConfigGraphScopeFluent configGraphScope();
         [[nodiscard]] bool popupMenuActive() const noexcept { return _flags.popupActive; }
         [[nodiscard]] bool popupMenuHasResult() const noexcept { return _popup.resultReady; }
         [[nodiscard]] int16_t popupMenuTakeResult() noexcept
@@ -247,41 +260,10 @@ namespace pipgui
             return _popup.resultIndex;
         }
 
-        void drawGraphGrid(int16_t x, int16_t y, int16_t w, int16_t h,
-                           uint8_t radius, GraphDirection dir, uint32_t bgColor,
-                           uint32_t gridColor, float speed = 1.0f);
-
-        void drawGraphGrid(int16_t x, int16_t y, int16_t w, int16_t h,
-                           uint8_t radius, GraphDirection dir, uint16_t bgColor565,
-                           uint16_t gridColor565, float speed = 1.0f)
-        {
-            drawGraphGrid(x, y, w, h, radius, dir, detail::color565To888(bgColor565), detail::color565To888(gridColor565), speed);
-        }
-
-        void updateGraphGrid(int16_t x, int16_t y, int16_t w, int16_t h,
-                             uint8_t radius, GraphDirection dir, uint32_t bgColor, uint32_t gridColor,
-                             float speed = 1.0f);
-
-        void updateGraphGrid(int16_t x, int16_t y, int16_t w, int16_t h,
-                             uint8_t radius, GraphDirection dir, uint16_t bgColor565, uint16_t gridColor565,
-                             float speed = 1.0f)
-        {
-            updateGraphGrid(x, y, w, h, radius, dir, detail::color565To888(bgColor565), detail::color565To888(gridColor565), speed);
-        }
-
-        void setGraphAutoScale(bool enabled);
-        void drawGraphLine(uint8_t lineIndex, int16_t value, uint32_t color, int16_t valueMin, int16_t valueMax);
-        void updateGraphLine(uint8_t lineIndex, int16_t value, uint32_t color, int16_t valueMin, int16_t valueMax);
-
-        void drawGraphLine(uint8_t lineIndex, int16_t value, uint16_t color565, int16_t valueMin, int16_t valueMax)
-        {
-            drawGraphLine(lineIndex, value, detail::color565To888(color565), valueMin, valueMax);
-        }
-
-        void updateGraphLine(uint8_t lineIndex, int16_t value, uint16_t color565, int16_t valueMin, int16_t valueMax)
-        {
-            updateGraphLine(lineIndex, value, detail::color565To888(color565), valueMin, valueMax);
-        }
+        void setGraphScale(bool enabled);
+        [[nodiscard]] uint16_t graphRate(uint8_t screenId) const noexcept;
+        [[nodiscard]] uint16_t graphTimebase(uint8_t screenId) const noexcept;
+        [[nodiscard]] uint16_t graphSamplesVisible(uint8_t screenId) const noexcept;
 
         void drawProgressText(int16_t x, int16_t y, int16_t w, int16_t h,
                               const String &text, uint16_t textColor565, uint16_t bgColor565,
@@ -306,8 +288,6 @@ namespace pipgui
         {
             drawProgressPercent(x, y, w, h, value, detail::color888To565(textColor), detail::color888To565(bgColor), align, fontPx);
         }
-
-        bool updateToggleSwitch(ToggleSwitchState &s, bool pressed);
 
         [[nodiscard]] DrawIconFluent drawIcon();
         [[nodiscard]] DrawTextFluent drawText();
@@ -357,13 +337,7 @@ namespace pipgui
         void loopWithInput(Button &next, Button &prev);
         void requestRedraw();
         void setScreenAnim(ScreenAnim anim, uint32_t durationMs);
-        void applyClip(int16_t x, int16_t y, int16_t w, int16_t h);
         void clearClip();
-
-        void startLogo(const String &t, const String &s,
-                       BootAnimation a = None, uint32_t fg = 0xFFFFFF,
-                       uint32_t bg = 0x000000, uint32_t dur = 0,
-                       int16_t x = -1, int16_t y = -1);
 
         void setNotificationButtonDown(bool down);
         [[nodiscard]] bool notificationActive() const noexcept;
@@ -422,12 +396,21 @@ namespace pipgui
         detail::Flags _flags = {};
         detail::DiagnosticsState _diag;
         detail::ButtonCacheState _buttonCache;
+        detail::TextCacheState _textCache;
+        detail::ToggleCacheState _toggleCache;
         detail::ScreenshotGalleryState _shots;
         detail::ScreenshotStreamState _shotStream;
 
         uint32_t nowMs() const;
 
         void initFonts();
+        void applyClip(int16_t x, int16_t y, int16_t w, int16_t h);
+        void startLogo(const String &t, const String &s,
+                       BootAnimation a = None, uint32_t fg = 0xFFFFFF,
+                       uint32_t bg = 0x000000, uint32_t dur = 0,
+                       int16_t x = -1, int16_t y = -1);
+        void configureDisplay(const pipcore::DisplayConfig &cfg);
+        void configureBacklight(uint8_t pin, uint8_t channel = 0, uint32_t freqHz = 5000, uint8_t resolutionBits = 12);
         void setBackgroundColorCache(uint16_t color565) noexcept;
         void resetDisplayRuntime() noexcept;
         void clearReportedPlatformError();
@@ -456,6 +439,9 @@ namespace pipgui
                                                int16_t w, int16_t h, uint16_t baseColor, uint8_t radius,
                                                IconId iconId);
         void stepButtonState(detail::ButtonState &s, bool isDown);
+        detail::ToggleState &resolveToggleState(int16_t x, int16_t y, int16_t w, int16_t h,
+                                               uint16_t activeColor, int32_t inactiveColor, int32_t knobColor);
+        bool stepToggleState(detail::ToggleState &state, bool &value, bool pressed);
         void flushDirty();
         void invalidateRect(int16_t x, int16_t y, int16_t w, int16_t h);
 
@@ -479,6 +465,14 @@ namespace pipgui
         void fillEllipse(int16_t cx, int16_t cy, int16_t rx, int16_t ry, uint16_t color);
         void drawTriangle(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint16_t color);
         void fillTriangle(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint16_t color);
+        void drawSquircleRect(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radius, uint16_t color);
+        void drawSquircleRect(int16_t x, int16_t y, int16_t w, int16_t h,
+                              uint8_t radiusTL, uint8_t radiusTR, uint8_t radiusBR, uint8_t radiusBL,
+                              uint16_t color);
+        void fillSquircleRect(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t radius, uint16_t color);
+        void fillSquircleRect(int16_t x, int16_t y, int16_t w, int16_t h,
+                              uint8_t radiusTL, uint8_t radiusTR, uint8_t radiusBR, uint8_t radiusBL,
+                              uint16_t color);
         void drawRoundTriangle(int16_t x0, int16_t y0,
                                int16_t x1, int16_t y1,
                                int16_t x2, int16_t y2,
@@ -571,6 +565,23 @@ namespace pipgui
                                   uint8_t dotRadius, uint8_t spacing,
                                   uint8_t activeWidth);
 
+        void drawGraphGrid(int16_t x, int16_t y, int16_t w, int16_t h,
+                           uint8_t radius, GraphDirection dir, uint32_t bgColor,
+                           float speed = 1.0f);
+        void updateGraphGrid(int16_t x, int16_t y, int16_t w, int16_t h,
+                             uint8_t radius, GraphDirection dir, uint32_t bgColor,
+                             float speed = 1.0f);
+        void drawGraphLine(uint8_t lineIndex, int16_t value, uint32_t color, int16_t valueMin, int16_t valueMax);
+        void updateGraphLine(uint8_t lineIndex, int16_t value, uint32_t color, int16_t valueMin, int16_t valueMax);
+        void drawGraphSamples(uint8_t lineIndex, const int16_t *samples, uint16_t sampleCount,
+                              uint32_t color, int16_t valueMin, int16_t valueMax);
+        void updateGraphSamples(uint8_t lineIndex, const int16_t *samples, uint16_t sampleCount,
+                                uint32_t color, int16_t valueMin, int16_t valueMax);
+        void configGraphScope(uint8_t screenId,
+                              uint16_t sampleRateHz,
+                              uint16_t timebaseMs,
+                              uint16_t visibleSamples = 0);
+
         struct ProgressBarState
         {
             bool inited;
@@ -613,10 +624,10 @@ namespace pipgui
                           int16_t h, uint16_t baseColor, uint8_t radius,
                           IconId iconId, const detail::ButtonState &state);
         void drawToggleSwitch(int16_t x, int16_t y, int16_t w, int16_t h,
-                              ToggleSwitchState &state, uint16_t activeColor,
+                              detail::ToggleState &state, uint16_t activeColor,
                               int32_t inactiveColor = -1, int32_t knobColor = -1);
         void updateToggleSwitch(int16_t x, int16_t y, int16_t w, int16_t h,
-                                ToggleSwitchState &state, uint16_t activeColor,
+                                detail::ToggleState &state, uint16_t activeColor,
                                 int32_t inactiveColor = -1, int32_t knobColor = -1);
 
         void drawGlowCircle(int16_t x, int16_t y,
@@ -659,6 +670,9 @@ namespace pipgui
                             uint16_t pulsePeriodMs);
 
         GraphArea *ensureGraphArea(uint8_t screenId);
+        void beginGraphFrame(uint8_t screenId) noexcept;
+        void endGraphFrame(uint8_t screenId) noexcept;
+        void releaseGraphBuffers(uint8_t screenId) noexcept;
         ListState *ensureList(uint8_t screenId);
         TileState *ensureTile(uint8_t screenId);
         ListState *getList(uint8_t screenId);

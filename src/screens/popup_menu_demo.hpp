@@ -16,33 +16,15 @@ SCREEN(popupMenuDemo, 41)
       .align(Center);
 
   ui.setTextStyle(Body);
-  ui.drawText()
-      .text("Next: open / down")
-      .pos(center, 104)
-      .color(sub565)
-      .bgColor(bg565)
-      .align(Center);
-
-  ui.drawText()
-      .text("Prev: up")
-      .pos(center, 124)
-      .color(sub565)
-      .bgColor(bg565)
-      .align(Center);
-
-  ui.drawText()
-      .text("Hold Next: select")
-      .pos(center, 144)
-      .color(sub565)
-      .bgColor(bg565)
-      .align(Center);
-
-  ui.drawText()
-      .text("Hold Prev: close")
-      .pos(center, 164)
-      .color(sub565)
-      .bgColor(bg565)
-      .align(Center);
+  auto hintText = ui.drawText()
+                      .pos(center, 104)
+                      .color(sub565)
+                      .bgColor(bg565)
+                      .align(Center);
+  hintText.derive().text("Next: open / down");
+  hintText.derive().text("Prev: up").pos(center, 124);
+  hintText.derive().text("Hold Next: select").pos(center, 144);
+  hintText.derive().text("Hold Prev: close").pos(center, 164);
 
   ui.drawButton()
       .label("Open menu")

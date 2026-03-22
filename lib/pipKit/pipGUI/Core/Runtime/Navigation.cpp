@@ -62,7 +62,11 @@ namespace pipgui
     void GUI::setScreenId(uint8_t id)
     {
         if (_screen.current != id)
+        {
             freeBlurBuffers(platform());
+            if (_screen.current != INVALID_SCREEN_ID)
+                releaseGraphBuffers(_screen.current);
+        }
 
         _flags.screenTransition = 0;
 
@@ -138,8 +142,10 @@ namespace pipgui
         if (screenId != INVALID_SCREEN_ID)
             _screen.current = screenId;
         clear(resolveBgColor565(_render.bgColor, _render.bgColor565));
+        beginGraphFrame(screenId);
         if (cb)
             cb(*this);
+        endGraphFrame(screenId);
 
         _screen.current = prevCurrent;
         _render.activeSprite = prevActive;

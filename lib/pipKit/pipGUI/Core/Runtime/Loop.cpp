@@ -259,13 +259,17 @@ namespace pipgui
                 }
                 else
                 {
+                    beginGraphFrame(_screen.current);
                     currentCb(*this);
+                    endGraphFrame(_screen.current);
                     renderStatusBar();
                 }
             }
             else
             {
+                beginGraphFrame(_screen.current);
                 currentCb(*this);
+                endGraphFrame(_screen.current);
                 renderStatusBar();
             }
         }

@@ -12,16 +12,14 @@ SCREEN(buttonsDemo, 42)
       .align(Center);
 
   ui.setTextStyle(Caption);
-  ui.drawText()
-      .text("Next: style  Prev: size")
-      .pos(-1, 44)
-      .color(ui.rgb(150, 150, 150))
-      .bgColor(bg565)
-      .align(Center);
-  ui.drawText()
+  auto hintText = ui.drawText()
+                      .pos(-1, 44)
+                      .color(ui.rgb(150, 150, 150))
+                      .bgColor(bg565)
+                      .align(Center);
+  hintText.derive().text("Next: style  Prev: size");
+  hintText.derive()
       .text("Hold both: back")
       .pos(-1, 58)
-      .color(ui.rgb(120, 120, 120))
-      .bgColor(bg565)
-      .align(Center);
+      .color(ui.rgb(120, 120, 120));
 }
