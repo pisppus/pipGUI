@@ -2,7 +2,7 @@ SCREEN(progress, 6)
 {
   ui.clear(0x000000);
 
-  auto barBase = ui.drawProgressBar()
+  auto barBase = ui.drawProgress()
                      .pos(center, 60)
                      .size(200, 10)
                      .value(0)
@@ -21,7 +21,7 @@ SCREEN(progress, 6)
       .fillColor(ui.rgb(255, 0, 72))
       .anim(None);
 
-  auto ringBase = ui.drawCircularProgressBar()
+  auto ringBase = ui.drawCircleProgress()
                       .pos(50, 165)
                       .radius(22)
                       .thickness(8)

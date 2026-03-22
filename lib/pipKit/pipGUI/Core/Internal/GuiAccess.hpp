@@ -240,11 +240,12 @@ namespace pipgui
                                 int16_t cx,
                                 int16_t cy,
                                 int16_t r,
+                                uint8_t thickness,
                                 float startDeg,
                                 float endDeg,
                                 uint16_t color)
             {
-                gui.drawArc(cx, cy, r, startDeg, endDeg, color);
+                gui.drawArc(cx, cy, r, thickness, startDeg, endDeg, color);
             }
 
             static void drawEllipse(GUI &gui,
@@ -735,60 +736,106 @@ namespace pipgui
                 gui.stepButtonState(state, isDown);
             }
 
-            static void drawProgressBar(GUI &gui,
-                                        int16_t x,
-                                        int16_t y,
-                                        int16_t w,
-                                        int16_t h,
-                                        uint8_t value,
-                                        uint16_t baseColor,
-                                        uint16_t fillColor,
-                                        uint8_t radius,
-                                        ProgressAnim anim)
+            static void drawProgress(GUI &gui,
+                                     int16_t x,
+                                     int16_t y,
+                                     int16_t w,
+                                     int16_t h,
+                                     uint8_t value,
+                                     uint16_t baseColor,
+                                     uint16_t fillColor,
+                                     uint8_t radius,
+                                     ProgressAnim anim)
             {
-                gui.drawProgressBar(x, y, w, h, value, baseColor, fillColor, radius, anim);
+                gui.drawProgress(x, y, w, h, value, baseColor, fillColor, radius, anim);
             }
 
-            static void updateProgressBar(GUI &gui,
-                                          int16_t x,
-                                          int16_t y,
-                                          int16_t w,
-                                          int16_t h,
-                                          uint8_t value,
-                                          uint16_t baseColor,
-                                          uint16_t fillColor,
-                                          uint8_t radius,
-                                          ProgressAnim anim,
-                                          bool doFlush)
+            static void updateProgress(GUI &gui,
+                                       int16_t x,
+                                       int16_t y,
+                                       int16_t w,
+                                       int16_t h,
+                                       uint8_t value,
+                                       uint16_t baseColor,
+                                       uint16_t fillColor,
+                                       uint8_t radius,
+                                       ProgressAnim anim)
             {
-                gui.updateProgressBar(x, y, w, h, value, baseColor, fillColor, radius, anim, doFlush);
+                gui.updateProgress(x, y, w, h, value, baseColor, fillColor, radius, anim);
             }
 
-            static void drawCircularProgressBar(GUI &gui,
+            static void drawProgressDecorated(GUI &gui,
+                                              int16_t x,
+                                              int16_t y,
+                                              int16_t w,
+                                              int16_t h,
+                                              uint8_t value,
+                                              uint16_t baseColor,
+                                              uint16_t fillColor,
+                                              uint8_t radius,
+                                              ProgressAnim anim,
+                                              const String *label,
+                                              uint16_t labelColor,
+                                              TextAlign labelAlign,
+                                              uint16_t labelFontPx,
+                                              bool showPercent,
+                                              uint16_t percentColor,
+                                              TextAlign percentAlign,
+                                              uint16_t percentFontPx)
+            {
+                gui.drawProgressDecorated(x, y, w, h, value, baseColor, fillColor, radius, anim,
+                                          label, labelColor, labelAlign, labelFontPx,
+                                          showPercent, percentColor, percentAlign, percentFontPx);
+            }
+
+            static void updateProgressDecorated(GUI &gui,
                                                 int16_t x,
                                                 int16_t y,
-                                                int16_t r,
-                                                uint8_t thickness,
+                                                int16_t w,
+                                                int16_t h,
                                                 uint8_t value,
                                                 uint16_t baseColor,
                                                 uint16_t fillColor,
-                                                ProgressAnim anim)
+                                                uint8_t radius,
+                                                ProgressAnim anim,
+                                                const String *label,
+                                                uint16_t labelColor,
+                                                TextAlign labelAlign,
+                                                uint16_t labelFontPx,
+                                                bool showPercent,
+                                                uint16_t percentColor,
+                                                TextAlign percentAlign,
+                                                uint16_t percentFontPx)
             {
-                gui.drawCircularProgressBar(x, y, r, thickness, value, baseColor, fillColor, anim);
+                gui.updateProgressDecorated(x, y, w, h, value, baseColor, fillColor, radius, anim,
+                                            label, labelColor, labelAlign, labelFontPx,
+                                            showPercent, percentColor, percentAlign, percentFontPx);
             }
 
-            static void updateCircularProgressBar(GUI &gui,
-                                                  int16_t x,
-                                                  int16_t y,
-                                                  int16_t r,
-                                                  uint8_t thickness,
-                                                  uint8_t value,
-                                                  uint16_t baseColor,
-                                                  uint16_t fillColor,
-                                                  ProgressAnim anim,
-                                                  bool doFlush)
+            static void drawCircleProgress(GUI &gui,
+                                           int16_t x,
+                                           int16_t y,
+                                           int16_t r,
+                                           uint8_t thickness,
+                                           uint8_t value,
+                                           uint16_t baseColor,
+                                           uint16_t fillColor,
+                                           ProgressAnim anim)
             {
-                gui.updateCircularProgressBar(x, y, r, thickness, value, baseColor, fillColor, anim, doFlush);
+                gui.drawCircleProgress(x, y, r, thickness, value, baseColor, fillColor, anim);
+            }
+
+            static void updateCircleProgress(GUI &gui,
+                                             int16_t x,
+                                             int16_t y,
+                                             int16_t r,
+                                             uint8_t thickness,
+                                             uint8_t value,
+                                             uint16_t baseColor,
+                                             uint16_t fillColor,
+                                             ProgressAnim anim)
+            {
+                gui.updateCircleProgress(x, y, r, thickness, value, baseColor, fillColor, anim);
             }
 
             static void drawText(GUI &gui,

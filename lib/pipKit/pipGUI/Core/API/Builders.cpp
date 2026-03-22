@@ -117,7 +117,7 @@ namespace pipgui
     {
         if (!beginCommit())
             return;
-        detail::GuiAccess::drawArc(*_gui, _cx, _cy, _r, _startDeg, _endDeg, _color);
+        detail::GuiAccess::drawArc(*_gui, _cx, _cy, _r, _thickness, _startDeg, _endDeg, _color);
     }
 
     void DrawEllipseFluent::draw()
@@ -336,28 +336,28 @@ namespace pipgui
     template void ButtonFluentT<true>::draw();
 
     template <bool IsUpdate>
-    void ProgressBarFluentT<IsUpdate>::draw()
+    void ProgressFluentT<IsUpdate>::draw()
     {
         if (!beginCommit())
             return;
         detail::callByMode<IsUpdate>(
-            [&] { detail::GuiAccess::updateProgressBar(*_gui, _x, _y, _w, _h, _value, _baseColor, _fillColor, _radius, _anim, _doFlush); },
-            [&] { detail::GuiAccess::drawProgressBar(*_gui, _x, _y, _w, _h, _value, _baseColor, _fillColor, _radius, _anim); });
+            [&] { detail::GuiAccess::updateProgressDecorated(*_gui, _x, _y, _w, _h, _value, _baseColor, _fillColor, _radius, _anim, _showLabel ? &_label : nullptr, _labelColor, _labelAlign, _labelFontPx, _showPercent, _percentColor, _percentAlign, _percentFontPx); },
+            [&] { detail::GuiAccess::drawProgressDecorated(*_gui, _x, _y, _w, _h, _value, _baseColor, _fillColor, _radius, _anim, _showLabel ? &_label : nullptr, _labelColor, _labelAlign, _labelFontPx, _showPercent, _percentColor, _percentAlign, _percentFontPx); });
     }
-    template void ProgressBarFluentT<false>::draw();
-    template void ProgressBarFluentT<true>::draw();
+    template void ProgressFluentT<false>::draw();
+    template void ProgressFluentT<true>::draw();
 
     template <bool IsUpdate>
-    void CircularProgressBarFluentT<IsUpdate>::draw()
+    void CircleProgressFluentT<IsUpdate>::draw()
     {
         if (!beginCommit())
             return;
         detail::callByMode<IsUpdate>(
-            [&] { detail::GuiAccess::updateCircularProgressBar(*_gui, _x, _y, _r, _thickness, _value, _baseColor, _fillColor, _anim, _doFlush); },
-            [&] { detail::GuiAccess::drawCircularProgressBar(*_gui, _x, _y, _r, _thickness, _value, _baseColor, _fillColor, _anim); });
+            [&] { detail::GuiAccess::updateCircleProgress(*_gui, _x, _y, _r, _thickness, _value, _baseColor, _fillColor, _anim); },
+            [&] { detail::GuiAccess::drawCircleProgress(*_gui, _x, _y, _r, _thickness, _value, _baseColor, _fillColor, _anim); });
     }
-    template void CircularProgressBarFluentT<false>::draw();
-    template void CircularProgressBarFluentT<true>::draw();
+    template void CircleProgressFluentT<false>::draw();
+    template void CircleProgressFluentT<true>::draw();
 
     void DrawScreenshotFluent::draw()
     {

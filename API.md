@@ -602,14 +602,18 @@ ui.fillTriangle()
 ui.drawArc()
     .pos(100, 80)
     .radius(28)
+    .thickness(6)
     .startDeg(-90.0f)
     .endDeg(90.0f)
     .color(ui.rgb(80, 255, 120))
 ```
 
 - `pos(...)` - центр дуги
-- `radius(...)` - радиус
+- `radius(...)` - внешний радиус дуги
+- `thickness(...)` - толщина дуги; по умолчанию `1`
 - `startDeg(...)` и `endDeg(...)` задают углы в градусах
+- концы дуги всегда скруглённые
+- `0..360` рисует полный круг
 
 ## 7.7 Эллипс
 
@@ -936,24 +940,10 @@ ui.drawToggleSwitch()
     .activeColor(ui.rgb(21, 180, 110));
 ```
 
-## 10.5. Прогресс-бар
+## 10.5. Прогресс
 
 ```cpp
-ui.drawProgressBar()
-    .pos(20, 220)
-    .size(180, 16)
-    .value(65)
-    .baseColor(ui.rgb(30, 30, 30))
-    .fillColor(ui.rgb(0, 120, 255))
-    .radius(8)
-    .anim(Shimmer)
-    .draw();
-```
-
-Для локального обновления без полной перерисовки есть `updateProgressBar()`:
-
-```cpp
-ui.updateProgressBar()
+ui.drawProgress()
     .pos(20, 220)
     .size(180, 16)
     .value(65)
@@ -963,33 +953,67 @@ ui.updateProgressBar()
     .anim(Shimmer);
 ```
 
-Текст над прогрессом:
+Для локального обновления без полной перерисовки есть `updateProgress()`:
 
 ```cpp
-ui.drawProgressText(20, 246, 180, 20, "Downloading",
-                    ui.rgb(255, 255, 255), ui.rgb(0, 0, 0),
-                    Center, 14);
-
-ui.drawProgressPercent(20, 268, 180, 20, 65,
-                       ui.rgb(255, 255, 255), ui.rgb(0, 0, 0),
-                       Center, 14);
+ui.updateProgress()
+    .pos(20, 220)
+    .size(180, 16)
+    .value(65)
+    .baseColor(ui.rgb(30, 30, 30))
+    .fillColor(ui.rgb(0, 120, 255))
+    .radius(8)
+    .anim(Shimmer);
 ```
 
-## 10.6. Круговой прогресс-бар
+Текст у линейного прогресса задаётся прямо на самом progress:
 
 ```cpp
-ui.drawCircularProgressBar()
+ui.drawProgress()
+    .pos(20, 246)
+    .size(180, 14)
+    .value(65)
+    .baseColor(ui.rgb(20, 20, 20))
+    .fillColor(ui.rgb(0, 120, 255))
+    .label("Downloading")
+    .labelAlign(Left)
+    .labelColor(ui.rgb(255, 255, 255))
+    .percent()
+    .percentAlign(Right)
+    .percentColor(ui.rgb(200, 200, 200));
+```
+
+- `label(...)` привязывает произвольный текст к конкретному линейному progress
+- `percent()` выводит текущее значение этого же progress в формате `65%`
+- `labelAlign(...)`, `labelColor(...)`, `labelFont(...)` настраивают label
+- `percentAlign(...)`, `percentColor(...)`, `percentFont(...)` настраивают числовой индикатор
+- текст поддерживается только у линейного progress; у `drawCircleProgress()` его нет
+
+## 10.6. Круговой прогресс
+
+```cpp
+ui.drawCircleProgress()
     .pos(center, 140)
     .radius(34)
     .thickness(8)
     .value(72)
     .baseColor(ui.rgb(30, 30, 30))
     .fillColor(ui.rgb(0, 120, 255))
-    .anim(None)
-    .draw();
+    .anim(None);
 ```
 
-Тот же принцип есть и у `updateCircularProgressBar()`, когда индикатор надо обновлять in-place.
+Локальное обновление:
+
+```cpp
+ui.updateCircleProgress()
+    .pos(center, 140)
+    .radius(34)
+    .thickness(8)
+    .value(72)
+    .baseColor(ui.rgb(30, 30, 30))
+    .fillColor(ui.rgb(0, 120, 255))
+    .anim(None);
+```
 
 ## 10.7. Drum roll
 

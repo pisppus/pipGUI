@@ -126,75 +126,68 @@ void updateProgressDemoFrame(uint32_t nowMs)
   g_lastProgressUpdateMs = nowMs;
   stepPingPong(g_progressValue, g_progressDirDown);
 
-  ui.updateProgressBar()
+  ui.updateProgress()
       .pos(center, 60)
       .size(200, 10)
       .value(0)
       .baseColor(ui.rgb(10, 10, 10))
       .fillColor(ui.rgb(0, 87, 250))
       .radius(6)
-      .anim(Indeterminate)
-      .doFlush(false);
+      .anim(Indeterminate);
 
-  ui.updateProgressBar()
+  ui.updateProgress()
       .pos(center, 74)
       .size(200, 10)
       .value(g_progressValue)
       .baseColor(ui.rgb(10, 10, 10))
       .fillColor(ui.rgb(255, 0, 72))
       .radius(6)
-      .anim(None)
-      .doFlush(false);
+      .anim(None);
 
-  ui.updateProgressBar()
+  ui.updateProgress()
       .pos(center, 88)
       .size(200, 10)
       .value(g_progressValue)
       .baseColor(ui.rgb(10, 10, 10))
       .fillColor(ui.rgb(255, 128, 0))
       .radius(6)
-      .anim(Shimmer)
-      .doFlush(false);
+      .anim(Shimmer);
 
-  ui.updateCircularProgressBar()
+  ui.updateCircleProgress()
       .pos(50, 165)
       .radius(22)
       .thickness(8)
       .value(0)
       .baseColor(ui.rgb(10, 10, 10))
       .fillColor(ui.rgb(0, 87, 250))
-      .anim(Indeterminate)
-      .doFlush(false);
+      .anim(Indeterminate);
 
-  ui.updateCircularProgressBar()
+  ui.updateCircleProgress()
       .pos(105, 165)
       .radius(22)
       .thickness(8)
       .value(g_progressValue)
       .baseColor(ui.rgb(10, 10, 10))
       .fillColor(ui.rgb(255, 0, 72))
-      .anim(None)
-      .doFlush(false);
+      .anim(None);
 
-  ui.updateCircularProgressBar()
+  ui.updateCircleProgress()
       .pos(160, 165)
       .radius(22)
       .thickness(8)
       .value(g_progressValue)
       .baseColor(ui.rgb(10, 10, 10))
       .fillColor(ui.rgb(255, 128, 0))
-      .anim(Shimmer)
-      .doFlush(false);
+      .anim(Shimmer);
 
-  ui.updateCircularProgressBar()
+  ui.updateCircleProgress()
       .pos(215, 165)
       .radius(22)
       .thickness(8)
       .value(g_progressValue)
       .baseColor(ui.rgb(10, 10, 10))
       .fillColor(ui.rgb(0, 200, 120))
-      .anim(Shimmer)
-      .doFlush(true);
+      .anim(Shimmer);
 }
 
 void updateSettingsDemoFrame(uint32_t nowMs, bool buttonPressed, bool buttonDown)
@@ -445,7 +438,7 @@ void updateFirmwareUpdateScreen(uint32_t nowMs, bool nextPressed, bool nextDown,
   if (st.total > 0)
     p = (uint8_t)min<uint32_t>(100u, (st.downloaded * 100u) / st.total);
 
-  ui.updateProgressBar()
+  ui.updateProgress()
       .pos(l.cardX + 10, l.infoY + l.infoH - 16)
       .size(l.cardW - 20, 8)
       .radius(4)

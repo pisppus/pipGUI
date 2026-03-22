@@ -5,69 +5,258 @@ namespace pipgui
 {
     namespace
     {
-        struct ArcQuadrantRange
+        constexpr float kArcDegToRad = 0.01745329252f;
+        constexpr float kArcRadToDeg = 57.2957795f;
+        constexpr int kArcSubSamples = 2;
+        constexpr int kArcSubSampleCount = kArcSubSamples * kArcSubSamples;
+        constexpr float kArcCrossEpsilon = 0.0001f;
+
+        struct ArcSweepInfo
         {
-            uint32_t lower;
-            uint32_t upper;
-            bool enabled;
+            float startDeg;
+            float endDeg;
+            float sweepDeg;
+            float startDirX;
+            float startDirY;
+            float endDirX;
+            float endDirY;
             bool full;
+            bool wide;
         };
 
-        static inline uint16_t normalizeAngleDeg(float degrees)
+        static inline float normalizeArcDeg(float deg) noexcept
         {
-            int32_t angle = (int32_t)degrees;
-            angle %= 360;
-            if (angle < 0)
-                angle += 360;
-            return (uint16_t)angle;
+            while (deg < 0.0f)
+                deg += 360.0f;
+            while (deg >= 360.0f)
+                deg -= 360.0f;
+            return deg;
         }
 
-        static inline uint16_t normalizeArcSlopeAngle(uint16_t angle)
+        static inline bool angleInArcSweep(float deg, float startDeg, float endDeg) noexcept
         {
-            angle %= 180;
-            return angle > 90 ? (uint16_t)(180 - angle) : angle;
+            deg = normalizeArcDeg(deg);
+            startDeg = normalizeArcDeg(startDeg);
+            endDeg = normalizeArcDeg(endDeg);
+            if (startDeg <= endDeg)
+                return deg >= startDeg && deg <= endDeg;
+            return deg >= startDeg || deg <= endDeg;
         }
 
-        static inline const uint32_t *arcSlopeTable()
+        static inline ArcSweepInfo makeArcSweepInfo(bool fullRing, float startDeg, float endDeg) noexcept
         {
-            static uint32_t table[91];
-            static bool ready = false;
-            if (!ready)
+            ArcSweepInfo info{};
+            info.startDeg = normalizeArcDeg(startDeg);
+            info.endDeg = normalizeArcDeg(endDeg);
+            float sweep = info.endDeg - info.startDeg;
+            if (sweep < 0.0f)
+                sweep += 360.0f;
+            info.sweepDeg = sweep;
+            info.full = fullRing || sweep >= 359.5f;
+            info.wide = sweep > 180.0f;
+
+            const float startRad = info.startDeg * kArcDegToRad;
+            const float endRad = info.endDeg * kArcDegToRad;
+            info.startDirX = sinf(startRad);
+            info.startDirY = cosf(startRad);
+            info.endDirX = sinf(endRad);
+            info.endDirY = cosf(endRad);
+            return info;
+        }
+
+        static inline bool pointInArcSweep(const ArcSweepInfo &info, float dx, float dy) noexcept
+        {
+            if (info.full)
+                return true;
+
+            const float px = dx;
+            const float py = -dy;
+            const float crossStart = info.startDirX * py - info.startDirY * px;
+            const float crossEnd = px * info.endDirY - py * info.endDirX;
+
+            if (!info.wide)
+                return crossStart <= kArcCrossEpsilon && crossEnd <= kArcCrossEpsilon;
+            return crossStart <= kArcCrossEpsilon || crossEnd <= kArcCrossEpsilon;
+        }
+
+        template <typename ColorFunc>
+        static void rasterThickArcAA(pipcore::Sprite *spr,
+                                     int16_t cx, int16_t cy,
+                                     int16_t r,
+                                     uint8_t thickness,
+                                     bool fullRing,
+                                     float startDeg,
+                                     float endDeg,
+                                     ColorFunc colorAtAngle,
+                                     bool needsColorAngle)
+        {
+            if (!spr || r <= 0 || thickness < 1)
+                return;
+
+            Surface565 s;
+            if (!getSurface565(spr, s))
+                return;
+
+            const float outerR = static_cast<float>(r) + 0.5f;
+            const float innerR = static_cast<float>(r - thickness) + 0.5f;
+            const float outerR2 = outerR * outerR;
+            const float innerR2 = innerR > 0.0f ? innerR * innerR : 0.0f;
+            const int16_t outerBound = static_cast<int16_t>(ceilf(outerR)) + 1;
+            int32_t minX = static_cast<int32_t>(cx - outerBound);
+            int32_t maxX = static_cast<int32_t>(cx + outerBound);
+            int32_t minY = static_cast<int32_t>(cy - outerBound);
+            int32_t maxY = static_cast<int32_t>(cy + outerBound);
+            if (minX < s.clipX)
+                minX = s.clipX;
+            if (maxX > s.clipR)
+                maxX = s.clipR;
+            if (minY < s.clipY)
+                minY = s.clipY;
+            if (maxY > s.clipB)
+                maxY = s.clipB;
+            if (minX > maxX || minY > maxY)
+                return;
+
+            const float subStep = 1.0f / static_cast<float>(kArcSubSamples);
+            const float subBias = 0.5f * subStep;
+            const uint8_t *gamma = gammaTable();
+            const ArcSweepInfo sweepInfo = makeArcSweepInfo(fullRing, startDeg, endDeg);
+
+            for (int32_t py = minY; py <= maxY; ++py)
             {
-                constexpr float deg2rad = 0.0174532925f;
-                constexpr float minDivisor = 1.0f / 0x8000;
-                for (uint32_t angle = 0; angle <= 90; ++angle)
+                for (int32_t px = minX; px <= maxX; ++px)
                 {
-                    const float radians = (float)angle * deg2rad;
-                    const float absCos = fabsf(cosf(radians));
-                    const float absSin = fabsf(sinf(radians));
-                    table[angle] = (uint32_t)((absCos / (absSin + minDivisor)) * (float)(1UL << 16));
+                    int covered = 0;
+                    for (int sy = 0; sy < kArcSubSamples; ++sy)
+                    {
+                        const float dy = (static_cast<float>(py - cy) - 0.5f) + subBias + static_cast<float>(sy) * subStep;
+                        for (int sx = 0; sx < kArcSubSamples; ++sx)
+                        {
+                            const float dx = (static_cast<float>(px - cx) - 0.5f) + subBias + static_cast<float>(sx) * subStep;
+                            const float d2 = dx * dx + dy * dy;
+                            if (d2 > outerR2 || d2 < innerR2)
+                                continue;
+                            if (!pointInArcSweep(sweepInfo, dx, dy))
+                                continue;
+                            ++covered;
+                        }
+                    }
+
+                    if (covered == 0)
+                        continue;
+
+                    float colorDeg = 0.0f;
+                    if (needsColorAngle && !sweepInfo.full)
+                    {
+                        colorDeg = normalizeArcDeg(atan2f(static_cast<float>(py - cy), static_cast<float>(px - cx)) * kArcRadToDeg + 90.0f);
+                        if (!angleInArcSweep(colorDeg, sweepInfo.startDeg, sweepInfo.endDeg))
+                            colorDeg = normalizeArcDeg((sweepInfo.startDeg + sweepInfo.sweepDeg * 0.5f));
+                    }
+
+                    const Color565 c = makeColor565(colorAtAngle(colorDeg));
+                    uint16_t *dst = s.buf + static_cast<int32_t>(py) * s.stride + px;
+                    if (covered >= kArcSubSampleCount)
+                        *dst = c.fg;
+                    else
+                        blendStore(dst, c, gamma[(covered * 255) / kArcSubSampleCount]);
                 }
-                ready = true;
             }
-            return table;
         }
 
-        static inline bool slopeInRange(uint32_t slopeY, uint32_t dx,
-                                        uint32_t lower, uint32_t upper)
+        static void rasterArcCapAA(pipcore::Sprite *spr,
+                                   float cx, float cy,
+                                   float radius,
+                                   uint16_t color)
         {
-            if (dx == 0)
-                return lower == 0 || upper == 0xFFFFFFFFu;
+            if (!spr || radius <= 0.0f)
+                return;
 
-            const uint64_t scaled = (uint64_t)dx;
-            if (upper != 0xFFFFFFFFu && (uint64_t)slopeY > (uint64_t)upper * scaled)
-                return false;
-            if (lower != 0 && (uint64_t)slopeY < (uint64_t)lower * scaled)
-                return false;
-            return true;
+            Surface565 s;
+            if (!getSurface565(spr, s))
+                return;
+
+            int32_t minX = static_cast<int32_t>(floorf(cx - radius - 1.0f));
+            int32_t maxX = static_cast<int32_t>(ceilf(cx + radius + 1.0f));
+            int32_t minY = static_cast<int32_t>(floorf(cy - radius - 1.0f));
+            int32_t maxY = static_cast<int32_t>(ceilf(cy + radius + 1.0f));
+            if (minX < s.clipX)
+                minX = s.clipX;
+            if (maxX > s.clipR)
+                maxX = s.clipR;
+            if (minY < s.clipY)
+                minY = s.clipY;
+            if (maxY > s.clipB)
+                maxY = s.clipB;
+            if (minX > maxX || minY > maxY)
+                return;
+            const float radius2 = radius * radius;
+            const float subStep = 1.0f / static_cast<float>(kArcSubSamples);
+            const float subBias = 0.5f * subStep;
+            const uint8_t *gamma = gammaTable();
+            const Color565 c = makeColor565(color);
+
+            for (int32_t py = minY; py <= maxY; ++py)
+            {
+                for (int32_t px = minX; px <= maxX; ++px)
+                {
+                    int covered = 0;
+                    for (int sy = 0; sy < kArcSubSamples; ++sy)
+                    {
+                        const float dy = (static_cast<float>(py) - cy - 0.5f) + subBias + static_cast<float>(sy) * subStep;
+                        for (int sx = 0; sx < kArcSubSamples; ++sx)
+                        {
+                            const float dx = (static_cast<float>(px) - cx - 0.5f) + subBias + static_cast<float>(sx) * subStep;
+                            if (dx * dx + dy * dy <= radius2)
+                                ++covered;
+                        }
+                    }
+
+                    if (covered == 0)
+                        continue;
+
+                    uint16_t *dst = s.buf + static_cast<int32_t>(py) * s.stride + px;
+                    if (covered >= kArcSubSampleCount)
+                        *dst = c.fg;
+                    else
+                        blendStore(dst, c, gamma[(covered * 255) / kArcSubSampleCount]);
+                }
+            }
         }
 
-        static inline ArcQuadrantRange makeArcQuadrantRange(uint32_t lower, uint32_t upper)
+        template <typename ColorFunc>
+        static void drawThickArcCaps(pipcore::Sprite *spr,
+                                     int16_t cx, int16_t cy,
+                                     int16_t r,
+                                     uint8_t thickness,
+                                     float startDeg,
+                                     float endDeg,
+                                     ColorFunc colorAtAngle)
         {
-            const bool enabled = !(upper == 0 || lower == 0xFFFFFFFFu);
-            return {lower, upper, enabled, enabled && lower == 0 && upper == 0xFFFFFFFFu};
+            if (!spr || r <= 0 || thickness < 1)
+                return;
+
+            const float capRadius = static_cast<float>(thickness) * 0.5f;
+            float centerRadius = static_cast<float>(r) - capRadius + 0.5f;
+            if (centerRadius < capRadius)
+                centerRadius = capRadius;
+
+            auto drawCap = [&](float deg)
+            {
+                const float rad = (deg - 90.0f) * kArcDegToRad;
+                const float px = static_cast<float>(cx) + cosf(rad) * centerRadius;
+                const float py = static_cast<float>(cy) + sinf(rad) * centerRadius;
+                rasterArcCapAA(spr, px, py, capRadius, colorAtAngle(normalizeArcDeg(deg)));
+            };
+
+            drawCap(startDeg);
+            if (fabsf(endDeg - startDeg) > 0.01f)
+                drawCap(endDeg);
         }
 
+        static uint16_t solidArcColorAtAngle(const void *ctx, float)
+        {
+            return *static_cast<const uint16_t *>(ctx);
+        }
         template <bool Fill>
         static inline const uint8_t *tinyCircleMask(uint8_t r, uint8_t &outSize)
         {
@@ -468,8 +657,8 @@ namespace pipgui
                 fillSpanClip(s, py, x0, x1, c);
         };
 
-          if (rTL == rTR && rTR == rBR && rBR == rBL && h >= (int16_t)(rTL * 2))
-          {
+        if (rTL == rTR && rTR == rBR && rBR == rBL && h >= (int16_t)(rTL * 2))
+        {
             int32_t rr = (int32_t)rTL;
             if (rr > w / 2)
                 rr = w / 2;
@@ -736,190 +925,44 @@ namespace pipgui
     }
 
     void GUI::drawArc(int16_t cx, int16_t cy, int16_t r,
+                      uint8_t thickness,
                       float startDeg, float endDeg, uint16_t color)
     {
-        if (r <= 0 || !_flags.spriteEnabled)
-            return;
-
-        const uint32_t startAngle = normalizeAngleDeg(startDeg);
-        const uint32_t endAngle = normalizeAngleDeg(endDeg);
-        if (startAngle == endAngle)
-            return;
-
-        auto spr = getDrawTarget();
-        Surface565 s;
-        if (!getSurface565(spr, s))
-            return;
-        if (cx - r > s.clipR || cx + r < s.clipX || cy - r > s.clipB || cy + r < s.clipY)
-            return;
-
-        const Color565 c = makeColor565(color);
-        const uint8_t *gamma = gammaTable();
-        const bool noClip = (cx - r >= s.clipX && cx + r <= s.clipR && cy - r >= s.clipY && cy + r <= s.clipB);
-
-        int16_t ir = r - 1;
-        const uint32_t r2 = (uint32_t)r * r;
-        r++;
-        const uint32_t r1 = (uint32_t)r * r;
-        const int16_t w = r - ir;
-        const uint32_t r3 = (uint32_t)ir * ir;
-        ir--;
-        const uint32_t r4 = (uint32_t)ir * ir;
-
-        uint32_t startSlope[4] = {0, 0, 0xFFFFFFFFu, 0};
-        uint32_t endSlope[4] = {0, 0xFFFFFFFFu, 0, 0};
-
-        const uint32_t *const slopeTable = arcSlopeTable();
-        uint32_t slope = slopeTable[normalizeArcSlopeAngle((uint16_t)startAngle)];
-        if (startAngle <= 90)
-            startSlope[0] = slope;
-        else if (startAngle <= 180)
-            startSlope[1] = slope;
-        else if (startAngle <= 270)
-        {
-            startSlope[1] = 0xFFFFFFFFu;
-            startSlope[2] = slope;
-        }
-        else
-        {
-            startSlope[1] = 0xFFFFFFFFu;
-            startSlope[2] = 0;
-            startSlope[3] = slope;
-        }
-
-        slope = slopeTable[normalizeArcSlopeAngle((uint16_t)endAngle)];
-        if (endAngle <= 90)
-        {
-            endSlope[0] = slope;
-            endSlope[1] = 0;
-            startSlope[2] = 0;
-        }
-        else if (endAngle <= 180)
-        {
-            endSlope[1] = slope;
-            startSlope[2] = 0;
-        }
-        else if (endAngle <= 270)
-            endSlope[2] = slope;
-        else
-            endSlope[3] = slope;
-
-        const ArcQuadrantRange ranges[4] = {
-            makeArcQuadrantRange(endSlope[0], startSlope[0]),
-            makeArcQuadrantRange(startSlope[1], endSlope[1]),
-            makeArcQuadrantRange(endSlope[2], startSlope[2]),
-            makeArcQuadrantRange(startSlope[3], endSlope[3])};
-
-        auto raster = [&](auto blendPixel, auto drawHLine, auto drawVLine) __attribute__((always_inline))
-        {
-            int32_t xs = 0;
-            for (int32_t y = r - 1; y > 0; --y)
-            {
-                uint32_t len[4] = {0, 0, 0, 0};
-                int32_t xst[4] = {-1, -1, -1, -1};
-                const uint32_t dy = (uint32_t)(r - y);
-                const uint32_t dy2 = dy * dy;
-                const uint32_t slopeY = dy << 16;
-
-                while ((uint32_t)(r - xs) * (uint32_t)(r - xs) + dy2 >= r1)
-                    ++xs;
-
-                for (int32_t x = xs; x < r; ++x)
-                {
-                    const uint32_t dxEdge = (uint32_t)(r - x);
-                    const uint32_t hyp = dxEdge * dxEdge + dy2;
-                    uint8_t alpha = 0;
-
-                    if (hyp > r2)
-                    {
-                        alpha = ~sqrtU8(hyp);
-                    }
-                    else if (hyp >= r3)
-                    {
-                        if (ranges[0].enabled && (ranges[0].full || slopeInRange(slopeY, dxEdge, ranges[0].lower, ranges[0].upper)))
-                        {
-                            xst[0] = x;
-                            ++len[0];
-                        }
-                        if (ranges[1].enabled && (ranges[1].full || slopeInRange(slopeY, dxEdge, ranges[1].lower, ranges[1].upper)))
-                        {
-                            xst[1] = x;
-                            ++len[1];
-                        }
-                        if (ranges[2].enabled && (ranges[2].full || slopeInRange(slopeY, dxEdge, ranges[2].lower, ranges[2].upper)))
-                        {
-                            xst[2] = x;
-                            ++len[2];
-                        }
-                        if (ranges[3].enabled && (ranges[3].full || slopeInRange(slopeY, dxEdge, ranges[3].lower, ranges[3].upper)))
-                        {
-                            xst[3] = x;
-                            ++len[3];
-                        }
-                        continue;
-                    }
-                    else
-                    {
-                        if (hyp <= r4)
-                            break;
-                        alpha = sqrtU8(hyp);
-                    }
-
-                    if (alpha < 16)
-                        continue;
-                    if (ranges[0].enabled && (ranges[0].full || slopeInRange(slopeY, dxEdge, ranges[0].lower, ranges[0].upper)))
-                        blendPixel(cx + x - r, cy - y + r, gamma[alpha]);
-                    if (ranges[1].enabled && (ranges[1].full || slopeInRange(slopeY, dxEdge, ranges[1].lower, ranges[1].upper)))
-                        blendPixel(cx + x - r, cy + y - r, gamma[alpha]);
-                    if (ranges[2].enabled && (ranges[2].full || slopeInRange(slopeY, dxEdge, ranges[2].lower, ranges[2].upper)))
-                        blendPixel(cx - x + r, cy + y - r, gamma[alpha]);
-                    if (ranges[3].enabled && (ranges[3].full || slopeInRange(slopeY, dxEdge, ranges[3].lower, ranges[3].upper)))
-                        blendPixel(cx - x + r, cy - y + r, gamma[alpha]);
-                }
-
-                if (len[0])
-                    drawHLine(cx + xst[0] - len[0] + 1 - r, cy - y + r, len[0]);
-                if (len[1])
-                    drawHLine(cx + xst[1] - len[1] + 1 - r, cy + y - r, len[1]);
-                if (len[2])
-                    drawHLine(cx - xst[2] + r, cy + y - r, len[2]);
-                if (len[3])
-                    drawHLine(cx - xst[3] + r, cy - y + r, len[3]);
-            }
-
-            if (startAngle == 0 || endAngle == 360)
-                drawVLine(cx, cy + r - w, cy + r - 1);
-            if (startAngle <= 90 && endAngle >= 90)
-                drawHLine(cx - r + 1, cy, w);
-            if (startAngle <= 180 && endAngle >= 180)
-                drawVLine(cx, cy - r + 1, cy - r + w);
-            if (startAngle <= 270 && endAngle >= 270)
-                drawHLine(cx + r - w, cy, w);
-        };
-
-        if (noClip)
-            raster([&](int32_t px, int32_t py, uint8_t alpha)
-                   { blendStore(s.buf + py * s.stride + px, c, alpha); },
-                   [&](int32_t px, int32_t py, int32_t len)
-                   {
-                       if (len > 0)
-                           fillSpanFast(s, py, px, px + len - 1, c);
-                   },
-                   [&](int32_t px, int32_t py0, int32_t py1)
-                   { fillVLineFast(s, px, py0, py1, c.fg); });
-        else
-            raster([&](int32_t px, int32_t py, uint8_t alpha)
-                   { plotBlendClip(s, c, px, py, alpha); },
-                   [&](int32_t px, int32_t py, int32_t len)
-                   {
-                       if (len > 0)
-                           fillSpanClip(s, py, px, px + len - 1, c);
-                   },
-                   [&](int32_t px, int32_t py0, int32_t py1)
-                   { fillVLineClip(s, px, py0, py1, c.fg); });
-
-        if (_disp.display && !_flags.inSpritePass)
-            invalidateRect(cx - r, cy - r, r * 2 + 1, r * 2 + 1);
+        drawArcShaded(cx, cy, r, thickness, startDeg, endDeg, solidArcColorAtAngle, &color, false, true);
     }
 
+    void GUI::drawArcShaded(int16_t cx, int16_t cy, int16_t r,
+                            uint8_t thickness,
+                            float startDeg, float endDeg,
+                            uint16_t (*shader)(const void *, float),
+                            const void *shaderCtx,
+                            bool needsColorAngle,
+                            bool invalidate)
+    {
+        if (r <= 0 || !_flags.spriteEnabled || !shader)
+            return;
+
+        const float rawSweep = fabsf(endDeg - startDeg);
+        const bool fullSweep = rawSweep >= 359.5f;
+        if (thickness < 1)
+            thickness = 1;
+
+        auto spr = getDrawTarget();
+        if (!spr)
+            return;
+        if (fullSweep)
+            rasterThickArcAA(spr, cx, cy, r, thickness, true, 0.0f, 360.0f, [&](float deg) -> uint16_t
+                             { return shader(shaderCtx, deg); }, needsColorAngle);
+        else
+        {
+            rasterThickArcAA(spr, cx, cy, r, thickness, false, startDeg, endDeg, [&](float deg) -> uint16_t
+                             { return shader(shaderCtx, deg); }, needsColorAngle);
+            drawThickArcCaps(spr, cx, cy, r, thickness, startDeg, endDeg,
+                             [&](float deg) -> uint16_t
+                             { return shader(shaderCtx, deg); });
+        }
+
+        if (invalidate && _disp.display && !_flags.inSpritePass)
+            invalidateRect(cx - r - 1, cy - r - 1, r * 2 + 3, r * 2 + 3);
+    }
 }

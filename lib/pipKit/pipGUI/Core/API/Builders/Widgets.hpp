@@ -217,18 +217,26 @@ namespace pipgui
     };
 
     template <bool IsUpdate>
-    struct ProgressBarFluentT : detail::FluentLifetime
+    struct ProgressFluentT : detail::FluentLifetime
     {
-        PIPGUI_DEFAULT_FLUENT_MOVE(ProgressBarFluentT);
+        PIPGUI_DEFAULT_FLUENT_MOVE(ProgressFluentT);
         int16_t _x, _y, _w, _h;
         uint8_t _value;
         uint16_t _baseColor;
         uint16_t _fillColor;
         uint8_t _radius;
         ProgressAnim _anim;
-        bool _doFlush;
+        String _label;
+        bool _showLabel;
+        uint16_t _labelColor;
+        TextAlign _labelAlign;
+        uint16_t _labelFontPx;
+        bool _showPercent;
+        uint16_t _percentColor;
+        TextAlign _percentAlign;
+        uint16_t _percentFontPx;
 
-        ProgressBarFluentT(GUI *g)
+        ProgressFluentT(GUI *g)
             : detail::FluentLifetime(g),
               _x(0), _y(0), _w(0), _h(0),
               _value(0),
@@ -236,13 +244,21 @@ namespace pipgui
               _fillColor(0),
               _radius(6),
               _anim(None),
-              _doFlush(true)
+              _label(),
+              _showLabel(false),
+              _labelColor(0xFFFF),
+              _labelAlign(Left),
+              _labelFontPx(0),
+              _showPercent(false),
+              _percentColor(0xFFFF),
+              _percentAlign(Right),
+              _percentFontPx(0)
         {
         }
 
-        ~ProgressBarFluentT() { draw(); }
+        ~ProgressFluentT() { draw(); }
 
-        ProgressBarFluentT &pos(int16_t x, int16_t y)
+        ProgressFluentT &pos(int16_t x, int16_t y)
         {
             if (!canMutate())
                 return *this;
@@ -251,7 +267,7 @@ namespace pipgui
             return *this;
         }
 
-        ProgressBarFluentT &size(int16_t w, int16_t h)
+        ProgressFluentT &size(int16_t w, int16_t h)
         {
             if (!canMutate())
                 return *this;
@@ -260,7 +276,7 @@ namespace pipgui
             return *this;
         }
 
-        ProgressBarFluentT &value(uint8_t v)
+        ProgressFluentT &value(uint8_t v)
         {
             if (!canMutate())
                 return *this;
@@ -268,7 +284,7 @@ namespace pipgui
             return *this;
         }
 
-        ProgressBarFluentT &baseColor(uint16_t c)
+        ProgressFluentT &baseColor(uint16_t c)
         {
             if (!canMutate())
                 return *this;
@@ -276,7 +292,7 @@ namespace pipgui
             return *this;
         }
 
-        ProgressBarFluentT &fillColor(uint16_t c)
+        ProgressFluentT &fillColor(uint16_t c)
         {
             if (!canMutate())
                 return *this;
@@ -284,7 +300,7 @@ namespace pipgui
             return *this;
         }
 
-        ProgressBarFluentT &radius(uint8_t r)
+        ProgressFluentT &radius(uint8_t r)
         {
             if (!canMutate())
                 return *this;
@@ -292,7 +308,7 @@ namespace pipgui
             return *this;
         }
 
-        ProgressBarFluentT &anim(ProgressAnim a)
+        ProgressFluentT &anim(ProgressAnim a)
         {
             if (!canMutate())
                 return *this;
@@ -300,11 +316,68 @@ namespace pipgui
             return *this;
         }
 
-        ProgressBarFluentT &doFlush(bool v)
+        ProgressFluentT &label(const String &text)
         {
             if (!canMutate())
                 return *this;
-            _doFlush = v;
+            _label = text;
+            _showLabel = text.length() > 0;
+            return *this;
+        }
+
+        ProgressFluentT &labelColor(uint16_t c)
+        {
+            if (!canMutate())
+                return *this;
+            _labelColor = c;
+            return *this;
+        }
+
+        ProgressFluentT &labelAlign(TextAlign a)
+        {
+            if (!canMutate())
+                return *this;
+            _labelAlign = a;
+            return *this;
+        }
+
+        ProgressFluentT &labelFont(uint16_t px)
+        {
+            if (!canMutate())
+                return *this;
+            _labelFontPx = px;
+            return *this;
+        }
+
+        ProgressFluentT &percent(bool enabled = true)
+        {
+            if (!canMutate())
+                return *this;
+            _showPercent = enabled;
+            return *this;
+        }
+
+        ProgressFluentT &percentColor(uint16_t c)
+        {
+            if (!canMutate())
+                return *this;
+            _percentColor = c;
+            return *this;
+        }
+
+        ProgressFluentT &percentAlign(TextAlign a)
+        {
+            if (!canMutate())
+                return *this;
+            _percentAlign = a;
+            return *this;
+        }
+
+        ProgressFluentT &percentFont(uint16_t px)
+        {
+            if (!canMutate())
+                return *this;
+            _percentFontPx = px;
             return *this;
         }
 
@@ -312,9 +385,9 @@ namespace pipgui
     };
 
     template <bool IsUpdate>
-    struct CircularProgressBarFluentT : detail::FluentLifetime
+    struct CircleProgressFluentT : detail::FluentLifetime
     {
-        PIPGUI_DEFAULT_FLUENT_MOVE(CircularProgressBarFluentT);
+        PIPGUI_DEFAULT_FLUENT_MOVE(CircleProgressFluentT);
         int16_t _x, _y;
         int16_t _r;
         uint8_t _thickness;
@@ -322,9 +395,8 @@ namespace pipgui
         uint16_t _baseColor;
         uint16_t _fillColor;
         ProgressAnim _anim;
-        bool _doFlush;
 
-        CircularProgressBarFluentT(GUI *g)
+        CircleProgressFluentT(GUI *g)
             : detail::FluentLifetime(g),
               _x(0), _y(0),
               _r(0),
@@ -332,14 +404,13 @@ namespace pipgui
               _value(0),
               _baseColor(0),
               _fillColor(0),
-              _anim(None),
-              _doFlush(true)
+              _anim(None)
         {
         }
 
-        ~CircularProgressBarFluentT() { draw(); }
+        ~CircleProgressFluentT() { draw(); }
 
-        CircularProgressBarFluentT &pos(int16_t x, int16_t y)
+        CircleProgressFluentT &pos(int16_t x, int16_t y)
         {
             if (!canMutate())
                 return *this;
@@ -348,7 +419,7 @@ namespace pipgui
             return *this;
         }
 
-        CircularProgressBarFluentT &radius(int16_t r)
+        CircleProgressFluentT &radius(int16_t r)
         {
             if (!canMutate())
                 return *this;
@@ -356,7 +427,7 @@ namespace pipgui
             return *this;
         }
 
-        CircularProgressBarFluentT &thickness(uint8_t t)
+        CircleProgressFluentT &thickness(uint8_t t)
         {
             if (!canMutate())
                 return *this;
@@ -364,7 +435,7 @@ namespace pipgui
             return *this;
         }
 
-        CircularProgressBarFluentT &value(uint8_t v)
+        CircleProgressFluentT &value(uint8_t v)
         {
             if (!canMutate())
                 return *this;
@@ -372,7 +443,7 @@ namespace pipgui
             return *this;
         }
 
-        CircularProgressBarFluentT &baseColor(uint16_t c)
+        CircleProgressFluentT &baseColor(uint16_t c)
         {
             if (!canMutate())
                 return *this;
@@ -380,7 +451,7 @@ namespace pipgui
             return *this;
         }
 
-        CircularProgressBarFluentT &fillColor(uint16_t c)
+        CircleProgressFluentT &fillColor(uint16_t c)
         {
             if (!canMutate())
                 return *this;
@@ -388,19 +459,11 @@ namespace pipgui
             return *this;
         }
 
-        CircularProgressBarFluentT &anim(ProgressAnim a)
+        CircleProgressFluentT &anim(ProgressAnim a)
         {
             if (!canMutate())
                 return *this;
             _anim = a;
-            return *this;
-        }
-
-        CircularProgressBarFluentT &doFlush(bool v)
-        {
-            if (!canMutate())
-                return *this;
-            _doFlush = v;
             return *this;
         }
 

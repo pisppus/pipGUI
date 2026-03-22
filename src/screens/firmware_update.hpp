@@ -96,7 +96,7 @@ SCREEN(firmwareUpdate, 40)
   keyText.derive().text("Update").pos(l.keyX, l.rowY2);
   keyText.derive().text("What's new").pos(l.keyX, l.notesLabelY);
 
-  ui.drawProgressBar()
+  ui.drawProgress()
       .pos(l.cardX + 10, l.infoY + l.infoH - 16)
       .size(l.cardW - 20, 8)
       .radius(4)

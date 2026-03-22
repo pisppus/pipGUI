@@ -65,14 +65,14 @@ namespace pipgui
     using UpdateButtonFluent = ButtonFluentT<true>;
 
     template <bool IsUpdate>
-    struct ProgressBarFluentT;
-    using DrawProgressBarFluent = ProgressBarFluentT<false>;
-    using UpdateProgressBarFluent = ProgressBarFluentT<true>;
+    struct ProgressFluentT;
+    using DrawProgressFluent = ProgressFluentT<false>;
+    using UpdateProgressFluent = ProgressFluentT<true>;
 
     template <bool IsUpdate>
-    struct CircularProgressBarFluentT;
-    using DrawCircularProgressBarFluent = CircularProgressBarFluentT<false>;
-    using UpdateCircularProgressBarFluent = CircularProgressBarFluentT<true>;
+    struct CircleProgressFluentT;
+    using DrawCircleProgressFluent = CircleProgressFluentT<false>;
+    using UpdateCircleProgressFluent = CircleProgressFluentT<true>;
 
     template <bool IsUpdate>
     struct ScrollDotsFluentT;
@@ -238,11 +238,11 @@ namespace pipgui
         [[nodiscard]] DrawButtonFluent drawButton();
         [[nodiscard]] UpdateButtonFluent updateButton();
 
-        [[nodiscard]] DrawProgressBarFluent drawProgressBar();
-        [[nodiscard]] UpdateProgressBarFluent updateProgressBar();
+        [[nodiscard]] DrawProgressFluent drawProgress();
+        [[nodiscard]] UpdateProgressFluent updateProgress();
 
-        [[nodiscard]] DrawCircularProgressBarFluent drawCircularProgressBar();
-        [[nodiscard]] UpdateCircularProgressBarFluent updateCircularProgressBar();
+        [[nodiscard]] DrawCircleProgressFluent drawCircleProgress();
+        [[nodiscard]] UpdateCircleProgressFluent updateCircleProgress();
 
         [[nodiscard]] ToastFluent showToast();
         [[nodiscard]] NotificationFluent showNotification();
@@ -264,30 +264,6 @@ namespace pipgui
         [[nodiscard]] uint16_t graphRate(uint8_t screenId) const noexcept;
         [[nodiscard]] uint16_t graphTimebase(uint8_t screenId) const noexcept;
         [[nodiscard]] uint16_t graphSamplesVisible(uint8_t screenId) const noexcept;
-
-        void drawProgressText(int16_t x, int16_t y, int16_t w, int16_t h,
-                              const String &text, uint16_t textColor565, uint16_t bgColor565,
-                              TextAlign align = TextAlign::Center, uint16_t fontPx = 0);
-
-        void drawProgressText(int16_t x, int16_t y, int16_t w, int16_t h,
-                              const String &text, TextAlign align = TextAlign::Center,
-                              uint32_t textColor = 0xFFFFFF, uint32_t bgColor = 0x000000,
-                              uint16_t fontPx = 0)
-        {
-            drawProgressText(x, y, w, h, text, detail::color888To565(textColor), detail::color888To565(bgColor), align, fontPx);
-        }
-
-        void drawProgressPercent(int16_t x, int16_t y, int16_t w, int16_t h,
-                                 uint8_t value, uint16_t textColor565, uint16_t bgColor565,
-                                 TextAlign align = TextAlign::Center, uint16_t fontPx = 0);
-
-        void drawProgressPercent(int16_t x, int16_t y, int16_t w, int16_t h,
-                                 uint8_t value, TextAlign align = TextAlign::Center,
-                                 uint32_t textColor = 0xFFFFFF, uint32_t bgColor = 0x000000,
-                                 uint16_t fontPx = 0)
-        {
-            drawProgressPercent(x, y, w, h, value, detail::color888To565(textColor), detail::color888To565(bgColor), align, fontPx);
-        }
 
         [[nodiscard]] DrawIconFluent drawIcon();
         [[nodiscard]] DrawTextFluent drawText();
@@ -444,6 +420,25 @@ namespace pipgui
         bool stepToggleState(detail::ToggleState &state, bool &value, bool pressed);
         void flushDirty();
         void invalidateRect(int16_t x, int16_t y, int16_t w, int16_t h);
+        void drawProgressTextSpan(int16_t x, int16_t y, int16_t w, int16_t h,
+                                  const String &text, uint16_t textColor565, uint16_t bgColor565,
+                                  TextAlign align, uint16_t fontPx,
+                                  int16_t clipX, int16_t clipW);
+        void drawProgressAttachedText(int16_t x, int16_t y, int16_t w, int16_t h,
+                                      int16_t fillLeft, int16_t fillRight,
+                                      uint16_t baseColor, uint16_t fillColor,
+                                      const String &text, uint16_t textColor565,
+                                      TextAlign align, uint16_t fontPx);
+        void drawProgressDecorated(int16_t x, int16_t y, int16_t w, int16_t h,
+                                   uint8_t value, uint16_t baseColor, uint16_t fillColor, uint8_t radius,
+                                   ProgressAnim anim,
+                                   const String *label, uint16_t labelColor, TextAlign labelAlign, uint16_t labelFontPx,
+                                   bool showPercent, uint16_t percentColor, TextAlign percentAlign, uint16_t percentFontPx);
+        void updateProgressDecorated(int16_t x, int16_t y, int16_t w, int16_t h,
+                                     uint8_t value, uint16_t baseColor, uint16_t fillColor, uint8_t radius,
+                                     ProgressAnim anim,
+                                     const String *label, uint16_t labelColor, TextAlign labelAlign, uint16_t labelFontPx,
+                                     bool showPercent, uint16_t percentColor, TextAlign percentAlign, uint16_t percentFontPx);
 
         template <typename Fn>
         void renderToSpriteAndInvalidate(int16_t x, int16_t y, int16_t w, int16_t h, Fn &&drawCall);
@@ -460,7 +455,13 @@ namespace pipgui
         void drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t color);
         void drawCircle(int16_t cx, int16_t cy, int16_t r, uint16_t color);
         void fillCircle(int16_t cx, int16_t cy, int16_t r, uint16_t color);
-        void drawArc(int16_t cx, int16_t cy, int16_t r, float startDeg, float endDeg, uint16_t color);
+        void drawArc(int16_t cx, int16_t cy, int16_t r, uint8_t thickness, float startDeg, float endDeg, uint16_t color);
+        void drawArcShaded(int16_t cx, int16_t cy, int16_t r, uint8_t thickness,
+                           float startDeg, float endDeg,
+                           uint16_t (*shader)(const void *, float),
+                           const void *shaderCtx,
+                           bool needsColorAngle,
+                           bool invalidate);
         void drawEllipse(int16_t cx, int16_t cy, int16_t rx, int16_t ry, uint16_t color);
         void fillEllipse(int16_t cx, int16_t cy, int16_t rx, int16_t ry, uint16_t color);
         void drawTriangle(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint16_t color);
@@ -582,40 +583,35 @@ namespace pipgui
                               uint16_t timebaseMs,
                               uint16_t visibleSamples = 0);
 
-        struct ProgressBarState
+        struct ProgressState
         {
-            bool inited;
-            uint8_t value;
-            ProgressAnim anim;
-            int16_t segL;
-            int16_t segR;
+            bool inited = false;
+            uint8_t value = 0;
+            ProgressAnim anim = None;
         };
 
-        void drawProgressBar(int16_t x, int16_t y, int16_t w, int16_t h,
-                             uint8_t value, uint16_t baseColor, uint16_t fillColor, uint8_t radius = 6,
-                             ProgressAnim anim = None);
-        void drawProgressBar(int16_t x, int16_t y, int16_t w, int16_t h,
-                             uint8_t value, uint16_t color, uint8_t radius = 6, ProgressAnim anim = None);
-        void updateProgressBar(int16_t x, int16_t y, int16_t w, int16_t h,
-                               uint8_t value, uint16_t baseColor, uint16_t fillColor, uint8_t radius = 6,
-                               ProgressAnim anim = None, bool doFlush = true);
-        void updateProgressBar(int16_t x, int16_t y, int16_t w, int16_t h,
-                               uint8_t value, uint16_t color, uint8_t radius = 6, ProgressAnim anim = None,
-                               bool doFlush = true);
-        void updateProgressBar(ProgressBarState &s, int16_t x, int16_t y, int16_t w,
-                               int16_t h, uint8_t value, uint16_t baseColor, uint16_t fillColor,
-                               uint8_t radius = 6, ProgressAnim anim = None);
+        void drawProgress(int16_t x, int16_t y, int16_t w, int16_t h,
+                          uint8_t value, uint16_t baseColor, uint16_t fillColor, uint8_t radius = 6,
+                          ProgressAnim anim = None);
+        void drawProgress(int16_t x, int16_t y, int16_t w, int16_t h,
+                          uint8_t value, uint16_t color, uint8_t radius = 6, ProgressAnim anim = None);
+        void updateProgress(int16_t x, int16_t y, int16_t w, int16_t h,
+                            uint8_t value, uint16_t baseColor, uint16_t fillColor, uint8_t radius = 6,
+                            ProgressAnim anim = None);
+        void updateProgress(int16_t x, int16_t y, int16_t w, int16_t h,
+                            uint8_t value, uint16_t color, uint8_t radius = 6, ProgressAnim anim = None);
+        void updateProgress(ProgressState &s, int16_t x, int16_t y, int16_t w,
+                            int16_t h, uint8_t value, uint16_t baseColor, uint16_t fillColor,
+                            uint8_t radius = 6, ProgressAnim anim = None);
 
-        void drawCircularProgressBar(int16_t x, int16_t y, int16_t r, uint8_t thickness,
-                                     uint8_t value, uint16_t baseColor, uint16_t fillColor, ProgressAnim anim = None);
-        void drawCircularProgressBar(int16_t x, int16_t y, int16_t r, uint8_t thickness,
-                                     uint8_t value, uint16_t color, ProgressAnim anim = None);
-        void updateCircularProgressBar(int16_t x, int16_t y, int16_t r, uint8_t thickness,
-                                       uint8_t value, uint16_t baseColor, uint16_t fillColor, ProgressAnim anim = None,
-                                       bool doFlush = true);
-        void updateCircularProgressBar(int16_t x, int16_t y, int16_t r, uint8_t thickness,
-                                       uint8_t value, uint16_t color, ProgressAnim anim = None,
-                                       bool doFlush = true);
+        void drawCircleProgress(int16_t x, int16_t y, int16_t r, uint8_t thickness,
+                                uint8_t value, uint16_t baseColor, uint16_t fillColor, ProgressAnim anim = None);
+        void drawCircleProgress(int16_t x, int16_t y, int16_t r, uint8_t thickness,
+                                uint8_t value, uint16_t color, ProgressAnim anim = None);
+        void updateCircleProgress(int16_t x, int16_t y, int16_t r, uint8_t thickness,
+                                  uint8_t value, uint16_t baseColor, uint16_t fillColor, ProgressAnim anim = None);
+        void updateCircleProgress(int16_t x, int16_t y, int16_t r, uint8_t thickness,
+                                  uint8_t value, uint16_t color, ProgressAnim anim = None);
 
         void drawButton(const String &label, int16_t x, int16_t y, int16_t w,
                         int16_t h, uint16_t baseColor, uint8_t radius,

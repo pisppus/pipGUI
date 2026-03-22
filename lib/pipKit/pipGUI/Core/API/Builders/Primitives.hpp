@@ -544,9 +544,10 @@ namespace pipgui
         PIPGUI_DEFAULT_FLUENT_MOVE(DrawArcFluent);
         int16_t _cx, _cy;
         int16_t _r;
+        uint8_t _thickness;
         float _startDeg, _endDeg;
         uint16_t _color;
-        DrawArcFluent(GUI *g) : detail::FluentLifetime(g), _cx(0), _cy(0), _r(0), _startDeg(0), _endDeg(360), _color(0) {}
+        DrawArcFluent(GUI *g) : detail::FluentLifetime(g), _cx(0), _cy(0), _r(0), _thickness(1), _startDeg(0), _endDeg(360), _color(0) {}
         ~DrawArcFluent() { draw(); }
         DrawArcFluent &pos(int16_t cx, int16_t cy)
         {
@@ -561,6 +562,13 @@ namespace pipgui
             if (!canMutate())
                 return *this;
             _r = r;
+            return *this;
+        }
+        DrawArcFluent &thickness(uint8_t t)
+        {
+            if (!canMutate())
+                return *this;
+            _thickness = t;
             return *this;
         }
         DrawArcFluent &startDeg(float d)

@@ -47,11 +47,11 @@ namespace pipgui
     inline DrawButtonFluent GUI::drawButton() { return DrawButtonFluent(this); }
     inline UpdateButtonFluent GUI::updateButton() { return UpdateButtonFluent(this); }
 
-    inline DrawProgressBarFluent GUI::drawProgressBar() { return DrawProgressBarFluent(this); }
-    inline UpdateProgressBarFluent GUI::updateProgressBar() { return UpdateProgressBarFluent(this); }
+    inline DrawProgressFluent GUI::drawProgress() { return DrawProgressFluent(this); }
+    inline UpdateProgressFluent GUI::updateProgress() { return UpdateProgressFluent(this); }
 
-    inline DrawCircularProgressBarFluent GUI::drawCircularProgressBar() { return DrawCircularProgressBarFluent(this); }
-    inline UpdateCircularProgressBarFluent GUI::updateCircularProgressBar() { return UpdateCircularProgressBarFluent(this); }
+    inline DrawCircleProgressFluent GUI::drawCircleProgress() { return DrawCircleProgressFluent(this); }
+    inline UpdateCircleProgressFluent GUI::updateCircleProgress() { return UpdateCircleProgressFluent(this); }
 
     inline ToastFluent GUI::showToast() { return ToastFluent(this); }
     inline NotificationFluent GUI::showNotification() { return NotificationFluent(this); }
