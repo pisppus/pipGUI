@@ -161,9 +161,23 @@ namespace pipgui
                                  int16_t y0,
                                  int16_t x1,
                                  int16_t y1,
+                                 uint8_t thickness,
                                  uint16_t color)
             {
-                gui.drawLine(x0, y0, x1, y1, color);
+                gui.drawLine(x0, y0, x1, y1, thickness, color);
+            }
+
+            static void drawLineSegment(GUI &gui,
+                                        int16_t x0,
+                                        int16_t y0,
+                                        int16_t x1,
+                                        int16_t y1,
+                                        uint8_t thickness,
+                                        uint16_t color,
+                                        bool roundStart,
+                                        bool roundEnd)
+            {
+                gui.drawLineCore(x0, y0, x1, y1, thickness, color, roundStart, roundEnd, false);
             }
 
             static void fillRectGradientVertical(GUI &gui,
@@ -377,13 +391,11 @@ namespace pipgui
                                        uint8_t activeIndex,
                                        uint8_t prevIndex,
                                        float animProgress,
-                                       bool animate,
                                        int8_t animDirection,
                                        uint16_t activeColor,
                                        uint16_t inactiveColor,
-                                       uint8_t dotRadius,
-                                       uint8_t spacing,
-                                       uint8_t activeWidth)
+                                       uint8_t radius,
+                                       uint8_t spacing)
             {
                 gui.drawScrollDotsImpl(
                     x,
@@ -392,13 +404,11 @@ namespace pipgui
                     activeIndex,
                     prevIndex,
                     animProgress,
-                    animate,
                     animDirection,
                     activeColor,
                     inactiveColor,
-                    dotRadius,
-                    spacing,
-                    activeWidth);
+                    radius,
+                    spacing);
             }
 
             static void updateScrollDots(GUI &gui,
@@ -408,13 +418,11 @@ namespace pipgui
                                          uint8_t activeIndex,
                                          uint8_t prevIndex,
                                          float animProgress,
-                                         bool animate,
                                          int8_t animDirection,
                                          uint16_t activeColor,
                                          uint16_t inactiveColor,
-                                         uint8_t dotRadius,
-                                         uint8_t spacing,
-                                         uint8_t activeWidth)
+                                         uint8_t radius,
+                                         uint8_t spacing)
             {
                 gui.updateScrollDotsImpl(
                     x,
@@ -423,13 +431,11 @@ namespace pipgui
                     activeIndex,
                     prevIndex,
                     animProgress,
-                    animate,
                     animDirection,
                     activeColor,
                     inactiveColor,
-                    dotRadius,
-                    spacing,
-                    activeWidth);
+                    radius,
+                    spacing);
             }
 
             static void drawGraphGrid(GUI &gui,
@@ -463,9 +469,10 @@ namespace pipgui
                                       int16_t value,
                                       uint32_t color,
                                       int16_t valueMin,
-                                      int16_t valueMax)
+                                      int16_t valueMax,
+                                      uint8_t thickness)
             {
-                gui.drawGraphLine(lineIndex, value, color, valueMin, valueMax);
+                gui.drawGraphLine(lineIndex, value, color, valueMin, valueMax, thickness);
             }
 
             static void updateGraphLine(GUI &gui,
@@ -473,9 +480,10 @@ namespace pipgui
                                         int16_t value,
                                         uint32_t color,
                                         int16_t valueMin,
-                                        int16_t valueMax)
+                                        int16_t valueMax,
+                                        uint8_t thickness)
             {
-                gui.updateGraphLine(lineIndex, value, color, valueMin, valueMax);
+                gui.updateGraphLine(lineIndex, value, color, valueMin, valueMax, thickness);
             }
 
             static void drawGraphSamples(GUI &gui,
@@ -484,9 +492,10 @@ namespace pipgui
                                          uint16_t sampleCount,
                                          uint32_t color,
                                          int16_t valueMin,
-                                         int16_t valueMax)
+                                         int16_t valueMax,
+                                         uint8_t thickness)
             {
-                gui.drawGraphSamples(lineIndex, samples, sampleCount, color, valueMin, valueMax);
+                gui.drawGraphSamples(lineIndex, samples, sampleCount, color, valueMin, valueMax, thickness);
             }
 
             static void updateGraphSamples(GUI &gui,
@@ -495,9 +504,10 @@ namespace pipgui
                                            uint16_t sampleCount,
                                            uint32_t color,
                                            int16_t valueMin,
-                                           int16_t valueMax)
+                                           int16_t valueMax,
+                                           uint8_t thickness)
             {
-                gui.updateGraphSamples(lineIndex, samples, sampleCount, color, valueMin, valueMax);
+                gui.updateGraphSamples(lineIndex, samples, sampleCount, color, valueMin, valueMax, thickness);
             }
 
             static void drawGlowCircle(GUI &gui,

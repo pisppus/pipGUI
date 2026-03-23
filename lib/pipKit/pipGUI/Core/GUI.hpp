@@ -452,7 +452,10 @@ namespace pipgui
         void renderScreenTransition(uint32_t now);
         void renderBootFrame(uint32_t now);
 
-        void drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t color);
+        void drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint8_t thickness, uint16_t color);
+        void drawLineCore(int16_t x0, int16_t y0, int16_t x1, int16_t y1,
+                          uint8_t thickness, uint16_t color,
+                          bool roundStart, bool roundEnd, bool invalidate);
         void drawCircle(int16_t cx, int16_t cy, int16_t r, uint16_t color);
         void fillCircle(int16_t cx, int16_t cy, int16_t r, uint16_t color);
         void drawArc(int16_t cx, int16_t cy, int16_t r, uint8_t thickness, float startDeg, float endDeg, uint16_t color);
@@ -553,18 +556,16 @@ namespace pipgui
         void drawScrollDotsImpl(int16_t x, int16_t y,
                                 uint8_t count, uint8_t activeIndex,
                                 uint8_t prevIndex, float animProgress,
-                                bool animate, int8_t animDirection,
+                                int8_t animDirection,
                                 uint16_t activeColor, uint16_t inactiveColor,
-                                uint8_t dotRadius, uint8_t spacing,
-                                uint8_t activeWidth);
+                                uint8_t radius, uint8_t spacing);
 
         void updateScrollDotsImpl(int16_t x, int16_t y,
                                   uint8_t count, uint8_t activeIndex,
                                   uint8_t prevIndex, float animProgress,
-                                  bool animate, int8_t animDirection,
+                                  int8_t animDirection,
                                   uint16_t activeColor, uint16_t inactiveColor,
-                                  uint8_t dotRadius, uint8_t spacing,
-                                  uint8_t activeWidth);
+                                  uint8_t radius, uint8_t spacing);
 
         void drawGraphGrid(int16_t x, int16_t y, int16_t w, int16_t h,
                            uint8_t radius, GraphDirection dir, uint32_t bgColor,
@@ -572,12 +573,12 @@ namespace pipgui
         void updateGraphGrid(int16_t x, int16_t y, int16_t w, int16_t h,
                              uint8_t radius, GraphDirection dir, uint32_t bgColor,
                              float speed = 1.0f);
-        void drawGraphLine(uint8_t lineIndex, int16_t value, uint32_t color, int16_t valueMin, int16_t valueMax);
-        void updateGraphLine(uint8_t lineIndex, int16_t value, uint32_t color, int16_t valueMin, int16_t valueMax);
+        void drawGraphLine(uint8_t lineIndex, int16_t value, uint32_t color, int16_t valueMin, int16_t valueMax, uint8_t thickness = 1);
+        void updateGraphLine(uint8_t lineIndex, int16_t value, uint32_t color, int16_t valueMin, int16_t valueMax, uint8_t thickness = 1);
         void drawGraphSamples(uint8_t lineIndex, const int16_t *samples, uint16_t sampleCount,
-                              uint32_t color, int16_t valueMin, int16_t valueMax);
+                              uint32_t color, int16_t valueMin, int16_t valueMax, uint8_t thickness = 1);
         void updateGraphSamples(uint8_t lineIndex, const int16_t *samples, uint16_t sampleCount,
-                                uint32_t color, int16_t valueMin, int16_t valueMax);
+                                uint32_t color, int16_t valueMin, int16_t valueMax, uint8_t thickness = 1);
         void configGraphScope(uint8_t screenId,
                               uint16_t sampleRateHz,
                               uint16_t timebaseMs,
@@ -669,6 +670,7 @@ namespace pipgui
         void beginGraphFrame(uint8_t screenId) noexcept;
         void endGraphFrame(uint8_t screenId) noexcept;
         void releaseGraphBuffers(uint8_t screenId) noexcept;
+        void flushPendingGraphRender(uint8_t screenId) noexcept;
         ListState *ensureList(uint8_t screenId);
         TileState *ensureTile(uint8_t screenId);
         ListState *getList(uint8_t screenId);

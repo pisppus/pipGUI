@@ -444,8 +444,9 @@ namespace pipgui
     {
         PIPGUI_DEFAULT_FLUENT_MOVE(DrawLineFluent);
         int16_t _x0, _y0, _x1, _y1;
+        uint8_t _thickness;
         uint16_t _color;
-        DrawLineFluent(GUI *g) : detail::FluentLifetime(g), _x0(0), _y0(0), _x1(0), _y1(0), _color(0) {}
+        DrawLineFluent(GUI *g) : detail::FluentLifetime(g), _x0(0), _y0(0), _x1(0), _y1(0), _thickness(1), _color(0) {}
         ~DrawLineFluent() { draw(); }
         DrawLineFluent &from(int16_t x0, int16_t y0)
         {
@@ -461,6 +462,13 @@ namespace pipgui
                 return *this;
             _x1 = x1;
             _y1 = y1;
+            return *this;
+        }
+        DrawLineFluent &thickness(uint8_t t)
+        {
+            if (!canMutate())
+                return *this;
+            _thickness = t;
             return *this;
         }
         DrawLineFluent &color(uint16_t c)

@@ -50,10 +50,10 @@ namespace pipgui
             const int16_t y0 = _y;
             const int16_t x1 = (int16_t)(_x + _w - 1);
             const int16_t y1 = (int16_t)(_y + _h - 1);
-            detail::GuiAccess::drawLine(*_gui, x0, y0, x1, y0, _color);
-            detail::GuiAccess::drawLine(*_gui, x1, y0, x1, y1, _color);
-            detail::GuiAccess::drawLine(*_gui, x1, y1, x0, y1, _color);
-            detail::GuiAccess::drawLine(*_gui, x0, y1, x0, y0, _color);
+            detail::GuiAccess::drawLine(*_gui, x0, y0, x1, y0, 1, _color);
+            detail::GuiAccess::drawLine(*_gui, x1, y0, x1, y1, 1, _color);
+            detail::GuiAccess::drawLine(*_gui, x1, y1, x0, y1, 1, _color);
+            detail::GuiAccess::drawLine(*_gui, x0, y1, x0, y0, 1, _color);
         }
     }
 
@@ -96,7 +96,7 @@ namespace pipgui
     {
         if (!beginCommit())
             return;
-        detail::GuiAccess::drawLine(*_gui, _x0, _y0, _x1, _y1, _color);
+        detail::GuiAccess::drawLine(*_gui, _x0, _y0, _x1, _y1, _thickness, _color);
     }
 
     void DrawCircleFluent::draw()
@@ -193,8 +193,8 @@ namespace pipgui
         if (!beginCommit())
             return;
         detail::callByMode<IsUpdate>(
-            [&] { detail::GuiAccess::updateScrollDots(*_gui, _x, _y, _count, _activeIndex, _prevIndex, _animProgress, _animate, _animDirection, _activeColor, _inactiveColor, _dotRadius, _spacing, _activeWidth); },
-            [&] { detail::GuiAccess::drawScrollDots(*_gui, _x, _y, _count, _activeIndex, _prevIndex, _animProgress, _animate, _animDirection, _activeColor, _inactiveColor, _dotRadius, _spacing, _activeWidth); });
+            [&] { detail::GuiAccess::updateScrollDots(*_gui, _x, _y, _count, _activeIndex, _prevIndex, _animProgress, _animDirection, _activeColor, _inactiveColor, _radius, _spacing); },
+            [&] { detail::GuiAccess::drawScrollDots(*_gui, _x, _y, _count, _activeIndex, _prevIndex, _animProgress, _animDirection, _activeColor, _inactiveColor, _radius, _spacing); });
     }
     template void ScrollDotsFluentT<false>::draw();
     template void ScrollDotsFluentT<true>::draw();
@@ -217,8 +217,8 @@ namespace pipgui
         if (!beginCommit())
             return;
         detail::callByMode<IsUpdate>(
-            [&] { detail::GuiAccess::updateGraphLine(*_gui, _lineIndex, _value, _color, _valueMin, _valueMax); },
-            [&] { detail::GuiAccess::drawGraphLine(*_gui, _lineIndex, _value, _color, _valueMin, _valueMax); });
+            [&] { detail::GuiAccess::updateGraphLine(*_gui, _lineIndex, _value, _color, _valueMin, _valueMax, _thickness); },
+            [&] { detail::GuiAccess::drawGraphLine(*_gui, _lineIndex, _value, _color, _valueMin, _valueMax, _thickness); });
     }
     template void GraphLineFluentT<false>::draw();
     template void GraphLineFluentT<true>::draw();
@@ -229,8 +229,8 @@ namespace pipgui
         if (!beginCommit())
             return;
         detail::callByMode<IsUpdate>(
-            [&] { detail::GuiAccess::updateGraphSamples(*_gui, _lineIndex, _samples, _sampleCount, _color, _valueMin, _valueMax); },
-            [&] { detail::GuiAccess::drawGraphSamples(*_gui, _lineIndex, _samples, _sampleCount, _color, _valueMin, _valueMax); });
+            [&] { detail::GuiAccess::updateGraphSamples(*_gui, _lineIndex, _samples, _sampleCount, _color, _valueMin, _valueMax, _thickness); },
+            [&] { detail::GuiAccess::drawGraphSamples(*_gui, _lineIndex, _samples, _sampleCount, _color, _valueMin, _valueMax, _thickness); });
     }
     template void GraphSamplesFluentT<false>::draw();
     template void GraphSamplesFluentT<true>::draw();

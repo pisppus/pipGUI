@@ -511,10 +511,12 @@ ui.drawIcon()
 ui.drawLine()
     .from(20, 20)
     .to(140, 60)
+    .thickness(2)
     .color(ui.rgb(255, 255, 255))
 ```
 
 - `from(...)` и `to(...)` задают начало и конец линии
+- `thickness(...)` задаёт толщину линии; по умолчанию `1`
 - `color(...)` задаёт цвет линии
 
 ## 7.2 Прямоугольник
@@ -816,17 +818,29 @@ ui.drawScrollDots()
     .activeIndex(2)
     .prevIndex(1)
     .animProgress(0.5f)
-    .animate(true)
     .animDirection(1)
     .activeColor(ui.rgb(0, 87, 250))
     .inactiveColor(ui.rgb(60, 60, 60)) 
-    .dotRadius(3)
-    .spacing(14)
-    .activeWidth(18)
-    .draw();
+    .radius(3)
+    .spacing(14);
 ```
 
 Есть и `updateScrollDots()` с теми же параметрами.
+
+Что задают параметры:
+
+- `count(...)` - общее число страниц/точек
+- `activeIndex(...)` - текущая активная страница
+- `prevIndex(...)` - предыдущая активная страница для анимации перехода
+- `animProgress(...)` - прогресс анимации от `0.0f` до `1.0f`
+- `animDirection(...)` - направление перехода: `1` вперёд, `-1` назад
+- `radius(...)` - базовый радиус точки
+- `spacing(...)` - шаг между центрами соседних точек
+
+Поведение:
+
+- при `prevIndex != activeIndex` индикатор всегда анимирует активную точку как `circle -> capsule -> circle`
+- при `count > 7` включается оконный режим: показывается компактное окно точек с taper по краям
 
 ## 10.2. Наследование стиля fluent
 
@@ -1187,12 +1201,14 @@ ui.drawGraphGrid()
 ui.drawGraphLine()
     .line(0)
     .value(sensorValue)
+    .thickness(2)
     .color(ui.rgb(0, 255, 140))
     .range(0, 100);
 ```
 
 - `drawGraphLine()` добавляет новую точку в уже настроенный график
 - `updateGraphLine()` подходит для in-place обновления, когда графику нужно самому зачистить и перерисовать нужную область
+- `thickness(...)` задаёт толщину линии графика; по умолчанию `1`
 
 ## Auto-scale:
 
@@ -1210,11 +1226,13 @@ int16_t samples[] = {10, 15, 12, 18, 20, 17};
 ui.drawGraphSamples()
     .line(0)
     .samples(samples, 6)
+    .thickness(2)
     .color(ui.rgb(0, 255, 140))
     .range(0, 100);
 ```
 
 - `drawGraphSamples()` рисует переданный массив сразу, не накапливает внутреннюю историю точек. Для streaming-режима с накоплением используйте `drawGraphLine()`
+- `thickness(...)` задаёт толщину линии; по умолчанию `1`
 
 Осциллограф можно настроить отдельно:
 

@@ -110,6 +110,9 @@ namespace pipgui
             return;
         }
 
+        if (!_flags.needRedraw && _screen.current < _screen.capacity)
+            flushPendingGraphRender(_screen.current);
+
         ScreenCallback currentCb = (_screen.current < _screen.capacity && _screen.callbacks)
                                        ? _screen.callbacks[_screen.current]
                                        : nullptr;

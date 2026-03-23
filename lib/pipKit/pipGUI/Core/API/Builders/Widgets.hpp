@@ -477,13 +477,12 @@ namespace pipgui
         int16_t _x, _y;
         uint8_t _count, _activeIndex, _prevIndex;
         float _animProgress;
-        bool _animate;
         int8_t _animDirection;
         uint16_t _activeColor, _inactiveColor;
-        uint8_t _dotRadius, _spacing, _activeWidth;
+        uint8_t _radius, _spacing;
         ScrollDotsFluentT(GUI *g)
-            : detail::FluentLifetime(g), _x(0), _y(0), _count(0), _activeIndex(0), _prevIndex(0), _animProgress(0), _animate(false), _animDirection(0),
-              _activeColor(0xFFFF), _inactiveColor(0x7BEF), _dotRadius(3), _spacing(14), _activeWidth(18) {}
+            : detail::FluentLifetime(g), _x(0), _y(0), _count(0), _activeIndex(0), _prevIndex(0), _animProgress(0), _animDirection(0),
+              _activeColor(0xFFFF), _inactiveColor(0x7BEF), _radius(3), _spacing(14) {}
 
         ~ScrollDotsFluentT() { draw(); }
         ScrollDotsFluentT &pos(int16_t x, int16_t y)
@@ -522,13 +521,6 @@ namespace pipgui
             _animProgress = p;
             return *this;
         }
-        ScrollDotsFluentT &animate(bool a)
-        {
-            if (!canMutate())
-                return *this;
-            _animate = a;
-            return *this;
-        }
         ScrollDotsFluentT &animDirection(int8_t d)
         {
             if (!canMutate())
@@ -550,11 +542,11 @@ namespace pipgui
             _inactiveColor = c;
             return *this;
         }
-        ScrollDotsFluentT &dotRadius(uint8_t r)
+        ScrollDotsFluentT &radius(uint8_t r)
         {
             if (!canMutate())
                 return *this;
-            _dotRadius = r;
+            _radius = r;
             return *this;
         }
         ScrollDotsFluentT &spacing(uint8_t s)
@@ -562,13 +554,6 @@ namespace pipgui
             if (!canMutate())
                 return *this;
             _spacing = s;
-            return *this;
-        }
-        ScrollDotsFluentT &activeWidth(uint8_t w)
-        {
-            if (!canMutate())
-                return *this;
-            _activeWidth = w;
             return *this;
         }
         void draw();
@@ -674,6 +659,7 @@ namespace pipgui
         uint32_t _color;
         int16_t _valueMin;
         int16_t _valueMax;
+        uint8_t _thickness;
 
         GraphLineFluentT(GUI *g)
             : detail::FluentLifetime(g),
@@ -681,7 +667,8 @@ namespace pipgui
               _value(0),
               _color(0),
               _valueMin(0),
-              _valueMax(1)
+              _valueMax(1),
+              _thickness(1)
         {
         }
 
@@ -736,6 +723,14 @@ namespace pipgui
             return *this;
         }
 
+        GraphLineFluentT &thickness(uint8_t t)
+        {
+            if (!canMutate())
+                return *this;
+            _thickness = t;
+            return *this;
+        }
+
         void draw();
     };
 
@@ -749,6 +744,7 @@ namespace pipgui
         uint32_t _color;
         int16_t _valueMin;
         int16_t _valueMax;
+        uint8_t _thickness;
 
         GraphSamplesFluentT(GUI *g)
             : detail::FluentLifetime(g),
@@ -757,7 +753,8 @@ namespace pipgui
               _sampleCount(0),
               _color(0),
               _valueMin(0),
-              _valueMax(1)
+              _valueMax(1),
+              _thickness(1)
         {
         }
 
@@ -810,6 +807,14 @@ namespace pipgui
                 return *this;
             _valueMin = vmin;
             _valueMax = vmax;
+            return *this;
+        }
+
+        GraphSamplesFluentT &thickness(uint8_t t)
+        {
+            if (!canMutate())
+                return *this;
+            _thickness = t;
             return *this;
         }
 

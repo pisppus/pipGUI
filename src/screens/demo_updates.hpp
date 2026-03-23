@@ -125,6 +125,11 @@ void updateProgressDemoFrame(uint32_t nowMs)
 
   g_lastProgressUpdateMs = nowMs;
   stepPingPong(g_progressValue, g_progressDirDown);
+  const uint16_t bg565 = ui.rgb(0, 0, 0);
+  const String valueRaw = String(g_progressValue);
+  const String valuePercent = valueRaw + "%";
+  const String valueFraction = String((float)g_progressValue / 100.0f, 2);
+  const String valueRange = valueRaw + "/100";
 
   ui.updateProgress()
       .pos(center, 60)
@@ -133,6 +138,10 @@ void updateProgressDemoFrame(uint32_t nowMs)
       .baseColor(ui.rgb(10, 10, 10))
       .fillColor(ui.rgb(0, 87, 250))
       .radius(6)
+      .label("Indeterminate")
+      .labelColor(ui.rgb(255, 255, 255))
+      .percent()
+      .percentColor(ui.rgb(200, 200, 200))
       .anim(Indeterminate);
 
   ui.updateProgress()
@@ -142,6 +151,10 @@ void updateProgressDemoFrame(uint32_t nowMs)
       .baseColor(ui.rgb(10, 10, 10))
       .fillColor(ui.rgb(255, 0, 72))
       .radius(6)
+      .label("Determinate")
+      .labelColor(ui.rgb(255, 255, 255))
+      .percent()
+      .percentColor(ui.rgb(200, 200, 200))
       .anim(None);
 
   ui.updateProgress()
@@ -151,6 +164,10 @@ void updateProgressDemoFrame(uint32_t nowMs)
       .baseColor(ui.rgb(10, 10, 10))
       .fillColor(ui.rgb(255, 128, 0))
       .radius(6)
+      .label("Shimmer")
+      .labelColor(ui.rgb(255, 255, 255))
+      .percent()
+      .percentColor(ui.rgb(200, 200, 200))
       .anim(Shimmer);
 
   ui.updateCircleProgress()
@@ -188,6 +205,38 @@ void updateProgressDemoFrame(uint32_t nowMs)
       .baseColor(ui.rgb(10, 10, 10))
       .fillColor(ui.rgb(0, 200, 120))
       .anim(Shimmer);
+
+  ui.updateText()
+      .pos(50, 200)
+      .text(valueRaw)
+      .size(12)
+      .color(ui.rgb(180, 180, 180))
+      .bgColor(bg565)
+      .align(Center);
+
+  ui.updateText()
+      .pos(105, 200)
+      .text(valuePercent)
+      .size(12)
+      .color(ui.rgb(180, 180, 180))
+      .bgColor(bg565)
+      .align(Center);
+
+  ui.updateText()
+      .pos(160, 200)
+      .text(valueFraction)
+      .size(12)
+      .color(ui.rgb(180, 180, 180))
+      .bgColor(bg565)
+      .align(Center);
+
+  ui.updateText()
+      .pos(215, 200)
+      .text(valueRange)
+      .size(12)
+      .color(ui.rgb(180, 180, 180))
+      .bgColor(bg565)
+      .align(Center);
 }
 
 void updateSettingsDemoFrame(uint32_t nowMs, bool buttonPressed, bool buttonDown)
@@ -667,13 +716,11 @@ void updateScrollDotsDemo(uint32_t nowMs, bool nextPressed, bool prevPressed)
       .activeIndex(g_dotsActive)
       .prevIndex(g_dotsPrev)
       .animProgress(p)
-      .animate(g_dotsAnimate)
       .animDirection(g_dotsDir)
       .activeColor(ui.rgb(0, 87, 250))
       .inactiveColor(ui.rgb(60, 60, 60))
-      .dotRadius(3)
-      .spacing(14)
-      .activeWidth(18);
+      .radius(3)
+      .spacing(14);
 }
 
 void updateDrumRollDemo(uint32_t nowMs, bool nextPressed, bool prevPressed)

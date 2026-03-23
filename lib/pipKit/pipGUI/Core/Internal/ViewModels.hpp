@@ -15,6 +15,9 @@ namespace pipgui
         int16_t innerY = 0;
         int16_t innerW = 0;
         int16_t innerH = 0;
+        uint16_t *innerCache = nullptr;
+        int16_t innerCacheW = 0;
+        int16_t innerCacheH = 0;
 
         uint32_t bgColor = 0;
         uint16_t bgColor565 = 0;
@@ -31,6 +34,7 @@ namespace pipgui
         GraphDirection direction = LeftToRight;
         float speed = 0.0f;
         bool frameUsed = false;
+        bool pendingRender = false;
         bool autoScaleEnabled = false;
         bool autoScaleInitialized = false;
         int16_t autoMin = 0;
@@ -43,8 +47,12 @@ namespace pipgui
         uint16_t *lineColors565 = nullptr;
         int16_t *lineValueMins = nullptr;
         int16_t *lineValueMaxs = nullptr;
+        uint8_t *lineThicknesses = nullptr;
         uint16_t *sampleCounts = nullptr;
         uint16_t *sampleHead = nullptr;
+        uint16_t *renderCounts = nullptr;
+        uint16_t *renderHead = nullptr;
+        bool renderSnapshotValid = false;
     };
 
     struct ListStyle

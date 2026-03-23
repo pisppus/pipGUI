@@ -324,9 +324,9 @@ namespace pipgui
                            int16_t x1, int16_t y1,
                            int16_t x2, int16_t y2, uint16_t color)
     {
-        drawLine(x0, y0, x1, y1, color);
-        drawLine(x1, y1, x2, y2, color);
-        drawLine(x2, y2, x0, y0, color);
+        drawLine(x0, y0, x1, y1, 1, color);
+        drawLine(x1, y1, x2, y2, 1, color);
+        drawLine(x2, y2, x0, y0, 1, color);
     }
 
     void GUI::fillTriangle(int16_t x0, int16_t y0,

@@ -257,6 +257,100 @@ namespace pipgui
         {
             return *static_cast<const uint16_t *>(ctx);
         }
+
+        static void rasterThickLineAA(pipcore::Sprite *spr,
+                                      int16_t x0, int16_t y0,
+                                      int16_t x1, int16_t y1,
+                                      uint8_t thickness,
+                                      uint16_t color565,
+                                      bool roundStart,
+                                      bool roundEnd)
+        {
+            if (!spr || thickness < 1)
+                return;
+
+            Surface565 s;
+            if (!getSurface565(spr, s))
+                return;
+
+            float radius = static_cast<float>(thickness) * 0.5f;
+            if (thickness > 1)
+                radius -= 0.125f;
+            if (radius < 0.5f)
+                radius = 0.5f;
+            const float radius2 = radius * radius;
+            int32_t minX = static_cast<int32_t>(floorf((x0 < x1 ? x0 : x1) - radius - 1.0f));
+            int32_t maxX = static_cast<int32_t>(ceilf((x0 > x1 ? x0 : x1) + radius + 1.0f));
+            int32_t minY = static_cast<int32_t>(floorf((y0 < y1 ? y0 : y1) - radius - 1.0f));
+            int32_t maxY = static_cast<int32_t>(ceilf((y0 > y1 ? y0 : y1) + radius + 1.0f));
+            if (minX < s.clipX)
+                minX = s.clipX;
+            if (maxX > s.clipR)
+                maxX = s.clipR;
+            if (minY < s.clipY)
+                minY = s.clipY;
+            if (maxY > s.clipB)
+                maxY = s.clipB;
+            if (minX > maxX || minY > maxY)
+                return;
+
+            const float vx = static_cast<float>(x1 - x0);
+            const float vy = static_cast<float>(y1 - y0);
+            const float len2 = vx * vx + vy * vy;
+            if (len2 <= 0.0f)
+            {
+                rasterArcCapAA(spr, static_cast<float>(x0), static_cast<float>(y0), radius, color565);
+                return;
+            }
+            const float invLen2 = 1.0f / len2;
+
+            const float subStep = 1.0f / static_cast<float>(kArcSubSamples);
+            const float subBias = 0.5f * subStep;
+            const uint8_t *gamma = gammaTable();
+            const Color565 c = makeColor565(color565);
+
+            for (int32_t py = minY; py <= maxY; ++py)
+            {
+                for (int32_t px = minX; px <= maxX; ++px)
+                {
+                    int covered = 0;
+                    for (int sy = 0; sy < kArcSubSamples; ++sy)
+                    {
+                        const float sampleY = (static_cast<float>(py) - 0.5f) + subBias + static_cast<float>(sy) * subStep;
+                        for (int sx = 0; sx < kArcSubSamples; ++sx)
+                        {
+                            const float sampleX = (static_cast<float>(px) - 0.5f) + subBias + static_cast<float>(sx) * subStep;
+                            float t = ((sampleX - static_cast<float>(x0)) * vx + (sampleY - static_cast<float>(y0)) * vy) * invLen2;
+                            if (t < 0.0f)
+                            {
+                                if (!roundStart)
+                                    continue;
+                                t = 0.0f;
+                            }
+                            else if (t > 1.0f)
+                            {
+                                if (!roundEnd)
+                                    continue;
+                                t = 1.0f;
+                            }
+                            const float dx = sampleX - (static_cast<float>(x0) + vx * t);
+                            const float dy = sampleY - (static_cast<float>(y0) + vy * t);
+                            if (dx * dx + dy * dy <= radius2)
+                                ++covered;
+                        }
+                    }
+
+                    if (covered == 0)
+                        continue;
+
+                    uint16_t *dst = s.buf + static_cast<int32_t>(py) * s.stride + px;
+                    if (covered >= kArcSubSampleCount)
+                        *dst = c.fg;
+                    else
+                        blendStore(dst, c, gamma[(covered * 255) / kArcSubSampleCount]);
+                }
+            }
+        }
         template <bool Fill>
         static inline const uint8_t *tinyCircleMask(uint8_t r, uint8_t &outSize)
         {
@@ -326,7 +420,14 @@ namespace pipgui
         }
     }
 
-    void GUI::drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t color)
+    void GUI::drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint8_t thickness, uint16_t color)
+    {
+        drawLineCore(x0, y0, x1, y1, thickness, color, true, true, true);
+    }
+
+    void GUI::drawLineCore(int16_t x0, int16_t y0, int16_t x1, int16_t y1,
+                           uint8_t thickness, uint16_t color,
+                           bool roundStart, bool roundEnd, bool invalidate)
     {
         if (!_flags.spriteEnabled)
             return;
@@ -334,6 +435,21 @@ namespace pipgui
         auto spr = getDrawTarget();
         if (!spr)
             return;
+
+        if (thickness < 1)
+            thickness = 1;
+
+        if (thickness > 1)
+        {
+            rasterThickLineAA(spr, x0, y0, x1, y1, thickness, color, roundStart, roundEnd);
+            if (invalidate && _disp.display && _flags.spriteEnabled && !_flags.inSpritePass)
+            {
+                const int16_t pad = static_cast<int16_t>(thickness / 2 + 2);
+                invalidateRect((int16_t)(std::min(x0, x1) - pad), (int16_t)(std::min(y0, y1) - pad),
+                               (int16_t)(std::abs(x1 - x0) + pad * 2 + 1), (int16_t)(std::abs(y1 - y0) + pad * 2 + 1));
+            }
+            return;
+        }
 
         if (x0 == x1 && y0 == y1)
         {
@@ -451,7 +567,7 @@ namespace pipgui
                 rasterAALine<false>(x0, x1, y0, step, w256, curve, gamma, blendFastClip);
         }
 
-        if (_disp.display && _flags.spriteEnabled && !_flags.inSpritePass)
+        if (invalidate && _disp.display && _flags.spriteEnabled && !_flags.inSpritePass)
             invalidateRect(std::min(origX0, origX1), std::min(origY0, origY1),
                            std::abs(origX1 - origX0) + 1, std::abs(origY1 - origY0) + 1);
     }

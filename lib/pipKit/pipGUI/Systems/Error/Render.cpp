@@ -519,13 +519,11 @@ namespace pipgui
             .activeIndex(dotsActive)
             .prevIndex(dotsPrev)
             .animProgress(rawProgress)
-            .animate(_flags.errorTransition)
             .animDirection((_flags.errorTransition && _error.transitionDir < 0) ? -1 : 1)
             .activeColor(theme.dotsActive565)
             .inactiveColor(theme.dotsInactive565)
-            .dotRadius(3)
+            .radius(3)
             .spacing(14)
-            .activeWidth(18)
             .draw();
 
         _error.buttonState.enabled = theme.dismissible;

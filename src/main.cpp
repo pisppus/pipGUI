@@ -16,7 +16,7 @@ namespace
   constexpr uint8_t kBlurRectCount = 3;
 
 #ifndef PIPGUI_DEMO_BTN_NEXT_PIN
-#define PIPGUI_DEMO_BTN_NEXT_PIN 2
+#define PIPGUI_DEMO_BTN_NEXT_PIN 20
 #endif
 
 #ifndef PIPGUI_DEMO_BTN_PREV_PIN
@@ -87,7 +87,7 @@ namespace
   bool g_dotsAnimate = false;
   int8_t g_dotsDir = 0;
   uint32_t g_dotsAnimStartMs = 0;
-  constexpr uint32_t g_dotsAnimDurMs = 240;
+  constexpr uint32_t g_dotsAnimDurMs = 320;
 
   const char *const g_drumOptionsH[] = {"Off", "5 min", "10 min", "30 min", "1 hr"};
   constexpr uint8_t g_drumCountH = 5;
