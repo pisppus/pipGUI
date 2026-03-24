@@ -13,38 +13,36 @@ namespace pipgui
             return nullptr;
         if (!arr[screenId])
         {
-            void *mem = detail::alloc(plat, sizeof(T), pipcore::AllocCaps::Default);
-            if (!mem)
+            auto *obj = static_cast<T *>(detail::alloc(plat, sizeof(T), pipcore::AllocCaps::Default));
+            if (!obj)
                 return nullptr;
-            T *obj = new (mem) T();
+            new (obj) T();
             initFunc(*obj);
             arr[screenId] = obj;
         }
         return arr[screenId];
     }
-    static void initGraphAreaDefaults(pipgui::GraphArea &area) noexcept
+    static void initGraphAreaDefaults(GraphArea &area) noexcept
     {
         area = {};
         area.autoMax = 1;
         area.speed = 1.0f;
-        area.direction = pipgui::LeftToRight;
+        area.direction = LeftToRight;
     }
-    static void initListDefaults(pipgui::ListState &menu) noexcept
+    static void initListDefaults(ListState &menu) noexcept
     {
         menu = {};
-        menu.parentScreen = INVALID_SCREEN_ID;
         menu.style.radius = 8;
         menu.style.spacing = 6;
-        menu.style.mode = pipgui::Cards;
+        menu.style.mode = Cards;
     }
-    static void initTileDefaults(pipgui::TileState &tile) noexcept
+    static void initTileDefaults(TileState &tile) noexcept
     {
         tile = {};
-        tile.parentScreen = INVALID_SCREEN_ID;
         tile.style.radius = 8;
         tile.style.spacing = 6;
         tile.style.columns = 2;
-        tile.style.contentMode = pipgui::TextSubtitle;
+        tile.style.contentMode = TextSubtitle;
     }
 
     void GUI::ensureScreenState(uint8_t id)
@@ -63,8 +61,6 @@ namespace pipgui
             }
             newCap = next;
         }
-        if (newCap < (uint16_t)(id + 1))
-            newCap = (uint16_t)(id + 1);
         ScreenCallback *newScreens = (ScreenCallback *)detail::alloc(plat, sizeof(ScreenCallback) * newCap, pipcore::AllocCaps::Default);
         GraphArea **newGraphs = (GraphArea **)detail::alloc(plat, sizeof(GraphArea *) * newCap, pipcore::AllocCaps::Default);
         ListState **newLists = (ListState **)detail::alloc(plat, sizeof(ListState *) * newCap, pipcore::AllocCaps::Default);
@@ -85,19 +81,17 @@ namespace pipgui
         std::fill_n(newGraphs, newCap, nullptr);
         std::fill_n(newLists, newCap, nullptr);
         std::fill_n(newTiles, newCap, nullptr);
-        if (_screen.capacity > 0)
+        const uint16_t oldCap = _screen.capacity;
+        if (oldCap)
         {
-            for (uint16_t i = 0; i < _screen.capacity; ++i)
-            {
-                if (_screen.callbacks)
-                    newScreens[i] = _screen.callbacks[i];
-                if (_screen.graphAreas)
-                    newGraphs[i] = _screen.graphAreas[i];
-                if (_screen.lists)
-                    newLists[i] = _screen.lists[i];
-                if (_screen.tiles)
-                    newTiles[i] = _screen.tiles[i];
-            }
+            if (_screen.callbacks)
+                std::copy_n(_screen.callbacks, oldCap, newScreens);
+            if (_screen.graphAreas)
+                std::copy_n(_screen.graphAreas, oldCap, newGraphs);
+            if (_screen.lists)
+                std::copy_n(_screen.lists, oldCap, newLists);
+            if (_screen.tiles)
+                std::copy_n(_screen.tiles, oldCap, newTiles);
         }
         if (_screen.callbacks)
             detail::free(plat, _screen.callbacks);
@@ -132,18 +126,11 @@ namespace pipgui
 
     ListState *GUI::getList(uint8_t screenId)
     {
-        if (screenId >= _screen.capacity || !_screen.lists)
-            return nullptr;
-        return _screen.lists[screenId];
+        return (screenId < _screen.capacity && _screen.lists) ? _screen.lists[screenId] : nullptr;
     }
     TileState *GUI::getTile(uint8_t screenId)
     {
-        if (screenId >= _screen.capacity || !_screen.tiles)
-            return nullptr;
-        return _screen.tiles[screenId];
+        return (screenId < _screen.capacity && _screen.tiles) ? _screen.tiles[screenId] : nullptr;
     }
 
 }
-
-
-

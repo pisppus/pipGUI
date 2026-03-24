@@ -475,13 +475,11 @@ namespace pipgui
     {
         PIPGUI_DEFAULT_FLUENT_MOVE(ScrollDotsFluentT);
         int16_t _x, _y;
-        uint8_t _count, _activeIndex, _prevIndex;
-        float _animProgress;
-        int8_t _animDirection;
+        uint8_t _count, _activeIndex;
         uint16_t _activeColor, _inactiveColor;
         uint8_t _radius, _spacing;
         ScrollDotsFluentT(GUI *g)
-            : detail::FluentLifetime(g), _x(0), _y(0), _count(0), _activeIndex(0), _prevIndex(0), _animProgress(0), _animDirection(0),
+            : detail::FluentLifetime(g), _x(0), _y(0), _count(0), _activeIndex(0),
               _activeColor(0xFFFF), _inactiveColor(0x7BEF), _radius(3), _spacing(14) {}
 
         ~ScrollDotsFluentT() { draw(); }
@@ -505,27 +503,6 @@ namespace pipgui
             if (!canMutate())
                 return *this;
             _activeIndex = i;
-            return *this;
-        }
-        ScrollDotsFluentT &prevIndex(uint8_t i)
-        {
-            if (!canMutate())
-                return *this;
-            _prevIndex = i;
-            return *this;
-        }
-        ScrollDotsFluentT &animProgress(float p)
-        {
-            if (!canMutate())
-                return *this;
-            _animProgress = p;
-            return *this;
-        }
-        ScrollDotsFluentT &animDirection(int8_t d)
-        {
-            if (!canMutate())
-                return *this;
-            _animDirection = d;
             return *this;
         }
         ScrollDotsFluentT &activeColor(uint16_t c)

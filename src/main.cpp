@@ -83,11 +83,6 @@ namespace
 
   constexpr uint8_t g_dotsCount = 15;
   uint8_t g_dotsActive = 0;
-  uint8_t g_dotsPrev = 0;
-  bool g_dotsAnimate = false;
-  int8_t g_dotsDir = 0;
-  uint32_t g_dotsAnimStartMs = 0;
-  constexpr uint32_t g_dotsAnimDurMs = 320;
 
   const char *const g_drumOptionsH[] = {"Off", "5 min", "10 min", "30 min", "1 hr"};
   constexpr uint8_t g_drumCountH = 5;
@@ -95,14 +90,7 @@ namespace
   constexpr uint8_t g_drumCountV = 3;
 
   uint8_t g_drumSelectedH = 0;
-  uint8_t g_drumPrevH = 0;
-  bool g_drumAnimateH = false;
-  uint32_t g_drumAnimStartMs = 0;
-  constexpr uint32_t g_drumAnimDurMs = 280;
-
   uint8_t g_drumSelectedV = 0;
-  uint8_t g_drumPrevV = 0;
-  bool g_drumAnimateV = false;
 
   float g_blurPhase = 0.0f;
   uint32_t g_blurLastUpdateMs = 0;
@@ -142,14 +130,6 @@ namespace
       else
         dirDown = true;
     }
-  }
-
-  float animProgress(uint32_t now, uint32_t startMs, uint32_t durationMs)
-  {
-    if (durationMs == 0)
-      return 1.0f;
-    const uint32_t elapsed = now - startMs;
-    return (elapsed >= durationMs) ? 1.0f : (float)elapsed / (float)durationMs;
   }
 
   uint32_t blurRectColor(uint8_t index)
@@ -367,7 +347,10 @@ void updateClockDisplay(uint32_t nowMs)
   const uint8_t h = (minute / 60U) % 24U;
   char buf[6];
   snprintf(buf, sizeof(buf), "%02u:%02u", (unsigned)h, (unsigned)m);
-  ui.setStatusBarText("pipGUI", String(buf), "");
+  ui.setStatusBarText()
+      .left("pipGUI")
+      .center(String(buf))
+      .right("");
   if (!ui.notificationActive())
     ui.updateStatusBar();
 }
@@ -439,9 +422,8 @@ void configureListMenus()
           {"Test: Squircles", "fill/draw squircle AA", testSquircles},
           {"Auto text color", "BT.709 luminance test", autoTextColor},
       })
-      .parent(mainMenu)
-      .cardColor(ui.rgb(8, 8, 8))
-      .activeColor(ui.rgb(21, 54, 140))
+      .inactive(ui.rgb(8, 8, 8))
+      .active(ui.rgb(21, 54, 140))
       .radius(13)
       .cardSize(310, 50);
 
@@ -458,9 +440,8 @@ void configureListMenus()
           {"Screenshots", "Captured frames gallery", screenshotGallery},
           {"Font compare", "PSDF", fontCompare},
       })
-      .parent(listMenu)
-      .cardColor(ui.rgb(8, 8, 8))
-      .activeColor(ui.rgb(21, 54, 140))
+      .inactive(ui.rgb(8, 8, 8))
+      .active(ui.rgb(21, 54, 140))
       .radius(12)
       .cardSize(310, 34)
       .mode(Plain);
@@ -476,9 +457,8 @@ void configureTileMenus()
           {battery_l1, "Graph", "Live graphs", graph},
           {battery_l2, "Toggle", "Switch", toggleSwitch},
       })
-      .parent(mainMenu)
-      .cardColor(ui.rgb(8, 8, 8))
-      .activeColor(ui.rgb(21, 54, 140))
+      .inactive(ui.rgb(8, 8, 8))
+      .active(ui.rgb(21, 54, 140))
       .radius(13)
       .spacing(10)
       .columns(2)
@@ -492,9 +472,8 @@ void configureTileMenus()
           {battery_l1, "Small 2", "", settings},
           {"Big", "Main", glow},
       })
-      .parent(listMenu)
-      .cardColor(ui.rgb(8, 8, 8))
-      .activeColor(ui.rgb(21, 54, 140))
+      .inactive(ui.rgb(8, 8, 8))
+      .active(ui.rgb(21, 54, 140))
       .radius(13)
       .spacing(10)
       .columns(2)
@@ -517,9 +496,8 @@ void configureTileMenus()
           {battery_l1, "7", "", progress},
           {"8", "", graphOsc},
       })
-      .parent(listMenu)
-      .cardColor(ui.rgb(8, 8, 8))
-      .activeColor(ui.rgb(21, 54, 140))
+      .inactive(ui.rgb(8, 8, 8))
+      .active(ui.rgb(21, 54, 140))
       .radius(13)
       .spacing(8)
       .columns(4)
@@ -542,9 +520,16 @@ void setup()
 
   ui.begin(3, 0);
   ui.setScreenAnim(SlideX, 320);
-  ui.configureStatusBar((PIPGUI_STATUS_BAR_ENABLED_DEFAULT != 0), 0x0000, kStatusBarHeight, Top);
-  ui.setStatusBarStyle((PIPGUI_STATUS_BAR_DEBUG_METRICS_DEFAULT != 0) ? StatusBarStyleSolid : StatusBarStyleBlurGradient);
-  ui.setStatusBarText("pipGUI", "00:00", "");
+  ui.configureStatusBar()
+      .enabled(PIPGUI_STATUS_BAR != 0)
+      .bgColor(0x0000)
+      .height(kStatusBarHeight)
+      .position(Top);
+  ui.setStatusBarStyle(StatusBarStyleBlur);
+  ui.setStatusBarText()
+      .left("pipGUI")
+      .center("00:00")
+      .right("");
   ui.setStatusBarBattery(100, Bar);
   if (kBacklightPin != 255)
     ui.setBacklight().pin(kBacklightPin);
@@ -626,7 +611,7 @@ void loop()
         break;
       case settings:
         if (prevPressed)
-          ui.setScreen(listMenu);
+          ui.prevScreen();
         else
           updateSettingsDemoFrame(nowMs, nextPressed, nextDown);
         break;

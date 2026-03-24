@@ -112,6 +112,8 @@ namespace pipgui
 
         if (!_flags.needRedraw && _screen.current < _screen.capacity)
             flushPendingGraphRender(_screen.current);
+        if (!_flags.needRedraw && statusBarAnimationActive())
+            updateStatusBar();
 
         ScreenCallback currentCb = (_screen.current < _screen.capacity && _screen.callbacks)
                                        ? _screen.callbacks[_screen.current]
@@ -231,6 +233,8 @@ namespace pipgui
                     {
                         updateList(_screen.current);
                         updateStatusBar();
+                        if (_dirty.count > 0)
+                            flushDirty();
                         if (_flags.notifActive || _flags.popupActive)
                             presentOverlaysFull();
                         else if (_flags.toastActive || _toast.lastRectValid)
@@ -238,16 +242,19 @@ namespace pipgui
                         return;
                     }
 
-                    renderScreenToMainSprite(currentCb, _screen.current);
-                    renderStatusBar();
-                    if (_flags.notifActive)
+                    beginGraphFrame(_screen.current);
+                    currentCb(*this);
+                    endGraphFrame(_screen.current);
+
+                    if (_flags.statusBarEnabled && _status.height > 0)
                     {
-                        renderNotificationOverlay();
+                        renderStatusBar();
+                        const int16_t barY = (_status.pos == Bottom)
+                                                 ? (int16_t)(_render.screenHeight - _status.height)
+                                                 : 0;
+                        invalidateRect(0, barY, (int16_t)_render.screenWidth, (int16_t)_status.height);
                     }
-                    if (_flags.popupActive)
-                    {
-                        renderPopupMenuOverlay(now);
-                    }
+
                     if (_flags.toastActive)
                     {
                         renderToastOverlay(now);
@@ -256,8 +263,23 @@ namespace pipgui
                         _toast.lastRect = r;
                         _toast.lastRectValid = vis;
                     }
-                    invalidateRect(0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight);
-                    flushDirty();
+
+                    if (_flags.toastActive || _toast.lastRectValid)
+                    {
+                        _dirty.count = 0;
+                        Debug::clearRects();
+                        presentSpriteRegion(0,
+                                            0,
+                                            0,
+                                            0,
+                                            (int16_t)_render.screenWidth,
+                                            (int16_t)_render.screenHeight,
+                                            "present");
+                    }
+                    else if (_dirty.count > 0)
+                    {
+                        flushDirty();
+                    }
                     return;
                 }
                 else

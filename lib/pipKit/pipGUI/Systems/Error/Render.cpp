@@ -512,14 +512,10 @@ namespace pipgui
 
         const uint8_t dotsCount = (_error.count > 1) ? _error.count : 0;
         const uint8_t dotsActive = (dotsCount > 0) ? (_flags.errorTransition ? clampIndex(_error.nextIndex, _error.count) : clampIndex(_error.currentIndex, _error.count)) : 0;
-        const uint8_t dotsPrev = (dotsCount > 0) ? clampIndex(_error.currentIndex, _error.count) : 0;
         drawScrollDots()
             .pos(center, dotsY)
             .count(dotsCount)
             .activeIndex(dotsActive)
-            .prevIndex(dotsPrev)
-            .animProgress(rawProgress)
-            .animDirection((_flags.errorTransition && _error.transitionDir < 0) ? -1 : 1)
             .activeColor(theme.dotsActive565)
             .inactiveColor(theme.dotsInactive565)
             .radius(3)

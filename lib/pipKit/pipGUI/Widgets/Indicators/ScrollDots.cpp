@@ -23,6 +23,7 @@ namespace pipgui
         struct ScrollDotsAnimState
         {
             bool valid = false;
+            uint8_t screenId = 0;
             int16_t reqX = 0;
             int16_t reqY = 0;
             uint8_t radius = 0;
@@ -30,12 +31,15 @@ namespace pipgui
             uint8_t prevCount = 0;
             uint8_t count = 0;
             uint32_t changeStartMs = 0;
+            uint8_t prevIndex = 0;
+            uint8_t index = 0;
+            uint32_t navStartMs = 0;
             uint32_t touchMs = 0;
         };
 
         ScrollDotsAnimState g_scrollDotsAnim[kScrollDotsAnimSlotCount];
 
-        static inline uint8_t scrollDotsActiveWidth(uint8_t radius, uint8_t spacing) noexcept
+        uint8_t scrollDotsActiveWidth(uint8_t radius, uint8_t spacing) noexcept
         {
             const int16_t diameter = (int16_t)radius * 2 + 1;
             int16_t width = (int16_t)spacing + radius + 1;
@@ -44,7 +48,7 @@ namespace pipgui
             return (uint8_t)width;
         }
 
-        static inline int16_t dotsTotalWidth(uint8_t count, uint8_t spacing, uint8_t activeWidth) noexcept
+        int16_t dotsTotalWidth(uint8_t count, uint8_t spacing, uint8_t activeWidth) noexcept
         {
             if (count <= 1)
                 return (int16_t)activeWidth;
@@ -53,12 +57,12 @@ namespace pipgui
             return (int16_t)((count - 1) * (int16_t)spacing + (int16_t)activeWidth);
         }
 
-        static inline int16_t dotsLeft(const GUI &gui, int16_t x, int16_t totalW) noexcept
+        int16_t dotsLeft(const GUI &gui, int16_t x, int16_t totalW) noexcept
         {
             return (x == center) ? (int16_t)(((int16_t)gui.screenWidth() - totalW) / 2) : x;
         }
 
-        static inline void normalizeDotsMetrics(uint8_t &radius, uint8_t &spacing) noexcept
+        void normalizeDotsMetrics(uint8_t &radius, uint8_t &spacing) noexcept
         {
             if (radius < 1)
                 radius = 1;
@@ -67,12 +71,12 @@ namespace pipgui
                 spacing = minSpacing;
         }
 
-        static inline uint16_t blendOverBackground(uint16_t bg565, uint16_t fg565, uint8_t alpha) noexcept
+        uint16_t blendOverBackground(uint16_t bg565, uint16_t fg565, uint8_t alpha) noexcept
         {
             return (alpha >= 255) ? fg565 : (uint16_t)detail::blend565(bg565, fg565, alpha);
         }
 
-        static inline float scrollDotsWindowBase(uint8_t count, uint8_t index) noexcept
+        float scrollDotsWindowBase(uint8_t count, uint8_t index) noexcept
         {
             if (count <= kScrollDotsMaxVisibleForTaper)
                 return 0.0f;
@@ -86,7 +90,7 @@ namespace pipgui
             return (float)base;
         }
 
-        static inline float taperSlotScale(float distanceToActive) noexcept
+        float taperSlotScale(float distanceToActive) noexcept
         {
             if (distanceToActive <= 0.5f)
                 return 1.0f;
@@ -108,7 +112,7 @@ namespace pipgui
             return 0.38f;
         }
 
-        static inline float taperSlotOpacity(float distanceToActive) noexcept
+        float taperSlotOpacity(float distanceToActive) noexcept
         {
             if (distanceToActive <= 0.5f)
                 return 1.0f;
@@ -130,11 +134,11 @@ namespace pipgui
             return 0.30f;
         }
 
-        static inline bool isTaperWrapJump(uint8_t count,
-                                           uint8_t activeIndex,
-                                           uint8_t prevIndex,
-                                           bool animate,
-                                           int8_t animDirection) noexcept
+        bool isTaperWrapJump(uint8_t count,
+                             uint8_t activeIndex,
+                             uint8_t prevIndex,
+                             bool animate,
+                             int8_t animDirection) noexcept
         {
             if (!animate || count <= kScrollDotsMaxVisibleForTaper || count < 2)
                 return false;
@@ -143,12 +147,12 @@ namespace pipgui
                     (prevIndex == (uint8_t)(count - 1) && activeIndex == 0 && animDirection > 0));
         }
 
-        static inline ScrollDotsLayout makeScrollDotsLayout(const GUI &gui,
-                                                            int16_t x,
-                                                            int16_t y,
-                                                            uint8_t count,
-                                                            uint8_t radius,
-                                                            uint8_t spacing) noexcept
+        ScrollDotsLayout makeScrollDotsLayout(const GUI &gui,
+                                              int16_t x,
+                                              int16_t y,
+                                              uint8_t count,
+                                              uint8_t radius,
+                                              uint8_t spacing) noexcept
         {
             ScrollDotsLayout layout;
             const uint8_t activeWidth = scrollDotsActiveWidth(radius, spacing);
@@ -194,17 +198,18 @@ namespace pipgui
             }
         };
 
-        static ScrollDotsAnimState &scrollDotsState(GUI &gui,
+        static ScrollDotsAnimState &scrollDotsState(uint8_t screenId,
                                                     int16_t x,
                                                     int16_t y,
                                                     uint8_t radius,
                                                     uint8_t spacing,
                                                     uint8_t count,
+                                                    uint8_t activeIndex,
+                                                    uint32_t now,
                                                     float &countProgress,
                                                     uint8_t &fromCount,
                                                     uint8_t &toCount)
         {
-            const uint32_t now = gui.platform() ? gui.platform()->nowMs() : 0;
             ScrollDotsAnimState *slot = nullptr;
             ScrollDotsAnimState *oldest = &g_scrollDotsAnim[0];
 
@@ -216,7 +221,8 @@ namespace pipgui
                     slot = &candidate;
                     break;
                 }
-                if (candidate.reqX == x &&
+                if (candidate.screenId == screenId &&
+                    candidate.reqX == x &&
                     candidate.reqY == y &&
                     candidate.radius == radius &&
                     candidate.spacing == spacing)
@@ -234,6 +240,7 @@ namespace pipgui
             if (!slot->valid)
             {
                 slot->valid = true;
+                slot->screenId = screenId;
                 slot->reqX = x;
                 slot->reqY = y;
                 slot->radius = radius;
@@ -241,9 +248,13 @@ namespace pipgui
                 slot->prevCount = count;
                 slot->count = count;
                 slot->changeStartMs = 0;
+                slot->prevIndex = activeIndex;
+                slot->index = activeIndex;
+                slot->navStartMs = 0;
             }
             else
             {
+                slot->screenId = screenId;
                 slot->reqX = x;
                 slot->reqY = y;
                 slot->radius = radius;
@@ -253,6 +264,24 @@ namespace pipgui
                     slot->prevCount = slot->count;
                     slot->count = count;
                     slot->changeStartMs = now;
+                }
+
+                if (count > 0)
+                {
+                    if (activeIndex >= count)
+                        activeIndex = (uint8_t)(count - 1);
+
+                    if (slot->index >= count)
+                        slot->index = (uint8_t)(count - 1);
+                    if (slot->prevIndex >= count)
+                        slot->prevIndex = slot->index;
+
+                    if (slot->index != activeIndex)
+                    {
+                        slot->prevIndex = slot->index;
+                        slot->index = activeIndex;
+                        slot->navStartMs = now;
+                    }
                 }
             }
 
@@ -284,9 +313,6 @@ namespace pipgui
     void GUI::updateScrollDotsImpl(int16_t x, int16_t y,
                                    uint8_t count,
                                    uint8_t activeIndex,
-                                   uint8_t prevIndex,
-                                   float animProgress,
-                                   int8_t animDirection,
                                    uint16_t activeColor,
                                    uint16_t inactiveColor,
                                    uint8_t radius,
@@ -294,17 +320,18 @@ namespace pipgui
     {
         if (!_flags.spriteEnabled || !_disp.display)
         {
-            drawScrollDotsImpl(x, y, count, activeIndex, prevIndex, animProgress, animDirection,
-                               activeColor, inactiveColor, radius, spacing);
+            drawScrollDotsImpl(x, y, count, activeIndex, activeColor, inactiveColor, radius, spacing);
             return;
         }
 
         normalizeDotsMetrics(radius, spacing);
 
+        const uint32_t now = nowMs();
+        const uint8_t screenId = currentScreen();
         float countProgress = 1.0f;
         uint8_t fromCount = count;
         uint8_t toCount = count;
-        scrollDotsState(*this, x, y, radius, spacing, count, countProgress, fromCount, toCount);
+        scrollDotsState(screenId, x, y, radius, spacing, count, activeIndex, now, countProgress, fromCount, toCount);
 
         const ScrollDotsLayout fromLayout = makeScrollDotsLayout(*this, x, y, fromCount, radius, spacing);
         const ScrollDotsLayout toLayout = makeScrollDotsLayout(*this, x, y, toCount, radius, spacing);
@@ -332,8 +359,7 @@ namespace pipgui
             .size(rw, rh)
             .color(bg565)
             .draw();
-        drawScrollDotsImpl(x, y, count, activeIndex, prevIndex, animProgress, animDirection,
-                           activeColor, inactiveColor, radius, spacing);
+        drawScrollDotsImpl(x, y, count, activeIndex, activeColor, inactiveColor, radius, spacing);
 
         _flags.inSpritePass = prevRender;
         _render.activeSprite = prevActive;
@@ -348,9 +374,6 @@ namespace pipgui
     void GUI::drawScrollDotsImpl(int16_t x, int16_t y,
                                  uint8_t count,
                                  uint8_t activeIndex,
-                                 uint8_t prevIndex,
-                                 float animProgress,
-                                 int8_t animDirection,
                                  uint16_t activeColor,
                                  uint16_t inactiveColor,
                                  uint8_t radius,
@@ -358,43 +381,58 @@ namespace pipgui
     {
         if (_flags.spriteEnabled && _disp.display && !_flags.inSpritePass)
         {
-            updateScrollDotsImpl(x, y, count, activeIndex, prevIndex, animProgress, animDirection,
-                                 activeColor, inactiveColor, radius, spacing);
+            updateScrollDotsImpl(x, y, count, activeIndex, activeColor, inactiveColor, radius, spacing);
             return;
         }
-
-        const uint8_t requestedActiveIndex = activeIndex;
-
-        if (count == 0)
-        {
-            activeIndex = 0;
-            prevIndex = 0;
-        }
-        else
-        {
-            if (activeIndex >= count)
-                activeIndex = (uint8_t)(count - 1);
-            if (prevIndex >= count)
-                prevIndex = activeIndex;
-        }
-
-        animProgress = detail::motion::clamp01(animProgress);
-        const bool animate = (activeIndex != prevIndex) && (animProgress < 1.0f);
-        const float navProgress = animate ? detail::motion::cubicBezierEase(animProgress, 0.22f, 0.0f, 0.18f, 1.0f) : 1.0f;
 
         normalizeDotsMetrics(radius, spacing);
 
         if (!getDrawTarget())
             return;
 
+        const uint32_t now = nowMs();
+        const uint8_t screenId = currentScreen();
         float countProgress = 1.0f;
         uint8_t fromCount = count;
         uint8_t toCount = count;
-        scrollDotsState(*this, x, y, radius, spacing, count, countProgress, fromCount, toCount);
+        ScrollDotsAnimState &anim = scrollDotsState(screenId, x, y, radius, spacing, count, activeIndex, now, countProgress, fromCount, toCount);
         const bool countAnimating = (fromCount != toCount && countProgress < 1.0f);
 
         if (!countAnimating && count == 0)
             return;
+
+        float animProgress = 1.0f;
+        if (count > 0 && anim.navStartMs != 0 && anim.prevIndex != anim.index)
+        {
+            const uint32_t elapsed = now - anim.navStartMs;
+            if (elapsed >= kScrollDotsCountAnimMs)
+            {
+                anim.prevIndex = anim.index;
+                anim.navStartMs = 0;
+            }
+            else
+            {
+                animProgress = (float)elapsed / (float)kScrollDotsCountAnimMs;
+            }
+        }
+
+        const uint8_t requestedActiveIndex = anim.index;
+        uint8_t prevIndex = (count > 0) ? anim.prevIndex : 0;
+        activeIndex = (count > 0) ? anim.index : 0;
+
+        const bool animate = (count > 0) && (prevIndex != activeIndex) && (animProgress < 1.0f);
+        const float navProgress = animate ? detail::motion::cubicBezierEase(animProgress, 0.22f, 0.0f, 0.18f, 1.0f) : 1.0f;
+
+        int8_t animDirection = 0;
+        if (animate && count > 1)
+        {
+            const int delta = (int)activeIndex - (int)prevIndex;
+            const int absDelta = (delta < 0) ? -delta : delta;
+            animDirection = (absDelta > (int)count / 2) ? (delta > 0 ? -1 : 1) : (delta > 0 ? 1 : -1);
+        }
+
+        if (countAnimating || animate)
+            requestRedraw();
 
         const bool taper = (count > kScrollDotsMaxVisibleForTaper);
         const bool oldTaper = (fromCount > kScrollDotsMaxVisibleForTaper);
@@ -666,9 +704,7 @@ namespace pipgui
             {
                 int16_t pillX = (int16_t)(lx - (int16_t)radius);
                 int16_t pillW = (int16_t)(gap + (int16_t)radius * 2 + 1);
-                int16_t pillY = layout.top;
-                uint8_t rad = (uint8_t)(radius < 255 ? radius : 255);
-                fillRoundRect(pillX, pillY, pillW, layout.h, rad, activeColor);
+                fillRoundRect(pillX, layout.top, pillW, layout.h, radius, activeColor);
             }
         }
         else

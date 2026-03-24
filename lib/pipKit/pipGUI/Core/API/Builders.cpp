@@ -193,8 +193,8 @@ namespace pipgui
         if (!beginCommit())
             return;
         detail::callByMode<IsUpdate>(
-            [&] { detail::GuiAccess::updateScrollDots(*_gui, _x, _y, _count, _activeIndex, _prevIndex, _animProgress, _animDirection, _activeColor, _inactiveColor, _radius, _spacing); },
-            [&] { detail::GuiAccess::drawScrollDots(*_gui, _x, _y, _count, _activeIndex, _prevIndex, _animProgress, _animDirection, _activeColor, _inactiveColor, _radius, _spacing); });
+            [&] { detail::GuiAccess::updateScrollDots(*_gui, _x, _y, _count, _activeIndex, _activeColor, _inactiveColor, _radius, _spacing); },
+            [&] { detail::GuiAccess::drawScrollDots(*_gui, _x, _y, _count, _activeIndex, _activeColor, _inactiveColor, _radius, _spacing); });
     }
     template void ScrollDotsFluentT<false>::draw();
     template void ScrollDotsFluentT<true>::draw();

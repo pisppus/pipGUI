@@ -93,12 +93,11 @@ namespace pipgui
 
             static void configureTile(GUI &gui,
                                       uint8_t screenId,
-                                      uint8_t parentScreen,
                                       const TileItemDef *items,
                                       uint8_t itemCount,
                                       const TileStyle &style)
             {
-                gui.configureTile(screenId, parentScreen, items, itemCount, style);
+                gui.configureTile(screenId, items, itemCount, style);
             }
 
             static void fillRect(GUI &gui, int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color)
@@ -389,9 +388,6 @@ namespace pipgui
                                        int16_t y,
                                        uint8_t count,
                                        uint8_t activeIndex,
-                                       uint8_t prevIndex,
-                                       float animProgress,
-                                       int8_t animDirection,
                                        uint16_t activeColor,
                                        uint16_t inactiveColor,
                                        uint8_t radius,
@@ -402,9 +398,6 @@ namespace pipgui
                     y,
                     count,
                     activeIndex,
-                    prevIndex,
-                    animProgress,
-                    animDirection,
                     activeColor,
                     inactiveColor,
                     radius,
@@ -416,9 +409,6 @@ namespace pipgui
                                          int16_t y,
                                          uint8_t count,
                                          uint8_t activeIndex,
-                                         uint8_t prevIndex,
-                                         float animProgress,
-                                         int8_t animDirection,
                                          uint16_t activeColor,
                                          uint16_t inactiveColor,
                                          uint8_t radius,
@@ -429,9 +419,6 @@ namespace pipgui
                     y,
                     count,
                     activeIndex,
-                    prevIndex,
-                    animProgress,
-                    animDirection,
                     activeColor,
                     inactiveColor,
                     radius,
@@ -905,6 +892,21 @@ namespace pipgui
                     gui.updateIconInternal(iconId, x, y, sizePx, fg565, bg565);
                 else
                     gui.drawIconInternal(iconId, x, y, sizePx, fg565);
+            }
+
+            static void configureStatusBar(GUI &gui, bool enabled, uint32_t bgColor, uint8_t height, StatusBarPosition pos)
+            {
+                gui.configureStatusBar(enabled, bgColor, height, pos);
+            }
+
+            static void setStatusBarText(GUI &gui, const String &left, const String &center, const String &right)
+            {
+                gui.setStatusBarText(left, center, right);
+            }
+
+            static void setStatusBarIcon(GUI &gui, TextAlign side, IconId iconId, int32_t color, uint16_t sizePx)
+            {
+                gui.setStatusBarIcon(side, iconId, color, sizePx);
             }
         };
     }

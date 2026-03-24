@@ -102,7 +102,6 @@ namespace pipgui
         };
 
         bool configured = false;
-        uint8_t parentScreen = INVALID_SCREEN_ID;
         uint8_t itemCount = 0;
         uint8_t selectedIndex = 0;
 
@@ -153,7 +152,6 @@ namespace pipgui
         };
 
         bool configured = false;
-        uint8_t parentScreen = INVALID_SCREEN_ID;
         uint8_t itemCount = 0;
         uint8_t selectedIndex = 0;
 

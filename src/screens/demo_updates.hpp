@@ -322,7 +322,7 @@ void updateFirmwareUpdateScreen(uint32_t nowMs, bool nextPressed, bool nextDown,
 #if PIPGUI_OTA
         ui.otaCancel();
 #endif
-        ui.setScreen(listMenu);
+        ui.prevScreen();
         return;
       }
     }
@@ -518,7 +518,7 @@ void updateToggleDemo(bool nextPressed, bool prevPressed)
   bool changed = false;
 
   if (prevPressed)
-    ui.setScreen(listMenu);
+    ui.prevScreen();
 
   const uint32_t nowMs = millis();
   const bool toggleEnabled = (g_toggleLockedUntil == 0 || nowMs >= g_toggleLockedUntil);
@@ -596,7 +596,7 @@ void updateButtonsDemo(uint32_t nowMs, bool nextPressed, bool nextDown, bool pre
     else if ((nowMs - comboHoldStartMs) >= 450U)
     {
       comboHoldStartMs = 0;
-      ui.setScreen(listMenu);
+      ui.prevScreen();
       return;
     }
   }
@@ -684,39 +684,16 @@ void updateButtonsDemo(uint32_t nowMs, bool nextPressed, bool nextDown, bool pre
 
 void updateScrollDotsDemo(uint32_t nowMs, bool nextPressed, bool prevPressed)
 {
-  if (nextPressed || prevPressed)
-  {
-    const uint8_t prev = g_dotsActive;
-    if (nextPressed)
-    {
-      g_dotsActive = (uint8_t)((g_dotsActive + 1) % g_dotsCount);
-      g_dotsDir = 1;
-    }
-    else
-    {
-      g_dotsActive = (uint8_t)((g_dotsActive + g_dotsCount - 1) % g_dotsCount);
-      g_dotsDir = -1;
-    }
-    g_dotsPrev = prev;
-    g_dotsAnimate = true;
-    g_dotsAnimStartMs = nowMs;
-  }
-
-  if (!g_dotsAnimate)
-    return;
-
-  if (nowMs - g_dotsAnimStartMs >= g_dotsAnimDurMs)
-    g_dotsAnimate = false;
-
-  const float p = animProgress(nowMs, g_dotsAnimStartMs, g_dotsAnimDurMs);
+  (void)nowMs;
+  if (nextPressed)
+    g_dotsActive = (uint8_t)((g_dotsActive + 1) % g_dotsCount);
+  else if (prevPressed)
+    g_dotsActive = (uint8_t)((g_dotsActive + g_dotsCount - 1) % g_dotsCount);
 
   ui.updateScrollDots()
       .pos(center, 150)
       .count(g_dotsCount)
       .activeIndex(g_dotsActive)
-      .prevIndex(g_dotsPrev)
-      .animProgress(p)
-      .animDirection(g_dotsDir)
       .activeColor(ui.rgb(0, 87, 250))
       .inactiveColor(ui.rgb(60, 60, 60))
       .radius(3)
@@ -725,27 +702,19 @@ void updateScrollDotsDemo(uint32_t nowMs, bool nextPressed, bool prevPressed)
 
 void updateDrumRollDemo(uint32_t nowMs, bool nextPressed, bool prevPressed)
 {
+  (void)nowMs;
   if (nextPressed)
   {
-    g_drumPrevH = g_drumSelectedH;
     g_drumSelectedH = (uint8_t)((g_drumSelectedH + 1) % g_drumCountH);
-    g_drumAnimateH = true;
-    g_drumAnimStartMs = nowMs;
   }
   else if (prevPressed)
   {
-    g_drumPrevH = g_drumSelectedH;
     g_drumSelectedH = (uint8_t)((g_drumSelectedH + g_drumCountH - 1) % g_drumCountH);
-    g_drumAnimateH = true;
-    g_drumAnimStartMs = nowMs;
   }
 
   if (prevPressed)
   {
-    g_drumPrevV = g_drumSelectedV;
     g_drumSelectedV = (uint8_t)((g_drumSelectedV + g_drumCountV - 1) % g_drumCountV);
-    g_drumAnimateV = true;
-    g_drumAnimStartMs = nowMs;
   }
 
   ui.requestRedraw();
@@ -758,7 +727,7 @@ void handleErrorDemo(uint8_t screenId, bool nextPressed, bool prevPressed)
 
   if (prevPressed)
   {
-    ui.setScreen(listMenu);
+    ui.prevScreen();
     return;
   }
 
@@ -798,7 +767,7 @@ void updatePopupMenuDemo(bool nextPressed, bool nextDown, bool prevPressed, bool
 
   if (prevPressed)
   {
-    ui.setScreen(listMenu);
+    ui.prevScreen();
     return;
   }
 

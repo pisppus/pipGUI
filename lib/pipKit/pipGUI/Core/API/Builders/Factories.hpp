@@ -67,6 +67,10 @@ namespace pipgui
     inline DrawTextMarqueeFluent GUI::drawTextMarquee() { return DrawTextMarqueeFluent(this); }
     inline DrawTextEllipsizedFluent GUI::drawTextEllipsized() { return DrawTextEllipsizedFluent(this); }
 
+    inline ConfigureStatusBarFluent GUI::configureStatusBar() { return ConfigureStatusBarFluent(this); }
+    inline SetStatusBarTextFluent GUI::setStatusBarText() { return SetStatusBarTextFluent(this); }
+    inline SetStatusBarIconFluent GUI::setStatusBarIcon() { return SetStatusBarIconFluent(this); }
+
     inline ConfigureListFluent GUI::configureList() { return ConfigureListFluent(this); }
     inline ListInputFluent GUI::listInput(uint8_t screenId) { return ListInputFluent(this, screenId); }
 

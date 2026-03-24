@@ -1,22 +1,8 @@
 #include <pipGUI/Core/pipGUI.hpp>
-#include <pipGUI/Core/Internal/ViewModels.hpp>
 #include <pipGUI/Core/Debug.hpp>
 
 namespace pipgui
 {
-    namespace
-    {
-        uint16_t resolveBgColor565(uint32_t bgColor, uint16_t bgColor565)
-        {
-            return bgColor565 ? bgColor565 : static_cast<uint16_t>(bgColor);
-        }
-
-        bool screenAnimationEnabled(ScreenAnim anim)
-        {
-            return anim != ScreenAnimNone;
-        }
-    }
-
     void GUI::syncRegisteredScreens()
     {
         if (_screen.registrySynced)
@@ -73,6 +59,8 @@ namespace pipgui
         if (id == INVALID_SCREEN_ID)
         {
             _screen.current = INVALID_SCREEN_ID;
+            _screen.historyCount = 0;
+            _screen.suppressHistory = false;
             _flags.needRedraw = 1;
             return;
         }
@@ -83,6 +71,21 @@ namespace pipgui
         else
             _screen.current = INVALID_SCREEN_ID;
         _flags.needRedraw = 1;
+    }
+
+    void GUI::pushScreenHistory(uint8_t screenId)
+    {
+        if (screenId == INVALID_SCREEN_ID)
+            return;
+        if (_screen.historyCount > 0 && _screen.history[_screen.historyCount - 1] == screenId)
+            return;
+        if (_screen.historyCount >= detail::ScreenState::HISTORY_MAX)
+        {
+            for (uint8_t i = 1; i < detail::ScreenState::HISTORY_MAX; ++i)
+                _screen.history[i - 1] = _screen.history[i];
+            _screen.historyCount = detail::ScreenState::HISTORY_MAX - 1;
+        }
+        _screen.history[_screen.historyCount++] = screenId;
     }
 
     void GUI::setScreen(uint8_t id)
@@ -107,7 +110,17 @@ namespace pipgui
 
     void GUI::activateScreenId(uint8_t id, int8_t transDir)
     {
-        if (screenAnimationEnabled(_screen.anim) &&
+        const bool suppressHistory = _screen.suppressHistory;
+        _screen.suppressHistory = false;
+        if (id == INVALID_SCREEN_ID || id >= _screen.capacity)
+        {
+            setScreenId(id);
+            return;
+        }
+        if (_screen.current != id && _screen.current < _screen.capacity && !suppressHistory)
+            pushScreenHistory(_screen.current);
+
+        if (_screen.anim != ScreenAnimNone &&
             _flags.spriteEnabled &&
             _disp.display &&
             !_flags.notifActive &&
@@ -141,7 +154,7 @@ namespace pipgui
         _render.activeSprite = &_render.sprite;
         if (screenId != INVALID_SCREEN_ID)
             _screen.current = screenId;
-        clear(resolveBgColor565(_render.bgColor, _render.bgColor565));
+        clear(_render.bgColor565 ? _render.bgColor565 : (uint16_t)_render.bgColor);
         beginGraphFrame(screenId);
         if (cb)
             cb(*this);
@@ -228,20 +241,19 @@ namespace pipgui
 
     void GUI::prevScreen()
     {
-        syncRegisteredScreens();
         if (_flags.screenTransition)
             return;
-        if (_screen.capacity == 0 || !_screen.callbacks)
-            return;
-        uint16_t cap = _screen.capacity;
-        uint16_t idx = (_screen.current < cap) ? _screen.current : 0;
-        for (uint16_t i = 0; i < cap; i++)
+        while (_screen.historyCount > 0)
         {
-            idx = (idx + cap - 1) % cap;
-            if (_screen.callbacks[idx])
-            {
-                activateScreenId(static_cast<uint8_t>(idx), -1);
-            }
+            const uint8_t target = _screen.history[--_screen.historyCount];
+            if (target == INVALID_SCREEN_ID || target == _screen.current)
+                continue;
+            if (target >= _screen.capacity || !_screen.callbacks || !_screen.callbacks[target])
+                continue;
+
+            _screen.suppressHistory = true;
+            activateScreenId(target, -1);
+            return;
         }
     }
 }

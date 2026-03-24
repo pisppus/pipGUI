@@ -25,9 +25,7 @@ namespace pipgui
 
         [[nodiscard]] uint16_t blendWhite(uint16_t color, uint8_t intensity)
         {
-            if (intensity == 0)
-                return color;
-            return static_cast<uint16_t>(pipgui::detail::blend565(color, static_cast<uint16_t>(0xFFFF), intensity));
+            return intensity ? (uint16_t)detail::blend565(color, (uint16_t)0xFFFF, intensity) : color;
         }
 
         [[nodiscard]] uint16_t lighten565Progress(uint16_t c, uint8_t amount)
@@ -47,14 +45,12 @@ namespace pipgui
         {
             if (width <= 0)
                 return 0;
-            int16_t fill = static_cast<int16_t>((width * static_cast<uint16_t>(clampProgressValue(value))) / 100U);
-            return fill > width ? width : fill;
+            return static_cast<int16_t>((width * static_cast<uint16_t>(clampProgressValue(value))) / 100U);
         }
 
         [[nodiscard]] float fillSpanForValue(uint8_t value) noexcept
         {
-            float span = static_cast<float>(clampProgressValue(value)) * 3.6f;
-            return span > 360.0f ? 360.0f : span;
+            return static_cast<float>(clampProgressValue(value)) * 3.6f;
         }
 
         [[nodiscard]] uint8_t shimmerIntensity(float dist, float halfSpan) noexcept
@@ -92,12 +88,12 @@ namespace pipgui
             return intensity == 0 ? shader.fillColor : blendWhite(shader.fillColor, intensity);
         }
 
-        static void resolveLinearProgressFillRange(int16_t x, int16_t w,
-                                                   uint8_t value,
-                                                   ProgressAnim anim,
-                                                   uint32_t now,
-                                                   int16_t &fillLeft,
-                                                   int16_t &fillRight) noexcept
+        void resolveLinearProgressFillRange(int16_t x, int16_t w,
+                                            uint8_t value,
+                                            ProgressAnim anim,
+                                            uint32_t now,
+                                            int16_t &fillLeft,
+                                            int16_t &fillRight) noexcept
         {
             fillLeft = x;
             fillRight = x;

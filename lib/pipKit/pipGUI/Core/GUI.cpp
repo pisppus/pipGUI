@@ -4,8 +4,8 @@
 #include <pipGUI/Core/Debug.hpp>
 #include <pipGUI/Systems/Network/Wifi.hpp>
 #include <pipGUI/Graphics/Utils/Colors.hpp>
+#include <pipGUI/Graphics/Utils/Easing.hpp>
 #include <pipCore/Platforms/Select.hpp>
-#include <algorithm>
 
 namespace pipgui
 {
@@ -60,6 +60,20 @@ namespace pipgui
             return hash ? hash : 1u;
         }
 
+        float drumRollCurrentIndex(const detail::DrumRollAnimState &state, uint32_t now) noexcept
+        {
+            if (state.startMs == 0 || state.durationMs == 0 || now <= state.startMs)
+                return state.fromIndex;
+
+            const uint32_t elapsed = now - state.startMs;
+            if (elapsed >= state.durationMs)
+                return static_cast<float>(state.toIndex);
+
+            const float t = static_cast<float>(elapsed) / static_cast<float>(state.durationMs);
+            const float eased = detail::motion::easeInOutCubic(t);
+            return state.fromIndex + (static_cast<float>(state.toIndex) - state.fromIndex) * eased;
+        }
+
         class NullDisplay final : public pipcore::Display
         {
         public:
@@ -70,12 +84,6 @@ namespace pipgui
             void writeRect565(int16_t, int16_t, int16_t, int16_t, const uint16_t *, int32_t) override {}
         };
 
-        void reportPlatformError(const char *stage, pipcore::Platform *plat)
-        {
-            (void)stage;
-            (void)plat;
-        }
-
     }
 
     void GUI::clearReportedPlatformError()
@@ -85,6 +93,7 @@ namespace pipgui
 
     void GUI::reportPlatformErrorOnce(const char *stage)
     {
+        (void)stage;
         pipcore::Platform *plat = pipcore::GetPlatform();
         if (!plat)
             return;
@@ -99,7 +108,6 @@ namespace pipgui
         if (error == _diag.lastReportedError)
             return;
 
-        reportPlatformError(stage, plat);
         _diag.lastReportedError = error;
     }
 
@@ -172,6 +180,43 @@ namespace pipgui
         best->key = key;
         best->lastUseMs = now;
         best->state = {};
+        return best->state;
+    }
+
+    detail::DrumRollAnimState &GUI::resolveDrumRollState(uint32_t key, uint8_t selectedIndex, uint16_t durationMs)
+    {
+        const uint32_t now = nowMs();
+        detail::DrumRollCacheEntry *best = &_drumRollCache.entries[0];
+
+        for (uint8_t i = 0; i < detail::DRUM_ROLL_CACHE_MAX; ++i)
+        {
+            detail::DrumRollCacheEntry &entry = _drumRollCache.entries[i];
+            if (entry.used && entry.key == key)
+            {
+                entry.lastUseMs = now;
+                detail::DrumRollAnimState &state = entry.state;
+                state.durationMs = durationMs > 0 ? durationMs : 1;
+                if (state.toIndex != selectedIndex)
+                {
+                    state.fromIndex = drumRollCurrentIndex(state, now);
+                    state.toIndex = selectedIndex;
+                    state.startMs = now;
+                }
+                return state;
+            }
+            if (!entry.used)
+                best = &entry;
+            else if (best->used && entry.lastUseMs < best->lastUseMs)
+                best = &entry;
+        }
+
+        best->used = true;
+        best->key = key;
+        best->lastUseMs = now;
+        best->state = {};
+        best->state.fromIndex = static_cast<float>(selectedIndex);
+        best->state.toIndex = selectedIndex;
+        best->state.durationMs = durationMs > 0 ? durationMs : 1;
         return best->state;
     }
 
@@ -448,7 +493,6 @@ namespace pipgui
 
         if (!plat->configureDisplay(normalized))
         {
-            reportPlatformError("configureDisplay", plat);
             return;
         }
 
@@ -527,6 +571,27 @@ namespace pipgui
         detail::GuiAccess::handlePopupMenuInput(*_gui, _nextDown, _prevDown);
     }
 
+    void ConfigureStatusBarFluent::apply()
+    {
+        if (!beginCommit())
+            return;
+        detail::GuiAccess::configureStatusBar(*_gui, _enabled, _bgColor, _height, _pos);
+    }
+
+    void SetStatusBarTextFluent::apply()
+    {
+        if (!beginCommit())
+            return;
+        detail::GuiAccess::setStatusBarText(*_gui, _left, _center, _right);
+    }
+
+    void SetStatusBarIconFluent::apply()
+    {
+        if (!beginCommit() || !_hasSide || !_hasIcon)
+            return;
+        detail::GuiAccess::setStatusBarIcon(*_gui, _side, _iconId, detail::optionalColor32(_color565), _sizePx);
+    }
+
     void GUI::begin(uint8_t rotation, uint16_t bgColor)
     {
         pipcore::Platform *plat = pipcore::GetPlatform();
@@ -536,12 +601,7 @@ namespace pipgui
         resetDisplayRuntime();
 
 #if PIPGUI_STATUS_BAR
-        _flags.statusBarDebugMetrics = (PIPGUI_STATUS_BAR_DEBUG_METRICS_DEFAULT != 0);
-        if (_flags.statusBarDebugMetrics)
-        {
-            Debug::init();
-            _status.dirtyMask = detail::StatusBarDirtyAll;
-        }
+        _flags.statusBarDebugMetrics = false;
 #endif
 
 #if PIPGUI_DEBUG_DIRTY_RECTS
@@ -557,7 +617,6 @@ namespace pipgui
         {
             if (!plat->configureDisplay(_disp.cfg))
             {
-                reportPlatformError("configureDisplay", plat);
                 return;
             }
             clearReportedPlatformError();
@@ -565,7 +624,6 @@ namespace pipgui
 
         if (!plat->beginDisplay(rotation))
         {
-            reportPlatformError("beginDisplay", plat);
             return;
         }
         clearReportedPlatformError();
@@ -573,7 +631,6 @@ namespace pipgui
         _disp.display = plat->display();
         if (!_disp.display)
         {
-            reportPlatformError("display", plat);
             return;
         }
 

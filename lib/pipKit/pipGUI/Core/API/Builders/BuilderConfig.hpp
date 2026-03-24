@@ -335,6 +335,151 @@ namespace pipgui
         void apply();
     };
 
+    struct ConfigureStatusBarFluent : detail::FluentLifetime
+    {
+        PIPGUI_DEFAULT_FLUENT_MOVE(ConfigureStatusBarFluent);
+        bool _enabled;
+        uint32_t _bgColor;
+        uint8_t _height;
+        StatusBarPosition _pos;
+
+        explicit ConfigureStatusBarFluent(GUI *g)
+            : detail::FluentLifetime(g), _enabled(true), _bgColor(0x000000), _height(0), _pos(Top)
+        {
+        }
+
+        ~ConfigureStatusBarFluent() { apply(); }
+
+        ConfigureStatusBarFluent &enabled(bool v = true)
+        {
+            if (!canMutate())
+                return *this;
+            _enabled = v;
+            return *this;
+        }
+
+        ConfigureStatusBarFluent &bgColor(uint32_t v)
+        {
+            if (!canMutate())
+                return *this;
+            _bgColor = v;
+            return *this;
+        }
+
+        ConfigureStatusBarFluent &height(uint8_t v)
+        {
+            if (!canMutate())
+                return *this;
+            _height = v;
+            return *this;
+        }
+
+        ConfigureStatusBarFluent &position(StatusBarPosition v)
+        {
+            if (!canMutate())
+                return *this;
+            _pos = v;
+            return *this;
+        }
+
+        void apply();
+    };
+
+    struct SetStatusBarTextFluent : detail::FluentLifetime
+    {
+        PIPGUI_DEFAULT_FLUENT_MOVE(SetStatusBarTextFluent);
+        String _left;
+        String _center;
+        String _right;
+
+        explicit SetStatusBarTextFluent(GUI *g)
+            : detail::FluentLifetime(g)
+        {
+        }
+
+        ~SetStatusBarTextFluent() { apply(); }
+
+        SetStatusBarTextFluent &left(const String &v)
+        {
+            if (!canMutate())
+                return *this;
+            _left = v;
+            return *this;
+        }
+
+        SetStatusBarTextFluent &center(const String &v)
+        {
+            if (!canMutate())
+                return *this;
+            _center = v;
+            return *this;
+        }
+
+        SetStatusBarTextFluent &right(const String &v)
+        {
+            if (!canMutate())
+                return *this;
+            _right = v;
+            return *this;
+        }
+
+        void apply();
+    };
+
+    struct SetStatusBarIconFluent : detail::FluentLifetime
+    {
+        PIPGUI_DEFAULT_FLUENT_MOVE(SetStatusBarIconFluent);
+        TextAlign _side;
+        IconId _iconId;
+        std::optional<uint16_t> _color565;
+        uint16_t _sizePx;
+        bool _hasSide;
+        bool _hasIcon;
+
+        explicit SetStatusBarIconFluent(GUI *g)
+            : detail::FluentLifetime(g), _side(Left), _iconId(static_cast<IconId>(0xFFFF)), _sizePx(0), _hasSide(false), _hasIcon(false)
+        {
+        }
+
+        ~SetStatusBarIconFluent() { apply(); }
+
+        SetStatusBarIconFluent &side(TextAlign v)
+        {
+            if (!canMutate())
+                return *this;
+            _side = v;
+            _hasSide = true;
+            return *this;
+        }
+
+        SetStatusBarIconFluent &icon(IconId v)
+        {
+            if (!canMutate())
+                return *this;
+            _iconId = v;
+            _hasIcon = true;
+            return *this;
+        }
+
+        SetStatusBarIconFluent &color(int32_t v)
+        {
+            if (!canMutate())
+                return *this;
+            detail::assignOptionalColor(_color565, v);
+            return *this;
+        }
+
+        SetStatusBarIconFluent &size(uint16_t v)
+        {
+            if (!canMutate())
+                return *this;
+            _sizePx = v;
+            return *this;
+        }
+
+        void apply();
+    };
+
     struct ListInputFluent : detail::FluentLifetime
     {
         PIPGUI_DEFAULT_FLUENT_MOVE(ListInputFluent);
@@ -461,7 +606,6 @@ namespace pipgui
         const ListItemDef *_items;
         uint8_t _itemCount;
         detail::OwnedHeapArray<ListItemDef> _ownedItems;
-        uint8_t _parentScreen;
         uint16_t _cardColor;
         uint16_t _cardActiveColor;
         uint8_t _radius;
@@ -471,7 +615,7 @@ namespace pipgui
 
         ConfigureListFluent(GUI *g)
             : detail::FluentLifetime(g), _screenId(INVALID_SCREEN_ID), _items(nullptr), _itemCount(0), _ownedItems(detail::resolvePlatform(g)),
-              _parentScreen(INVALID_SCREEN_ID), _cardColor(0), _cardActiveColor(0), _radius(8),
+              _cardColor(0), _cardActiveColor(0), _radius(8),
               _cardWidth(0), _cardHeight(0), _mode(Cards)
         {
         }
@@ -482,7 +626,6 @@ namespace pipgui
               _items(std::exchange(other._items, nullptr)),
               _itemCount(std::exchange(other._itemCount, 0)),
               _ownedItems(std::move(other._ownedItems)),
-              _parentScreen(other._parentScreen),
               _cardColor(other._cardColor),
               _cardActiveColor(other._cardActiveColor),
               _radius(other._radius),
@@ -501,7 +644,6 @@ namespace pipgui
                 _items = std::exchange(other._items, nullptr);
                 _itemCount = std::exchange(other._itemCount, 0);
                 _ownedItems = std::move(other._ownedItems);
-                _parentScreen = other._parentScreen;
                 _cardColor = other._cardColor;
                 _cardActiveColor = other._cardActiveColor;
                 _radius = other._radius;
@@ -517,7 +659,6 @@ namespace pipgui
             ConfigureListFluent copy(_gui);
             copy._screenId = _screenId;
             copy._itemCount = _itemCount;
-            copy._parentScreen = _parentScreen;
             copy._cardColor = _cardColor;
             copy._cardActiveColor = _cardActiveColor;
             copy._radius = _radius;
@@ -576,15 +717,7 @@ namespace pipgui
             return *this;
         }
 
-        ConfigureListFluent &parent(uint8_t parentScreen)
-        {
-            if (!canMutate())
-                return *this;
-            _parentScreen = parentScreen;
-            return *this;
-        }
-
-        ConfigureListFluent &cardColor(uint16_t color565)
+        ConfigureListFluent &inactive(uint16_t color565)
         {
             if (!canMutate())
                 return *this;
@@ -592,7 +725,7 @@ namespace pipgui
             return *this;
         }
 
-        ConfigureListFluent &activeColor(uint16_t color565)
+        ConfigureListFluent &active(uint16_t color565)
         {
             if (!canMutate())
                 return *this;
@@ -673,7 +806,6 @@ namespace pipgui
         detail::OwnedHeapArray<const char *> _ownedLayoutRowsSpec;
         uint8_t _layoutRowCount;
         bool _layoutConfigured;
-        uint8_t _parentScreen;
         uint32_t _cardColor;
         uint32_t _cardActiveColor;
         uint8_t _radius;
@@ -687,7 +819,7 @@ namespace pipgui
         ConfigureTileFluent(GUI *g)
             : detail::FluentLifetime(g), _screenId(INVALID_SCREEN_ID), _items(nullptr), _itemCount(0), _ownedItems(detail::resolvePlatform(g)),
               _layoutRowsSpec(nullptr), _ownedLayoutRowsSpec(detail::resolvePlatform(g)), _layoutRowCount(0), _layoutConfigured(false),
-              _parentScreen(INVALID_SCREEN_ID), _cardColor(0), _cardActiveColor(0), _radius(8), _spacing(8),
+              _cardColor(0), _cardActiveColor(0), _radius(8), _spacing(8),
               _columns(2), _tileWidth(0), _tileHeight(0), _lineGapPx(0),
               _contentMode(TextSubtitle)
         {
@@ -703,7 +835,6 @@ namespace pipgui
               _ownedLayoutRowsSpec(std::move(other._ownedLayoutRowsSpec)),
               _layoutRowCount(std::exchange(other._layoutRowCount, 0)),
               _layoutConfigured(std::exchange(other._layoutConfigured, false)),
-              _parentScreen(other._parentScreen),
               _cardColor(other._cardColor),
               _cardActiveColor(other._cardActiveColor),
               _radius(other._radius),
@@ -729,7 +860,6 @@ namespace pipgui
                 _ownedLayoutRowsSpec = std::move(other._ownedLayoutRowsSpec);
                 _layoutRowCount = std::exchange(other._layoutRowCount, 0);
                 _layoutConfigured = std::exchange(other._layoutConfigured, false);
-                _parentScreen = other._parentScreen;
                 _cardColor = other._cardColor;
                 _cardActiveColor = other._cardActiveColor;
                 _radius = other._radius;
@@ -750,7 +880,6 @@ namespace pipgui
             copy._itemCount = _itemCount;
             copy._layoutRowCount = _layoutRowCount;
             copy._layoutConfigured = _layoutConfigured;
-            copy._parentScreen = _parentScreen;
             copy._cardColor = _cardColor;
             copy._cardActiveColor = _cardActiveColor;
             copy._radius = _radius;
@@ -854,15 +983,7 @@ namespace pipgui
             return *this;
         }
 
-        ConfigureTileFluent &parent(uint8_t parentScreen)
-        {
-            if (!canMutate())
-                return *this;
-            _parentScreen = parentScreen;
-            return *this;
-        }
-
-        ConfigureTileFluent &cardColor(uint32_t color888)
+        ConfigureTileFluent &inactive(uint32_t color888)
         {
             if (!canMutate())
                 return *this;
@@ -870,7 +991,7 @@ namespace pipgui
             return *this;
         }
 
-        ConfigureTileFluent &activeColor(uint32_t color888)
+        ConfigureTileFluent &active(uint32_t color888)
         {
             if (!canMutate())
                 return *this;

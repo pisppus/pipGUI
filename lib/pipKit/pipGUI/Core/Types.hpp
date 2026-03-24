@@ -94,7 +94,7 @@ namespace pipgui
     enum StatusBarStyle : uint8_t
     {
         StatusBarStyleSolid,
-        StatusBarStyleBlurGradient
+        StatusBarStyleBlur
     };
 
     enum ScreenAnim : uint8_t

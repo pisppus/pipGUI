@@ -20,6 +20,9 @@ namespace pipgui
     struct SetClipFluent;
     struct ShowLogoFluent;
     struct ShowErrorFluent;
+    struct ConfigureStatusBarFluent;
+    struct SetStatusBarTextFluent;
+    struct SetStatusBarIconFluent;
 
     struct FillRectFluent;
     struct DrawRectFluent;
@@ -272,12 +275,12 @@ namespace pipgui
         [[nodiscard]] DrawTextEllipsizedFluent drawTextEllipsized();
 
         void drawDrumRollHorizontal(int16_t x, int16_t y, int16_t w, int16_t h,
-                                    const String *options, uint8_t count, uint8_t selectedIndex, uint8_t prevIndex,
-                                    float animProgress, uint32_t fgColor, uint32_t bgColor, uint16_t fontPx = 0);
+                                    const String *options, uint8_t count, uint8_t selectedIndex,
+                                    uint32_t fgColor, uint32_t bgColor, uint16_t fontPx = 0, uint16_t animDurationMs = 280);
 
         void drawDrumRollVertical(int16_t x, int16_t y, int16_t w, int16_t h,
-                                  const String *options, uint8_t count, uint8_t selectedIndex, uint8_t prevIndex,
-                                  float animProgress, uint32_t fgColor, uint32_t bgColor, uint16_t fontPx = 0);
+                                  const String *options, uint8_t count, uint8_t selectedIndex,
+                                  uint32_t fgColor, uint32_t bgColor, uint16_t fontPx = 0, uint16_t animDurationMs = 280);
 
         FontId registerFont(const uint8_t *atlasData,
                             uint16_t atlasWidth, uint16_t atlasHeight,
@@ -325,8 +328,7 @@ namespace pipgui
         void setErrorButtonsDown(bool nextDown, bool prevDown, bool comboDown = false);
         void setErrorButtonDown(bool down);
 
-        void configureStatusBar(bool enabled, uint32_t bgColor = 0x000000,
-                                uint8_t height = 0, StatusBarPosition pos = Top);
+        [[nodiscard]] ConfigureStatusBarFluent configureStatusBar();
 
         void setStatusBarStyle(StatusBarStyle style) noexcept
         {
@@ -334,8 +336,10 @@ namespace pipgui
             _status.dirtyMask = detail::StatusBarDirtyAll;
         }
 
-        void setStatusBarText(const String &left, const String &center, const String &right);
+        [[nodiscard]] SetStatusBarTextFluent setStatusBarText();
         void setStatusBarBattery(int8_t levelPercent, BatteryStyle style);
+        [[nodiscard]] SetStatusBarIconFluent setStatusBarIcon();
+        void clearStatusBarIcon(TextAlign side);
         void setStatusBarCustom(StatusBarCustomCallback cb);
         [[nodiscard]] int16_t statusBarHeight() const noexcept;
         void updateStatusBar();
@@ -374,6 +378,7 @@ namespace pipgui
         detail::ButtonCacheState _buttonCache;
         detail::TextCacheState _textCache;
         detail::ToggleCacheState _toggleCache;
+        detail::DrumRollCacheState _drumRollCache;
         detail::ScreenshotGalleryState _shots;
         detail::ScreenshotStreamState _shotStream;
 
@@ -392,6 +397,10 @@ namespace pipgui
         void clearReportedPlatformError();
         void reportPlatformErrorOnce(const char *stage);
         void handleScreenshotShortcut(bool comboDown);
+        [[nodiscard]] bool statusBarAnimationActive() const noexcept;
+        void configureStatusBar(bool enabled, uint32_t bgColor, uint8_t height, StatusBarPosition pos);
+        void setStatusBarText(const String &left, const String &center, const String &right);
+        void setStatusBarIcon(TextAlign side, IconId iconId, int32_t color, uint16_t sizePx);
         void freeScreenshotGallery(pipcore::Platform *plat) noexcept;
         void releaseScreenshotGalleryCache(pipcore::Platform *plat) noexcept;
         void freeScreenshotStream(pipcore::Platform *plat) noexcept;
@@ -417,6 +426,7 @@ namespace pipgui
         void stepButtonState(detail::ButtonState &s, bool isDown);
         detail::ToggleState &resolveToggleState(int16_t x, int16_t y, int16_t w, int16_t h,
                                                uint16_t activeColor, int32_t inactiveColor, int32_t knobColor);
+        detail::DrumRollAnimState &resolveDrumRollState(uint32_t key, uint8_t selectedIndex, uint16_t durationMs);
         bool stepToggleState(detail::ToggleState &state, bool &value, bool pressed);
         void flushDirty();
         void invalidateRect(int16_t x, int16_t y, int16_t w, int16_t h);
@@ -447,6 +457,7 @@ namespace pipgui
         void syncRegisteredScreens();
         void setScreenId(uint8_t id);
         void activateScreenId(uint8_t id, int8_t transDir);
+        void pushScreenHistory(uint8_t screenId);
         void renderScreenToMainSprite(ScreenCallback cb, uint8_t screenId = INVALID_SCREEN_ID);
         void freeScreenState(pipcore::Platform *plat) noexcept;
         void renderScreenTransition(uint32_t now);
@@ -555,15 +566,11 @@ namespace pipgui
 
         void drawScrollDotsImpl(int16_t x, int16_t y,
                                 uint8_t count, uint8_t activeIndex,
-                                uint8_t prevIndex, float animProgress,
-                                int8_t animDirection,
                                 uint16_t activeColor, uint16_t inactiveColor,
                                 uint8_t radius, uint8_t spacing);
 
         void updateScrollDotsImpl(int16_t x, int16_t y,
                                   uint8_t count, uint8_t activeIndex,
-                                  uint8_t prevIndex, float animProgress,
-                                  int8_t animDirection,
                                   uint16_t activeColor, uint16_t inactiveColor,
                                   uint8_t radius, uint8_t spacing);
 
@@ -684,7 +691,6 @@ namespace pipgui
         void updateTile(uint8_t screenId, uint8_t prevSelectedIndex);
         void handleTileInput(uint8_t screenId, bool nextDown, bool prevDown);
         void configureTile(uint8_t screenId,
-                           uint8_t parentScreen,
                            const TileItemDef *items,
                            uint8_t itemCount,
                            const TileStyle &style);

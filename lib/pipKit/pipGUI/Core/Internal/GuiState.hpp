@@ -85,12 +85,16 @@ namespace pipgui::detail
 
     struct ScreenState
     {
+        static constexpr uint8_t HISTORY_MAX = 16;
         ScreenCallback *callbacks = nullptr;
         GraphArea **graphAreas = nullptr;
         ListState **lists = nullptr;
         TileState **tiles = nullptr;
         uint16_t capacity = 0;
         uint8_t current = INVALID_SCREEN_ID;
+        uint8_t history[HISTORY_MAX] = {};
+        uint8_t historyCount = 0;
+        bool suppressHistory = false;
         bool registrySynced = false;
 
         ScreenAnim anim = None;
@@ -221,6 +225,18 @@ namespace pipgui::detail
         StatusBarDirtyAll = 0xFF,
     };
 
+    struct StatusBarIconState
+    {
+        IconId iconId = static_cast<IconId>(0xFFFF);
+        uint16_t color565 = 0xFFFF;
+        uint16_t sizePx = 0;
+        uint8_t alpha = 0;
+        uint8_t alphaFrom = 0;
+        uint8_t alphaTo = 0;
+        uint32_t animStartMs = 0;
+        bool visible = false;
+    };
+
     struct StatusBarState
     {
         StatusBarPosition pos = Top;
@@ -239,6 +255,10 @@ namespace pipgui::detail
         DirtyRect lastCenter = {};
         DirtyRect lastRight = {};
         DirtyRect lastBattery = {};
+
+        StatusBarIconState leftIcon;
+        StatusBarIconState centerIcon;
+        StatusBarIconState rightIcon;
 
         int8_t batteryLevel = -1;
         BatteryStyle batteryStyle = Hidden;
@@ -342,6 +362,29 @@ namespace pipgui::detail
     struct ToggleCacheState
     {
         ToggleCacheEntry entries[TOGGLE_CACHE_MAX] = {};
+    };
+
+    struct DrumRollAnimState
+    {
+        float fromIndex = 0.0f;
+        uint8_t toIndex = 0;
+        uint16_t durationMs = 280;
+        uint32_t startMs = 0;
+    };
+
+    struct DrumRollCacheEntry
+    {
+        uint32_t key = 0;
+        uint32_t lastUseMs = 0;
+        bool used = false;
+        DrumRollAnimState state{};
+    };
+
+    inline constexpr uint8_t DRUM_ROLL_CACHE_MAX = 8;
+
+    struct DrumRollCacheState
+    {
+        DrumRollCacheEntry entries[DRUM_ROLL_CACHE_MAX] = {};
     };
 
     struct ScreenshotEntry

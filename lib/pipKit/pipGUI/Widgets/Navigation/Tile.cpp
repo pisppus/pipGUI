@@ -44,12 +44,9 @@ namespace pipgui
         static void resetTileRuntime(TileState &menu)
         {
             menu.selectedIndex = 0;
-            menu.nextHoldStartMs = 0;
-            menu.prevHoldStartMs = 0;
-            menu.nextLongFired = false;
-            menu.prevLongFired = false;
-            menu.lastNextDown = false;
-            menu.lastPrevDown = false;
+            menu.nextHoldStartMs = menu.prevHoldStartMs = 0;
+            menu.nextLongFired = menu.prevLongFired = false;
+            menu.lastNextDown = menu.lastPrevDown = false;
             menu.marqueeStartMs = 0;
             menu.customLayout = false;
             menu.layoutCols = 0;
@@ -62,7 +59,7 @@ namespace pipgui
             const uint32_t base = bg888 ? bg888 : 0x000000;
 
             if (out.cardColor == 0)
-                out.cardColor = pipgui::detail::lighten888(base, 4);
+                out.cardColor = detail::lighten888(base, 4);
             if (out.cardActiveColor == 0)
                 out.cardActiveColor = 0x0082DC;
             if (out.radius == 0)
@@ -86,8 +83,6 @@ namespace pipgui
             out.right = screenWidth;
             out.top = 0;
             out.bottom = screenHeight;
-            out.usableW = screenWidth;
-            out.usableH = screenHeight;
             if (reserveStatusBar && statusBarHeight > 0)
             {
                 if (statusBarPos == Top)
@@ -136,6 +131,16 @@ namespace pipgui
 
         static void resolveTileGrid(const TileState &menu, const TileViewport &viewport, TileGridMetrics &out)
         {
+            const auto resolveUnit = [](int16_t requested, int16_t usable, uint8_t count, uint8_t spacing) noexcept
+            {
+                const int16_t unit = (requested > 0 && requested < usable)
+                                         ? requested
+                                     : (count > 1)
+                                         ? (usable - (int16_t)spacing * (count - 1)) / count
+                                         : (usable - 16);
+                return std::max<int16_t>(20, unit);
+            };
+
             out.cols = 1;
             out.rows = 1;
             if (menu.customLayout && menu.layoutCols > 0 && menu.layoutRows > 0)
@@ -152,35 +157,16 @@ namespace pipgui
             out.spacing = menu.style.spacing ? menu.style.spacing : 8;
             out.radius = std::max<uint8_t>(2, menu.style.radius ? menu.style.radius : 10);
 
-            out.unitW = (menu.style.tileWidth > 0 && menu.style.tileWidth < viewport.usableW)
-                            ? menu.style.tileWidth
-                        : (out.cols > 1)
-                            ? (viewport.usableW - (int16_t)out.spacing * (out.cols - 1)) / out.cols
-                            : (viewport.usableW - 16);
-
-            out.unitH = (menu.style.tileHeight > 0 && menu.style.tileHeight < viewport.usableH)
-                            ? menu.style.tileHeight
-                        : (out.rows > 1)
-                            ? (viewport.usableH - (int16_t)out.spacing * (out.rows - 1)) / out.rows
-                            : (viewport.usableH - 16);
-
-            out.unitW = std::max<int16_t>(20, out.unitW);
-            out.unitH = std::max<int16_t>(20, out.unitH);
+            out.unitW = resolveUnit(menu.style.tileWidth, viewport.usableW, out.cols, out.spacing);
+            out.unitH = resolveUnit(menu.style.tileHeight, viewport.usableH, out.rows, out.spacing);
 
             int16_t gridW = (int16_t)out.cols * out.unitW + (int16_t)out.spacing * (out.cols - 1);
             int16_t gridH = (int16_t)out.rows * out.unitH + (int16_t)out.spacing * (out.rows - 1);
 
             if (gridW > viewport.usableW || gridH > viewport.usableH)
             {
-                out.unitW = (out.cols > 1)
-                                ? (viewport.usableW - (int16_t)out.spacing * (out.cols - 1)) / out.cols
-                                : (viewport.usableW - 16);
-                out.unitH = (out.rows > 1)
-                                ? (viewport.usableH - (int16_t)out.spacing * (out.rows - 1)) / out.rows
-                                : (viewport.usableH - 16);
-
-                out.unitW = std::max<int16_t>(20, out.unitW);
-                out.unitH = std::max<int16_t>(20, out.unitH);
+                out.unitW = resolveUnit(0, viewport.usableW, out.cols, out.spacing);
+                out.unitH = resolveUnit(0, viewport.usableH, out.rows, out.spacing);
 
                 gridW = (int16_t)out.cols * out.unitW + (int16_t)out.spacing * (out.cols - 1);
                 gridH = (int16_t)out.rows * out.unitH + (int16_t)out.spacing * (out.rows - 1);
@@ -415,7 +401,7 @@ namespace pipgui
             _tileHeight,
             _lineGapPx,
             _contentMode};
-        detail::GuiAccess::configureTile(*_gui, _screenId, _parentScreen, _items, _itemCount, style);
+        detail::GuiAccess::configureTile(*_gui, _screenId, _items, _itemCount, style);
         if (_layoutConfigured)
         {
             TileLayoutCell layoutCells[255] = {};
@@ -431,7 +417,7 @@ namespace pipgui
         }
     }
 
-    void GUI::configureTile(uint8_t screenId, uint8_t parentScreen, const TileItemDef *items, uint8_t itemCount, const TileStyle &style)
+    void GUI::configureTile(uint8_t screenId, const TileItemDef *items, uint8_t itemCount, const TileStyle &style)
     {
         if (screenId == INVALID_SCREEN_ID || !items || itemCount == 0)
             return;
@@ -448,7 +434,6 @@ namespace pipgui
         }
 
         m->configured = true;
-        m->parentScreen = parentScreen;
         m->itemCount = itemCount;
         resetTileRuntime(*m);
         m->style = normalizedTileStyle(style, _render.bgColor);
@@ -493,8 +478,7 @@ namespace pipgui
         uint32_t now = nowMs();
         bool changed = false;
 
-        const uint32_t ENTER_HOLD_MS = 400;
-        const uint32_t BACK_HOLD_MS = 400;
+        const uint32_t holdMs = 400;
 
         if (nextDown)
         {
@@ -503,7 +487,7 @@ namespace pipgui
                 m.nextHoldStartMs = now;
                 m.nextLongFired = false;
             }
-            else if (!m.nextLongFired && m.nextHoldStartMs && (now - m.nextHoldStartMs) >= ENTER_HOLD_MS)
+            else if (!m.nextLongFired && m.nextHoldStartMs && (now - m.nextHoldStartMs) >= holdMs)
             {
                 if (m.selectedIndex < m.itemCount)
                 {
@@ -536,10 +520,9 @@ namespace pipgui
                 m.prevHoldStartMs = now;
                 m.prevLongFired = false;
             }
-            else if (!m.prevLongFired && m.prevHoldStartMs && (now - m.prevHoldStartMs) >= BACK_HOLD_MS)
+            else if (!m.prevLongFired && m.prevHoldStartMs && (now - m.prevHoldStartMs) >= holdMs)
             {
-                if (m.parentScreen != INVALID_SCREEN_ID)
-                    activateScreenId(m.parentScreen, -1);
+                prevScreen();
                 m.prevLongFired = true;
             }
         }
@@ -598,7 +581,7 @@ namespace pipgui
         const int16_t sb = statusBarHeight();
         if (!resolveTileViewport(_render.screenWidth,
                                  _render.screenHeight,
-                                 _flags.statusBarEnabled && sb > 0 && _status.style == StatusBarStyleSolid,
+                                 sb > 0,
                                  sb,
                                  _status.pos,
                                  viewport))
@@ -612,16 +595,28 @@ namespace pipgui
         tileRectAtIndex(m, prevSelectedIndex, grid, xOld, yOld, wOld, hOld);
         tileRectAtIndex(m, m.selectedIndex, grid, xNew, yNew, wNew, hNew);
 
-        int16_t pad = 2;
-        int16_t bxOld = (int16_t)(xOld - pad);
-        int16_t byOld = (int16_t)(yOld - pad);
-        int16_t bwOld = (int16_t)(wOld + pad * 2);
-        int16_t bhOld = (int16_t)(hOld + pad * 2);
+        const int16_t pad = 2;
+        DirtyRect dirtyRects[2] = {
+            {(int16_t)(xOld - pad), (int16_t)(yOld - pad), (int16_t)(wOld + pad * 2), (int16_t)(hOld + pad * 2)},
+            {(int16_t)(xNew - pad), (int16_t)(yNew - pad), (int16_t)(wNew + pad * 2), (int16_t)(hNew + pad * 2)}};
+        uint8_t dirtyCount = (prevSelectedIndex != m.selectedIndex) ? 2 : 1;
 
-        int16_t bxNew = (int16_t)(xNew - pad);
-        int16_t byNew = (int16_t)(yNew - pad);
-        int16_t bwNew = (int16_t)(wNew + pad * 2);
-        int16_t bhNew = (int16_t)(hNew + pad * 2);
+        if (dirtyCount == 2)
+        {
+            const DirtyRect &a = dirtyRects[0];
+            const DirtyRect &b = dirtyRects[1];
+            const bool touches = (a.x <= b.x + b.w) && (b.x <= a.x + a.w) &&
+                                 (a.y <= b.y + b.h) && (b.y <= a.y + a.h);
+            if (touches)
+            {
+                const int16_t x1 = std::min<int16_t>(a.x, b.x);
+                const int16_t y1 = std::min<int16_t>(a.y, b.y);
+                const int16_t x2 = std::max<int16_t>(a.x + a.w, b.x + b.w);
+                const int16_t y2 = std::max<int16_t>(a.y + a.h, b.y + b.h);
+                dirtyRects[0] = {x1, y1, (int16_t)(x2 - x1), (int16_t)(y2 - y1)};
+                dirtyCount = 1;
+            }
+        }
 
         bool prevRender = _flags.inSpritePass;
         pipcore::Sprite *prevActive = _render.activeSprite;
@@ -632,12 +627,10 @@ namespace pipgui
         _flags.inSpritePass = 1;
         _render.activeSprite = &_render.sprite;
 
-        _render.sprite.setClipRect(bxOld, byOld, bwOld, bhOld);
-        renderTile(screenId);
-
-        if (prevSelectedIndex != m.selectedIndex)
+        for (uint8_t i = 0; i < dirtyCount; ++i)
         {
-            _render.sprite.setClipRect(bxNew, byNew, bwNew, bhNew);
+            const DirtyRect &dirty = dirtyRects[i];
+            _render.sprite.setClipRect(dirty.x, dirty.y, dirty.w, dirty.h);
             renderTile(screenId);
         }
 
@@ -648,9 +641,11 @@ namespace pipgui
 
         if (!prevRender)
         {
-            invalidateRect(bxOld, byOld, bwOld, bhOld);
-            if (prevSelectedIndex != m.selectedIndex)
-                invalidateRect(bxNew, byNew, bwNew, bhNew);
+            for (uint8_t i = 0; i < dirtyCount; ++i)
+            {
+                const DirtyRect &dirty = dirtyRects[i];
+                invalidateRect(dirty.x, dirty.y, dirty.w, dirty.h);
+            }
             flushDirty();
         }
     }
@@ -671,10 +666,11 @@ namespace pipgui
         auto t = getDrawTarget();
 
         TileViewport viewport;
+        const int16_t sb = statusBarHeight();
         if (!resolveTileViewport(_render.screenWidth,
                                  _render.screenHeight,
-                                 _flags.statusBarEnabled && _status.height > 0,
-                                 _status.height,
+                                 sb > 0,
+                                 sb,
                                  _status.pos,
                                  viewport))
             return;
@@ -762,11 +758,7 @@ namespace pipgui
             int16_t x = 0, y = 0, tileW = 0, tileH = 0;
             tileRectAtIndex(m, i, grid, x, y, tileW, tileH);
 
-            uint32_t bg888 = (i == m.selectedIndex) ? m.style.cardActiveColor : m.style.cardColor;
-            if (bg888 == 0)
-                bg888 = _render.bgColor;
-
-            uint16_t bg = detail::color888To565(bg888);
+            const uint16_t bg = detail::color888To565((i == m.selectedIndex) ? m.style.cardActiveColor : m.style.cardColor);
             fillRoundRect(x, y, tileW, tileH, grid.radius, bg);
 
             uint16_t txtCol = detail::autoTextColor(bg, 140);
@@ -789,15 +781,11 @@ namespace pipgui
             if (contentClipW <= 0 || contentClipH <= 0)
                 continue;
 
-            uint16_t titlePx = 0;
-            uint16_t subPx = 0;
+            const uint16_t titlePx = hasSub ? 18 : 20;
+            uint16_t subPx = hasSub ? static_cast<uint16_t>((titlePx * 7U) / 10U) : 0;
             uint16_t gapPx = m.style.lineGapPx;
-            if (titlePx == 0)
-                titlePx = hasSub ? 18 : 20;
             if (hasSub)
             {
-                if (subPx == 0)
-                    subPx = (uint16_t)((titlePx * 7U) / 10U);
                 if (gapPx == 0)
                     gapPx = (uint16_t)(titlePx / 5U);
             }
@@ -880,4 +868,3 @@ namespace pipgui
         }
     }
 }
-

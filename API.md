@@ -319,6 +319,8 @@ ui.screenTransitionActive();
 ```
 
 - `currentScreen()` возвращает id текущего активного экрана
+- библиотека автоматически ведёт navigation-history при переходах между экранами
+- `prevScreen()` возвращает по navigation-history, а не по порядку
 
 ## 5.4. Принудительная перерисовка
 
@@ -816,9 +818,6 @@ ui.drawScrollDots()
     .pos(center, 220)
     .count(5)
     .activeIndex(2)
-    .prevIndex(1)
-    .animProgress(0.5f)
-    .animDirection(1)
     .activeColor(ui.rgb(0, 87, 250))
     .inactiveColor(ui.rgb(60, 60, 60)) 
     .radius(3)
@@ -831,15 +830,12 @@ ui.drawScrollDots()
 
 - `count(...)` - общее число страниц/точек
 - `activeIndex(...)` - текущая активная страница
-- `prevIndex(...)` - предыдущая активная страница для анимации перехода
-- `animProgress(...)` - прогресс анимации от `0.0f` до `1.0f`
-- `animDirection(...)` - направление перехода: `1` вперёд, `-1` назад
 - `radius(...)` - базовый радиус точки
 - `spacing(...)` - шаг между центрами соседних точек
 
 Поведение:
 
-- при `prevIndex != activeIndex` индикатор всегда анимирует активную точку как `circle -> capsule -> circle`
+- при смене `activeIndex` индикатор сам (time-based) анимирует активную точку как `circle -> capsule -> circle`
 - при `count > 7` включается оконный режим: показывается компактное окно точек с taper по краям
 
 ## 10.2. Наследование стиля fluent
@@ -1039,15 +1035,19 @@ String options[] = {"Low", "Medium", "High"};
 ui.drawDrumRollHorizontal(
     20, 60, 200, 40,
     options, 3,
-    1, 0,          // selectedIndex, prevIndex
-    0.4f,          // animProgress
+    1,             // selectedIndex
     ui.rgb(255, 255, 255),
     ui.rgb(0, 0, 0),
-    16
+    16,            // fontPx
+    280            // animDurationMs
 );
 ```
 
 Вертикальный есть отдельной функцией `drawDrumRollVertical(...)`.
+
+- анимация у `DrumRoll` теперь внутренняя time-based
+- снаружи передаётся только новый `selectedIndex`
+- `animDurationMs` задаёт длительность перелистывания в миллисекундах
 
 ---
 
@@ -1060,14 +1060,13 @@ ui.drawDrumRollHorizontal(
 ```cpp
 ui.configureList()
     .screen(ScreenMainMenu)
-    .parent(ScreenHome) 
     .items({
         {"Settings", "Device configuration", ScreenSettings},
         {"About",    "Firmware info",        ScreenAbout},
         {"Restart",  "Reboot device",        ScreenRestart}
     })
-    .cardColor(ui.rgb(12, 12, 12))
-    .activeColor(ui.rgb(0, 120, 255))
+    .inactive(ui.rgb(12, 12, 12))
+    .active(ui.rgb(0, 120, 255))
     .radius(8)
     .cardSize(0, 0)
     .mode(Cards)
@@ -1098,7 +1097,7 @@ SCREEN(ScreenMainMenu, 1)
 - короткое отпускание `NEXT` переключает пункт вперёд;
 - короткое отпускание `PREV` переключает пункт назад;
 - удержание `NEXT` открывает `targetScreen` выбранного пункта;
-- удержание `PREV` возвращает на `parentScreen`.
+- удержание `PREV` возвращает на предыдущий экран из navigation-history.
 
 Режимы списка:
 
@@ -1112,15 +1111,14 @@ SCREEN(ScreenMainMenu, 1)
 ```cpp
 ui.configureTile()
     .screen(ScreenTiles)
-    .parent(ScreenHome)
     .items({
         {"Main",     "Главный экран", ScreenHome},
         {"Settings", "Настройки",     ScreenSettings},
         {"Info",     "Инфо",          ScreenInfo},
         {"Graph",    "Графики",       ScreenGraph}
     })
-    .cardColor(ui.rgb(16, 16, 16))
-    .activeColor(ui.rgb(0, 120, 255))
+    .inactive(ui.rgb(16, 16, 16))
+    .active(ui.rgb(0, 120, 255))
     .radius(12)
     .spacing(10)
     .columns(2)
@@ -1133,7 +1131,6 @@ ui.configureTile()
 Ввод:
 
 ```cpp
-// btnNext.update() и btnPrev.update() уже вызваны в начале этого loop()
 ui.tileInput(ScreenTiles)
     .nextDown(btnNext.isDown())
     .prevDown(btnPrev.isDown())
@@ -1154,6 +1151,13 @@ SCREEN(ScreenTiles, 2)
 - `TextOnly`
 - `TextSubtitle`
 
+Что важно:
+
+- `columns(...)` управляет обычной равномерной сеткой
+- `tileSize(...)` задаёт желаемый размер плитки, но layout всё равно ужимается в доступную область экрана
+- `lineGap(...)` влияет только на расстояние между title и subtitle внутри плитки
+- `mode(TextSubtitle)` не гарантирует subtitle любой ценой — если по высоте не влезает, subtitle скрывается
+
 ## 11.3. Кастомная раскладка плиток
 
 Если стандартной сетки мало, можно описать layout строками:
@@ -1172,10 +1176,15 @@ ui.configureTile()
         "BC",
         "BD"
     })
-    .apply();
 ```
 
 Это advanced-режим. Для большинства экранов хватает обычных `columns(...)`, `spacing(...)` и `tileSize(...)`.
+
+Что важно:
+
+- `layout(...)` переключает плитки в кастомную сетку
+- в этом режиме `columns(...)` уже не управляет раскладкой
+- каждая буква — отдельная плитка, прямоугольный блок одинаковых букв задаёт её span
 
 ---
 
@@ -1275,15 +1284,22 @@ uint16_t visible = ui.graphSamplesVisible(ScreenGraph);
 
 # 13. Статус-бар
 
+## 13.0. Build-time флаги
+
+- `PIPGUI_STATUS_BAR`
+  - `1` включает код статус-бара
+  - `0` вырезает runtime-реализацию, публичные методы остаются no-op
+
+Обычно эти флаги задаются в `include/config.hpp`.
+
 ## 13.1. Включение
 
 ```cpp
-ui.configureStatusBar(
-    true,
-    ui.rgb(0, 0, 0),
-    18,
-    Top
-);
+ui.configureStatusBar()
+    .enabled(true)
+    .bgColor(ui.rgb(0, 0, 0))
+    .height(18)
+    .position(Top);
 ```
 
 Позиции:
@@ -1296,17 +1312,21 @@ ui.configureStatusBar(
 ```cpp
 ui.setStatusBarStyle(StatusBarStyleSolid);
 // или
-ui.setStatusBarStyle(StatusBarStyleBlurGradient);
+ui.setStatusBarStyle(StatusBarStyleBlur);
 ```
+
+Режимы:
+
+- `StatusBarStyleSolid` — обычная непрозрачная полоса; layout резервирует под неё высоту
+- `StatusBarStyleBlur` — блюр-полоса поверх контента; layout не должен откусывать под неё safe area
 
 ## 13.3. Текст
 
 ```cpp
-ui.setStatusBarText(
-    "pipGUI",
-    "12:34",
-    "Wi-Fi"
-);
+ui.setStatusBarText()
+    .left("pipGUI")
+    .center("12:34")
+    .right("Wi-Fi");
 ```
 
 ## 13.4. Батарея
@@ -1347,6 +1367,55 @@ int16_t h = ui.statusBarHeight();
 ui.updateStatusBar();
 ui.renderStatusBar();
 ```
+
+Что важно:
+
+- `statusBarHeight()` возвращает ненулевую высоту только для `StatusBarStyleSolid`
+- при `StatusBarStyleBlur` helper возвращает `0`, потому что layout не должен резервировать fixed-height safe area под blur-панель
+
+## 13.6. Иконки слотов
+
+Можно повесить отдельную иконку в левый, центральный или правый слот статус-бара:
+
+```cpp
+ui.setStatusBarIcon()
+    .side(Left)
+    .icon(warning);
+
+ui.setStatusBarIcon()
+    .side(Center)
+    .icon(error)
+    .color(ui.rgb(255, 80, 80))
+    .size(16);
+
+ui.setStatusBarIcon()
+    .side(Right)
+    .icon(warning)
+    .color(ui.rgb(255, 220, 120))
+    .size(14);
+```
+
+Параметры:
+
+- первый аргумент - слот: `Left`, `Center` или `Right`
+- второй аргумент - `IconId`
+- `color` необязателен; если не задан, берётся foreground-цвет статус-бара
+- `sizePx` необязателен; если `0`, размер подбирается автоматически от высоты панели
+
+Удаление иконки:
+
+```cpp
+ui.clearStatusBarIcon(Left);
+ui.clearStatusBarIcon(Center);
+ui.clearStatusBarIcon(Right);
+```
+
+Поведение:
+
+- иконки появляются и исчезают с короткой fade-анимацией
+- левая иконка живёт в одном block-е с левым текстом
+- центральная иконка центрируется вместе с центральным текстом как одна группа
+- правая иконка живёт в правом block-е вместе с правым текстом
 
 ---
 

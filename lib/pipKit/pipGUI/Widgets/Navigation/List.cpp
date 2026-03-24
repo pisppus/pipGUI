@@ -45,7 +45,6 @@ namespace pipgui
             detail::free(plat, menu.items);
         }
         menu = {};
-        menu.parentScreen = INVALID_SCREEN_ID;
     }
 
     static bool ensureListCapacity(ListState &menu, uint8_t newCapacity, pipcore::Platform *plat)
@@ -77,7 +76,6 @@ namespace pipgui
         }
 
         menu->configured = true;
-        menu->parentScreen = _parentScreen;
         menu->itemCount = _itemCount;
         resetListRuntime(*menu);
 
@@ -95,9 +93,8 @@ namespace pipgui
 
         if (menu->style.cardColor == 0 || menu->style.cardActiveColor == 0)
         {
-            uint16_t bg565 = (uint16_t)0x0000;
-            menu->style.cardColor = (uint16_t)detail::blend565(bg565, (uint16_t)0xFFFF, 18);
-            menu->style.cardActiveColor = (uint16_t)((0 << 11) | ((130 >> 2) << 5) | (220 >> 3));
+            menu->style.cardColor = (uint16_t)detail::blend565(0x0000, 0xFFFF, 18);
+            menu->style.cardActiveColor = (uint16_t)(((130 >> 2) << 5) | (220 >> 3));
         }
     }
 
@@ -169,8 +166,7 @@ namespace pipgui
             }
             else if (!menu.prevLongFired && menu.prevHoldStartMs && (now - menu.prevHoldStartMs) >= holdMs)
             {
-                if (menu.parentScreen != INVALID_SCREEN_ID)
-                    activateScreenId(menu.parentScreen, -1);
+                prevScreen();
                 menu.prevLongFired = true;
             }
         }
@@ -208,12 +204,13 @@ namespace pipgui
 
         int16_t top = 0;
         int16_t height = (int16_t)_render.screenHeight;
-        if (_flags.statusBarEnabled && _status.height > 0)
+        const int16_t sb = statusBarHeight();
+        if (sb > 0)
         {
             if (_status.pos == Top)
-                top += _status.height;
+                top += sb;
             else if (_status.pos == Bottom)
-                height -= _status.height;
+                height -= sb;
         }
 
         const int16_t contentHeight = (int16_t)(height - top);
@@ -259,8 +256,6 @@ namespace pipgui
             int16_t cardW = (menu.style.cardWidth > 0 && menu.style.cardWidth < w)
                                 ? menu.style.cardWidth
                                 : (int16_t)(w - marginX * 2);
-            if (cardW > w)
-                cardW = w;
             if (cardW < 20)
                 cardW = 20;
 
@@ -362,11 +357,7 @@ namespace pipgui
 
             if (fabsf(diff) > 0.0005f)
             {
-                float dtSec = (float)dtMs / 1000.0f;
-                if (dtSec < 0.0f)
-                    dtSec = 0.0f;
-                if (dtSec > 0.1f)
-                    dtSec = 0.1f;
+                const float dtSec = (float)dtMs * 0.001f;
 
                 const float omega = 12.0f;
                 const float xVal = omega * dtSec;
@@ -420,16 +411,15 @@ namespace pipgui
             if (radius < 2)
                 radius = 2;
 
+            const int16_t lastIdx = (int16_t)menu.itemCount - 1;
             int16_t startIndex = (int16_t)floorf(renderScrollPos) - 3;
-            int16_t endIndex = startIndex + (int16_t)visibleCount + 6;
             if (startIndex < 0)
                 startIndex = 0;
-            if (endIndex >= (int16_t)menu.itemCount)
-                endIndex = (int16_t)menu.itemCount - 1;
-            if (startIndex >= (int16_t)menu.itemCount)
-                startIndex = (int16_t)menu.itemCount - 1;
-            if (startIndex > endIndex)
-                startIndex = endIndex;
+            if (startIndex > lastIdx)
+                startIndex = lastIdx;
+            int16_t endIndex = startIndex + (int16_t)visibleCount + 6;
+            if (endIndex > lastIdx)
+                endIndex = lastIdx;
 
             auto setTextFont = [&](uint16_t weight, uint16_t px)
             {
@@ -509,6 +499,10 @@ namespace pipgui
                     drawTextAligned(text, textX, textY, fg, bg, TextAlign::Left);
             };
 
+            const uint16_t inactiveTextColor = detail::autoTextColor(bgColor565);
+            const int16_t textClipX = cardX + 6;
+            const int16_t textClipW = cardW - 12;
+
             for (int16_t itemIndex = startIndex; itemIndex <= endIndex; ++itemIndex)
             {
                 const uint8_t i = (uint8_t)itemIndex;
@@ -530,7 +524,7 @@ namespace pipgui
                         fillRoundRect(cardX, itemY, cardW, cardH, radius, bg);
 
                     const int16_t textOffsetX = drawItemIcon(item.iconId, cardX + 8, itemY, (cardH > 30) ? 22 : 18, 6,
-                                                             active ? textColor : detail::autoTextColor(bgColor565),
+                                                             active ? textColor : inactiveTextColor,
                                                              active ? bg : bgColor565, false);
                     const int16_t textX = cardX + 12 + textOffsetX;
                     const int16_t textMaxWidth = (cardX + cardW - textX - 10 > 4) ? (cardX + cardW - textX - 10) : 4;
@@ -554,7 +548,7 @@ namespace pipgui
 
                     int32_t prevItemClipX = 0, prevItemClipY = 0, prevItemClipW = 0, prevItemClipH = 0;
                     target->getClipRect(&prevItemClipX, &prevItemClipY, &prevItemClipW, &prevItemClipH);
-                    target->setClipRect(cardX + 6, itemClipY, cardW - 12, itemClipH);
+                    target->setClipRect(textClipX, itemClipY, textClipW, itemClipH);
 
                     setTextFont(TITLE_WEIGHT, titlePx);
                     drawTextLine(item.title, textX, baseY, textMaxWidth, textColor, bg, active);
@@ -595,8 +589,6 @@ namespace pipgui
                     gapPx = 0;
                 }
 
-                // Small 16:9 displays need a more compact default stack so the subtitle
-                // does not get dropped when card height is tight.
                 if (hasSub && cardH <= 52)
                 {
                     if (autoTitlePx)
@@ -641,7 +633,7 @@ namespace pipgui
                 const int16_t subY = baseY + item.titleH + (showSub ? gapPx : 0);
                 int32_t prevItemClipX = 0, prevItemClipY = 0, prevItemClipW = 0, prevItemClipH = 0;
                 target->getClipRect(&prevItemClipX, &prevItemClipY, &prevItemClipW, &prevItemClipH);
-                target->setClipRect(cardX + 6, itemClipY, cardW - 12, itemClipH);
+                target->setClipRect(textClipX, itemClipY, textClipW, itemClipH);
 
                 setTextFont(TITLE_WEIGHT, titlePx);
                 drawTextLine(item.title, textX, titleY, textMaxWidth, textColor, bg, active);
@@ -679,20 +671,17 @@ namespace pipgui
                 }
                 else if (since <= SHOW_MS + FADE_MS)
                 {
-                    float tFade = (float)(since - SHOW_MS) / (float)FADE_MS;
-                    float tt = tFade * tFade * (3.0f - 2.0f * tFade);
-                    targetAlpha = 1.0f - tt;
+                    const float tFade = (float)(since - SHOW_MS) / (float)FADE_MS;
+                    targetAlpha = 1.0f - tFade * tFade * (3.0f - 2.0f * tFade);
                 }
                 else if (since <= SHOW_MS + FADE_MS + SLIDE_MS)
                 {
-                    targetAlpha = 0.0f;
                     slideT = (float)(since - (SHOW_MS + FADE_MS)) / (float)SLIDE_MS;
                     if (slideT > 1.0f)
                         slideT = 1.0f;
                 }
                 else
                 {
-                    targetAlpha = 0.0f;
                     slideT = 1.0f;
                 }
             }
@@ -717,8 +706,7 @@ namespace pipgui
                 int16_t trackH = h - (int16_t)(2 * sbInset);
                 if (trackH < 1)
                     trackH = 1;
-                const int16_t baseX = right - 4;
-                const int16_t trackX = baseX + (int16_t)(6.0f * slideT);
+                const int16_t trackX = (int16_t)(right - 4 + (int16_t)(6.0f * slideT));
 
                 const float ratio = (float)visibleCount / (float)menu.itemCount;
                 int16_t thumbH = (int16_t)(trackH * ratio);
@@ -733,11 +721,7 @@ namespace pipgui
 
                 int16_t thumbY = trackTop + (int16_t)((trackH - thumbH) * pct);
 
-                uint8_t minV = 40;
-                uint8_t maxV = 140;
-                uint32_t range = (uint32_t)(maxV - minV);
-                uint8_t v = (uint8_t)(minV + (range * (uint32_t)menu.scrollbarAlpha) / 255U);
-
+                const uint8_t v = (uint8_t)(40U + (100U * (uint32_t)menu.scrollbarAlpha) / 255U);
                 uint16_t col = target->color565(v, v, v);
 
                 uint8_t thumbRadius = (thumbH < 6) ? 1 : 2;
@@ -764,5 +748,3 @@ namespace pipgui
         return true;
     }
 }
-
-

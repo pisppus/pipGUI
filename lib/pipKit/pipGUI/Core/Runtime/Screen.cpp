@@ -1,7 +1,6 @@
 #include <pipGUI/Core/pipGUI.hpp>
 #include <pipGUI/Core/Internal/ViewModels.hpp>
 #include <pipGUI/Core/Debug.hpp>
-#include <pipGUI/Systems/Network/Wifi.hpp>
 #include <cstring>
 #include <math.h>
 
@@ -67,7 +66,8 @@ namespace pipgui
         if (el > dur)
             el = dur;
         const float p = navigationEase((float)el / dur);
-        const bool keepStatusBarStatic = _flags.statusBarEnabled && _status.height > 0;
+        const int16_t sbh = statusBarHeight();
+        const bool keepStatusBarStatic = sbh > 0;
         int16_t contentX = 0;
         int16_t contentY = 0;
         int16_t contentW = (int16_t)_render.screenWidth;
@@ -75,12 +75,10 @@ namespace pipgui
 
         if (keepStatusBarStatic)
         {
-            const int16_t sbh = (int16_t)std::min<uint16_t>(_status.height, (uint16_t)contentH);
-            contentH -= sbh;
-            if (_status.pos == Bottom)
-                ;
-            else
-                contentY = sbh;
+            const int16_t reserved = (int16_t)std::min<uint16_t>((uint16_t)sbh, (uint16_t)contentH);
+            contentH -= reserved;
+            if (_status.pos != Bottom)
+                contentY = reserved;
         }
 
         const bool horizontal = (_screen.anim == SlideX);
@@ -134,14 +132,14 @@ namespace pipgui
                 if (keepStatusBarStatic)
                 {
                     renderStatusBar();
-                    const int16_t sbh = (int16_t)std::min<uint16_t>(_status.height, (uint16_t)_render.screenHeight);
-                    const int16_t sbY = (_status.pos == Bottom) ? (int16_t)(_render.screenHeight - sbh) : 0;
+                    const int16_t reserved = (int16_t)std::min<uint16_t>((uint16_t)sbh, (uint16_t)_render.screenHeight);
+                    const int16_t sbY = (_status.pos == Bottom) ? (int16_t)(_render.screenHeight - reserved) : 0;
                     presentSpriteRegion(0,
                                         sbY,
                                         0,
                                         sbY,
                                         (int16_t)_render.screenWidth,
-                                        sbh,
+                                        reserved,
                                         "present");
                 }
                 _flags.needRedraw = 0;
@@ -412,14 +410,14 @@ namespace pipgui
                 if (keepStatusBarStatic)
                 {
                     renderStatusBar();
-                    const int16_t sbh = (int16_t)std::min<uint16_t>(_status.height, (uint16_t)_render.screenHeight);
-                    const int16_t sbY = (_status.pos == Bottom) ? (int16_t)(_render.screenHeight - sbh) : 0;
+                    const int16_t reserved = (int16_t)std::min<uint16_t>((uint16_t)sbh, (uint16_t)_render.screenHeight);
+                    const int16_t sbY = (_status.pos == Bottom) ? (int16_t)(_render.screenHeight - reserved) : 0;
                     presentSpriteRegion(0,
                                         sbY,
                                         0,
                                         sbY,
                                         (int16_t)_render.screenWidth,
-                                        sbh,
+                                        reserved,
                                         "present");
                 }
                 _flags.needRedraw = 0;

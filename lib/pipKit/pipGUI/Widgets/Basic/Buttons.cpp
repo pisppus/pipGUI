@@ -124,6 +124,11 @@ namespace pipgui
             return out;
         }
 
+        [[nodiscard]] String loadingLayoutLabel(const String &label, bool loading) noexcept
+        {
+            return loading ? (label + "...") : label;
+        }
+
         [[nodiscard]] uint16_t resolveButtonIconSize(int16_t buttonH, bool hasLabel) noexcept
         {
             const float ratio = hasLabel ? 0.48f : 0.58f;
@@ -205,6 +210,7 @@ namespace pipgui
         const uint16_t fg = resolveButtonTextColor(bg, state, fgActive);
 
         const String labelToDraw = loadingLabel(label, state.loading, nowMs());
+        const String labelForLayout = loadingLayoutLabel(label, state.loading);
         const bool hasText = labelToDraw.length() > 0;
         const bool hasIcon = (iconId != static_cast<IconId>(0xFFFF) && iconId < psdf_icons::IconCount);
 
@@ -229,7 +235,7 @@ namespace pipgui
         {
             setFontWeight(Medium);
             setFontSize(sizePx);
-            measureText(labelToDraw, outW, outH);
+            measureText(labelForLayout, outW, outH);
 
             const int16_t availW = hasIcon && hasText
                                        ? static_cast<int16_t>(maxW - resolvedIconSize - iconGap)
@@ -253,8 +259,12 @@ namespace pipgui
             measureText(labelToDraw, outW, outH);
         };
 
+        int16_t layoutW = 0;
         if (hasText)
-            fitLabel(px, tw, th);
+        {
+            fitLabel(px, layoutW, th);
+            measureText(labelToDraw, tw, th);
+        }
 
         const int16_t iconY = static_cast<int16_t>(frame.centerY - resolvedIconSize / 2);
         int16_t textY = static_cast<int16_t>(frame.centerY - th / 2);
@@ -268,7 +278,8 @@ namespace pipgui
         }
         else if (hasText)
         {
-            const int16_t contentW = hasIcon ? static_cast<int16_t>(resolvedIconSize + iconGap + tw) : tw;
+            const int16_t contentTextW = state.loading ? layoutW : tw;
+            const int16_t contentW = hasIcon ? static_cast<int16_t>(resolvedIconSize + iconGap + contentTextW) : contentTextW;
             const int16_t contentX = static_cast<int16_t>(frame.centerX - contentW / 2);
 
             if (hasIcon)
@@ -277,7 +288,7 @@ namespace pipgui
             setFontWeight(Medium);
             setFontSize(px);
             const int16_t textCenterX = hasIcon
-                                            ? static_cast<int16_t>(contentX + resolvedIconSize + iconGap + tw / 2)
+                                            ? static_cast<int16_t>(contentX + resolvedIconSize + iconGap + contentTextW / 2)
                                             : frame.centerX;
             drawTextAligned(labelToDraw, textCenterX, textY, fg, bg, TextAlign::Center);
         }
@@ -319,9 +330,6 @@ namespace pipgui
         _render.activeSprite = prevActive;
 
         if (!prevRender)
-        {
             invalidateRect((int16_t)(rx - pad), (int16_t)(ry - pad), (int16_t)(w + pad * 2), (int16_t)(h + pad * 2));
-            flushDirty();
-        }
     }
 }

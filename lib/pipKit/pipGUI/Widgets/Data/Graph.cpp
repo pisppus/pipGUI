@@ -1230,8 +1230,7 @@ namespace pipgui
         area->lineColors565[lineIndex] = detail::color888To565(color);
         area->lineValueMins[lineIndex] = valueMin;
         area->lineValueMaxs[lineIndex] = (valueMax > valueMin) ? valueMax : (int16_t)(valueMin + 1);
-        if (area->lineThicknesses)
-            area->lineThicknesses[lineIndex] = thickness < 1 ? 1 : thickness;
+        area->lineThicknesses[lineIndex] = thickness < 1 ? 1 : thickness;
 
         appendGraphSample(*area, lineIndex, value, visibleSamples);
 
@@ -1303,9 +1302,7 @@ namespace pipgui
             redrawGraphInner(t, *area);
         }
 
-        SeriesWindow window;
-        window.count = sampleCount;
-        window.visible = sampleCount;
+        const SeriesWindow window{0, sampleCount, sampleCount};
         renderSeries(*this, t, *area, samples, window, sampleCount, detail::color888To565(color), valueMin, valueMax, thickness);
     }
 

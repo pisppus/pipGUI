@@ -6,15 +6,6 @@ SCREEN(drumRoll, 27)
   ui.drawText().text("Drum roll").pos(-1, 24).color(ui.rgb(220, 220, 220)).bgColor(bg565).align(Center);
   ui.drawText().text("Next: H  Prev: V").pos(-1, 48).color(ui.rgb(120, 120, 120)).bgColor(bg565).align(Center);
 
-  uint32_t now = millis();
-  if (g_drumAnimateH && now - g_drumAnimStartMs >= g_drumAnimDurMs)
-    g_drumAnimateH = false;
-  if (g_drumAnimateV && now - g_drumAnimStartMs >= g_drumAnimDurMs)
-    g_drumAnimateV = false;
-
-  const float progressH = g_drumAnimateH ? animProgress(now, g_drumAnimStartMs, g_drumAnimDurMs) : 1.0f;
-  const float progressV = g_drumAnimateV ? animProgress(now, g_drumAnimStartMs, g_drumAnimDurMs) : 1.0f;
-
   String optsH[g_drumCountH] = {
       String(g_drumOptionsH[0]),
       String(g_drumOptionsH[1]),
@@ -30,11 +21,10 @@ SCREEN(drumRoll, 27)
       optsH,
       g_drumCountH,
       g_drumSelectedH,
-      g_drumPrevH,
-      progressH,
       ui.rgb(255, 255, 255),
       ui.rgb(8, 8, 8),
-      18);
+      18,
+      280);
 
   String optsV[g_drumCountV] = {
       String(g_drumOptionsV[0]),
@@ -49,9 +39,8 @@ SCREEN(drumRoll, 27)
       optsV,
       g_drumCountV,
       g_drumSelectedV,
-      g_drumPrevV,
-      progressV,
       ui.rgb(200, 200, 200),
       ui.rgb(8, 8, 8),
-      14);
+      14,
+      280);
 }
