@@ -278,7 +278,6 @@ namespace pipgui
                            (int16_t)(ry - kToggleUpdatePad),
                            (int16_t)(w + kToggleUpdatePad * 2),
                            (int16_t)(h + kToggleUpdatePad * 2));
-            flushDirty();
         }
     }
 }

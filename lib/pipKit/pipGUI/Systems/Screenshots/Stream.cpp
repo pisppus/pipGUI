@@ -35,7 +35,7 @@ namespace pipgui
 
             out = static_cast<uint32_t>(v);
             return true;
-        }
+        } 
 
         void writeShotsCounter(uint32_t value) noexcept
         {
@@ -160,18 +160,6 @@ namespace pipgui
 #endif
         }
 
-        void releaseToastScratch(pipcore::Platform *plat,
-                                 detail::ToastState &toast,
-                                 const detail::Flags &flags) noexcept
-        {
-            if (!plat || flags.toastActive || !toast.scratch)
-                return;
-
-            detail::free(plat, toast.scratch);
-            toast.scratch = nullptr;
-            toast.scratchPixels = 0;
-        }
-
         [[nodiscard]] bool snapshotSpriteBuffer(pipcore::Platform *plat,
                                                 const void *src,
                                                 uint32_t bytes,
@@ -225,7 +213,6 @@ namespace pipgui
             freeBlurBuffers(plat);
             releaseGalleryScratch(plat, _shots);
             releaseGalleryThumbPixels(plat, _shots);
-            releaseToastScratch(plat, _toast, _flags);
             haveSnapshot = snapshotSpriteBuffer(plat, src, snapshotBytes, _shotStream);
         }
 
@@ -423,8 +410,8 @@ namespace pipgui
 #endif
             if (notify)
             {
-                showToastInternal(ok ? "Screenshot saved" : "Screenshot failed", 1800, true,
-                                  static_cast<IconId>(psdf_icons::IconCount), 0);
+                showToastInternal(ok ? "Screenshot saved" : "Screenshot failed", true,
+                                  static_cast<IconId>(psdf_icons::IconCount));
             }
         };
 

@@ -156,6 +156,14 @@ namespace pipgui
         int8_t tracking128;
     };
 
+    struct TextLayoutBox
+    {
+        int16_t width = 0;
+        int16_t height = 0;
+        int16_t originX = 0;
+        int16_t originY = 0;
+    };
+
     struct KerningPair
     {
         uint32_t left;
@@ -394,6 +402,96 @@ namespace pipgui
             penX += glyph->unpackAdvance() * sizePx;
             prevCodepoint = codepoint;
         }
+        return true;
+    }
+
+    static inline bool computeTextLayoutBox(const char *s, int len,
+                                            const FontData *font,
+                                            uint16_t sizePxU16,
+                                            uint16_t weight,
+                                            TextLayoutBox &out)
+    {
+        out = {};
+        if (!font || sizePxU16 == 0)
+            return false;
+        if (len <= 0)
+            return true;
+
+        const float sizePx = (float)sizePxU16;
+        const float lineAdvance = font->lineHeight * sizePx;
+        const float padScale = sizePx * (1.0f / 128.0f);
+        float minX = 0.0f;
+        float minY = 0.0f;
+        float maxX = 0.0f;
+        float maxY = lineAdvance;
+        float maxAdvanceX = 0.0f;
+        uint16_t lines = 1;
+        bool hasInk = false;
+
+        forEachGlyph(s, len, font, sizePx, weight,
+                     [&](const Glyph *g, float penX, float penY, bool nl) -> bool
+                     {
+                         if (nl)
+                         {
+                             if (penX > maxAdvanceX)
+                                 maxAdvanceX = penX;
+                             ++lines;
+                             return true;
+                         }
+                         if (!g)
+                             return true;
+
+                         const float advanceX = penX + g->unpackAdvance() * sizePx;
+                         if (advanceX > maxAdvanceX)
+                             maxAdvanceX = advanceX;
+
+                         const float gx0 = penX + (float)g->padLeft * padScale;
+                         const float gx1 = penX + (float)g->padRight * padScale;
+                         const float gy0 = penY - (float)g->padTop * padScale;
+                         const float gy1 = penY - (float)g->padBottom * padScale;
+
+                         if (!hasInk)
+                         {
+                             minX = gx0;
+                             minY = gy0;
+                             maxX = gx1;
+                             maxY = gy1;
+                             hasInk = true;
+                             return true;
+                         }
+
+                         if (gx0 < minX)
+                             minX = gx0;
+                         if (gy0 < minY)
+                             minY = gy0;
+                         if (gx1 > maxX)
+                             maxX = gx1;
+                         if (gy1 > maxY)
+                             maxY = gy1;
+                         return true;
+                     });
+
+        if (maxAdvanceX > maxX)
+            maxX = maxAdvanceX;
+        const float lineBottom = (float)lines * lineAdvance;
+        if (lineBottom > maxY)
+            maxY = lineBottom;
+        if (minX > 0.0f)
+            minX = 0.0f;
+        if (minY > 0.0f)
+            minY = 0.0f;
+
+        const int minXI = floorToInt(minX);
+        const int minYI = floorToInt(minY);
+        const int maxXI = ceilToInt(maxX);
+        const int maxYI = ceilToInt(maxY);
+        const int16_t weightExpandX = weightExpandXPxInt(weight, sizePx);
+        const int16_t weightExpandY = weightExpandYPxInt(weight, sizePx);
+
+        out.width = (int16_t)std::max(0, maxXI - minXI + weightExpandX * 2);
+        out.height = (int16_t)std::max(0, maxYI - minYI + weightExpandY * 2);
+        out.originX = (int16_t)(-minXI + weightExpandX);
+        out.originY = (int16_t)(-minYI + weightExpandY);
         return true;
     }
 }

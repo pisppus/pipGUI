@@ -49,11 +49,18 @@ namespace pipgui
             if (radius == 0 || clipW <= 0 || clipH <= 0)
                 return;
 
+            const int32_t cornerClipX = clipX;
+            const int32_t cornerClipY = clipY;
+            const int32_t cornerClipR = static_cast<int32_t>(clipX) + clipW - 1;
+            const int32_t cornerClipB = static_cast<int32_t>(clipY) + clipH - 1;
+            if (cornerClipR < s.clipX || cornerClipX > s.clipR || cornerClipB < s.clipY || cornerClipY > s.clipB)
+                return;
+
             Surface565 corner = s;
-            corner.clipX = clipX;
-            corner.clipY = clipY;
-            corner.clipR = static_cast<int32_t>(clipX + clipW - 1);
-            corner.clipB = static_cast<int32_t>(clipY + clipH - 1);
+            corner.clipX = (cornerClipX > s.clipX) ? cornerClipX : s.clipX;
+            corner.clipY = (cornerClipY > s.clipY) ? cornerClipY : s.clipY;
+            corner.clipR = (cornerClipR < s.clipR) ? cornerClipR : s.clipR;
+            corner.clipB = (cornerClipB < s.clipB) ? cornerClipB : s.clipB;
             squircleRaster<true, AccT>(corner, c, cx, cy, radius, gamma, false);
         }
 
@@ -65,11 +72,18 @@ namespace pipgui
             if (radius == 0 || clipW <= 0 || clipH <= 0)
                 return;
 
+            const int32_t cornerClipX = clipX;
+            const int32_t cornerClipY = clipY;
+            const int32_t cornerClipR = static_cast<int32_t>(clipX) + clipW - 1;
+            const int32_t cornerClipB = static_cast<int32_t>(clipY) + clipH - 1;
+            if (cornerClipR < s.clipX || cornerClipX > s.clipR || cornerClipB < s.clipY || cornerClipY > s.clipB)
+                return;
+
             Surface565 corner = s;
-            corner.clipX = clipX;
-            corner.clipY = clipY;
-            corner.clipR = static_cast<int32_t>(clipX + clipW - 1);
-            corner.clipB = static_cast<int32_t>(clipY + clipH - 1);
+            corner.clipX = (cornerClipX > s.clipX) ? cornerClipX : s.clipX;
+            corner.clipY = (cornerClipY > s.clipY) ? cornerClipY : s.clipY;
+            corner.clipR = (cornerClipR < s.clipR) ? cornerClipR : s.clipR;
+            corner.clipB = (cornerClipB < s.clipB) ? cornerClipB : s.clipB;
             squircleRaster<false, AccT>(corner, c, cx, cy, radius, gamma, false);
         }
 

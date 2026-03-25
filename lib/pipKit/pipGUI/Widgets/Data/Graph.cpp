@@ -7,6 +7,8 @@ namespace pipgui
 {
     namespace
     {
+        constexpr uint8_t kDefaultGraphRadius = 17;
+
         struct SeriesWindow
         {
             uint16_t start = 0;
@@ -1053,15 +1055,16 @@ namespace pipgui
         }
 
         const uint16_t bg565 = detail::color888To565(bgColor);
+        const uint8_t resolvedRadius = radius ? radius : kDefaultGraphRadius;
         const bool graphChanged =
             area->x != x || area->y != y ||
             area->w != w || area->h != h ||
-            area->radius != radius ||
+            area->radius != resolvedRadius ||
             area->direction != dir ||
             area->bgColor != bgColor;
 
-        const uint8_t outerRadius = (radius < 1) ? 1 : radius;
-        fillRoundRect(x, y, w, h, outerRadius, deriveGraphGridColor565(bg565));
+        const uint8_t outerRadius = resolvedRadius;
+        fillSquircleRect(x, y, w, h, outerRadius, deriveGraphGridColor565(bg565));
 
         const int16_t innerX = (int16_t)(x + 2);
         const int16_t innerY = (int16_t)(y + 2);
@@ -1089,7 +1092,7 @@ namespace pipgui
         area->innerY = innerY;
         area->innerW = innerW;
         area->innerH = innerH;
-        area->radius = radius;
+        area->radius = resolvedRadius;
         area->direction = dir;
         area->speed = speed;
         area->bgColor = bgColor;
@@ -1100,7 +1103,7 @@ namespace pipgui
             return;
 
         const int16_t innerRadius = (outerRadius > 2) ? (int16_t)(outerRadius - 2) : (outerRadius > 0 ? (int16_t)(outerRadius - 1) : 0);
-        fillRoundRect(innerX, innerY, innerW, innerH, (uint8_t)innerRadius, bg565);
+        fillSquircleRect(innerX, innerY, innerW, innerH, (uint8_t)innerRadius, bg565);
 
         int16_t cellsX = (int16_t)((float)innerW / 12.0f + 0.5f);
         int16_t cellsY = (int16_t)((float)innerH / 12.0f + 0.5f);

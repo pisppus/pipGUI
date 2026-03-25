@@ -6,6 +6,8 @@ namespace pipgui
 {
     namespace
     {
+        constexpr int16_t kScrollDotsDirtyPad = 1;
+
         constexpr uint8_t kScrollDotsMaxVisibleForTaper = 7;
         constexpr uint32_t kScrollDotsCountAnimMs = 220;
         constexpr uint8_t kScrollDotsAnimSlotCount = 4;
@@ -337,7 +339,7 @@ namespace pipgui
         const ScrollDotsLayout toLayout = makeScrollDotsLayout(*this, x, y, toCount, radius, spacing);
         const ScrollDotsLayout drawLayout = makeScrollDotsLayout(*this, x, y, count, radius, spacing);
 
-        const int16_t pad = (int16_t)(radius + 3);
+        const int16_t pad = kScrollDotsDirtyPad;
         const int16_t rx = (fromLayout.left < toLayout.left) ? fromLayout.left : toLayout.left;
         const int16_t ry = drawLayout.top;
         const int16_t unionRight = ((fromLayout.left + fromLayout.totalW) > (toLayout.left + toLayout.totalW))
@@ -365,10 +367,7 @@ namespace pipgui
         _render.activeSprite = prevActive;
 
         if (!prevRender)
-        {
             invalidateRect((int16_t)(rx - pad), (int16_t)(ry - pad), rw, rh);
-            flushDirty();
-        }
     }
 
     void GUI::drawScrollDotsImpl(int16_t x, int16_t y,
@@ -431,9 +430,6 @@ namespace pipgui
             animDirection = (absDelta > (int)count / 2) ? (delta > 0 ? -1 : 1) : (delta > 0 ? 1 : -1);
         }
 
-        if (countAnimating || animate)
-            requestRedraw();
-
         const bool taper = (count > kScrollDotsMaxVisibleForTaper);
         const bool oldTaper = (fromCount > kScrollDotsMaxVisibleForTaper);
         const bool canAnimateCount = countAnimating && !taper && !oldTaper;
@@ -459,6 +455,17 @@ namespace pipgui
                                              ? (fromLayout.left + fromLayout.totalW)
                                              : (toLayout.left + toLayout.totalW))
                                       : (layout.left + layout.totalW);
+        if (countAnimating || animate)
+        {
+            if (_flags.spriteEnabled && _disp.display)
+            {
+                invalidateRect((int16_t)(clipLeft - kScrollDotsDirtyPad),
+                               (int16_t)(layout.top - kScrollDotsDirtyPad),
+                               (int16_t)((clipRight - clipLeft) + kScrollDotsDirtyPad * 2),
+                               (int16_t)(layout.h + kScrollDotsDirtyPad * 2));
+            }
+            requestRedraw();
+        }
         ClipRectGuard clipGuard(getDrawTarget(), clipLeft, layout.top, (int16_t)(clipRight - clipLeft), layout.h);
 
         if (canAnimateCount && count == 0)

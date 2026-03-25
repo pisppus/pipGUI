@@ -1104,6 +1104,10 @@ SCREEN(ScreenMainMenu, 1)
 - `Cards`
 - `Plain`
 
+Дефолты:
+
+- `radius = 17`
+
 ## 11.2. Плиточное меню
 
 Конфигурация:
@@ -1426,10 +1430,15 @@ ui.clearStatusBarIcon(Right);
 ```cpp
 ui.showToast()
     .text("Saved")
-    .duration(1500)
-    .fromTop()
-    .show();
+    .icon(error)
+    .pos(top);
 ```
+
+Параметры:
+
+- `text(...)` — текст toast (можно не задавать, если toast только с иконкой)
+- `pos(top | down)` — появление сверху или снизу (`down` по умолчанию)
+- `icon(id)` — иконка (если не задана, toast будет только текстом)
 
 Проверка активности:
 

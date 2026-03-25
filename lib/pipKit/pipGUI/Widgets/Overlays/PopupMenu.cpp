@@ -251,8 +251,10 @@ namespace pipgui
         if (!target)
             return;
 
+        const ClipState prevGuiClip = _clip;
         int32_t clipX = 0, clipY = 0, clipW = 0, clipH = 0;
         target->getClipRect(&clipX, &clipY, &clipW, &clipH);
+        applyClip(x, y, w, revealH);
         target->setClipRect(x, y, w, revealH);
 
         const uint16_t shadow565 = (uint16_t)detail::blend565((uint16_t)0x0000, _popup.bg565, 80);
@@ -284,6 +286,7 @@ namespace pipgui
                                      (int16_t)(w - pad * 2), fg, Left);
         }
 
+        _clip = prevGuiClip;
         target->setClipRect(clipX, clipY, clipW, clipH);
     }
 }

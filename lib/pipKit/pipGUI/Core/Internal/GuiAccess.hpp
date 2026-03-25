@@ -603,12 +603,10 @@ namespace pipgui
 
             static void showToast(GUI &gui,
                                   const String &text,
-                                  uint32_t durationMs,
                                   bool fromTop,
-                                  IconId iconId,
-                                  uint16_t iconSizePx)
+                                  IconId iconId)
             {
-                gui.showToastInternal(text, durationMs, fromTop, iconId, iconSizePx);
+                gui.showToastInternal(text, fromTop, iconId);
             }
 
             static void showNotification(GUI &gui,

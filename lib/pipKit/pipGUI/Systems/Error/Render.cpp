@@ -179,13 +179,16 @@ namespace pipgui
             if (!sprite)
                 return;
 
+            const ClipState prevGuiClip = _clip;
             int32_t clipX = 0;
             int32_t clipY = 0;
             int32_t clipW = 0;
             int32_t clipH = 0;
             sprite->getClipRect(&clipX, &clipY, &clipW, &clipH);
+            applyClip(x, y, w, h);
             sprite->setClipRect(x, y, w, h);
             drawFn();
+            _clip = prevGuiClip;
             sprite->setClipRect((int16_t)clipX, (int16_t)clipY, (int16_t)clipW, (int16_t)clipH);
         };
 

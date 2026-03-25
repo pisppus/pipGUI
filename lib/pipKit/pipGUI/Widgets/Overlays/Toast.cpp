@@ -4,6 +4,8 @@ namespace pipgui
 {
     namespace
     {
+        constexpr uint32_t kToastDisplayMs = 2500;
+
         float cubicBezierPoint(float u, float p1, float p2)
         {
             const float inv = 1.0f - u;
@@ -42,48 +44,59 @@ namespace pipgui
         {
             return cubicBezierEase(t, 0.40f, 0.0f, 1.0f, 1.0f);
         }
+
+        [[nodiscard]] int16_t toastIconSize(int16_t boxH, bool hasText) noexcept
+        {
+            const float ratio = hasText ? 0.48f : 0.58f;
+            const int16_t sizePx = (int16_t)lroundf((float)boxH * ratio);
+            return sizePx > 6 ? sizePx : 6;
+        }
     }
 
     void GUI::showToastInternal(const String &text,
-                                uint32_t durationMs,
                                 bool fromTop,
-                                IconId iconId,
-                                uint16_t iconSizePx)
+                                IconId iconId)
     {
         _toast.text = text;
         _toast.textMetricsValid = false;
         _toast.lastRectValid = false;
-        if (_toast.text.length() == 0)
+        _toast.fromTop = fromTop;
+        _toast.iconId = iconId;
+
+        const bool hasText = (_toast.text.length() > 0);
+        const bool hasIcon = (_toast.iconId < psdf_icons::IconCount);
+        if (!hasText && !hasIcon)
         {
             _flags.toastActive = 0;
             return;
         }
-        _toast.displayMs = (durationMs != 0) ? durationMs : 2500;
-        _toast.fromTop = fromTop;
-        _toast.iconId = iconId;
-        _toast.iconSizePx = iconSizePx ? iconSizePx : 20;
         _toast.startMs = nowMs();
         _toast.animDurMs = 420;
         _flags.toastActive = 1;
-        _flags.needRedraw = 1;
 
-        const uint16_t prevSize = fontSize();
-        const uint16_t prevWeight = fontWeight();
-        setFontSize(16);
-        setFontWeight(Medium);
-        int16_t tw = 0;
-        int16_t th = 0;
-        if (measureText(_toast.text, tw, th))
+        if (hasText)
         {
-            _toast.textW = tw;
-            _toast.textH = th;
-            _toast.textMetricsValid = true;
+            const uint16_t prevSize = fontSize();
+            const uint16_t prevWeight = fontWeight();
+            setFontSize(16);
+            setFontWeight(Medium);
+            int16_t tw = 0;
+            int16_t th = 0;
+            if (measureText(_toast.text, tw, th))
+            {
+                _toast.textW = tw;
+                _toast.textH = th;
+                _toast.textMetricsValid = true;
+            }
+            setFontWeight(prevWeight);
+            setFontSize(prevSize);
         }
-        setFontWeight(prevWeight);
-        setFontSize(prevSize);
     }
 
-    bool GUI::toastActive() const { return _flags.toastActive && _toast.text.length() > 0; }
+    bool GUI::toastActive() const
+    {
+        return _flags.toastActive && (_toast.text.length() > 0 || _toast.iconId < psdf_icons::IconCount);
+    }
 
     bool GUI::computeToastBounds(uint32_t now, DirtyRect &outRect)
     {
@@ -91,14 +104,14 @@ namespace pipgui
 
         if (!_flags.toastActive)
             return false;
-        if (_toast.text.length() == 0)
+        if (_toast.text.length() == 0 && _toast.iconId >= psdf_icons::IconCount)
         {
             _flags.toastActive = 0;
             return false;
         }
 
         const uint32_t elapsed = (now >= _toast.startMs) ? (now - _toast.startMs) : 0;
-        const uint32_t totalDur = _toast.animDurMs * 2 + _toast.displayMs;
+        const uint32_t totalDur = _toast.animDurMs * 2 + kToastDisplayMs;
         if (elapsed >= totalDur)
         {
             _flags.toastActive = 0;
@@ -111,9 +124,9 @@ namespace pipgui
             const float phaseProgress = (float)elapsed / (float)_toast.animDurMs;
             visualP = toastEnterEase(phaseProgress);
         }
-        else if (elapsed >= _toast.animDurMs + _toast.displayMs)
+        else if (elapsed >= _toast.animDurMs + kToastDisplayMs)
         {
-            const uint32_t exitElapsed = elapsed - _toast.animDurMs - _toast.displayMs;
+            const uint32_t exitElapsed = elapsed - _toast.animDurMs - kToastDisplayMs;
             const float phaseProgress = (float)exitElapsed / (float)_toast.animDurMs;
             if (phaseProgress >= 1.0f)
             {
@@ -123,9 +136,10 @@ namespace pipgui
             visualP = 1.0f - toastExitEase(phaseProgress);
         }
 
-        int16_t tw = _toast.textW;
-        int16_t th = _toast.textH;
-        if (!_toast.textMetricsValid)
+        const bool hasText = (_toast.text.length() > 0);
+        int16_t tw = hasText ? _toast.textW : 0;
+        int16_t th = hasText ? _toast.textH : 0;
+        if (hasText && !_toast.textMetricsValid)
         {
             const uint16_t prevSize = fontSize();
             const uint16_t prevWeight = fontWeight();
@@ -146,15 +160,15 @@ namespace pipgui
             setFontSize(prevSize);
         }
 
-        const bool hasIcon = (_toast.iconId < psdf_icons::IconCount) && (_toast.iconSizePx > 0);
-        const int16_t padH = 18;
-        const int16_t padV = 9;
-        const int16_t iconGap = hasIcon ? 8 : 0;
-        const int16_t iconSide = (int16_t)_toast.iconSizePx;
+        const bool hasIcon = (_toast.iconId < psdf_icons::IconCount);
+        const int16_t padH = 14;
+        const int16_t padV = 7;
+        const int16_t boxH = hasText ? (int16_t)(th + padV * 2) : 34;
+        const int16_t iconSide = hasIcon ? toastIconSize(boxH, hasText) : 0;
+        const int16_t iconGap = (hasIcon && hasText) ? 8 : 0;
         const int16_t contentW = (int16_t)(tw + (hasIcon ? (iconSide + iconGap) : 0));
 
         int16_t boxW = (int16_t)(contentW + padH * 2);
-        int16_t boxH = (int16_t)(th + padV * 2);
         if (boxW > (int16_t)_render.screenWidth - 24)
             boxW = (int16_t)_render.screenWidth - 24;
 
@@ -163,7 +177,7 @@ namespace pipgui
         int16_t endY = _toast.fromTop ? 18 : (int16_t)(_render.screenHeight - boxH - 18);
 
         const int16_t sb = statusBarHeight();
-        if (_flags.statusBarEnabled && sb > 0 && _status.style == StatusBarStyleSolid)
+        if (_flags.statusBarEnabled && sb > 0)
         {
             if (_status.pos == Top && _toast.fromTop)
                 endY = (int16_t)(sb + 10);
@@ -204,7 +218,7 @@ namespace pipgui
     {
         if (!_flags.toastActive)
             return;
-        if (_toast.text.length() == 0)
+        if (_toast.text.length() == 0 && _toast.iconId >= psdf_icons::IconCount)
         {
             _flags.toastActive = 0;
             return;
@@ -214,7 +228,7 @@ namespace pipgui
             return;
 
         const uint32_t elapsed = (now >= _toast.startMs) ? (now - _toast.startMs) : 0;
-        const uint32_t totalDur = _toast.animDurMs * 2 + _toast.displayMs;
+        const uint32_t totalDur = _toast.animDurMs * 2 + kToastDisplayMs;
 
         if (elapsed >= totalDur)
         {
@@ -228,9 +242,9 @@ namespace pipgui
             const float phaseProgress = (float)elapsed / (float)_toast.animDurMs;
             visualP = toastEnterEase(phaseProgress);
         }
-        else if (elapsed >= _toast.animDurMs + _toast.displayMs)
+        else if (elapsed >= _toast.animDurMs + kToastDisplayMs)
         {
-            const uint32_t exitElapsed = elapsed - _toast.animDurMs - _toast.displayMs;
+            const uint32_t exitElapsed = elapsed - _toast.animDurMs - kToastDisplayMs;
             const float phaseProgress = (float)exitElapsed / (float)_toast.animDurMs;
             if (phaseProgress >= 1.0f)
             {
@@ -246,9 +260,10 @@ namespace pipgui
         setFontSize(fontPx);
         setFontWeight(Medium);
 
-        int16_t tw = _toast.textW;
-        int16_t th = _toast.textH;
-        if (!_toast.textMetricsValid)
+        const bool hasText = (_toast.text.length() > 0);
+        int16_t tw = hasText ? _toast.textW : 0;
+        int16_t th = hasText ? _toast.textH : 0;
+        if (hasText && !_toast.textMetricsValid)
         {
             tw = 0;
             th = 0;
@@ -260,16 +275,16 @@ namespace pipgui
             }
         }
 
-        const bool hasIcon = (_toast.iconId < psdf_icons::IconCount) && (_toast.iconSizePx > 0);
-        const int16_t padH = 18;
-        const int16_t padV = 9;
-        const int16_t iconGap = hasIcon ? 8 : 0;
-        const int16_t baseRadius = 10;
-        const int16_t iconSide = (int16_t)_toast.iconSizePx;
+        const bool hasIcon = (_toast.iconId < psdf_icons::IconCount);
+        const int16_t padH = 14;
+        const int16_t padV = 7;
+        const int16_t iconGap = (hasIcon && hasText) ? 8 : 0;
+        const int16_t baseRadius = 18;
+        const int16_t boxH = hasText ? (int16_t)(th + padV * 2) : 34;
+        const int16_t iconSide = hasIcon ? toastIconSize(boxH, hasText) : 0;
         const int16_t contentW = (int16_t)(tw + (hasIcon ? (iconSide + iconGap) : 0));
 
         int16_t boxW = (int16_t)(contentW + padH * 2);
-        int16_t boxH = (int16_t)(th + padV * 2);
         if (boxW > (int16_t)_render.screenWidth - 24)
             boxW = (int16_t)_render.screenWidth - 24;
 
@@ -281,7 +296,7 @@ namespace pipgui
         int16_t endY = _toast.fromTop ? 18 : (int16_t)(_render.screenHeight - drawH - 18);
 
         const int16_t sb = statusBarHeight();
-        if (_flags.statusBarEnabled && sb > 0 && _status.style == StatusBarStyleSolid)
+        if (_flags.statusBarEnabled && sb > 0)
         {
             if (_status.pos == Top && _toast.fromTop)
                 endY = (int16_t)(sb + 10);
@@ -306,15 +321,15 @@ namespace pipgui
         _render.activeSprite = &_render.sprite;
 
         const int16_t drawRadius = baseRadius;
-        fillRoundRect(boxX, boxY, drawW, drawH, (uint8_t)drawRadius, borderColor);
-        fillRoundRect(boxX + 1, boxY + 1, drawW - 2, drawH - 2,
-                      (uint8_t)(drawRadius > 2 ? drawRadius - 2 : drawRadius), bgColor);
+        fillSquircleRect(boxX, boxY, drawW, drawH, (uint8_t)drawRadius, borderColor);
+        fillSquircleRect(boxX + 1, boxY + 1, drawW - 2, drawH - 2,
+                         (uint8_t)(drawRadius > 2 ? drawRadius - 2 : drawRadius), bgColor);
 
         int16_t textX = boxX + (drawW - tw) / 2;
         const int16_t textY = boxY + (drawH - th) / 2;
         const int16_t textMaxW = (int16_t)max<int16_t>(24, drawW - padH * 2 - (hasIcon ? (iconSide + iconGap) : 0));
 
-        if (hasIcon)
+        if (hasIcon && hasText)
         {
             const int16_t iconX = (int16_t)(boxX + padH);
             const int16_t iconY = (int16_t)(boxY + (drawH - iconSide) / 2);
@@ -327,16 +342,31 @@ namespace pipgui
                 .draw();
             textX = (int16_t)(iconX + iconSide + iconGap);
         }
-
-        MarqueeTextOptions marqueeOpts;
-        marqueeOpts.speedPxPerSec = 24;
-        marqueeOpts.holdStartMs = 700;
-        marqueeOpts.phaseStartMs = _toast.startMs;
-
-        if (!drawTextMarquee(_toast.text, textX, textY, textMaxW, fgColor, TextAlign::Left, marqueeOpts) &&
-            !drawTextEllipsized(_toast.text, textX, textY, textMaxW, fgColor, TextAlign::Left))
+        else if (hasIcon)
         {
-            drawTextAligned(_toast.text, textX, textY, fgColor, bgColor, TextAlign::Left);
+            const int16_t iconX = (int16_t)(boxX + (drawW - iconSide) / 2);
+            const int16_t iconY = (int16_t)(boxY + (drawH - iconSide) / 2);
+            drawIcon()
+                .pos(iconX, iconY)
+                .size((uint16_t)iconSide)
+                .icon(_toast.iconId)
+                .color(0xFFFF)
+                .bgColor(bgColor)
+                .draw();
+        }
+
+        if (hasText)
+        {
+            MarqueeTextOptions marqueeOpts;
+            marqueeOpts.speedPxPerSec = 24;
+            marqueeOpts.holdStartMs = 700;
+            marqueeOpts.phaseStartMs = _toast.startMs;
+
+            if (!drawTextMarquee(_toast.text, textX, textY, textMaxW, fgColor, TextAlign::Left, marqueeOpts) &&
+                !drawTextEllipsized(_toast.text, textX, textY, textMaxW, fgColor, TextAlign::Left))
+            {
+                drawTextAligned(_toast.text, textX, textY, fgColor, bgColor, TextAlign::Left);
+            }
         }
 
         _flags.inSpritePass = prevRender;

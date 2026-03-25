@@ -32,14 +32,12 @@ namespace pipgui
     static void initListDefaults(ListState &menu) noexcept
     {
         menu = {};
-        menu.style.radius = 8;
         menu.style.spacing = 6;
         menu.style.mode = Cards;
     }
     static void initTileDefaults(TileState &tile) noexcept
     {
         tile = {};
-        tile.style.radius = 8;
         tile.style.spacing = 6;
         tile.style.columns = 2;
         tile.style.contentMode = TextSubtitle;

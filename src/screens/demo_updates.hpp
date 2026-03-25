@@ -360,7 +360,7 @@ void updateFirmwareUpdateScreen(uint32_t nowMs, bool nextPressed, bool nextDown,
       const uint8_t count = ui.otaStableListCount();
       if (count == 0)
       {
-        ui.showToast().text("No previous stable").duration(1800);
+        ui.showToast().text("No previous stable");
       }
       else if (!busy)
       {
@@ -756,12 +756,11 @@ void updatePopupMenuDemo(bool nextPressed, bool nextDown, bool prevPressed, bool
         .prevDown(prevDown);
 
     const int16_t picked = ui.popupMenuTakeResult();
-    if (picked >= 0 && picked < kPopupMenuDemoItemCount)
-    {
-      ui.showToast()
-          .text(String("Picked: ") + kPopupMenuDemoItems[picked])
-          .duration(1500);
-    }
+      if (picked >= 0 && picked < kPopupMenuDemoItemCount)
+      {
+        ui.showToast()
+          .text(String("Picked: ") + kPopupMenuDemoItems[picked]);
+      }
     return;
   }
 
@@ -773,7 +772,7 @@ void updatePopupMenuDemo(bool nextPressed, bool nextDown, bool prevPressed, bool
 
   ui.updateButton()
       .label("Open menu")
-      .pos(center, 228)
+      .pos(center, 188)
       .size(180, 32)
       .baseColor(ui.rgb(0, 87, 250))
       .radius(10)
@@ -785,7 +784,7 @@ void updatePopupMenuDemo(bool nextPressed, bool nextDown, bool prevPressed, bool
 
   ui.showPopupMenu()
       .items(kPopupMenuDemoItems, kPopupMenuDemoItemCount)
-      .pos(42, 80)
+      .pos(42, 40)
       .width(156)
       .selected(1)
       .maxVisible(6);

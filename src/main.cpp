@@ -424,7 +424,6 @@ void configureListMenus()
       })
       .inactive(ui.rgb(8, 8, 8))
       .active(ui.rgb(21, 54, 140))
-      .radius(13)
       .cardSize(310, 50);
 
   ui.configureList()
@@ -442,7 +441,6 @@ void configureListMenus()
       })
       .inactive(ui.rgb(8, 8, 8))
       .active(ui.rgb(21, 54, 140))
-      .radius(12)
       .cardSize(310, 34)
       .mode(Plain);
 }

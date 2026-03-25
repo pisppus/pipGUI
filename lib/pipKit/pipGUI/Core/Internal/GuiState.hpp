@@ -122,6 +122,8 @@ namespace pipgui::detail
         uint16_t psdfSizePx = 0;
         uint16_t psdfWeight = 500;
         FontId currentFontId = static_cast<FontId>(0);
+        float subpixelOffsetX = 0.0f;
+        float subpixelOffsetY = 0.0f;
     };
 
     struct ErrorEntry
@@ -171,19 +173,15 @@ namespace pipgui::detail
     struct ToastState
     {
         String text;
-        IconId iconId = warning;
-        uint16_t iconSizePx = 20;
+        IconId iconId = static_cast<IconId>(0xFFFF);
         uint32_t startMs = 0;
         uint32_t animDurMs = 420;
-        uint32_t displayMs = 2500;
         bool fromTop = false;
         int16_t textW = 0;
         int16_t textH = 0;
         bool textMetricsValid = false;
         DirtyRect lastRect = {};
         bool lastRectValid = false;
-        uint16_t *scratch = nullptr;
-        uint32_t scratchPixels = 0;
     };
 
     struct PopupMenuState
@@ -290,6 +288,7 @@ namespace pipgui::detail
         unsigned spriteEnabled : 1;
         unsigned inSpritePass : 1;
         unsigned needRedraw : 1;
+        unsigned dirtyRedrawPending : 1;
         unsigned bootActive : 1;
         unsigned screenTransition : 1;
         unsigned errorActive : 1;

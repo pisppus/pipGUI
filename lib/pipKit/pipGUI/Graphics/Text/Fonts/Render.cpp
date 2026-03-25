@@ -263,6 +263,8 @@ namespace pipgui
                                           ? std::min<int32_t>((int32_t)fadePx, std::max<int32_t>(1, fadeBoxW / 3))
                                           : 0;
         const bool useFade = (fadePxClamped > 0 && fadeBoxW > 0);
+        const float baseRx = (float)rx + _typo.subpixelOffsetX;
+        const float baseRy = (float)ry + _typo.subpixelOffsetY;
 
         const float sizePx = (float)_typo.psdfSizePx;
         const float distanceScale = font->distanceRange * (sizePx / font->nominalSizePx);
@@ -287,8 +289,8 @@ namespace pipgui
                          if (nl || !g)
                              return true;
 
-                         const float absPenX = rx + penX;
-                         const float absPenY = ry + penY;
+                         const float absPenX = baseRx + penX;
+                         const float absPenY = baseRy + penY;
                          const float padLeftPx = (float)g->padLeft * padScale;
                          const float padRightPx = (float)g->padRight * padScale;
                          const float padTopPx = (float)g->padTop * padScale;
@@ -445,9 +447,15 @@ namespace pipgui
     void GUI::drawTextAligned(const String &text, int16_t x, int16_t y,
                               uint16_t fg565, uint16_t bg565, TextAlign align)
     {
-        int16_t tw = 0, th = 0;
-        if (!measureText(text, tw, th) || tw <= 0 || th <= 0)
+        const FontData *font = fontDataForId(_typo.currentFontId);
+        if (!_typo.psdfSizePx || !font)
             return;
+        TextLayoutBox box;
+        if (!computeTextLayoutBox(text.c_str(), (int)text.length(), font, _typo.psdfSizePx, _typo.psdfWeight, box) ||
+            box.width <= 0 || box.height <= 0)
+            return;
+        const int16_t tw = box.width;
+        const int16_t th = box.height;
 
         int16_t rx = (x == -1) ? AutoX((int32_t)tw) : x;
         if (align == TextAlign::Center)
@@ -455,15 +463,11 @@ namespace pipgui
         else if (align == TextAlign::Right)
             rx -= tw;
 
-        int16_t ry = (y == -1) ? AutoY((int32_t)th) : y;
-        const int16_t weightExpandX = weightExpandXPxInt(_typo.psdfWeight, (float)_typo.psdfSizePx);
-        const int16_t weightExpandY = weightExpandYPxInt(_typo.psdfWeight, (float)_typo.psdfSizePx);
-        if (weightExpandX > 0 || weightExpandY > 0)
-        {
-            rx += weightExpandX;
-            ry += weightExpandY;
-        }
-        drawTextImmediate(text, rx, ry, tw, th, fg565, bg565, align);
+        const int16_t ry = (y == -1) ? AutoY((int32_t)th) : y;
+        drawTextImmediate(text,
+                          (int16_t)(rx + box.originX),
+                          (int16_t)(ry + box.originY),
+                          tw, th, fg565, bg565, align);
     }
 
     void GUI::drawText(const String &text, int16_t x, int16_t y,
@@ -477,32 +481,35 @@ namespace pipgui
     void GUI::updateText(const String &text, int16_t x, int16_t y,
                          uint16_t fg565, uint16_t bg565, TextAlign align)
     {
-        if (!_typo.psdfSizePx || !fontDataForId(_typo.currentFontId))
+        const FontData *font = fontDataForId(_typo.currentFontId);
+        if (!_typo.psdfSizePx || !font)
             return;
 
-        int16_t tw = 0, th = 0;
-        if (!measureText(text, tw, th) || tw <= 0 || th <= 0)
+        TextLayoutBox box;
+        if (!computeTextLayoutBox(text.c_str(), (int)text.length(), font, _typo.psdfSizePx, _typo.psdfWeight, box) ||
+            box.width <= 0 || box.height <= 0)
             return;
+        const int16_t tw = box.width;
+        const int16_t th = box.height;
 
         int16_t rx = (x == -1) ? AutoX((int32_t)tw) : x;
         if (align == TextAlign::Center)
             rx -= (tw + 1) / 2;
         else if (align == TextAlign::Right)
             rx -= tw;
-        int16_t ry = (y == -1) ? AutoY((int32_t)th) : y;
-        const int16_t weightExpandX = weightExpandXPxInt(_typo.psdfWeight, (float)_typo.psdfSizePx);
-        const int16_t weightExpandY = weightExpandYPxInt(_typo.psdfWeight, (float)_typo.psdfSizePx);
-        if (weightExpandX > 0 || weightExpandY > 0)
-        {
-            rx += weightExpandX;
-            ry += weightExpandY;
-        }
+        const int16_t ry = (y == -1) ? AutoY((int32_t)th) : y;
 
+        const float drawXf = (float)(rx + box.originX) + _typo.subpixelOffsetX;
+        const float drawYf = (float)(ry + box.originY) + _typo.subpixelOffsetY;
+        const int drawX0 = floorToInt(drawXf);
+        const int drawY0 = floorToInt(drawYf);
+        const int drawX1 = ceilToInt(drawXf + tw);
+        const int drawY1 = ceilToInt(drawYf + th);
         constexpr int16_t pad = 4;
-        const int16_t newX = rx - pad;
-        const int16_t newY = ry - pad;
-        const int16_t newW = tw + pad * 2;
-        const int16_t newH = th + pad * 2;
+        const int16_t newX = (int16_t)(drawX0 - pad);
+        const int16_t newY = (int16_t)(drawY0 - pad);
+        const int16_t newW = (int16_t)(drawX1 - drawX0 + pad * 2);
+        const int16_t newH = (int16_t)(drawY1 - drawY0 + pad * 2);
         const uint32_t now = nowMs();
         detail::TextCacheEntry &cacheEntry = resolveTextCacheEntry(
             _textCache,
@@ -531,7 +538,10 @@ namespace pipgui
         _render.activeSprite = &_render.sprite;
 
         fillRect().pos(clearX, clearY).size(clearW, clearH).color(bg565).draw();
-        drawTextImmediate(text, rx, ry, tw, th, fg565, bg565, align);
+        drawTextImmediate(text,
+                          (int16_t)(rx + box.originX),
+                          (int16_t)(ry + box.originY),
+                          tw, th, fg565, bg565, align);
 
         _flags.inSpritePass = prevRender;
         _render.activeSprite = prevActive;

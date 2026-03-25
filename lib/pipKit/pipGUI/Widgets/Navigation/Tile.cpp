@@ -8,6 +8,8 @@ namespace pipgui
 {
     namespace
     {
+        constexpr uint8_t kDefaultTileRadius = 17;
+
         struct TileLayoutCell
         {
             uint8_t col;
@@ -63,7 +65,7 @@ namespace pipgui
             if (out.cardActiveColor == 0)
                 out.cardActiveColor = 0x0082DC;
             if (out.radius == 0)
-                out.radius = 10;
+                out.radius = kDefaultTileRadius;
             if (out.spacing == 0)
                 out.spacing = 8;
             if (out.columns == 0)
@@ -155,7 +157,7 @@ namespace pipgui
             }
 
             out.spacing = menu.style.spacing ? menu.style.spacing : 8;
-            out.radius = std::max<uint8_t>(2, menu.style.radius ? menu.style.radius : 10);
+            out.radius = std::max<uint8_t>(2, menu.style.radius ? menu.style.radius : kDefaultTileRadius);
 
             out.unitW = resolveUnit(menu.style.tileWidth, viewport.usableW, out.cols, out.spacing);
             out.unitH = resolveUnit(menu.style.tileHeight, viewport.usableH, out.rows, out.spacing);
@@ -646,7 +648,6 @@ namespace pipgui
                 const DirtyRect &dirty = dirtyRects[i];
                 invalidateRect(dirty.x, dirty.y, dirty.w, dirty.h);
             }
-            flushDirty();
         }
     }
 
@@ -664,6 +665,19 @@ namespace pipgui
             return;
 
         auto t = getDrawTarget();
+        if (!t)
+            return;
+
+        int32_t baseClipX = 0, baseClipY = 0, baseClipW = 0, baseClipH = 0;
+        t->getClipRect(&baseClipX, &baseClipY, &baseClipW, &baseClipH);
+        if (baseClipW <= 0 || baseClipH <= 0)
+            return;
+        const ClipState prevRootGuiClip = _clip;
+        _clip.enabled = true;
+        _clip.x = (int16_t)baseClipX;
+        _clip.y = (int16_t)baseClipY;
+        _clip.w = (int16_t)baseClipW;
+        _clip.h = (int16_t)baseClipH;
 
         TileViewport viewport;
         const int16_t sb = statusBarHeight();
@@ -759,7 +773,7 @@ namespace pipgui
             tileRectAtIndex(m, i, grid, x, y, tileW, tileH);
 
             const uint16_t bg = detail::color888To565((i == m.selectedIndex) ? m.style.cardActiveColor : m.style.cardColor);
-            fillRoundRect(x, y, tileW, tileH, grid.radius, bg);
+            fillSquircleRect(x, y, tileW, tileH, grid.radius, bg);
 
             uint16_t txtCol = detail::autoTextColor(bg, 140);
             uint16_t subCol = (txtCol == 0xFFFF) ? (uint16_t)0xC618 : (uint16_t)0x8410;
@@ -842,9 +856,11 @@ namespace pipgui
                 baseY = contentClipY;
 
             int16_t contentY = baseY;
+            const ClipState prevGuiClip = _clip;
             int32_t prevClipX = 0, prevClipY = 0, prevClipW = 0, prevClipH = 0;
             t->getClipRect(&prevClipX, &prevClipY, &prevClipW, &prevClipH);
-            t->setClipRect(contentClipX, contentClipY, contentClipW, contentClipH);
+            applyClip(contentClipX, contentClipY, contentClipW, contentClipH);
+            t->setClipRect(_clip.x, _clip.y, _clip.w, _clip.h);
 
             if (iconSize > 0)
             {
@@ -864,7 +880,11 @@ namespace pipgui
                 drawTextLine(sub, centerX, subY, textMaxWidth, subCol, bg, active);
             }
 
+            _clip = prevGuiClip;
             t->setClipRect(prevClipX, prevClipY, prevClipW, prevClipH);
         }
+
+        _clip = prevRootGuiClip;
+        t->setClipRect(baseClipX, baseClipY, baseClipW, baseClipH);
     }
 }

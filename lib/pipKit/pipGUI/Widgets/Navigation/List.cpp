@@ -5,6 +5,10 @@
 #include <math.h>
 namespace pipgui
 {
+    namespace
+    {
+        constexpr uint8_t kDefaultListRadius = 17;
+    }
 
     static void resetListItemCache(ListState::Item &item)
     {
@@ -193,7 +197,10 @@ namespace pipgui
             menu.scrollbarAlpha = 255;
             menu.lastScrollActivityMs = now;
             menu.marqueeStartMs = now;
-            requestRedraw();
+            if (_flags.spriteEnabled && _disp.display && !_flags.inSpritePass && _screen.current == screenId)
+                updateList(screenId);
+            else
+                requestRedraw();
         }
     }
 
@@ -265,8 +272,10 @@ namespace pipgui
 
             const int16_t cardX = left + (w - cardW) / 2;
 
+            const ClipState prevGuiClip = _clip;
             int32_t clipX = 0, clipY = 0, clipW = 0, clipH = 0;
             target->getClipRect(&clipX, &clipY, &clipW, &clipH);
+            applyClip(left, top, w, h);
             target->setClipRect(left, top, w, h);
 
             int32_t bgL = left;
@@ -294,6 +303,7 @@ namespace pipgui
             if (bgW > 0 && bgH > 0)
                 target->fillRect((int16_t)bgL, (int16_t)bgT, (int16_t)bgW, (int16_t)bgH, bgColor565);
 
+            applyClip(left, contentTop, w, contentBottom - contentTop);
             target->setClipRect(left, contentTop, w, contentBottom - contentTop);
 
             int16_t visibleHeight = contentBottom - contentTop;
@@ -408,7 +418,9 @@ namespace pipgui
             }
 
             uint8_t radius = menu.style.radius;
-            if (radius < 2)
+            if (radius == 0)
+                radius = kDefaultListRadius;
+            else if (radius < 2)
                 radius = 2;
 
             const int16_t lastIdx = (int16_t)menu.itemCount - 1;
@@ -482,21 +494,30 @@ namespace pipgui
             const MarqueeTextOptions marqueeOpts(28, 700, menu.marqueeStartMs);
             const auto drawTextLine = [&](const String &text,
                                           int16_t textX,
-                                          int16_t textY,
+                                          float textY,
                                           int16_t textMaxWidth,
                                           uint16_t fg,
                                           uint16_t bg,
                                           bool active)
             {
+                const float prevSubX = _typo.subpixelOffsetX;
+                const float prevSubY = _typo.subpixelOffsetY;
+                const int16_t textYInt = (int16_t)floorf(textY);
+                _typo.subpixelOffsetX = 0.0f;
+                _typo.subpixelOffsetY = textY - (float)textYInt;
                 if (active)
                 {
-                    if (!drawTextMarquee(text, textX, textY, textMaxWidth, fg, TextAlign::Left, marqueeOpts))
-                        drawTextAligned(text, textX, textY, fg, bg, TextAlign::Left);
+                    if (!drawTextMarquee(text, textX, textYInt, textMaxWidth, fg, TextAlign::Left, marqueeOpts))
+                        drawTextAligned(text, textX, textYInt, fg, bg, TextAlign::Left);
+                    _typo.subpixelOffsetX = prevSubX;
+                    _typo.subpixelOffsetY = prevSubY;
                     return;
                 }
 
-                if (!drawTextEllipsized(text, textX, textY, textMaxWidth, fg, TextAlign::Left))
-                    drawTextAligned(text, textX, textY, fg, bg, TextAlign::Left);
+                if (!drawTextEllipsized(text, textX, textYInt, textMaxWidth, fg, TextAlign::Left))
+                    drawTextAligned(text, textX, textYInt, fg, bg, TextAlign::Left);
+                _typo.subpixelOffsetX = prevSubX;
+                _typo.subpixelOffsetY = prevSubY;
             };
 
             const uint16_t inactiveTextColor = detail::autoTextColor(bgColor565);
@@ -521,7 +542,7 @@ namespace pipgui
                 if (!cardMode)
                 {
                     if (active)
-                        fillRoundRect(cardX, itemY, cardW, cardH, radius, bg);
+                        fillSquircleRect(cardX, itemY, cardW, cardH, radius, bg);
 
                     const int16_t textOffsetX = drawItemIcon(item.iconId, cardX + 8, itemY, (cardH > 30) ? 22 : 18, 6,
                                                              active ? textColor : inactiveTextColor,
@@ -539,26 +560,29 @@ namespace pipgui
                     if (itemClipH <= 0 || item.titleH > itemClipH)
                         continue;
 
-                    int16_t baseY = itemClipY + (itemClipH - item.titleH) / 2;
-                    if (baseY < itemClipY)
-                        baseY = itemClipY;
+                    float baseY = posY + 2.0f + (float)(itemClipH - item.titleH) * 0.5f;
+                    if (baseY < (float)itemClipY)
+                        baseY = (float)itemClipY;
 
-                    if (baseY + item.titleH <= contentTop || baseY >= contentBottom)
+                    if (baseY + item.titleH <= (float)contentTop || baseY >= (float)contentBottom)
                         continue;
 
                     int32_t prevItemClipX = 0, prevItemClipY = 0, prevItemClipW = 0, prevItemClipH = 0;
                     target->getClipRect(&prevItemClipX, &prevItemClipY, &prevItemClipW, &prevItemClipH);
+                    const ClipState prevItemGuiClip = _clip;
+                    applyClip(textClipX, itemClipY, textClipW, itemClipH);
                     target->setClipRect(textClipX, itemClipY, textClipW, itemClipH);
 
                     setTextFont(TITLE_WEIGHT, titlePx);
                     drawTextLine(item.title, textX, baseY, textMaxWidth, textColor, bg, active);
 
+                    _clip = prevItemGuiClip;
                     target->setClipRect(prevItemClipX, prevItemClipY, prevItemClipW, prevItemClipH);
 
                     continue;
                 }
 
-                fillRoundRect(cardX, itemY, cardW, cardH, radius, bg);
+                fillSquircleRect(cardX, itemY, cardW, cardH, radius, bg);
 
                 const String &subtitle = item.subtitle;
                 const bool hasSub = subtitle.length() > 0;
@@ -625,14 +649,16 @@ namespace pipgui
                     totalH = item.titleH;
                 }
 
-                int16_t baseY = itemClipY + (itemClipH - totalH) / 2;
-                if (baseY < itemClipY)
-                    baseY = itemClipY;
+                float baseY = posY + 4.0f + (float)(itemClipH - totalH) * 0.5f;
+                if (baseY < (float)itemClipY)
+                    baseY = (float)itemClipY;
 
-                const int16_t titleY = baseY;
-                const int16_t subY = baseY + item.titleH + (showSub ? gapPx : 0);
+                const float titleY = baseY;
+                const float subY = baseY + item.titleH + (showSub ? gapPx : 0);
                 int32_t prevItemClipX = 0, prevItemClipY = 0, prevItemClipW = 0, prevItemClipH = 0;
                 target->getClipRect(&prevItemClipX, &prevItemClipY, &prevItemClipW, &prevItemClipH);
+                const ClipState prevItemGuiClip = _clip;
+                applyClip(textClipX, itemClipY, textClipW, itemClipH);
                 target->setClipRect(textClipX, itemClipY, textClipW, itemClipH);
 
                 setTextFont(TITLE_WEIGHT, titlePx);
@@ -644,6 +670,7 @@ namespace pipgui
                     drawTextLine(subtitle, textX, subY, textMaxWidth, subColor, bg, active);
                 }
 
+                _clip = prevItemGuiClip;
                 target->setClipRect(prevItemClipX, prevItemClipY, prevItemClipW, prevItemClipH);
             }
 
@@ -697,6 +724,7 @@ namespace pipgui
                 requestRedraw();
             }
 
+            applyClip(left, top, w, h);
             target->setClipRect(left, top, w, h);
 
             if (menu.itemCount > visibleCount && menu.scrollbarAlpha > 5)
@@ -725,9 +753,10 @@ namespace pipgui
                 uint16_t col = target->color565(v, v, v);
 
                 uint8_t thumbRadius = (thumbH < 6) ? 1 : 2;
-                fillRoundRect(trackX - 2, thumbY, 3, thumbH, thumbRadius, col);
+                fillSquircleRect(trackX - 2, thumbY, 3, thumbH, thumbRadius, col);
             }
 
+            _clip = prevGuiClip;
             target->setClipRect(clipX, clipY, clipW, clipH);
         };
 
@@ -741,10 +770,7 @@ namespace pipgui
         _render.activeSprite = prevActive;
 
         if (!prevRender)
-        {
             invalidateRect(x, y, w, h);
-            flushDirty();
-        }
         return true;
     }
 }

@@ -85,6 +85,29 @@ namespace pipgui
         if (selectedIndex >= count)
             selectedIndex = (uint8_t)(count - 1);
 
+        if (_flags.spriteEnabled && _disp.display && !_flags.inSpritePass)
+        {
+            const bool prevRender = _flags.inSpritePass;
+            pipcore::Sprite *const prevActive = _render.activeSprite;
+
+            _flags.inSpritePass = 1;
+            _render.activeSprite = &_render.sprite;
+
+            fillRect()
+                .pos(x, y)
+                .size(w, h)
+                .color(detail::color888To565(bgColor))
+                .draw();
+            drawDrumRollHorizontal(x, y, w, h, options, count, selectedIndex, fgColor, bgColor, fontPx, animDurationMs);
+
+            _flags.inSpritePass = prevRender;
+            _render.activeSprite = prevActive;
+
+            if (!prevRender)
+                invalidateRect(x, y, w, h);
+            return;
+        }
+
         const uint16_t savePx = _typo.psdfSizePx;
         const uint16_t saveWeight = _typo.psdfWeight;
         const uint16_t basePx = resolveDrumRollFontPx(fontPx, h, 255);
@@ -112,10 +135,12 @@ namespace pipgui
         const uint16_t bg565 = detail::color888To565(bgColor);
 
         pipcore::Sprite *spr = getDrawTarget();
+        const ClipState prevGuiClip = _clip;
         int32_t clipX = 0, clipY = 0, clipW = 0, clipH = 0;
         if (spr)
         {
             spr->getClipRect(&clipX, &clipY, &clipW, &clipH);
+            applyClip(x, y, w, h);
             spr->setClipRect(x, y, w, h);
         }
 
@@ -143,10 +168,17 @@ namespace pipgui
         }
 
         if (currentIndex != static_cast<float>(state.toIndex))
+        {
+            if (_flags.spriteEnabled && _disp.display)
+                invalidateRect(x, y, w, h);
             requestRedraw();
+        }
 
         if (spr)
+        {
+            _clip = prevGuiClip;
             spr->setClipRect((int16_t)clipX, (int16_t)clipY, (int16_t)clipW, (int16_t)clipH);
+        }
         setFontSize(savePx);
         setFontWeight(saveWeight);
     }
@@ -159,6 +191,29 @@ namespace pipgui
             return;
         if (selectedIndex >= count)
             selectedIndex = (uint8_t)(count - 1);
+
+        if (_flags.spriteEnabled && _disp.display && !_flags.inSpritePass)
+        {
+            const bool prevRender = _flags.inSpritePass;
+            pipcore::Sprite *const prevActive = _render.activeSprite;
+
+            _flags.inSpritePass = 1;
+            _render.activeSprite = &_render.sprite;
+
+            fillRect()
+                .pos(x, y)
+                .size(w, h)
+                .color(detail::color888To565(bgColor))
+                .draw();
+            drawDrumRollVertical(x, y, w, h, options, count, selectedIndex, fgColor, bgColor, fontPx, animDurationMs);
+
+            _flags.inSpritePass = prevRender;
+            _render.activeSprite = prevActive;
+
+            if (!prevRender)
+                invalidateRect(x, y, w, h);
+            return;
+        }
 
         const uint16_t savePx = _typo.psdfSizePx;
         const uint16_t saveWeight = _typo.psdfWeight;
@@ -187,10 +242,12 @@ namespace pipgui
         const uint16_t bg565 = detail::color888To565(bgColor);
 
         pipcore::Sprite *spr = getDrawTarget();
+        const ClipState prevGuiClip = _clip;
         int32_t clipX = 0, clipY = 0, clipW = 0, clipH = 0;
         if (spr)
         {
             spr->getClipRect(&clipX, &clipY, &clipW, &clipH);
+            applyClip(x, y, w, h);
             spr->setClipRect(x, y, w, h);
         }
 
@@ -217,10 +274,17 @@ namespace pipgui
         }
 
         if (currentIndex != static_cast<float>(state.toIndex))
+        {
+            if (_flags.spriteEnabled && _disp.display)
+                invalidateRect(x, y, w, h);
             requestRedraw();
+        }
 
         if (spr)
+        {
+            _clip = prevGuiClip;
             spr->setClipRect((int16_t)clipX, (int16_t)clipY, (int16_t)clipW, (int16_t)clipH);
+        }
         setFontSize(savePx);
         setFontWeight(saveWeight);
     }

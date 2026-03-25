@@ -37,6 +37,7 @@ namespace pipgui
 
         int32_t savedClipX = 0, savedClipY = 0, savedClipW = 0, savedClipH = 0;
         bool clipSaved = false;
+        const ClipState prevGuiClip = _clip;
 
         do
         {
@@ -134,6 +135,7 @@ namespace pipgui
             const int32_t clipH = clipY2 - clipY1;
             if (clipW <= 0 || clipH <= 0)
                 break;
+            applyClip((int16_t)clipX1, (int16_t)clipY1, (int16_t)clipW, (int16_t)clipH);
             spr->setClipRect((int16_t)clipX1, (int16_t)clipY1, (int16_t)clipW, (int16_t)clipH);
 
             uint16_t *buf = static_cast<uint16_t *>(spr->getBuffer());
@@ -325,6 +327,7 @@ namespace pipgui
             }
         } while (false);
 
+        _clip = prevGuiClip;
         if (clipSaved && spr)
             spr->setClipRect((int16_t)savedClipX, (int16_t)savedClipY, (int16_t)savedClipW, (int16_t)savedClipH);
 

@@ -272,11 +272,11 @@ namespace pipgui
     template void GlowRectFluentT<false>::draw();
     template void GlowRectFluentT<true>::draw();
 
-    void ToastFluent::show()
+    void ToastFluent::commit()
     {
         if (!beginCommit())
             return;
-        detail::GuiAccess::showToast(*_gui, _text, _durationMs, _fromTop, _iconId, _iconSizePx);
+        detail::GuiAccess::showToast(*_gui, _text, _pos == ToastPos::Top, _iconId);
     }
 
     void NotificationFluent::show()

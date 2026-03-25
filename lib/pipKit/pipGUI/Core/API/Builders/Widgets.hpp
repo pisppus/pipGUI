@@ -802,20 +802,16 @@ namespace pipgui
     {
         PIPGUI_DEFAULT_FLUENT_MOVE(ToastFluent);
         String _text;
-        uint32_t _durationMs;
-        bool _fromTop;
+        ToastPos _pos;
         IconId _iconId;
-        uint16_t _iconSizePx;
 
         ToastFluent(GUI *g)
             : detail::FluentLifetime(g),
               _text(),
-              _durationMs(2500),
-              _fromTop(false),
-              _iconId(warning),
-              _iconSizePx(20) {}
+              _pos(ToastPos::Down),
+              _iconId(static_cast<IconId>(0xFFFF)) {}
 
-        ~ToastFluent() { show(); }
+        ~ToastFluent() { commit(); }
 
         ToastFluent &text(const String &t)
         {
@@ -825,32 +821,24 @@ namespace pipgui
             return *this;
         }
 
-        ToastFluent &duration(uint32_t ms)
+        ToastFluent &pos(ToastPos p)
         {
             if (!canMutate())
                 return *this;
-            _durationMs = ms;
+            _pos = p;
             return *this;
         }
 
-        ToastFluent &fromTop(bool v = true)
-        {
-            if (!canMutate())
-                return *this;
-            _fromTop = v;
-            return *this;
-        }
-
-        ToastFluent &icon(IconId id, uint16_t sizePx)
+        ToastFluent &icon(IconId id)
         {
             if (!canMutate())
                 return *this;
             _iconId = id;
-            _iconSizePx = sizePx;
             return *this;
         }
 
-        void show();
+    private:
+        void commit();
     };
 
     struct NotificationFluent : detail::FluentLifetime

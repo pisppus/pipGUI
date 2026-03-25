@@ -61,6 +61,7 @@ namespace pipgui
             _screen.current = INVALID_SCREEN_ID;
             _screen.historyCount = 0;
             _screen.suppressHistory = false;
+            _flags.dirtyRedrawPending = 0;
             _flags.needRedraw = 1;
             return;
         }
@@ -70,6 +71,7 @@ namespace pipgui
             _screen.current = id;
         else
             _screen.current = INVALID_SCREEN_ID;
+        _flags.dirtyRedrawPending = 0;
         _flags.needRedraw = 1;
     }
 
@@ -106,7 +108,12 @@ namespace pipgui
 
     bool GUI::screenTransitionActive() const noexcept { return _flags.screenTransition; }
 
-    void GUI::requestRedraw() { _flags.needRedraw = 1; }
+    void GUI::requestRedraw()
+    {
+        if (_dirty.count > 0)
+            _flags.dirtyRedrawPending = 1;
+        _flags.needRedraw = 1;
+    }
 
     void GUI::activateScreenId(uint8_t id, int8_t transDir)
     {
@@ -136,6 +143,7 @@ namespace pipgui
             _screen.transDir = transDir;
             _screen.animStartMs = nowMs();
             _dirty.count = 0;
+            _flags.dirtyRedrawPending = 0;
             Debug::clearRects();
             _flags.screenTransition = 1;
             return;
@@ -149,16 +157,34 @@ namespace pipgui
         const bool prevRender = _flags.inSpritePass;
         pipcore::Sprite *prevActive = _render.activeSprite;
         const uint8_t prevCurrent = _screen.current;
+        const uint8_t targetScreen = (screenId != INVALID_SCREEN_ID) ? screenId : _screen.current;
 
         _flags.inSpritePass = 1;
         _render.activeSprite = &_render.sprite;
         if (screenId != INVALID_SCREEN_ID)
             _screen.current = screenId;
         clear(_render.bgColor565 ? _render.bgColor565 : (uint16_t)_render.bgColor);
-        beginGraphFrame(screenId);
-        if (cb)
-            cb(*this);
-        endGraphFrame(screenId);
+
+        ListState *list = getList(targetScreen);
+        if (list && list->configured && list->itemCount > 0)
+        {
+            updateList(targetScreen);
+        }
+        else
+        {
+            TileState *tile = getTile(targetScreen);
+            if (tile && tile->configured && tile->itemCount > 0)
+            {
+                renderTile(targetScreen);
+            }
+            else
+            {
+                beginGraphFrame(targetScreen);
+                if (cb)
+                    cb(*this);
+                endGraphFrame(targetScreen);
+            }
+        }
 
         _screen.current = prevCurrent;
         _render.activeSprite = prevActive;

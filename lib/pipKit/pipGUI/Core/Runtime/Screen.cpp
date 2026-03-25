@@ -41,19 +41,18 @@ namespace pipgui
         {
             return bgColor565 ? bgColor565 : static_cast<uint16_t>(bgColor);
         }
-
-        bool screenAnimationEnabled(ScreenAnim anim)
-        {
-            return anim != ScreenAnimNone;
-        }
-
     }
 
     void GUI::renderScreenTransition(uint32_t now)
     {
         if (!_flags.screenTransition)
             return;
-        if (_screen.to >= _screen.capacity || !_flags.spriteEnabled || !_disp.display || !_screen.callbacks || !_screen.callbacks[_screen.to])
+        const bool targetHasCallback = (_screen.to < _screen.capacity && _screen.callbacks && _screen.callbacks[_screen.to]);
+        ListState *targetList = (_screen.to < _screen.capacity) ? getList(_screen.to) : nullptr;
+        TileState *targetTile = (_screen.to < _screen.capacity) ? getTile(_screen.to) : nullptr;
+        const bool targetIsList = targetList && targetList->configured && targetList->itemCount > 0;
+        const bool targetIsTile = targetTile && targetTile->configured && targetTile->itemCount > 0;
+        if (_screen.to >= _screen.capacity || !_flags.spriteEnabled || !_disp.display || (!targetHasCallback && !targetIsList && !targetIsTile))
         {
             _screen.current = _screen.to;
             _flags.needRedraw = 1;
@@ -86,9 +85,87 @@ namespace pipgui
 
         const bool notifActive = _flags.notifActive || _flags.popupActive;
         const bool toastActive = _flags.toastActive;
+        const ScreenCallback fromCb = (_screen.current < _screen.capacity && _screen.callbacks)
+                                          ? _screen.callbacks[_screen.current]
+                                          : nullptr;
+        const ScreenCallback toCb = (_screen.to < _screen.capacity && _screen.callbacks)
+                                        ? _screen.callbacks[_screen.to]
+                                        : nullptr;
+        auto blitInPlace = [&](int16_t dstX, int16_t dstY,
+                               int16_t srcX, int16_t srcY,
+                               int16_t w, int16_t h)
+        {
+            if (w <= 0 || h <= 0)
+                return;
+            uint16_t *buf = static_cast<uint16_t *>(_render.sprite.getBuffer());
+            const int16_t stride = _render.sprite.width();
+            const int16_t sh = _render.sprite.height();
+            if (!buf || stride <= 0 || sh <= 0)
+                return;
+
+            if (srcX < 0 || srcY < 0 || dstX < 0 || dstY < 0)
+                return;
+            if (srcX + w > stride || dstX + w > stride)
+                return;
+            if (srcY + h > sh || dstY + h > sh)
+                return;
+
+            const bool bottomUp = (dstY > srcY);
+            const int yStart = bottomUp ? (h - 1) : 0;
+            const int yEnd = bottomUp ? -1 : h;
+            const int yStep = bottomUp ? -1 : 1;
+
+            for (int yy = yStart; yy != yEnd; yy += yStep)
+            {
+                uint16_t *dst = buf + (size_t)(dstY + yy) * stride + dstX;
+                const uint16_t *src = buf + (size_t)(srcY + yy) * stride + srcX;
+                memmove(dst, src, (size_t)w * sizeof(uint16_t));
+            }
+        };
+        auto renderScreenClipped = [&](ScreenCallback cb, uint8_t screenId,
+                                       int16_t clipX, int16_t clipY, int16_t clipW, int16_t clipH)
+        {
+            const bool prevRender = _flags.inSpritePass;
+            pipcore::Sprite *prevActive = _render.activeSprite;
+            const uint8_t prevCurrent = _screen.current;
+            const ClipState prevClip = _clip;
+
+            _flags.inSpritePass = 1;
+            _render.activeSprite = &_render.sprite;
+            _screen.current = screenId;
+
+            applyClip(clipX, clipY, clipW, clipH);
+            clear(resolveBgColor565(_render.bgColor, _render.bgColor565));
+
+            ListState *list = getList(screenId);
+            if (list && list->configured && list->itemCount > 0)
+            {
+                updateList(screenId);
+            }
+            else
+            {
+                TileState *tile = getTile(screenId);
+                if (tile && tile->configured && tile->itemCount > 0)
+                {
+                    renderTile(screenId);
+                }
+                else
+                {
+                    beginGraphFrame(screenId);
+                    if (cb)
+                        cb(*this);
+                    endGraphFrame(screenId);
+                }
+            }
+
+            _clip = prevClip;
+            _screen.current = prevCurrent;
+            _render.activeSprite = prevActive;
+            _flags.inSpritePass = prevRender;
+        };
         if (!notifActive && !toastActive)
         {
-            renderScreenToMainSprite(_screen.callbacks[_screen.to], _screen.to);
+            renderScreenToMainSprite(toCb, _screen.to);
             if (!keepStatusBarStatic)
                 renderStatusBar();
             _dirty.count = 0;
@@ -151,12 +228,6 @@ namespace pipgui
 
         if (!notifActive && toastActive)
         {
-            renderScreenToMainSprite(_screen.callbacks[_screen.to], _screen.to);
-            if (!keepStatusBarStatic)
-                renderStatusBar();
-            _dirty.count = 0;
-            Debug::clearRects();
-
             const auto isEmpty = [](const DirtyRect &r)
             { return r.w <= 0 || r.h <= 0; };
             const auto rectUnion = [&](DirtyRect a, DirtyRect b) -> DirtyRect
@@ -203,6 +274,34 @@ namespace pipgui
                     return {0, 0, 0, 0};
                 return out;
             };
+            const auto presentCut = [&](DirtyRect strip, DirtyRect cut)
+            {
+                if (isEmpty(strip))
+                    return;
+
+                cut = rectIntersect(strip, cut);
+                if (isEmpty(cut))
+                {
+                    presentSpriteRegion(strip.x, strip.y, strip.x, strip.y, strip.w, strip.h, "present");
+                    return;
+                }
+
+                const auto presentPart = [&](DirtyRect r)
+                {
+                    if (!isEmpty(r))
+                        presentSpriteRegion(r.x, r.y, r.x, r.y, r.w, r.h, "present");
+                };
+
+                const int16_t stripX2 = (int16_t)(strip.x + strip.w);
+                const int16_t stripY2 = (int16_t)(strip.y + strip.h);
+                const int16_t cutX2 = (int16_t)(cut.x + cut.w);
+                const int16_t cutY2 = (int16_t)(cut.y + cut.h);
+
+                presentPart({strip.x, strip.y, strip.w, (int16_t)(cut.y - strip.y)});
+                presentPart({strip.x, cutY2, strip.w, (int16_t)(stripY2 - cutY2)});
+                presentPart({strip.x, cut.y, (int16_t)(cut.x - strip.x), cut.h});
+                presentPart({cutX2, cut.y, (int16_t)(stripX2 - cutX2), cut.h});
+            };
 
             DirtyRect curToast = {};
             const bool curVisible = computeToastBounds(now, curToast);
@@ -218,195 +317,69 @@ namespace pipgui
                 paint = rectUnion(prevToast, curToast);
             paint = rectClipToScreen(paint);
 
-            const auto presentStrip = [&](DirtyRect dstStrip, int16_t src0X, int16_t src0Y, DirtyRect cut)
-            {
-                if (isEmpty(dstStrip))
-                    return;
+            renderScreenToMainSprite(fromCb, _screen.current);
 
-                cut = rectIntersect(dstStrip, cut);
-                if (isEmpty(cut))
-                {
-                    presentSpriteRegion(dstStrip.x, dstStrip.y, src0X, src0Y, dstStrip.w, dstStrip.h, "present");
-                    return;
-                }
-
-                auto presentPart = [&](DirtyRect r)
-                {
-                    if (isEmpty(r))
-                        return;
-                    const int16_t srcX = (int16_t)(src0X + (r.x - dstStrip.x));
-                    const int16_t srcY = (int16_t)(src0Y + (r.y - dstStrip.y));
-                    presentSpriteRegion(r.x, r.y, srcX, srcY, r.w, r.h, "present");
-                };
-
-                const int16_t stripX2 = (int16_t)(dstStrip.x + dstStrip.w);
-                const int16_t stripY2 = (int16_t)(dstStrip.y + dstStrip.h);
-                const int16_t cutX2 = (int16_t)(cut.x + cut.w);
-                const int16_t cutY2 = (int16_t)(cut.y + cut.h);
-
-                // Top / bottom
-                presentPart({dstStrip.x, dstStrip.y, dstStrip.w, (int16_t)(cut.y - dstStrip.y)});
-                presentPart({dstStrip.x, cutY2, dstStrip.w, (int16_t)(stripY2 - cutY2)});
-
-                // Middle band: left / right
-                presentPart({dstStrip.x, cut.y, (int16_t)(cut.x - dstStrip.x), cut.h});
-                presentPart({cutX2, cut.y, (int16_t)(stripX2 - cutX2), cut.h});
-            };
-
-            int16_t srcX = 0, srcY = 0, dstX = 0, dstY = 0;
-            int16_t revealW = 0, revealH = 0;
+            DirtyRect strip = {0, 0, 0, 0};
             if (revealPrimary > 0)
             {
                 const bool forward = (_screen.transDir >= 0);
                 if (horizontal)
                 {
-                    revealW = revealPrimary;
-                    revealH = contentH;
-                    dstX = forward ? (int16_t)(contentX + contentW - revealW) : contentX;
-                    srcX = forward ? contentX : (int16_t)(contentX + contentW - revealW);
-                    dstY = contentY;
-                    srcY = contentY;
+                    const int16_t revealW = revealPrimary;
+                    const int16_t offset = (int16_t)(contentW - revealW);
+                    const int16_t srcX = forward ? contentX : (int16_t)(contentX + offset);
+                    const int16_t dstX = forward ? (int16_t)(contentX + offset) : contentX;
 
-                    const DirtyRect dstStrip{dstX, dstY, revealW, revealH};
-                    presentStrip(dstStrip, srcX, srcY, paint);
+                    renderScreenClipped(toCb, _screen.to, srcX, contentY, revealW, contentH);
+                    blitInPlace(dstX, contentY, srcX, contentY, revealW, contentH);
+                    if (offset > 0)
+                    {
+                        const int16_t restoreX = forward ? contentX : (int16_t)(contentX + revealW);
+                        renderScreenClipped(fromCb, _screen.current, restoreX, contentY, offset, contentH);
+                    }
+                    strip = {dstX, contentY, revealW, contentH};
                 }
                 else
                 {
-                    revealW = contentW;
-                    revealH = revealPrimary;
-                    dstY = forward ? (int16_t)(contentY + contentH - revealH) : contentY;
-                    srcY = forward ? contentY : (int16_t)(contentY + contentH - revealH);
-                    dstX = contentX;
-                    srcX = contentX;
+                    const int16_t revealH = revealPrimary;
+                    const int16_t offset = (int16_t)(contentH - revealH);
+                    const int16_t srcY = forward ? contentY : (int16_t)(contentY + offset);
+                    const int16_t dstY = forward ? (int16_t)(contentY + offset) : contentY;
 
-                    const DirtyRect dstStrip{dstX, dstY, revealW, revealH};
-                    presentStrip(dstStrip, srcX, srcY, paint);
+                    renderScreenClipped(toCb, _screen.to, contentX, srcY, contentW, revealH);
+                    blitInPlace(contentX, dstY, contentX, srcY, contentW, revealH);
+                    if (offset > 0)
+                    {
+                        const int16_t restoreY = forward ? contentY : (int16_t)(contentY + revealH);
+                        renderScreenClipped(fromCb, _screen.current, contentX, restoreY, contentW, offset);
+                    }
+                    strip = {contentX, dstY, contentW, revealH};
                 }
             }
 
+            renderStatusBar();
             if (!isEmpty(paint))
             {
-                uint16_t *buf = static_cast<uint16_t *>(_render.sprite.getBuffer());
-                const int16_t stride = _render.sprite.width();
-                const int16_t sh = _render.sprite.height();
-
-                const DirtyRect dstStrip = (revealPrimary > 0)
-                                               ? DirtyRect{dstX, dstY, revealW, revealH}
-                                               : DirtyRect{0, 0, 0, 0};
-                DirtyRect toDst = rectIntersect(paint, dstStrip);
-                const int16_t dx = (int16_t)(dstX - srcX);
-                const int16_t dy = (int16_t)(dstY - srcY);
-
                 ClipState prevClip = _clip;
-
-                uint16_t *toPixels = nullptr;
-                DirtyRect toSrc = {};
-                if (!isEmpty(toDst) && buf && stride > 0 && sh > 0)
-                {
-                    toSrc = {(int16_t)(toDst.x - dx), (int16_t)(toDst.y - dy), toDst.w, toDst.h};
-
-                    if (toSrc.x < 0)
-                    {
-                        const int16_t d = (int16_t)-toSrc.x;
-                        toSrc.x = 0;
-                        toSrc.w = (int16_t)(toSrc.w - d);
-                        toDst.x = (int16_t)(toDst.x + d);
-                        toDst.w = (int16_t)(toDst.w - d);
-                    }
-                    if (toSrc.y < 0)
-                    {
-                        const int16_t d = (int16_t)-toSrc.y;
-                        toSrc.y = 0;
-                        toSrc.h = (int16_t)(toSrc.h - d);
-                        toDst.y = (int16_t)(toDst.y + d);
-                        toDst.h = (int16_t)(toDst.h - d);
-                    }
-                    if (toSrc.x + toSrc.w > stride)
-                    {
-                        const int16_t over = (int16_t)(toSrc.x + toSrc.w - stride);
-                        toSrc.w = (int16_t)(toSrc.w - over);
-                        toDst.w = (int16_t)(toDst.w - over);
-                    }
-                    if (toSrc.y + toSrc.h > sh)
-                    {
-                        const int16_t over = (int16_t)(toSrc.y + toSrc.h - sh);
-                        toSrc.h = (int16_t)(toSrc.h - over);
-                        toDst.h = (int16_t)(toDst.h - over);
-                    }
-
-                    if (!isEmpty(toDst) && !isEmpty(toSrc))
-                    {
-                        const uint32_t needPixels = (uint32_t)toDst.w * (uint32_t)toDst.h;
-                        if ((!_toast.scratch || _toast.scratchPixels < needPixels) && platform())
-                        {
-                            pipcore::Platform *plat = platform();
-                            if (_toast.scratch)
-                                plat->free(_toast.scratch);
-                            _toast.scratch = (uint16_t *)plat->alloc(sizeof(uint16_t) * needPixels, pipcore::AllocCaps::Default);
-                            _toast.scratchPixels = _toast.scratch ? needPixels : 0;
-                        }
-
-                        toPixels = _toast.scratch;
-                        if (toPixels && _toast.scratchPixels >= needPixels)
-                        {
-                            for (int16_t yy = 0; yy < toDst.h; yy++)
-                            {
-                                memcpy(toPixels + (size_t)yy * toDst.w,
-                                       buf + (size_t)(toSrc.y + yy) * stride + toSrc.x,
-                                       (size_t)toDst.w * sizeof(uint16_t));
-                            }
-                        }
-                        else
-                        {
-                            toPixels = nullptr;
-                        }
-                    }
-                }
-
-                applyClip(paint.x, paint.y, paint.w, paint.h);
-                const ScreenCallback fromCb = (_screen.current < _screen.capacity && _screen.callbacks)
-                                                  ? _screen.callbacks[_screen.current]
-                                                  : nullptr;
-                renderScreenToMainSprite(fromCb, _screen.current);
-                renderStatusBar();
-
-                if (toPixels && !isEmpty(toDst))
-                {
-                    for (int16_t yy = 0; yy < toDst.h; yy++)
-                    {
-                        memcpy(buf + (size_t)(toDst.y + yy) * stride + toDst.x,
-                               toPixels + (size_t)yy * toDst.w,
-                               (size_t)toDst.w * sizeof(uint16_t));
-                    }
-                }
-
                 applyClip(paint.x, paint.y, paint.w, paint.h);
                 if (curVisible)
                     renderToastOverlay(now);
-
                 _clip = prevClip;
-                presentSpriteRegion(paint.x, paint.y, paint.x, paint.y, paint.w, paint.h, "present");
             }
+
+            _dirty.count = 0;
+            Debug::clearRects();
+            presentCut(strip, paint);
+            if (!isEmpty(paint))
+                presentSpriteRegion(paint.x, paint.y, paint.x, paint.y, paint.w, paint.h, "present");
 
             _toast.lastRect = curToast;
             _toast.lastRectValid = curVisible;
-            if (!_flags.toastActive && !_toast.lastRectValid && _toast.scratch && platform())
-            {
-                platform()->free(_toast.scratch);
-                _toast.scratch = nullptr;
-                _toast.scratchPixels = 0;
-            }
 
             if (el >= dur)
             {
                 _flags.screenTransition = 0;
                 _screen.current = _screen.to;
-                if (_toast.scratch && platform())
-                {
-                    platform()->free(_toast.scratch);
-                    _toast.scratch = nullptr;
-                    _toast.scratchPixels = 0;
-                }
                 if (keepStatusBarStatic)
                 {
                     renderStatusBar();
@@ -426,70 +399,6 @@ namespace pipgui
             }
             return;
         }
-
-        auto blitInPlace = [&](int16_t dstX, int16_t dstY,
-                               int16_t srcX, int16_t srcY,
-                               int16_t w, int16_t h)
-        {
-            if (w <= 0 || h <= 0)
-                return;
-            uint16_t *buf = static_cast<uint16_t *>(_render.sprite.getBuffer());
-            const int16_t stride = _render.sprite.width();
-            const int16_t sh = _render.sprite.height();
-            if (!buf || stride <= 0 || sh <= 0)
-                return;
-
-            if (srcX < 0 || srcY < 0 || dstX < 0 || dstY < 0)
-                return;
-            if (srcX + w > stride || dstX + w > stride)
-                return;
-            if (srcY + h > sh || dstY + h > sh)
-                return;
-
-            const bool bottomUp = (dstY > srcY);
-            const int yStart = bottomUp ? (h - 1) : 0;
-            const int yEnd = bottomUp ? -1 : h;
-            const int yStep = bottomUp ? -1 : 1;
-
-            for (int yy = yStart; yy != yEnd; yy += yStep)
-            {
-                uint16_t *dst = buf + (size_t)(dstY + yy) * stride + dstX;
-                const uint16_t *src = buf + (size_t)(srcY + yy) * stride + srcX;
-                memmove(dst, src, (size_t)w * sizeof(uint16_t));
-            }
-        };
-
-        auto renderScreenClipped = [&](ScreenCallback cb, uint8_t screenId,
-                                       int16_t clipX, int16_t clipY, int16_t clipW, int16_t clipH)
-        {
-            if (!cb)
-                return;
-
-            const bool prevRender = _flags.inSpritePass;
-            pipcore::Sprite *prevActive = _render.activeSprite;
-            const uint8_t prevCurrent = _screen.current;
-            const ClipState prevClip = _clip;
-
-            _flags.inSpritePass = 1;
-            _render.activeSprite = &_render.sprite;
-            _screen.current = screenId;
-
-            applyClip(clipX, clipY, clipW, clipH);
-            clear(resolveBgColor565(_render.bgColor, _render.bgColor565));
-            beginGraphFrame(screenId);
-            cb(*this);
-            endGraphFrame(screenId);
-
-            _clip = prevClip;
-            _screen.current = prevCurrent;
-            _render.activeSprite = prevActive;
-            _flags.inSpritePass = prevRender;
-        };
-
-        const ScreenCallback fromCb = (_screen.current < _screen.capacity && _screen.callbacks)
-                                          ? _screen.callbacks[_screen.current]
-                                          : nullptr;
-        const ScreenCallback toCb = _screen.callbacks[_screen.to];
 
         renderScreenToMainSprite(fromCb, _screen.current);
 
@@ -539,8 +448,8 @@ namespace pipgui
             renderPopupMenuOverlay(now);
         if (_flags.toastActive)
             renderToastOverlay(now);
-        invalidateRect(0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight);
-        flushDirty();
+        presentSprite(0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight, "present");
+        _dirty.count = 0;
         Debug::clearRects();
 
         if (el >= dur)

@@ -615,7 +615,7 @@ namespace pipgui
 
         ConfigureListFluent(GUI *g)
             : detail::FluentLifetime(g), _screenId(INVALID_SCREEN_ID), _items(nullptr), _itemCount(0), _ownedItems(detail::resolvePlatform(g)),
-              _cardColor(0), _cardActiveColor(0), _radius(8),
+              _cardColor(0), _cardActiveColor(0), _radius(0),
               _cardWidth(0), _cardHeight(0), _mode(Cards)
         {
         }
@@ -819,7 +819,7 @@ namespace pipgui
         ConfigureTileFluent(GUI *g)
             : detail::FluentLifetime(g), _screenId(INVALID_SCREEN_ID), _items(nullptr), _itemCount(0), _ownedItems(detail::resolvePlatform(g)),
               _layoutRowsSpec(nullptr), _ownedLayoutRowsSpec(detail::resolvePlatform(g)), _layoutRowCount(0), _layoutConfigured(false),
-              _cardColor(0), _cardActiveColor(0), _radius(8), _spacing(8),
+              _cardColor(0), _cardActiveColor(0), _radius(0), _spacing(8),
               _columns(2), _tileWidth(0), _tileHeight(0), _lineGapPx(0),
               _contentMode(TextSubtitle)
         {

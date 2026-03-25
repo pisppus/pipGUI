@@ -47,8 +47,8 @@ namespace pipgui
                 }
                 else
                 {
-                    showToastInternal("Screenshot failed", 1800, true,
-                                      static_cast<IconId>(psdf_icons::IconCount), 0);
+                    showToastInternal("Screenshot failed", true,
+                                      static_cast<IconId>(psdf_icons::IconCount));
                 }
                 _diag.screenshotCaptured = true;
             }

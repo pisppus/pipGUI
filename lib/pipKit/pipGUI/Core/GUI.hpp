@@ -713,10 +713,8 @@ namespace pipgui
                                    uint8_t maxVisible);
         void handlePopupMenuInput(bool nextDown, bool prevDown);
         void showToastInternal(const String &text,
-                               uint32_t durationMs,
                                bool fromTop,
-                               IconId iconId,
-                               uint16_t iconSizePx);
+                               IconId iconId);
         void showNotificationInternal(const String &title,
                                       const String &message,
                                       const String &buttonText,

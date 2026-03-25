@@ -328,10 +328,13 @@ namespace pipgui
         auto target = getDrawTarget();
         if (!target)
             return;
+        const ClipState prevGuiClip = _clip;
         int32_t prevClipX = 0, prevClipY = 0, prevClipW = 0, prevClipH = 0;
         target->getClipRect(&prevClipX, &prevClipY, &prevClipW, &prevClipH);
+        applyClip(clipX, y, clipW, h);
         target->setClipRect(clipX, y, clipW, h);
         drawTextAligned(text, tx, ty, textColor565, bgColor565, TextAlign::Left);
+        _clip = prevGuiClip;
         target->setClipRect(prevClipX, prevClipY, prevClipW, prevClipH);
 
         setFontSize(prevSize);
@@ -452,7 +455,6 @@ namespace pipgui
         _render.activeSprite = prevActive;
         if (!prevRender)
             invalidateRect((int16_t)(rx - updatePad), (int16_t)(ry - updatePad), (int16_t)(w + updatePad * 2), (int16_t)(h + updatePad * 2));
-        flushDirty();
     }
 
     void GUI::drawProgress(int16_t x, int16_t y,
@@ -632,10 +634,7 @@ namespace pipgui
         _render.activeSprite = prevActive;
 
         if (!prevRender)
-        {
             invalidateRect((int16_t)(rx - kSpritePad), (int16_t)(ry - kSpritePad), (int16_t)(w + kSpritePad * 2), (int16_t)(h + kSpritePad * 2));
-            flushDirty();
-        }
     }
 
     void GUI::updateProgress(int16_t x, int16_t y,
@@ -701,7 +700,6 @@ namespace pipgui
             if (!prevRender)
             {
                 invalidateRect((int16_t)(rx - updatePad), (int16_t)(ry - updatePad), (int16_t)(w + updatePad * 2), (int16_t)(h + updatePad * 2));
-                flushDirty();
             }
 
             s.inited = true;
@@ -752,7 +750,6 @@ namespace pipgui
         if (!prevRender)
         {
             invalidateRect(cx, (int16_t)(ry - updatePad), cw, (int16_t)(h + updatePad * 2));
-            flushDirty();
         }
 
         s.value = value;
@@ -799,7 +796,6 @@ namespace pipgui
         if (!prevRender)
         {
             invalidateRect((int16_t)(cx - rr), (int16_t)(cy - rr), (int16_t)(rr * 2 + 1), (int16_t)(rr * 2 + 1));
-            flushDirty();
         }
     }
 

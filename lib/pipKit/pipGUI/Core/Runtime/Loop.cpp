@@ -87,8 +87,9 @@ namespace pipgui
             }
             if (wroteOverlay && _flags.spriteEnabled && _disp.display)
             {
-                invalidateRect(0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight);
-                flushDirty();
+                presentSprite(0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight, "present");
+                _dirty.count = 0;
+                Debug::clearRects();
             }
         };
 
@@ -118,6 +119,46 @@ namespace pipgui
         ScreenCallback currentCb = (_screen.current < _screen.capacity && _screen.callbacks)
                                        ? _screen.callbacks[_screen.current]
                                        : nullptr;
+        const auto renderCurrentScreenDirty = [&](ScreenCallback cb, uint8_t screenId)
+        {
+            if (_dirty.count == 0)
+                return;
+
+            const bool prevRender = _flags.inSpritePass;
+            pipcore::Sprite *prevActive = _render.activeSprite;
+            const uint8_t prevCurrent = _screen.current;
+            const ClipState prevClip = _clip;
+            int32_t prevClipX = 0;
+            int32_t prevClipY = 0;
+            int32_t prevClipW = 0;
+            int32_t prevClipH = 0;
+            _render.sprite.getClipRect(&prevClipX, &prevClipY, &prevClipW, &prevClipH);
+
+            _flags.inSpritePass = 1;
+            _render.activeSprite = &_render.sprite;
+            _screen.current = screenId;
+
+            beginGraphFrame(screenId);
+            for (uint8_t i = 0; i < _dirty.count; ++i)
+            {
+                const DirtyRect &dirty = _dirty.rects[i];
+                if (dirty.w <= 0 || dirty.h <= 0)
+                    continue;
+
+                _clip = prevClip;
+                applyClip(dirty.x, dirty.y, dirty.w, dirty.h);
+                clear(_render.bgColor565 ? _render.bgColor565 : (uint16_t)_render.bgColor);
+                if (cb)
+                    cb(*this);
+            }
+            endGraphFrame(screenId);
+
+            _clip = prevClip;
+            _render.sprite.setClipRect((int16_t)prevClipX, (int16_t)prevClipY, (int16_t)prevClipW, (int16_t)prevClipH);
+            _screen.current = prevCurrent;
+            _render.activeSprite = prevActive;
+            _flags.inSpritePass = prevRender;
+        };
 
         const auto serviceToast = [&]()
         {
@@ -126,88 +167,24 @@ namespace pipgui
             if (!_flags.spriteEnabled || !_disp.display)
                 return;
 
-            const auto isEmpty = [](const DirtyRect &r)
-            { return r.w <= 0 || r.h <= 0; };
-            const auto rectUnion = [&](DirtyRect a, DirtyRect b) -> DirtyRect
-            {
-                if (isEmpty(a))
-                    return b;
-                if (isEmpty(b))
-                    return a;
-                const int16_t x1 = min(a.x, b.x);
-                const int16_t y1 = min(a.y, b.y);
-                const int16_t x2 = max<int16_t>(a.x + a.w, b.x + b.w);
-                const int16_t y2 = max<int16_t>(a.y + a.h, b.y + b.h);
-                return {x1, y1, (int16_t)(x2 - x1), (int16_t)(y2 - y1)};
-            };
-            const auto rectClipToScreen = [&](DirtyRect r) -> DirtyRect
-            {
-                if (isEmpty(r))
-                    return {0, 0, 0, 0};
-                int16_t x1 = r.x;
-                int16_t y1 = r.y;
-                int16_t x2 = (int16_t)(r.x + r.w);
-                int16_t y2 = (int16_t)(r.y + r.h);
-                if (x1 < 0)
-                    x1 = 0;
-                if (y1 < 0)
-                    y1 = 0;
-                if (x2 > (int16_t)_render.screenWidth)
-                    x2 = (int16_t)_render.screenWidth;
-                if (y2 > (int16_t)_render.screenHeight)
-                    y2 = (int16_t)_render.screenHeight;
-                DirtyRect out{x1, y1, (int16_t)(x2 - x1), (int16_t)(y2 - y1)};
-                if (isEmpty(out))
-                    return {0, 0, 0, 0};
-                return out;
-            };
-
             DirtyRect curToast = {};
             const bool curVisible = computeToastBounds(now, curToast);
-            const bool hadPrev = _toast.lastRectValid;
-            const DirtyRect prevToast = _toast.lastRect;
-
-            DirtyRect paint = {};
-            if (hadPrev && !curVisible)
-                paint = prevToast;
-            else if (!hadPrev && curVisible)
-                paint = curToast;
-            else if (hadPrev && curVisible)
-                paint = rectUnion(prevToast, curToast);
-
-            paint = rectClipToScreen(paint);
-            if (isEmpty(paint))
-            {
-                _toast.lastRect = curToast;
-                _toast.lastRectValid = curVisible;
-                if (!_flags.toastActive && !_toast.lastRectValid && _toast.scratch && platform())
-                {
-                    platform()->free(_toast.scratch);
-                    _toast.scratch = nullptr;
-                    _toast.scratchPixels = 0;
-                }
+            if (!curVisible && !_toast.lastRectValid)
                 return;
-            }
 
-            const ClipState prevClip = _clip;
-            applyClip(paint.x, paint.y, paint.w, paint.h);
-            renderScreenToMainSprite(currentCb, _screen.current);
+            if (currentCb)
+                renderScreenToMainSprite(currentCb, _screen.current);
+            else
+                clear(_render.bgColor565 ? _render.bgColor565 : (uint16_t)_render.bgColor);
             renderStatusBar();
-            applyClip(paint.x, paint.y, paint.w, paint.h);
             if (curVisible)
                 renderToastOverlay(now);
-            _clip = prevClip;
-
-            presentSpriteRegion(paint.x, paint.y, paint.x, paint.y, paint.w, paint.h, "present");
+            presentSprite(0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight, "present");
+            _dirty.count = 0;
+            Debug::clearRects();
 
             _toast.lastRect = curToast;
             _toast.lastRectValid = curVisible;
-            if (!_flags.toastActive && !_toast.lastRectValid && _toast.scratch && platform())
-            {
-                platform()->free(_toast.scratch);
-                _toast.scratch = nullptr;
-                _toast.scratchPixels = 0;
-            }
         };
 
         if ((_flags.notifActive || _flags.popupActive) && _flags.spriteEnabled)
@@ -228,57 +205,57 @@ namespace pipgui
             {
                 if (_disp.display)
                 {
-                    ListState *lm = getList(_screen.current);
-                    if (lm && lm->configured && lm->itemCount > 0)
+                    ListState *list = getList(_screen.current);
+                    TileState *tile = getTile(_screen.current);
+                    const bool currentIsList = list && list->configured && list->itemCount > 0;
+                    const bool currentIsTile = tile && tile->configured && tile->itemCount > 0;
+                    const bool overlaysActive = _flags.toastActive || _toast.lastRectValid || _flags.notifActive || _flags.popupActive;
+
+                    if (!overlaysActive && currentIsList)
                     {
                         updateList(_screen.current);
-                        updateStatusBar();
+                        renderStatusBar();
+                        _flags.dirtyRedrawPending = 0;
                         if (_dirty.count > 0)
                             flushDirty();
-                        if (_flags.notifActive || _flags.popupActive)
-                            presentOverlaysFull();
-                        else if (_flags.toastActive || _toast.lastRectValid)
-                            serviceToast();
                         return;
                     }
 
-                    beginGraphFrame(_screen.current);
-                    currentCb(*this);
-                    endGraphFrame(_screen.current);
-
-                    if (_flags.statusBarEnabled && _status.height > 0)
+                    if (!overlaysActive && currentIsTile)
                     {
+                        updateTile(_screen.current, tile->selectedIndex);
                         renderStatusBar();
-                        const int16_t barY = (_status.pos == Bottom)
-                                                 ? (int16_t)(_render.screenHeight - _status.height)
-                                                 : 0;
-                        invalidateRect(0, barY, (int16_t)_render.screenWidth, (int16_t)_status.height);
+                        _flags.dirtyRedrawPending = 0;
+                        if (_dirty.count > 0)
+                            flushDirty();
+                        return;
                     }
 
-                    if (_flags.toastActive)
+                    if (!overlaysActive && _flags.dirtyRedrawPending && _dirty.count > 0)
                     {
-                        renderToastOverlay(now);
-                        DirtyRect r = {};
-                        const bool vis = computeToastBounds(now, r);
-                        _toast.lastRect = r;
-                        _toast.lastRectValid = vis;
+                        renderCurrentScreenDirty(currentCb, _screen.current);
+                        renderStatusBar();
+                        _flags.dirtyRedrawPending = 0;
+                        if (_dirty.count > 0)
+                            flushDirty();
+                        return;
                     }
+
+                    _flags.dirtyRedrawPending = 0;
+                    renderScreenToMainSprite(currentCb, _screen.current);
+                    renderStatusBar();
 
                     if (_flags.toastActive || _toast.lastRectValid)
                     {
+                        serviceToast();
+                        return;
+                    }
+
+                    presentSprite(0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight, "present");
+                    if (!_flags.dirtyRedrawPending || _dirty.count == 0)
+                    {
                         _dirty.count = 0;
                         Debug::clearRects();
-                        presentSpriteRegion(0,
-                                            0,
-                                            0,
-                                            0,
-                                            (int16_t)_render.screenWidth,
-                                            (int16_t)_render.screenHeight,
-                                            "present");
-                    }
-                    else if (_dirty.count > 0)
-                    {
-                        flushDirty();
                     }
                     return;
                 }
@@ -303,7 +280,8 @@ namespace pipgui
             renderNotificationOverlay();
         if (_flags.popupActive && !_flags.spriteEnabled)
             renderPopupMenuOverlay(now);
-        if (!_flags.needRedraw && _dirty.count > 0 && _flags.spriteEnabled && _disp.display)
+        if (!_flags.needRedraw && _dirty.count > 0 && _flags.spriteEnabled && _disp.display &&
+            !_flags.toastActive && !_toast.lastRectValid)
             flushDirty();
         if (_flags.toastActive || _toast.lastRectValid)
             serviceToast();

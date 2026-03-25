@@ -8,44 +8,14 @@ namespace pipgui
         const FontData *font = fontDataForId(_typo.currentFontId);
         if (!_typo.psdfSizePx || !font)
             return false;
-        int len = (int)text.length();
-        if (!len)
+        if (text.length() == 0)
             return true;
 
-        const float sizePx = (float)_typo.psdfSizePx;
-        uint16_t lines = 1;
-        float maxX = 0.f, curX = 0.f;
-
-        forEachGlyph(text.c_str(), len, font, sizePx, _typo.psdfWeight,
-                     [&](const Glyph *g, float penX, float, bool nl) -> bool
-                     {
-                         if (nl)
-                         {
-                             if (penX > maxX)
-                                 maxX = penX;
-                             curX = 0.f;
-                             ++lines;
-                         }
-                         else
-                         {
-                             curX = penX + g->unpackAdvance() * sizePx;
-                         }
-                         return true;
-                     });
-
-        if (curX > maxX)
-            maxX = curX;
-        outW = (int16_t)ceilToInt(maxX);
-        outH = (int16_t)ceilToInt((float)lines * font->lineHeight * sizePx);
-
-        const int16_t weightExpandX = weightExpandXPxInt(_typo.psdfWeight, sizePx);
-        const int16_t weightExpandY = weightExpandYPxInt(_typo.psdfWeight, sizePx);
-        if (weightExpandX > 0)
-            outW = (int16_t)(outW + weightExpandX * 2);
-        if (weightExpandY > 0)
-        {
-            outH = (int16_t)(outH + weightExpandY * 2);
-        }
+        TextLayoutBox box;
+        if (!computeTextLayoutBox(text.c_str(), (int)text.length(), font, _typo.psdfSizePx, _typo.psdfWeight, box))
+            return false;
+        outW = box.width;
+        outH = box.height;
         return true;
     }
 
@@ -56,9 +26,15 @@ namespace pipgui
         if (maxWidth <= 0)
             return false;
 
-        int16_t tw = 0, th = 0;
-        if (!measureText(text, tw, th) || tw <= 0 || th <= 0)
+        const FontData *font = fontDataForId(_typo.currentFontId);
+        if (!_typo.psdfSizePx || !font)
             return false;
+        TextLayoutBox box;
+        if (!computeTextLayoutBox(text.c_str(), (int)text.length(), font, _typo.psdfSizePx, _typo.psdfWeight, box) ||
+            box.width <= 0 || box.height <= 0)
+            return false;
+        const int16_t tw = box.width;
+        const int16_t th = box.height;
 
         int16_t boxX = (x == -1) ? AutoX((int32_t)maxWidth) : x;
         if (align == TextAlign::Center)
@@ -69,8 +45,6 @@ namespace pipgui
         const int16_t boxY = (y == -1) ? AutoY((int32_t)th) : y;
         if (tw <= maxWidth)
             return false;
-        const int16_t weightExpandX = weightExpandXPxInt(_typo.psdfWeight, (float)_typo.psdfSizePx);
-        const int16_t weightExpandY = weightExpandYPxInt(_typo.psdfWeight, (float)_typo.psdfSizePx);
 
         pipcore::Sprite *target = getDrawTarget();
         if (!target)
@@ -130,12 +104,12 @@ namespace pipgui
                 offsetPx = 0;
         }
 
-        const int16_t drawX = (int16_t)(boxX - offsetPx + weightExpandX);
-        drawTextImmediateMasked(text, drawX, boxY + weightExpandY,
+        const int16_t drawX = (int16_t)(boxX - offsetPx + box.originX);
+        drawTextImmediateMasked(text, drawX, (int16_t)(boxY + box.originY),
                                 tw, th, fg565, 0, TextAlign::Left, boxX, maxWidth, kMarqueeEdgeFadePx);
         if (speedPxPerSec > 0 && loopPx > 0)
         {
-            drawTextImmediateMasked(text, (int16_t)(drawX + loopPx), boxY + weightExpandY,
+            drawTextImmediateMasked(text, (int16_t)(drawX + loopPx), (int16_t)(boxY + box.originY),
                                     tw, th, fg565, 0, TextAlign::Left, boxX, maxWidth, kMarqueeEdgeFadePx);
         }
 

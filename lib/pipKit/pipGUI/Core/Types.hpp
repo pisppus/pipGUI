@@ -97,6 +97,15 @@ namespace pipgui
         StatusBarStyleBlur
     };
 
+    enum class ToastPos : uint8_t
+    {
+        Top,
+        Down
+    };
+
+    inline constexpr ToastPos top = ToastPos::Top;
+    inline constexpr ToastPos down = ToastPos::Down;
+
     enum ScreenAnim : uint8_t
     {
         ScreenAnimNone,
