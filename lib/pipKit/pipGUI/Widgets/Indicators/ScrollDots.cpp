@@ -356,10 +356,10 @@ namespace pipgui
 
         const uint16_t bg565 = detail::color888To565(_render.bgColor);
 
-        fillRect()
+        drawRect()
             .pos((int16_t)(rx - pad), (int16_t)(ry - pad))
             .size(rw, rh)
-            .color(bg565)
+            .fill(bg565)
             .draw();
         drawScrollDotsImpl(x, y, count, activeIndex, activeColor, inactiveColor, radius, spacing);
 
@@ -441,10 +441,10 @@ namespace pipgui
 
         const uint16_t bg565 = detail::color888To565(_render.bgColor);
 
-        fillRect()
+        drawRect()
             .pos(layout.left, layout.top)
             .size(layout.totalW, layout.h)
-            .color(bg565)
+            .fill(bg565)
             .draw();
 
         const int16_t clipLeft = countAnimating && fromCount != toCount

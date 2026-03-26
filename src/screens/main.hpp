@@ -26,10 +26,10 @@ SCREEN(mainMenu, 0)
 
     const int16_t cutX = (int16_t)(ix + (int16_t)((uint32_t)is * (uint32_t)level) / 100u);
 
-    ui.fillRect()
+    ui.drawRect()
         .pos(cutX, iy)
         .size((int16_t)(ix + (int16_t)is - cutX), (int16_t)is)
-        .color(bg565);
+        .fill(bg565);
 
     ui.drawIcon()
         .pos(ix, iy)

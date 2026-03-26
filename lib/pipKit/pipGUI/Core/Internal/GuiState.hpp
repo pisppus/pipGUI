@@ -188,15 +188,17 @@ namespace pipgui::detail
     {
         PopupMenuItemFn itemFn = nullptr;
         void *itemUser = nullptr;
-        uint8_t count = 0;
-        uint8_t selectedIndex = 0;
-        uint8_t scrollIndex = 0;
-        uint8_t maxVisible = 6;
+        PopupMenuItemFn rememberedItemFn = nullptr;
+        void *rememberedItemUser = nullptr;
+        uint8_t rememberedCount = 0;
+        uint8_t rememberedIndex = 0xFF;
+        ListState list;
+        uint8_t maxVisible = 4;
         int16_t x = 0;
         int16_t y = 0;
         int16_t w = 0;
         uint8_t itemHeight = 28;
-        uint8_t radius = 12;
+        uint8_t radius = 18;
         uint16_t bg565 = 0x0000;
         uint16_t fg565 = 0xFFFF;
         uint16_t selBg565 = 0x39E7;
@@ -205,13 +207,9 @@ namespace pipgui::detail
         uint32_t animDurationMs = 220;
         int16_t resultIndex = -1;
         bool resultReady = false;
-
-        uint32_t nextHoldStartMs = 0;
-        uint32_t prevHoldStartMs = 0;
-        bool nextLongFired = false;
-        bool prevLongFired = false;
-        bool lastNextDown = false;
-        bool lastPrevDown = false;
+        bool inputArmed = false;
+        DirtyRect lastRect = {};
+        bool lastRectValid = false;
     };
 
     enum StatusBarDirty : uint8_t

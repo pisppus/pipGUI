@@ -4,7 +4,6 @@
 
 namespace pipgui
 {
-    inline FillRectFluent GUI::fillRect() { return FillRectFluent(this); }
     inline DrawRectFluent GUI::drawRect() { return DrawRectFluent(this); }
     inline GradientVerticalFluent GUI::gradientVertical() { return GradientVerticalFluent(this); }
     inline GradientHorizontalFluent GUI::gradientHorizontal() { return GradientHorizontalFluent(this); }
@@ -14,14 +13,10 @@ namespace pipgui
 
     inline DrawLineFluent GUI::drawLine() { return DrawLineFluent(this); }
     inline DrawCircleFluent GUI::drawCircle() { return DrawCircleFluent(this); }
-    inline FillCircleFluent GUI::fillCircle() { return FillCircleFluent(this); }
     inline DrawArcFluent GUI::drawArc() { return DrawArcFluent(this); }
     inline DrawEllipseFluent GUI::drawEllipse() { return DrawEllipseFluent(this); }
-    inline FillEllipseFluent GUI::fillEllipse() { return FillEllipseFluent(this); }
     inline DrawTriangleFluent GUI::drawTriangle() { return DrawTriangleFluent(this); }
-    inline FillTriangleFluent GUI::fillTriangle() { return FillTriangleFluent(this); }
     inline DrawSquircleRectFluent GUI::drawSquircleRect() { return DrawSquircleRectFluent(this); }
-    inline FillSquircleRectFluent GUI::fillSquircleRect() { return FillSquircleRectFluent(this); }
 
     inline DrawBlurFluent GUI::drawBlur() { return DrawBlurFluent(this); }
     inline UpdateBlurFluent GUI::updateBlur() { return UpdateBlurFluent(this); }

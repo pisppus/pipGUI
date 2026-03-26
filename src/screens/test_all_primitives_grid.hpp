@@ -39,23 +39,19 @@ SCREEN(testAllPrimitivesGrid, 35)
 
       if (type == 0)
       {
-        ui.fillCircle().pos(x, y).radius(14).color(c);
-        ui.drawCircle().pos(x, y).radius(14).color(white);
+        ui.drawCircle().pos(x, y).radius(14).fill(c).border(1, white);
       }
       else if (type == 1)
       {
-        ui.fillRect().pos(x - 18, y - 12).size(36, 24).radius({6}).color(c);
-        ui.drawRect().pos(x - 18, y - 12).size(36, 24).radius({6}).color(white);
+        ui.drawRect().pos(x - 18, y - 12).size(36, 24).radius({6}).fill(c).border(1, white);
       }
       else if (type == 2)
       {
-        ui.fillEllipse().pos(x, y).radiusX(16).radiusY(10).color(c);
-        ui.drawEllipse().pos(x, y).radiusX(16).radiusY(10).color(white);
+        ui.drawEllipse().pos(x, y).radiusX(16).radiusY(10).fill(c).border(1, white);
       }
       else if (type == 3)
       {
-        ui.fillTriangle().point0(x, y - 12).point1(x + 14, y + 10).point2(x - 14, y + 10).radius(0).color(c);
-        ui.drawTriangle().point0(x, y - 12).point1(x + 14, y + 10).point2(x - 14, y + 10).radius(0).color(white);
+        ui.drawTriangle().point0(x, y - 12).point1(x + 14, y + 10).point2(x - 14, y + 10).radius(0).fill(c).border(1, white);
       }
       else if (type == 4)
       {
@@ -63,18 +59,15 @@ SCREEN(testAllPrimitivesGrid, 35)
       }
       else if (type == 5)
       {
-        ui.fillRect().pos(x - 18, y - 12).size(36, 24).radius({8, 3, 8, 3}).color(c);
-        ui.drawRect().pos(x - 18, y - 12).size(36, 24).radius({8, 3, 8, 3}).color(white);
+        ui.drawRect().pos(x - 18, y - 12).size(36, 24).radius({8, 3, 8, 3}).fill(c).border(1, white);
       }
       else if (type == 6)
       {
-        ui.fillEllipse().pos(x, y).radiusX(8).radiusY(16).color(c);
-        ui.drawEllipse().pos(x, y).radiusX(8).radiusY(16).color(white);
+        ui.drawEllipse().pos(x, y).radiusX(8).radiusY(16).fill(c).border(1, white);
       }
       else if (type == 7)
       {
-        ui.fillTriangle().point0(x - 16, y - 4).point1(x + 16, y + 4).point2(x - 16, y + 8).radius(0).color(c);
-        ui.drawTriangle().point0(x - 16, y - 4).point1(x + 16, y + 4).point2(x - 16, y + 8).radius(0).color(white);
+        ui.drawTriangle().point0(x - 16, y - 4).point1(x + 16, y + 4).point2(x - 16, y + 8).radius(0).fill(c).border(1, white);
       }
     }
   }

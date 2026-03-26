@@ -3,32 +3,11 @@
 
 namespace pipgui
 {
-
-    void FillRectFluent::draw()
+    namespace
     {
-        if (!beginCommit())
-            return;
-        if (_perCorner)
+        inline uint8_t shrinkRadius(uint8_t radius, uint8_t amount) noexcept
         {
-            detail::GuiAccess::fillRoundRect(
-                *_gui,
-                _x,
-                _y,
-                _w,
-                _h,
-                _radiusTL,
-                _radiusTR,
-                _radiusBR,
-                _radiusBL,
-                _color);
-        }
-        else if (_radius > 0)
-        {
-            detail::GuiAccess::fillRoundRect(*_gui, _x, _y, _w, _h, _radius, _color);
-        }
-        else
-        {
-            detail::GuiAccess::fillRect(*_gui, _x, _y, _w, _h, _color);
+            return (radius > amount) ? static_cast<uint8_t>(radius - amount) : 0;
         }
     }
 
@@ -36,24 +15,58 @@ namespace pipgui
     {
         if (!beginCommit())
             return;
-        if (_perCorner)
+        if (_hasFill)
         {
-            detail::GuiAccess::drawRoundRect(*_gui, _x, _y, _w, _h, _radiusTL, _radiusTR, _radiusBR, _radiusBL, _color);
+            if (_perCorner)
+            {
+                detail::GuiAccess::fillRoundRect(*_gui, _x, _y, _w, _h, _radiusTL, _radiusTR, _radiusBR, _radiusBL, _fillColor);
+            }
+            else if (_radius > 0)
+            {
+                detail::GuiAccess::fillRoundRect(*_gui, _x, _y, _w, _h, _radius, _fillColor);
+            }
+            else
+            {
+                detail::GuiAccess::fillRect(*_gui, _x, _y, _w, _h, _fillColor);
+            }
         }
-        else if (_radius > 0)
+
+        if (_borderWidth == 0)
+            return;
+
+        for (uint8_t i = 0; i < _borderWidth; ++i)
         {
-            detail::GuiAccess::drawRoundRect(*_gui, _x, _y, _w, _h, _radius, _color);
-        }
-        else
-        {
-            const int16_t x0 = _x;
-            const int16_t y0 = _y;
-            const int16_t x1 = (int16_t)(_x + _w - 1);
-            const int16_t y1 = (int16_t)(_y + _h - 1);
-            detail::GuiAccess::drawLine(*_gui, x0, y0, x1, y0, 1, _color);
-            detail::GuiAccess::drawLine(*_gui, x1, y0, x1, y1, 1, _color);
-            detail::GuiAccess::drawLine(*_gui, x1, y1, x0, y1, 1, _color);
-            detail::GuiAccess::drawLine(*_gui, x0, y1, x0, y0, 1, _color);
+            const int16_t x = (int16_t)(_x + i);
+            const int16_t y = (int16_t)(_y + i);
+            const int16_t w = (int16_t)(_w - i * 2);
+            const int16_t h = (int16_t)(_h - i * 2);
+            if (w <= 0 || h <= 0)
+                break;
+
+            if (_perCorner)
+            {
+                detail::GuiAccess::drawRoundRect(*_gui, x, y, w, h,
+                                                shrinkRadius(_radiusTL, i),
+                                                shrinkRadius(_radiusTR, i),
+                                                shrinkRadius(_radiusBR, i),
+                                                shrinkRadius(_radiusBL, i),
+                                                _borderColor);
+            }
+            else if (_radius > 0)
+            {
+                detail::GuiAccess::drawRoundRect(*_gui, x, y, w, h, shrinkRadius(_radius, i), _borderColor);
+            }
+            else
+            {
+                const int16_t x0 = x;
+                const int16_t y0 = y;
+                const int16_t x1 = (int16_t)(x + w - 1);
+                const int16_t y1 = (int16_t)(y + h - 1);
+                detail::GuiAccess::drawLine(*_gui, x0, y0, x1, y0, 1, _borderColor);
+                detail::GuiAccess::drawLine(*_gui, x1, y0, x1, y1, 1, _borderColor);
+                detail::GuiAccess::drawLine(*_gui, x1, y1, x0, y1, 1, _borderColor);
+                detail::GuiAccess::drawLine(*_gui, x0, y1, x0, y0, 1, _borderColor);
+            }
         }
     }
 
@@ -103,14 +116,15 @@ namespace pipgui
     {
         if (!beginCommit())
             return;
-        detail::GuiAccess::drawCircle(*_gui, _cx, _cy, _r, _color);
-    }
-
-    void FillCircleFluent::draw()
-    {
-        if (!beginCommit())
-            return;
-        detail::GuiAccess::fillCircle(*_gui, _cx, _cy, _r, _color);
+        if (_hasFill)
+            detail::GuiAccess::fillCircle(*_gui, _cx, _cy, _r, _fillColor);
+        for (uint8_t i = 0; i < _borderWidth; ++i)
+        {
+            const int16_t r = (int16_t)(_r - i);
+            if (r < 0)
+                break;
+            detail::GuiAccess::drawCircle(*_gui, _cx, _cy, r, _borderColor);
+        }
     }
 
     void DrawArcFluent::draw()
@@ -124,54 +138,68 @@ namespace pipgui
     {
         if (!beginCommit())
             return;
-        detail::GuiAccess::drawEllipse(*_gui, _cx, _cy, _rx, _ry, _color);
-    }
-
-    void FillEllipseFluent::draw()
-    {
-        if (!beginCommit())
-            return;
-        detail::GuiAccess::fillEllipse(*_gui, _cx, _cy, _rx, _ry, _color);
+        if (_hasFill)
+            detail::GuiAccess::fillEllipse(*_gui, _cx, _cy, _rx, _ry, _fillColor);
+        for (uint8_t i = 0; i < _borderWidth; ++i)
+        {
+            const int16_t rx = (int16_t)(_rx - i);
+            const int16_t ry = (int16_t)(_ry - i);
+            if (rx < 0 || ry < 0)
+                break;
+            detail::GuiAccess::drawEllipse(*_gui, _cx, _cy, rx, ry, _borderColor);
+        }
     }
 
     void DrawTriangleFluent::draw()
     {
         if (!beginCommit())
             return;
-        if (_radius > 0)
-            detail::GuiAccess::drawRoundTriangle(*_gui, _x0, _y0, _x1, _y1, _x2, _y2, _radius, _color);
-        else
-            detail::GuiAccess::drawTriangle(*_gui, _x0, _y0, _x1, _y1, _x2, _y2, _color);
-    }
-
-    void FillTriangleFluent::draw()
-    {
-        if (!beginCommit())
-            return;
-        if (_radius > 0)
-            detail::GuiAccess::fillRoundTriangle(*_gui, _x0, _y0, _x1, _y1, _x2, _y2, _radius, _color);
-        else
-            detail::GuiAccess::fillTriangle(*_gui, _x0, _y0, _x1, _y1, _x2, _y2, _color);
+        if (_hasFill)
+        {
+            if (_radius > 0)
+                detail::GuiAccess::fillRoundTriangle(*_gui, _x0, _y0, _x1, _y1, _x2, _y2, _radius, _fillColor);
+            else
+                detail::GuiAccess::fillTriangle(*_gui, _x0, _y0, _x1, _y1, _x2, _y2, _fillColor);
+        }
+        for (uint8_t i = 0; i < _borderWidth; ++i)
+        {
+            if (_radius > 0)
+                detail::GuiAccess::drawRoundTriangle(*_gui, _x0, _y0, _x1, _y1, _x2, _y2, shrinkRadius(_radius, i), _borderColor);
+            else
+                detail::GuiAccess::drawTriangle(*_gui, _x0, _y0, _x1, _y1, _x2, _y2, _borderColor);
+        }
     }
 
     void DrawSquircleRectFluent::draw()
     {
         if (!beginCommit())
             return;
-        if (_perCorner)
-            detail::GuiAccess::drawSquircleRect(*_gui, _x, _y, _w, _h, _radiusTL, _radiusTR, _radiusBR, _radiusBL, _color);
-        else
-            detail::GuiAccess::drawSquircleRect(*_gui, _x, _y, _w, _h, _radius, _color);
-    }
+        if (_hasFill)
+        {
+            if (_perCorner)
+                detail::GuiAccess::fillSquircleRect(*_gui, _x, _y, _w, _h, _radiusTL, _radiusTR, _radiusBR, _radiusBL, _fillColor);
+            else
+                detail::GuiAccess::fillSquircleRect(*_gui, _x, _y, _w, _h, _radius, _fillColor);
+        }
+        for (uint8_t i = 0; i < _borderWidth; ++i)
+        {
+            const int16_t x = (int16_t)(_x + i);
+            const int16_t y = (int16_t)(_y + i);
+            const int16_t w = (int16_t)(_w - i * 2);
+            const int16_t h = (int16_t)(_h - i * 2);
+            if (w <= 0 || h <= 0)
+                break;
 
-    void FillSquircleRectFluent::draw()
-    {
-        if (!beginCommit())
-            return;
-        if (_perCorner)
-            detail::GuiAccess::fillSquircleRect(*_gui, _x, _y, _w, _h, _radiusTL, _radiusTR, _radiusBR, _radiusBL, _color);
-        else
-            detail::GuiAccess::fillSquircleRect(*_gui, _x, _y, _w, _h, _radius, _color);
+            if (_perCorner)
+                detail::GuiAccess::drawSquircleRect(*_gui, x, y, w, h,
+                                                    shrinkRadius(_radiusTL, i),
+                                                    shrinkRadius(_radiusTR, i),
+                                                    shrinkRadius(_radiusBR, i),
+                                                    shrinkRadius(_radiusBL, i),
+                                                    _borderColor);
+            else
+                detail::GuiAccess::drawSquircleRect(*_gui, x, y, w, h, shrinkRadius(_radius, i), _borderColor);
+        }
     }
 
     template <bool IsUpdate>
@@ -297,7 +325,7 @@ namespace pipgui
     {
         if (!beginCommit())
             return;
-        detail::GuiAccess::showPopupMenu(*_gui, _itemFn, _itemUser, _count, _selectedIndex, _x, _y, _w, _maxVisible);
+        detail::GuiAccess::showPopupMenu(*_gui, _itemFn, _itemUser, _count, _selectedIndex, _w, _maxVisible, _anchorX, _anchorY, _anchorW, _anchorH);
     }
 
     template <bool IsUpdate>

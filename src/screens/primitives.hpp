@@ -7,58 +7,38 @@ SCREEN(primitives, 23)
   ui.setTextStyle(Caption);
   ui.drawText().text("Primitives").pos(-1, 8).color(ui.rgb(220, 220, 220)).bgColor(bg565).align(Center);
 
-  ui.fillCircle()
-      .pos(50, 55)
-      .radius(18)
-      .color(ui.rgb(0, 87, 250));
-
   ui.drawCircle()
       .pos(50, 55)
       .radius(18)
-      .color(ui.rgb(255, 255, 255));
-
-  ui.fillEllipse()
-      .pos(140, 55)
-      .radiusX(28)
-      .radiusY(16)
-      .color(ui.rgb(255, 0, 72));
+      .fill(ui.rgb(0, 87, 250))
+      .border(1, ui.rgb(255, 255, 255));
 
   ui.drawEllipse()
       .pos(140, 55)
       .radiusX(28)
       .radiusY(16)
-      .color(ui.rgb(255, 255, 255));
-
-  ui.fillTriangle()
-      .point0(220, 72)
-      .point1(250, 40)
-      .point2(280, 72)
-      .radius(6)
-      .color(ui.rgb(0, 200, 120));
+      .fill(ui.rgb(255, 0, 72))
+      .border(1, ui.rgb(255, 255, 255));
 
   ui.drawTriangle()
       .point0(220, 72)
       .point1(250, 40)
       .point2(280, 72)
       .radius(6)
-      .color(ui.rgb(255, 255, 255));
-
-  ui.fillSquircleRect()
-      .pos(44, 109)
-      .size(52, 52)
-      .radius({26})
-      .color(ui.rgb(255, 128, 0));
+      .fill(ui.rgb(0, 200, 120))
+      .border(1, ui.rgb(255, 255, 255));
 
   ui.drawSquircleRect()
       .pos(44, 109)
       .size(52, 52)
       .radius({26})
-      .color(ui.rgb(255, 255, 255));
+      .fill(ui.rgb(255, 128, 0))
+      .border(1, ui.rgb(255, 255, 255));
 
-  ui.fillRect()
+  ui.drawRect()
       .pos(210, 165)
       .size(80, 40)
-      .color(bg565);
+      .fill(bg565);
 
   ui.drawGlowRect()
       .pos(250, 185)
@@ -72,7 +52,7 @@ SCREEN(primitives, 23)
   ui.drawCircle()
       .pos(170, 135)
       .radius(28)
-      .color(ui.rgb(60, 60, 60));
+      .border(1, ui.rgb(60, 60, 60));
 
   ui.drawArc()
       .pos(170, 135)
@@ -117,10 +97,10 @@ SCREEN(primitives, 23)
       .endDeg(180.0f)
       .color(ui.rgb(80, 255, 120));
 
-  ui.fillRect()
+  ui.drawRect()
       .pos(10, 180)
       .size(80, 40)
-      .color(ui.rgb(30, 30, 30))
+      .fill(ui.rgb(30, 30, 30))
       .radius({16, 4, 16, 4});
 
   ui.drawLine()

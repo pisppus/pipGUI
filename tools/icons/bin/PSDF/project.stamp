@@ -3,6 +3,8 @@ e892a5379dcc484ea7e2e4d28452f84c46528304b7f64a7bca6462268f0e2a68
 6d51369bf5edd19e457501dc78de7560d83758a68cb240f8cb720f6401f4627a
 {"mtime_ns": 1764505527689675600, "path": "c:\\users\\pisppus\\documents\\platformio\\projects\\pipgui\\tools\\icons\\bin\\msdfgen.exe", "size": 1803776}
 {"icon_px": 48, "pxrange": 8, "stroke_steps": "2048", "svgpathtools": "{\"mtime_ns\": 1772721031101860400, \"path\": \"c:\\\\users\\\\pisppus\\\\.platformio\\\\penv\\\\lib\\\\site-packages\\\\svgpathtools\\\\__init__.py\", \"size\": 1097}"}
+{"file": "arrow.svg", "hash": "efc3f7794814c746e6b39bbe770a040052c737fc847c29abbb3436c9d5c02282"}
 {"file": "battery.svg", "hash": "cbc41af2f8b6a2fc3b96e81141c73b8f4ceaf6442a0707b322df641b5a8d91bb"}
+{"file": "checkmark.svg", "hash": "1ece4eecdd4f2f3bd9538db89ed41c483cedae66da50dcf5b91e30d27d40d985"}
 {"file": "error.svg", "hash": "cbbba5b2abf90ed7d87d9b3c03f9253e8c1adb8ff004334bb4a5440a9138ff78"}
 {"file": "warning.svg", "hash": "534130944489d72c26801e3f1d7d4a28f3b9e280a285dc12a9a8b34a08a2ced3"}

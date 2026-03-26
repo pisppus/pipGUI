@@ -321,9 +321,16 @@ namespace pipgui
         _render.activeSprite = &_render.sprite;
 
         const int16_t drawRadius = baseRadius;
-        fillSquircleRect(boxX, boxY, drawW, drawH, (uint8_t)drawRadius, borderColor);
-        fillSquircleRect(boxX + 1, boxY + 1, drawW - 2, drawH - 2,
-                         (uint8_t)(drawRadius > 2 ? drawRadius - 2 : drawRadius), bgColor);
+        drawSquircleRect()
+            .pos(boxX, boxY)
+            .size(drawW, drawH)
+            .radius({(uint8_t)drawRadius})
+            .fill(borderColor);
+        drawSquircleRect()
+            .pos((int16_t)(boxX + 1), (int16_t)(boxY + 1))
+            .size((int16_t)(drawW - 2), (int16_t)(drawH - 2))
+            .radius({(uint8_t)(drawRadius > 2 ? drawRadius - 2 : drawRadius)})
+            .fill(bgColor);
 
         int16_t textX = boxX + (drawW - tw) / 2;
         const int16_t textY = boxY + (drawH - th) / 2;

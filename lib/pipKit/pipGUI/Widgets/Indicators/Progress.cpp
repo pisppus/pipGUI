@@ -442,10 +442,10 @@ namespace pipgui
         _flags.inSpritePass = 1;
         _render.activeSprite = &_render.sprite;
 
-        fillRect()
+        drawRect()
             .pos((int16_t)(rx - updatePad), (int16_t)(ry - updatePad))
             .size((int16_t)(w + updatePad * 2), (int16_t)(h + updatePad * 2))
-            .color(_render.bgColor565)
+            .fill(_render.bgColor565)
             .draw();
         drawProgressDecorated(x, y, w, h, value, baseColor, fillColor, radius, anim,
                               label, labelColor, labelAlign, labelFontPx,
@@ -624,10 +624,10 @@ namespace pipgui
         _flags.inSpritePass = 1;
         _render.activeSprite = &_render.sprite;
 
-        fillRect()
+        drawRect()
             .pos((int16_t)(rx - kSpritePad), (int16_t)(ry - kSpritePad))
             .size((int16_t)(w + kSpritePad * 2), (int16_t)(h + kSpritePad * 2))
-            .color(_render.bgColor565)
+            .fill(_render.bgColor565)
             .draw();
         drawProgress(x, y, w, h, value, baseColor, fillColor, radius, anim);
         _flags.inSpritePass = prevRender;
@@ -688,10 +688,10 @@ namespace pipgui
             _flags.inSpritePass = 1;
             _render.activeSprite = &_render.sprite;
 
-            fillRect()
+            drawRect()
                 .pos((int16_t)(rx - updatePad), (int16_t)(ry - updatePad))
                 .size((int16_t)(w + updatePad * 2), (int16_t)(h + updatePad * 2))
-                .color(_render.bgColor565)
+                .fill(_render.bgColor565)
                 .draw();
             drawProgress(x, y, w, h, value, baseColor, fillColor, radius, anim);
             _flags.inSpritePass = prevRender;
@@ -736,10 +736,10 @@ namespace pipgui
         _flags.inSpritePass = 1;
         _render.activeSprite = &_render.sprite;
 
-        fillRect()
+        drawRect()
             .pos(cx, (int16_t)(ry - updatePad))
             .size(cw, (int16_t)(h + updatePad * 2))
-            .color(_render.bgColor565)
+            .fill(_render.bgColor565)
             .draw();
         drawProgress(x, y, w, h, value, baseColor, fillColor, radius, anim);
         _flags.inSpritePass = prevRender;
@@ -784,10 +784,10 @@ namespace pipgui
             cy = AutoY(0);
 
         int16_t rr = (int16_t)(r + kSpritePad);
-        fillRect()
+        drawRect()
             .pos((int16_t)(cx - rr), (int16_t)(cy - rr))
             .size((int16_t)(rr * 2 + 1), (int16_t)(rr * 2 + 1))
-            .color(_render.bgColor565)
+            .fill(_render.bgColor565)
             .draw();
         drawCircleProgress(x, y, r, thickness, value, baseColor, fillColor, anim);
         _flags.inSpritePass = prevRender;

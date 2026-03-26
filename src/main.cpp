@@ -296,10 +296,10 @@ namespace
   {
     for (uint8_t i = 0; i < kBlurRectCount; ++i)
     {
-      ui.fillRect()
+      ui.drawRect()
           .pos(rects[i].x, rects[i].y)
           .size(rects[i].w, rects[i].h)
-          .color(rects[i].color);
+          .fill(rects[i].color);
     }
   }
 
@@ -307,10 +307,10 @@ namespace
   {
     for (uint8_t i = 0; i < kBlurRectCount; ++i)
     {
-      ui.fillRect()
+      ui.drawRect()
           .pos(rects[i].x, rects[i].y)
           .size(rects[i].w, rects[i].h)
-          .color(bg565);
+          .fill(bg565);
     }
   }
 
@@ -412,7 +412,7 @@ void configureListMenus()
           {"Font weights", "Test all weights", fontWeight},
           {"Drum roll", "Horizontal + vertical picker", drumRoll},
           {"Circle AA", "Gupta-Sproull optimized", circle},
-          {"Test: Circles", "fillCircle + drawCircle", testCircles},
+          {"Test: Circles", "drawCircle fill / border", testCircles},
           {"Test: RoundRects", "1 & 4 radius variants", testRoundRects},
           {"Test: Ellipses", "Wu-style AA ellipses", testEllipses},
           {"Test: Triangles", "4x subpixel AA triangles", testTriangles},

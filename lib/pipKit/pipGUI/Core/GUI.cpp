@@ -270,6 +270,7 @@ namespace pipgui
         freeGraphAreas(plat);
         freeLists(plat);
         freeTiles(plat);
+        freePopupMenu(plat);
         freeErrors(plat);
         freeScreenState(plat);
 #if PIPGUI_SCREENSHOTS

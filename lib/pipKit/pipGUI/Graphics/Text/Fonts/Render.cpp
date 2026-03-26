@@ -537,7 +537,7 @@ namespace pipgui
         _flags.inSpritePass = 1;
         _render.activeSprite = &_render.sprite;
 
-        fillRect().pos(clearX, clearY).size(clearW, clearH).color(bg565).draw();
+        drawRect().pos(clearX, clearY).size(clearW, clearH).fill(bg565).draw();
         drawTextImmediate(text,
                           (int16_t)(rx + box.originX),
                           (int16_t)(ry + box.originY),

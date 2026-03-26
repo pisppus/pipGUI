@@ -3,81 +3,23 @@
 namespace pipgui
 {
 
-    struct FillRectFluent : detail::FluentLifetime
-    {
-        PIPGUI_DEFAULT_FLUENT_MOVE(FillRectFluent);
-        int16_t _x, _y, _w, _h;
-        uint16_t _color;
-        uint8_t _radius;
-        uint8_t _radiusTL, _radiusTR, _radiusBR, _radiusBL;
-        bool _perCorner;
-        FillRectFluent(GUI *g)
-            : detail::FluentLifetime(g),
-              _x(0), _y(0), _w(0), _h(0),
-              _color(0),
-              _radius(0), _radiusTL(0), _radiusTR(0), _radiusBR(0), _radiusBL(0),
-              _perCorner(false) {}
-        ~FillRectFluent() { draw(); }
-        FillRectFluent &pos(int16_t x, int16_t y)
-        {
-            if (!canMutate())
-                return *this;
-            _x = x;
-            _y = y;
-            return *this;
-        }
-        FillRectFluent &size(int16_t w, int16_t h)
-        {
-            if (!canMutate())
-                return *this;
-            _w = w;
-            _h = h;
-            return *this;
-        }
-        FillRectFluent &color(uint16_t c)
-        {
-            if (!canMutate())
-                return *this;
-            _color = c;
-            return *this;
-        }
-        FillRectFluent &radius(std::initializer_list<uint8_t> radii)
-        {
-            if (!canMutate())
-                return *this;
-            if (radii.size() == 1)
-            {
-                _radius = *radii.begin();
-                _perCorner = false;
-            }
-            else if (radii.size() == 4)
-            {
-                auto it = radii.begin();
-                _radiusTL = *it++;
-                _radiusTR = *it++;
-                _radiusBR = *it++;
-                _radiusBL = *it++;
-                _perCorner = true;
-            }
-            return *this;
-        }
-        void draw();
-    };
-
     struct DrawRectFluent : detail::FluentLifetime
     {
         PIPGUI_DEFAULT_FLUENT_MOVE(DrawRectFluent);
         int16_t _x, _y, _w, _h;
-        uint16_t _color;
         uint8_t _radius;
         uint8_t _radiusTL, _radiusTR, _radiusBR, _radiusBL;
+        uint16_t _fillColor;
+        uint16_t _borderColor;
+        uint8_t _borderWidth;
         bool _perCorner;
+        bool _hasFill;
         DrawRectFluent(GUI *g)
             : detail::FluentLifetime(g),
               _x(0), _y(0), _w(0), _h(0),
-              _color(0),
               _radius(0), _radiusTL(0), _radiusTR(0), _radiusBR(0), _radiusBL(0),
-              _perCorner(false) {}
+              _fillColor(0), _borderColor(0), _borderWidth(0),
+              _perCorner(false), _hasFill(false) {}
         ~DrawRectFluent() { draw(); }
         DrawRectFluent &pos(int16_t x, int16_t y)
         {
@@ -95,11 +37,20 @@ namespace pipgui
             _h = h;
             return *this;
         }
-        DrawRectFluent &color(uint16_t c)
+        DrawRectFluent &fill(uint16_t c)
         {
             if (!canMutate())
                 return *this;
-            _color = c;
+            _fillColor = c;
+            _hasFill = true;
+            return *this;
+        }
+        DrawRectFluent &border(uint8_t width, uint16_t c)
+        {
+            if (!canMutate())
+                return *this;
+            _borderWidth = width;
+            _borderColor = c;
             return *this;
         }
         DrawRectFluent &radius(std::initializer_list<uint8_t> radii)
@@ -486,8 +437,11 @@ namespace pipgui
         PIPGUI_DEFAULT_FLUENT_MOVE(DrawCircleFluent);
         int16_t _cx, _cy;
         int16_t _r;
-        uint16_t _color;
-        DrawCircleFluent(GUI *g) : detail::FluentLifetime(g), _cx(0), _cy(0), _r(0), _color(0) {}
+        uint16_t _fillColor;
+        uint16_t _borderColor;
+        uint8_t _borderWidth;
+        bool _hasFill;
+        DrawCircleFluent(GUI *g) : detail::FluentLifetime(g), _cx(0), _cy(0), _r(0), _fillColor(0), _borderColor(0), _borderWidth(0), _hasFill(false) {}
         ~DrawCircleFluent() { draw(); }
         DrawCircleFluent &pos(int16_t cx, int16_t cy)
         {
@@ -504,44 +458,20 @@ namespace pipgui
             _r = r;
             return *this;
         }
-        DrawCircleFluent &color(uint16_t c)
+        DrawCircleFluent &fill(uint16_t c)
         {
             if (!canMutate())
                 return *this;
-            _color = c;
+            _fillColor = c;
+            _hasFill = true;
             return *this;
         }
-        void draw();
-    };
-
-    struct FillCircleFluent : detail::FluentLifetime
-    {
-        PIPGUI_DEFAULT_FLUENT_MOVE(FillCircleFluent);
-        int16_t _cx, _cy;
-        int16_t _r;
-        uint16_t _color;
-        FillCircleFluent(GUI *g) : detail::FluentLifetime(g), _cx(0), _cy(0), _r(0), _color(0) {}
-        ~FillCircleFluent() { draw(); }
-        FillCircleFluent &pos(int16_t cx, int16_t cy)
+        DrawCircleFluent &border(uint8_t width, uint16_t c)
         {
             if (!canMutate())
                 return *this;
-            _cx = cx;
-            _cy = cy;
-            return *this;
-        }
-        FillCircleFluent &radius(int16_t r)
-        {
-            if (!canMutate())
-                return *this;
-            _r = r;
-            return *this;
-        }
-        FillCircleFluent &color(uint16_t c)
-        {
-            if (!canMutate())
-                return *this;
-            _color = c;
+            _borderWidth = width;
+            _borderColor = c;
             return *this;
         }
         void draw();
@@ -608,8 +538,11 @@ namespace pipgui
         PIPGUI_DEFAULT_FLUENT_MOVE(DrawEllipseFluent);
         int16_t _cx, _cy;
         int16_t _rx, _ry;
-        uint16_t _color;
-        DrawEllipseFluent(GUI *g) : detail::FluentLifetime(g), _cx(0), _cy(0), _rx(0), _ry(0), _color(0) {}
+        uint16_t _fillColor;
+        uint16_t _borderColor;
+        uint8_t _borderWidth;
+        bool _hasFill;
+        DrawEllipseFluent(GUI *g) : detail::FluentLifetime(g), _cx(0), _cy(0), _rx(0), _ry(0), _fillColor(0), _borderColor(0), _borderWidth(0), _hasFill(false) {}
         ~DrawEllipseFluent() { draw(); }
         DrawEllipseFluent &pos(int16_t cx, int16_t cy)
         {
@@ -633,51 +566,20 @@ namespace pipgui
             _ry = ry;
             return *this;
         }
-        DrawEllipseFluent &color(uint16_t c)
+        DrawEllipseFluent &fill(uint16_t c)
         {
             if (!canMutate())
                 return *this;
-            _color = c;
+            _fillColor = c;
+            _hasFill = true;
             return *this;
         }
-        void draw();
-    };
-
-    struct FillEllipseFluent : detail::FluentLifetime
-    {
-        PIPGUI_DEFAULT_FLUENT_MOVE(FillEllipseFluent);
-        int16_t _cx, _cy;
-        int16_t _rx, _ry;
-        uint16_t _color;
-        FillEllipseFluent(GUI *g) : detail::FluentLifetime(g), _cx(0), _cy(0), _rx(0), _ry(0), _color(0) {}
-        ~FillEllipseFluent() { draw(); }
-        FillEllipseFluent &pos(int16_t cx, int16_t cy)
+        DrawEllipseFluent &border(uint8_t width, uint16_t c)
         {
             if (!canMutate())
                 return *this;
-            _cx = cx;
-            _cy = cy;
-            return *this;
-        }
-        FillEllipseFluent &radiusX(int16_t rx)
-        {
-            if (!canMutate())
-                return *this;
-            _rx = rx;
-            return *this;
-        }
-        FillEllipseFluent &radiusY(int16_t ry)
-        {
-            if (!canMutate())
-                return *this;
-            _ry = ry;
-            return *this;
-        }
-        FillEllipseFluent &color(uint16_t c)
-        {
-            if (!canMutate())
-                return *this;
-            _color = c;
+            _borderWidth = width;
+            _borderColor = c;
             return *this;
         }
         void draw();
@@ -687,9 +589,12 @@ namespace pipgui
     {
         PIPGUI_DEFAULT_FLUENT_MOVE(DrawTriangleFluent);
         int16_t _x0, _y0, _x1, _y1, _x2, _y2;
-        uint16_t _color;
         uint8_t _radius;
-        DrawTriangleFluent(GUI *g) : detail::FluentLifetime(g), _x0(0), _y0(0), _x1(0), _y1(0), _x2(0), _y2(0), _color(0), _radius(0) {}
+        uint16_t _fillColor;
+        uint16_t _borderColor;
+        uint8_t _borderWidth;
+        bool _hasFill;
+        DrawTriangleFluent(GUI *g) : detail::FluentLifetime(g), _x0(0), _y0(0), _x1(0), _y1(0), _x2(0), _y2(0), _radius(0), _fillColor(0), _borderColor(0), _borderWidth(0), _hasFill(false) {}
         ~DrawTriangleFluent() { draw(); }
         DrawTriangleFluent &point0(int16_t x, int16_t y)
         {
@@ -715,63 +620,23 @@ namespace pipgui
             _y2 = y;
             return *this;
         }
-        DrawTriangleFluent &color(uint16_t c)
+        DrawTriangleFluent &fill(uint16_t c)
         {
             if (!canMutate())
                 return *this;
-            _color = c;
+            _fillColor = c;
+            _hasFill = true;
+            return *this;
+        }
+        DrawTriangleFluent &border(uint8_t width, uint16_t c)
+        {
+            if (!canMutate())
+                return *this;
+            _borderWidth = width;
+            _borderColor = c;
             return *this;
         }
         DrawTriangleFluent &radius(uint8_t r)
-        {
-            if (!canMutate())
-                return *this;
-            _radius = r;
-            return *this;
-        }
-        void draw();
-    };
-
-    struct FillTriangleFluent : detail::FluentLifetime
-    {
-        PIPGUI_DEFAULT_FLUENT_MOVE(FillTriangleFluent);
-        int16_t _x0, _y0, _x1, _y1, _x2, _y2;
-        uint16_t _color;
-        uint8_t _radius;
-        FillTriangleFluent(GUI *g) : detail::FluentLifetime(g), _x0(0), _y0(0), _x1(0), _y1(0), _x2(0), _y2(0), _color(0), _radius(0) {}
-        ~FillTriangleFluent() { draw(); }
-        FillTriangleFluent &point0(int16_t x, int16_t y)
-        {
-            if (!canMutate())
-                return *this;
-            _x0 = x;
-            _y0 = y;
-            return *this;
-        }
-        FillTriangleFluent &point1(int16_t x, int16_t y)
-        {
-            if (!canMutate())
-                return *this;
-            _x1 = x;
-            _y1 = y;
-            return *this;
-        }
-        FillTriangleFluent &point2(int16_t x, int16_t y)
-        {
-            if (!canMutate())
-                return *this;
-            _x2 = x;
-            _y2 = y;
-            return *this;
-        }
-        FillTriangleFluent &color(uint16_t c)
-        {
-            if (!canMutate())
-                return *this;
-            _color = c;
-            return *this;
-        }
-        FillTriangleFluent &radius(uint8_t r)
         {
             if (!canMutate())
                 return *this;
@@ -788,12 +653,15 @@ namespace pipgui
         uint8_t _radius;
         uint8_t _radiusTL, _radiusTR, _radiusBR, _radiusBL;
         bool _perCorner;
-        uint16_t _color;
+        uint16_t _fillColor;
+        uint16_t _borderColor;
+        uint8_t _borderWidth;
+        bool _hasFill;
         DrawSquircleRectFluent(GUI *g)
             : detail::FluentLifetime(g),
               _x(0), _y(0), _w(0), _h(0),
               _radius(0), _radiusTL(0), _radiusTR(0), _radiusBR(0), _radiusBL(0),
-              _perCorner(false), _color(0) {}
+              _perCorner(false), _fillColor(0), _borderColor(0), _borderWidth(0), _hasFill(false) {}
         ~DrawSquircleRectFluent() { draw(); }
         DrawSquircleRectFluent &pos(int16_t x, int16_t y)
         {
@@ -831,74 +699,22 @@ namespace pipgui
             }
             return *this;
         }
-        DrawSquircleRectFluent &color(uint16_t c)
+        DrawSquircleRectFluent &fill(uint16_t c)
         {
             if (!canMutate())
                 return *this;
-            _color = c;
+            _fillColor = c;
+            _hasFill = true;
+            return *this;
+        }
+        DrawSquircleRectFluent &border(uint8_t width, uint16_t c)
+        {
+            if (!canMutate())
+                return *this;
+            _borderWidth = width;
+            _borderColor = c;
             return *this;
         }
         void draw();
     };
-
-    struct FillSquircleRectFluent : detail::FluentLifetime
-    {
-        PIPGUI_DEFAULT_FLUENT_MOVE(FillSquircleRectFluent);
-        int16_t _x, _y, _w, _h;
-        uint8_t _radius;
-        uint8_t _radiusTL, _radiusTR, _radiusBR, _radiusBL;
-        bool _perCorner;
-        uint16_t _color;
-        FillSquircleRectFluent(GUI *g)
-            : detail::FluentLifetime(g),
-              _x(0), _y(0), _w(0), _h(0),
-              _radius(0), _radiusTL(0), _radiusTR(0), _radiusBR(0), _radiusBL(0),
-              _perCorner(false), _color(0) {}
-        ~FillSquircleRectFluent() { draw(); }
-        FillSquircleRectFluent &pos(int16_t x, int16_t y)
-        {
-            if (!canMutate())
-                return *this;
-            _x = x;
-            _y = y;
-            return *this;
-        }
-        FillSquircleRectFluent &size(int16_t w, int16_t h)
-        {
-            if (!canMutate())
-                return *this;
-            _w = w;
-            _h = h;
-            return *this;
-        }
-        FillSquircleRectFluent &radius(std::initializer_list<uint8_t> radii)
-        {
-            if (!canMutate())
-                return *this;
-            if (radii.size() == 1)
-            {
-                _radius = *radii.begin();
-                _perCorner = false;
-            }
-            else if (radii.size() == 4)
-            {
-                auto it = radii.begin();
-                _radiusTL = *it++;
-                _radiusTR = *it++;
-                _radiusBR = *it++;
-                _radiusBL = *it++;
-                _perCorner = true;
-            }
-            return *this;
-        }
-        FillSquircleRectFluent &color(uint16_t c)
-        {
-            if (!canMutate())
-                return *this;
-            _color = c;
-            return *this;
-        }
-        void draw();
-    };
-
 }

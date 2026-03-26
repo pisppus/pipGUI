@@ -104,6 +104,8 @@ namespace pipgui
         bool configured = false;
         uint8_t itemCount = 0;
         uint8_t selectedIndex = 0;
+        uint8_t checkedIndex = 0xFF;
+        uint16_t checkedIconId = 0xFFFF;
 
         float scrollPos = 0.0f;
         float targetScroll = 0.0f;

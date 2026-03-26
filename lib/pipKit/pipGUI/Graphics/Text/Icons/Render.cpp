@@ -256,7 +256,7 @@ namespace pipgui
         _flags.inSpritePass = 1;
         _render.activeSprite = &_render.sprite;
 
-        fillRect().pos(rx - pad, ry - pad).size(sizePx + pad * 2, sizePx + pad * 2).color(bg565).draw();
+        drawRect().pos(rx - pad, ry - pad).size(sizePx + pad * 2, sizePx + pad * 2).fill(bg565).draw();
         drawIconInternal(iconId, rx, ry, sizePx, fg565);
 
         _flags.inSpritePass = prevRender;

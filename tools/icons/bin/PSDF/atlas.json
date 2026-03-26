@@ -1,43 +1,57 @@
 {
   "atlas": {
     "width": 48,
-    "height": 240,
+    "height": 336,
     "distanceRange": 8,
     "size": 48
   },
   "icons": [
     {
-      "name": "BatteryL0",
+      "name": "Arrow",
       "x": 0,
       "y": 0,
       "w": 48,
       "h": 48
     },
     {
-      "name": "BatteryL1",
+      "name": "BatteryL0",
       "x": 0,
       "y": 48,
       "w": 48,
       "h": 48
     },
     {
-      "name": "BatteryL2",
+      "name": "BatteryL1",
       "x": 0,
       "y": 96,
       "w": 48,
       "h": 48
     },
     {
-      "name": "Error",
+      "name": "BatteryL2",
       "x": 0,
       "y": 144,
       "w": 48,
       "h": 48
     },
     {
-      "name": "Warning",
+      "name": "Checkmark",
       "x": 0,
       "y": 192,
+      "w": 48,
+      "h": 48
+    },
+    {
+      "name": "Error",
+      "x": 0,
+      "y": 240,
+      "w": 48,
+      "h": 48
+    },
+    {
+      "name": "Warning",
+      "x": 0,
+      "y": 288,
       "w": 48,
       "h": 48
     }

@@ -93,10 +93,10 @@ namespace pipgui
             _flags.inSpritePass = 1;
             _render.activeSprite = &_render.sprite;
 
-            fillRect()
+            drawRect()
                 .pos(x, y)
                 .size(w, h)
-                .color(detail::color888To565(bgColor))
+                .fill(detail::color888To565(bgColor))
                 .draw();
             drawDrumRollHorizontal(x, y, w, h, options, count, selectedIndex, fgColor, bgColor, fontPx, animDurationMs);
 
@@ -200,10 +200,10 @@ namespace pipgui
             _flags.inSpritePass = 1;
             _render.activeSprite = &_render.sprite;
 
-            fillRect()
+            drawRect()
                 .pos(x, y)
                 .size(w, h)
-                .color(detail::color888To565(bgColor))
+                .fill(detail::color888To565(bgColor))
                 .draw();
             drawDrumRollVertical(x, y, w, h, options, count, selectedIndex, fgColor, bgColor, fontPx, animDurationMs);
 

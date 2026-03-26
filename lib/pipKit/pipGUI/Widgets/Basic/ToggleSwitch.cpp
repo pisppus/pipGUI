@@ -263,10 +263,10 @@ namespace pipgui
         _flags.inSpritePass = 1;
         _render.activeSprite = &_render.sprite;
 
-        fillRect()
+        drawRect()
             .pos((int16_t)(rx - kToggleUpdatePad), (int16_t)(ry - kToggleUpdatePad))
             .size((int16_t)(w + kToggleUpdatePad * 2), (int16_t)(h + kToggleUpdatePad * 2))
-            .color(_render.bgColor565);
+            .fill(_render.bgColor565);
         drawToggleSwitch(x, y, w, h, state, activeColor, inactiveColor, knobColor);
 
         _flags.inSpritePass = prevRender;

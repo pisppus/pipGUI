@@ -612,11 +612,12 @@ namespace pipgui
         int16_t _cardWidth;
         int16_t _cardHeight;
         ListMode _mode;
+        uint8_t _checkedIndex;
 
         ConfigureListFluent(GUI *g)
             : detail::FluentLifetime(g), _screenId(INVALID_SCREEN_ID), _items(nullptr), _itemCount(0), _ownedItems(detail::resolvePlatform(g)),
               _cardColor(0), _cardActiveColor(0), _radius(0),
-              _cardWidth(0), _cardHeight(0), _mode(Cards)
+              _cardWidth(0), _cardHeight(0), _mode(Cards), _checkedIndex(0xFF)
         {
         }
 
@@ -631,7 +632,8 @@ namespace pipgui
               _radius(other._radius),
               _cardWidth(other._cardWidth),
               _cardHeight(other._cardHeight),
-              _mode(other._mode)
+              _mode(other._mode),
+              _checkedIndex(other._checkedIndex)
         {
         }
 
@@ -650,6 +652,7 @@ namespace pipgui
                 _cardWidth = other._cardWidth;
                 _cardHeight = other._cardHeight;
                 _mode = other._mode;
+                _checkedIndex = other._checkedIndex;
             }
             return *this;
         }
@@ -665,6 +668,7 @@ namespace pipgui
             copy._cardWidth = _cardWidth;
             copy._cardHeight = _cardHeight;
             copy._mode = _mode;
+            copy._checkedIndex = _checkedIndex;
 
             if (_ownedItems.data && _itemCount > 0)
             {
@@ -755,6 +759,14 @@ namespace pipgui
             if (!canMutate())
                 return *this;
             _mode = m;
+            return *this;
+        }
+
+        ConfigureListFluent &checked(uint8_t idx)
+        {
+            if (!canMutate())
+                return *this;
+            _checkedIndex = idx;
             return *this;
         }
 

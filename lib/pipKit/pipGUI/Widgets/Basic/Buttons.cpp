@@ -108,7 +108,7 @@ namespace pipgui
 
         void fillButtonBody(GUI &gui, const ButtonFrame &frame, uint16_t color565)
         {
-            detail::GuiAccess::fillSquircleRect(gui, frame.x, frame.y, frame.w, frame.h, frame.radius, color565);
+            gui.drawSquircleRect().pos(frame.x, frame.y).size(frame.w, frame.h).radius({(uint8_t)frame.radius}).fill(color565);
         }
 
         [[nodiscard]] String loadingLabel(const String &label, bool loading, uint32_t now) noexcept
@@ -319,10 +319,10 @@ namespace pipgui
         _flags.inSpritePass = 1;
         _render.activeSprite = &_render.sprite;
 
-        fillRect()
+        drawRect()
             .pos((int16_t)(rx - pad), (int16_t)(ry - pad))
             .size((int16_t)(w + pad * 2), (int16_t)(h + pad * 2))
-            .color(_render.bgColor565)
+            .fill(_render.bgColor565)
             .draw();
         drawButton(label, x, y, w, h, baseColor, radius, iconId, state);
 

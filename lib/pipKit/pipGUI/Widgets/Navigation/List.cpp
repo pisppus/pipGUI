@@ -94,6 +94,8 @@ namespace pipgui
 
         menu->style = {_cardColor, _cardActiveColor, _radius, 6,
                        _cardWidth, _cardHeight, 0, 0, 0, _mode};
+        menu->checkedIndex = _checkedIndex;
+        menu->checkedIconId = (_checkedIndex == 0xFF) ? static_cast<uint16_t>(0xFFFF) : static_cast<uint16_t>(IconCheckmark);
 
         if (menu->style.cardColor == 0 || menu->style.cardActiveColor == 0)
         {
@@ -232,12 +234,19 @@ namespace pipgui
         ListState *menuPtr = getList(screenId);
         if (!menuPtr || !menuPtr->configured || menuPtr->itemCount == 0 || w <= 0 || h <= 0)
             return false;
-        ListState &menu = *menuPtr;
+        return renderListState(*menuPtr, x, y, w, h, bgColor565, true);
+    }
+
+    bool GUI::renderListState(ListState &menu, int16_t x, int16_t y, int16_t w, int16_t h, uint16_t bgColor565, bool invalidate)
+    {
+        if (!menu.configured || menu.itemCount == 0 || w <= 0 || h <= 0)
+            return false;
 
         auto drawList = [&]()
         {
             auto *target = getDrawTarget();
             const uint32_t now = nowMs();
+            setTextStyle(Body);
             if (menu.marqueeStartMs == 0)
                 menu.marqueeStartMs = now;
 
@@ -260,6 +269,7 @@ namespace pipgui
 
             const bool cardMode = (menu.style.mode == Cards);
             const int16_t marginX = 1;
+            int16_t contentRight = right;
             int16_t cardW = (menu.style.cardWidth > 0 && menu.style.cardWidth < w)
                                 ? menu.style.cardWidth
                                 : (int16_t)(w - marginX * 2);
@@ -269,8 +279,7 @@ namespace pipgui
             int16_t cardH = (menu.style.cardHeight > 0) ? menu.style.cardHeight : (cardMode ? 50 : 34);
             if (menu.style.cardHeight <= 0 && cardH * 2 + menu.style.spacing > h)
                 cardH = h / 3;
-
-            const int16_t cardX = left + (w - cardW) / 2;
+            int16_t cardX = left + (w - cardW) / 2;
 
             const ClipState prevGuiClip = _clip;
             int32_t clipX = 0, clipY = 0, clipW = 0, clipH = 0;
@@ -330,6 +339,28 @@ namespace pipgui
                 const float maxScrollPx = contentHeightPx - (float)visibleHeight;
                 if (maxScrollPx > 0.0f)
                     maxScroll = maxScrollPx / itemSpan;
+            }
+
+            const bool hasScrollbar = menu.itemCount > visibleCount;
+            if (hasScrollbar)
+            {
+                constexpr int16_t scrollbarWidth = 3;
+                constexpr int16_t scrollbarGap = 2;
+                contentRight = right - (scrollbarWidth + scrollbarGap);
+                if (menu.style.cardWidth <= 0)
+                {
+                    cardX = left + marginX;
+                    cardW = (int16_t)(contentRight - cardX);
+                    if (cardW < 20)
+                        cardW = 20;
+                }
+                else
+                {
+                    cardX = (int16_t)(contentRight - cardW);
+                    const int16_t minCardX = left + marginX;
+                    if (cardX < minCardX)
+                        cardX = minCardX;
+                }
             }
 
             float targetTop = menu.targetScroll;
@@ -523,6 +554,9 @@ namespace pipgui
             const uint16_t inactiveTextColor = detail::autoTextColor(bgColor565);
             const int16_t textClipX = cardX + 6;
             const int16_t textClipW = cardW - 12;
+            const bool hasCheckedMarker = (menu.checkedIndex < menu.itemCount) && menu.checkedIconId != 0xFFFF;
+            const int16_t trailingIconSize = (cardH > 40) ? 18 : 16;
+            const int16_t trailingPad = hasCheckedMarker ? (trailingIconSize + 12) : 0;
 
             for (int16_t itemIndex = startIndex; itemIndex <= endIndex; ++itemIndex)
             {
@@ -536,19 +570,20 @@ namespace pipgui
 
                 ListState::Item &item = menu.items[i];
                 const bool active = (i == menu.selectedIndex);
+                const bool checked = (i == menu.checkedIndex) && menu.checkedIconId != 0xFFFF;
                 const uint16_t bg = active ? menu.style.cardActiveColor : (cardMode ? menu.style.cardColor : bgColor565);
                 const uint16_t textColor = detail::autoTextColor(bg);
 
                 if (!cardMode)
                 {
                     if (active)
-                        fillSquircleRect(cardX, itemY, cardW, cardH, radius, bg);
+                        drawSquircleRect().pos(cardX, itemY).size(cardW, cardH).radius({radius}).fill(bg);
 
                     const int16_t textOffsetX = drawItemIcon(item.iconId, cardX + 8, itemY, (cardH > 30) ? 22 : 18, 6,
                                                              active ? textColor : inactiveTextColor,
                                                              active ? bg : bgColor565, false);
                     const int16_t textX = cardX + 12 + textOffsetX;
-                    const int16_t textMaxWidth = (cardX + cardW - textX - 10 > 4) ? (cardX + cardW - textX - 10) : 4;
+                    const int16_t textMaxWidth = (cardX + cardW - textX - 10 - trailingPad > 4) ? (cardX + cardW - textX - 10 - trailingPad) : 4;
                     uint16_t titlePx = menu.style.titleFontPx;
                     if (titlePx == 0)
                         titlePx = 18;
@@ -576,13 +611,24 @@ namespace pipgui
                     setTextFont(TITLE_WEIGHT, titlePx);
                     drawTextLine(item.title, textX, baseY, textMaxWidth, textColor, bg, active);
 
+                    if (checked)
+                    {
+                        drawIcon()
+                            .pos((int16_t)(cardX + cardW - trailingIconSize - 8), (int16_t)(itemY + (cardH - trailingIconSize) / 2))
+                            .size((uint16_t)trailingIconSize)
+                            .icon(menu.checkedIconId)
+                            .color(active ? textColor : inactiveTextColor)
+                            .bgColor(bg)
+                            .draw();
+                    }
+
                     _clip = prevItemGuiClip;
                     target->setClipRect(prevItemClipX, prevItemClipY, prevItemClipW, prevItemClipH);
 
                     continue;
                 }
 
-                fillSquircleRect(cardX, itemY, cardW, cardH, radius, bg);
+                drawSquircleRect().pos(cardX, itemY).size(cardW, cardH).radius({radius}).fill(bg);
 
                 const String &subtitle = item.subtitle;
                 const bool hasSub = subtitle.length() > 0;
@@ -590,7 +636,7 @@ namespace pipgui
                 const int16_t textOffsetX = drawItemIcon(item.iconId, cardX + 10, itemY, (cardH > 40) ? 20 : 18, 8,
                                                          textColor, bg, true);
                 const int16_t textX = cardX + 10 + textOffsetX;
-                const int16_t textMaxWidth = (cardX + cardW - textX - 10 > 4) ? (cardX + cardW - textX - 10) : 4;
+                const int16_t textMaxWidth = (cardX + cardW - textX - 10 - trailingPad > 4) ? (cardX + cardW - textX - 10 - trailingPad) : 4;
                 const bool autoTitlePx = (menu.style.titleFontPx == 0);
                 const bool autoSubPx = (menu.style.subtitleFontPx == 0);
                 const bool autoGapPx = (menu.style.lineGapPx == 0);
@@ -670,6 +716,17 @@ namespace pipgui
                     drawTextLine(subtitle, textX, subY, textMaxWidth, subColor, bg, active);
                 }
 
+                if (checked)
+                {
+                    drawIcon()
+                        .pos((int16_t)(cardX + cardW - trailingIconSize - 8), (int16_t)(itemY + (cardH - trailingIconSize) / 2))
+                        .size((uint16_t)trailingIconSize)
+                        .icon(menu.checkedIconId)
+                        .color(textColor)
+                        .bgColor(bg)
+                        .draw();
+                }
+
                 _clip = prevItemGuiClip;
                 target->setClipRect(prevItemClipX, prevItemClipY, prevItemClipW, prevItemClipH);
             }
@@ -727,14 +784,16 @@ namespace pipgui
             applyClip(left, top, w, h);
             target->setClipRect(left, top, w, h);
 
-            if (menu.itemCount > visibleCount && menu.scrollbarAlpha > 5)
+            if (hasScrollbar && menu.scrollbarAlpha > 5)
             {
+                constexpr int16_t scrollbarWidth = 3;
+                constexpr int16_t scrollbarSlidePx = 4;
                 const int16_t sbInset = 2;
                 int16_t trackTop = top + sbInset;
                 int16_t trackH = h - (int16_t)(2 * sbInset);
                 if (trackH < 1)
                     trackH = 1;
-                const int16_t trackX = (int16_t)(right - 4 + (int16_t)(6.0f * slideT));
+                const int16_t trackX = (int16_t)(right - scrollbarWidth + (int16_t)lroundf((float)scrollbarSlidePx * slideT));
 
                 const float ratio = (float)visibleCount / (float)menu.itemCount;
                 int16_t thumbH = (int16_t)(trackH * ratio);
@@ -749,11 +808,11 @@ namespace pipgui
 
                 int16_t thumbY = trackTop + (int16_t)((trackH - thumbH) * pct);
 
-                const uint8_t v = (uint8_t)(40U + (100U * (uint32_t)menu.scrollbarAlpha) / 255U);
-                uint16_t col = target->color565(v, v, v);
+                const uint16_t thumb565 = target->color565(168, 168, 168);
+                const uint16_t col = detail::blend565(bgColor565, thumb565, menu.scrollbarAlpha);
 
                 uint8_t thumbRadius = (thumbH < 6) ? 1 : 2;
-                fillSquircleRect(trackX - 2, thumbY, 3, thumbH, thumbRadius, col);
+                fillRoundRect(trackX, thumbY, scrollbarWidth, thumbH, thumbRadius, col);
             }
 
             _clip = prevGuiClip;
@@ -769,7 +828,7 @@ namespace pipgui
         _flags.inSpritePass = prevRender;
         _render.activeSprite = prevActive;
 
-        if (!prevRender)
+        if (invalidate && !prevRender)
             invalidateRect(x, y, w, h);
         return true;
     }

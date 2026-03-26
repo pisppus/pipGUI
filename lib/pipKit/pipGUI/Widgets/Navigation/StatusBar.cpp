@@ -537,10 +537,10 @@ namespace pipgui
 
         if (_status.style == StatusBarStyleSolid)
         {
-            fillRect()
+            drawRect()
                 .pos(x, y)
                 .size(w, h)
-                .color(bg565)
+                .fill(bg565)
                 .draw();
         }
         else if (_status.style == StatusBarStyleBlur)
@@ -640,10 +640,10 @@ namespace pipgui
                 .bgColor(bg565)
                 .draw();
             int16_t cutX = static_cast<int16_t>(layout.batteryX + (int32_t)layout.batterySize * _status.batteryLevel / 100);
-            fillRect()
+            drawRect()
                 .pos(cutX, layout.batteryY)
                 .size(static_cast<int16_t>(layout.batteryX + layout.batterySize - cutX), (int16_t)layout.batterySize)
-                .color(bg565)
+                .fill(bg565)
                 .draw();
 
             drawIcon()

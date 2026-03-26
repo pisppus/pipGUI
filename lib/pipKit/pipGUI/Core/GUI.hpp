@@ -24,7 +24,6 @@ namespace pipgui
     struct SetStatusBarTextFluent;
     struct SetStatusBarIconFluent;
 
-    struct FillRectFluent;
     struct DrawRectFluent;
     struct GradientVerticalFluent;
     struct GradientHorizontalFluent;
@@ -33,14 +32,10 @@ namespace pipgui
     struct GradientRadialFluent;
     struct DrawLineFluent;
     struct DrawCircleFluent;
-    struct FillCircleFluent;
     struct DrawArcFluent;
     struct DrawEllipseFluent;
-    struct FillEllipseFluent;
     struct DrawTriangleFluent;
-    struct FillTriangleFluent;
     struct DrawSquircleRectFluent;
-    struct FillSquircleRectFluent;
 
     template <bool IsUpdate>
     struct BlurRegionFluentT;
@@ -199,7 +194,6 @@ namespace pipgui
         uint16_t rgb(uint8_t r, uint8_t g, uint8_t b) const;
         void clear(uint16_t color = 0x0000);
 
-        [[nodiscard]] FillRectFluent fillRect();
         [[nodiscard]] DrawRectFluent drawRect();
         [[nodiscard]] GradientVerticalFluent gradientVertical();
         [[nodiscard]] GradientHorizontalFluent gradientHorizontal();
@@ -209,14 +203,10 @@ namespace pipgui
 
         [[nodiscard]] DrawLineFluent drawLine();
         [[nodiscard]] DrawCircleFluent drawCircle();
-        [[nodiscard]] FillCircleFluent fillCircle();
         [[nodiscard]] DrawArcFluent drawArc();
         [[nodiscard]] DrawEllipseFluent drawEllipse();
-        [[nodiscard]] FillEllipseFluent fillEllipse();
         [[nodiscard]] DrawTriangleFluent drawTriangle();
-        [[nodiscard]] FillTriangleFluent fillTriangle();
         [[nodiscard]] DrawSquircleRectFluent drawSquircleRect();
-        [[nodiscard]] FillSquircleRectFluent fillSquircleRect();
 
         [[nodiscard]] DrawBlurFluent drawBlur();
         [[nodiscard]] UpdateBlurFluent updateBlur();
@@ -684,6 +674,11 @@ namespace pipgui
         TileState *getTile(uint8_t screenId);
 
         void handleListInput(uint8_t screenId, bool nextDown, bool prevDown);
+        bool renderListState(ListState &menu,
+                             int16_t x, int16_t y,
+                             int16_t w, int16_t h,
+                             uint16_t bgColor565,
+                             bool invalidate);
         bool updateList(uint8_t screenId,
                         int16_t x, int16_t y,
                         int16_t w, int16_t h,
@@ -698,19 +693,23 @@ namespace pipgui
         void freeGraphAreas(pipcore::Platform *plat) noexcept;
         void freeLists(pipcore::Platform *plat) noexcept;
         void freeTiles(pipcore::Platform *plat) noexcept;
+        void freePopupMenu(pipcore::Platform *plat) noexcept;
 
         void renderToastOverlay(uint32_t now);
         bool computeToastBounds(uint32_t now, DirtyRect &outRect);
+        bool computePopupBounds(uint32_t now, DirtyRect &outRect);
         void renderNotificationOverlay();
         void renderPopupMenuOverlay(uint32_t now);
         void showPopupMenuInternal(PopupMenuItemFn itemFn,
                                    void *itemUser,
                                    uint8_t count,
                                    uint8_t selectedIndex,
-                                   int16_t x,
-                                   int16_t y,
                                    int16_t w,
-                                   uint8_t maxVisible);
+                                   uint8_t maxVisible,
+                                   int16_t anchorX,
+                                   int16_t anchorY,
+                                   int16_t anchorW,
+                                   int16_t anchorH);
         void handlePopupMenuInput(bool nextDown, bool prevDown);
         void showToastInternal(const String &text,
                                bool fromTop,

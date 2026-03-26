@@ -11,10 +11,6 @@ namespace
   constexpr const char *kPopupMenuDemoItems[] = {
       "Open",
       "Rename",
-      "Duplicate",
-      "Share",
-      "Archive",
-      "Delete",
   };
   constexpr uint8_t kPopupMenuDemoItemCount = static_cast<uint8_t>(sizeof(kPopupMenuDemoItems) / sizeof(kPopupMenuDemoItems[0]));
 }
@@ -76,10 +72,10 @@ void updateBlurDemoFrame(uint32_t nowMs)
   BlurRect row1[kBlurRectCount];
   BlurRect row2[kBlurRectCount];
 
-  ui.fillRect()
+  ui.drawRect()
       .pos(0, bandY)
       .size(w, bandH)
-      .color(bg565);
+      .fill(bg565);
 
   buildBlurRow(g_blurPhase, w, bandY + 15, 22, 18, row1);
   drawBlurRow(ui, row1);
@@ -290,17 +286,17 @@ void updateFirmwareUpdateScreen(uint32_t nowMs, bool nextPressed, bool nextDown,
       (st.state == OtaState::FetchingManifest) ||
       (st.state == OtaState::Downloading) ||
       (st.state == OtaState::Installing);
+  const int16_t picked = ui.popupMenuTakeResult();
+  if (picked >= 0 && !busy)
+  {
+    const char *ver = ui.otaStableListVersion((uint8_t)picked);
+    if (ver && ver[0])
+      ui.otaRequestInstallStableVersion(ver);
+  }
 
   if (ui.popupMenuActive())
   {
     ui.popupMenuInput().nextDown(nextDown).prevDown(prevDown);
-    const int16_t picked = ui.popupMenuTakeResult();
-    if (picked >= 0 && !busy)
-    {
-      const char *ver = ui.otaStableListVersion((uint8_t)picked);
-      if (ver && ver[0])
-        ui.otaRequestInstallStableVersion(ver);
-    }
   }
   else
   {
@@ -334,11 +330,9 @@ void updateFirmwareUpdateScreen(uint32_t nowMs, bool nextPressed, bool nextDown,
         {
           const uint8_t count = ui.otaStableListCount();
           const uint8_t maxVisible = 7;
-          const uint8_t visible = (count < maxVisible) ? count : maxVisible;
-          const int16_t menuH = (int16_t)(16 + visible * 28);
           ui.showPopupMenu()
               .items(&otaStableVersionItem, nullptr, count)
-              .pos(l.btnX1, (int16_t)(l.btnY - 8 - menuH))
+              .anchor(l.btnX1, l.btnY, l.btnW, l.btnH)
               .width(l.btnW)
               .selected(0)
               .maxVisible(maxVisible);
@@ -365,11 +359,9 @@ void updateFirmwareUpdateScreen(uint32_t nowMs, bool nextPressed, bool nextDown,
       else if (!busy)
       {
         const uint8_t maxVisible = 7;
-        const uint8_t visible = (count < maxVisible) ? count : maxVisible;
-        const int16_t menuH = (int16_t)(16 + visible * 28);
         ui.showPopupMenu()
             .items(&otaStableVersionItem, nullptr, count)
-            .pos(l.btnX1, (int16_t)(l.btnY - 8 - menuH))
+            .anchor(l.btnX1, l.btnY, l.btnW, l.btnH)
             .width(l.btnW)
             .selected(0)
             .maxVisible(maxVisible);
@@ -749,18 +741,27 @@ void handleErrorDemo(uint8_t screenId, bool nextPressed, bool prevPressed)
 
 void updatePopupMenuDemo(bool nextPressed, bool nextDown, bool prevPressed, bool prevDown)
 {
+  const int16_t picked = ui.popupMenuTakeResult();
+  if (picked >= 0 && picked < kPopupMenuDemoItemCount)
+  {
+    ui.showToast()
+        .text(String("Picked: ") + kPopupMenuDemoItems[picked]);
+  }
+
+  auto button = ui.updateButton()
+      .label("Open menu")
+      .pos(center, 188)
+      .size(180, 32)
+      .baseColor(ui.rgb(0, 87, 250))
+      .radius(10)
+      .mode(true, false);
+  button.down(nextDown);
+
   if (ui.popupMenuActive())
   {
     ui.popupMenuInput()
         .nextDown(nextDown)
         .prevDown(prevDown);
-
-    const int16_t picked = ui.popupMenuTakeResult();
-      if (picked >= 0 && picked < kPopupMenuDemoItemCount)
-      {
-        ui.showToast()
-          .text(String("Picked: ") + kPopupMenuDemoItems[picked]);
-      }
     return;
   }
 
@@ -770,22 +771,11 @@ void updatePopupMenuDemo(bool nextPressed, bool nextDown, bool prevPressed, bool
     return;
   }
 
-  ui.updateButton()
-      .label("Open menu")
-      .pos(center, 188)
-      .size(180, 32)
-      .baseColor(ui.rgb(0, 87, 250))
-      .radius(10)
-      .mode(true, false)
-      .down(nextDown);
-
   if (!nextPressed)
     return;
 
   ui.showPopupMenu()
       .items(kPopupMenuDemoItems, kPopupMenuDemoItemCount)
-      .pos(42, 40)
-      .width(156)
-      .selected(1)
-      .maxVisible(6);
+      .anchor(button)
+      .width(156);
 }

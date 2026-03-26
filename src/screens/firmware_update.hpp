@@ -75,11 +75,11 @@ SCREEN(firmwareUpdate, 40)
   ui.drawText().text("Prev=action  Next=rollback  Hold=back").pos(-1, 42).color(ui.rgb(170, 170, 170)).bgColor(bg565).align(Center);
 
   const uint16_t cardBg = ui.rgb(16, 16, 16);
-  auto cardRect = ui.fillRect()
+  auto cardRect = ui.drawRect()
                       .pos(l.cardX, l.infoY)
                       .size(l.cardW, l.infoH)
                       .radius({14})
-                      .color(cardBg);
+                      .fill(cardBg);
   cardRect.derive()
       .pos(l.cardX, l.notesY)
       .size(l.cardW, l.notesH);

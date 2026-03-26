@@ -60,10 +60,10 @@ SCREEN(autoTextColor, 38)
     const uint16_t bg = testColors[i];
     const uint16_t fg = detail::autoTextColor(bg, 128);
 
-    ui.fillRect()
+    ui.drawRect()
     .pos(x, y)
     .size(cellW, cellH)
-    .color(bg);
+    .fill(bg);
 
     ui.setTextStyle(Body);
 

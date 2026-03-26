@@ -25,6 +25,7 @@ SCREEN(popupMenuDemo, 41)
   hintText.derive().text("Prev: up").pos(center, 84);
   hintText.derive().text("Hold Next: select").pos(center, 104);
   hintText.derive().text("Hold Prev: close").pos(center, 124);
+  hintText.derive().text("4 visible, then scroll").pos(center, 144);
 
   ui.drawButton()
       .label("Open menu")

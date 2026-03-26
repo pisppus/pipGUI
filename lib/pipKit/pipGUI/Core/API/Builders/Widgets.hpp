@@ -973,20 +973,24 @@ namespace pipgui
         uint8_t _count;
         uint8_t _selectedIndex;
         uint8_t _maxVisible;
-        int16_t _x;
-        int16_t _y;
         int16_t _w;
+        int16_t _anchorX;
+        int16_t _anchorY;
+        int16_t _anchorW;
+        int16_t _anchorH;
 
         PopupMenuFluent(GUI *g)
             : detail::FluentLifetime(g),
               _itemFn(nullptr),
               _itemUser(nullptr),
               _count(0),
-              _selectedIndex(0),
-              _maxVisible(6),
-              _x(0),
-              _y(0),
-              _w(0)
+              _selectedIndex(0xFF),
+              _maxVisible(4),
+              _w(0),
+              _anchorX(0),
+              _anchorY(0),
+              _anchorW(0),
+              _anchorH(0)
         {
         }
 
@@ -1021,13 +1025,23 @@ namespace pipgui
             return *this;
         }
 
-        PopupMenuFluent &pos(int16_t x, int16_t y)
+        PopupMenuFluent &anchor(int16_t x, int16_t y, int16_t w, int16_t h)
         {
             if (!canMutate())
                 return *this;
-            _x = x;
-            _y = y;
+            _anchorX = x;
+            _anchorY = y;
+            _anchorW = w;
+            _anchorH = h;
             return *this;
+        }
+
+        template <typename AnchorFluent>
+        PopupMenuFluent &anchor(const AnchorFluent &component)
+        {
+            if (!canMutate())
+                return *this;
+            return anchor(component._x, component._y, component._w, component._h);
         }
 
         PopupMenuFluent &width(int16_t w)

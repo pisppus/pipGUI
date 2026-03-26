@@ -501,11 +501,48 @@ ui.drawIcon()
     .color(ui.rgb(0, 200, 120));
 ```
 
+### Свои SVG-иконки
+
+Кастомные иконки добавляются так:
+
+1. положить SVG в `tools/icons/SVG/`
+2. пересобрать проект — генератор сам обновит `lib/pipKit/pipGUI/Graphics/Text/Icons/icons.cpp` и `lib/pipKit/pipGUI/Graphics/Text/Icons/metrics.hpp`
+3. использовать иконку по имени файла
+
+Пример:
+
+- файл `tools/icons/SVG/checkmark.svg`
+- в коде: `.icon(checkmark)`
+
+Что генерируется:
+
+- для однослойной иконки из `name.svg` появляется alias `name`
+- для многослойной иконки появляются alias вида `name_l0`, `name_l1`, `name_l2`
+- дополнительно экспортируются и enum-константы `IconName`, `IconNameL0`, `IconNameL1` и т.д.
+
+Если в имени файла есть `-`, пробелы или другие неподходящие символы, генератор сам приводит имя к валидному C++-идентификатору через `_`
+
 ---
 
 # 7. Фигуры
 
-Приставка fill - это фигуры с заливкой, draw - с контуром
+Заливка и контур комбинируются прямо в одном builder:
+
+```cpp
+ui.drawRect()
+    .pos(20, 40)
+    .size(100, 40)
+    .radius({10})
+    .fill(ui.rgb(0, 120, 255))
+    .border(1, ui.rgb(255, 255, 255));
+```
+
+Что важно:
+
+- `fill(color565)` — задаёт заливку; если не вызывать, фигура остаётся без заливки
+- `border(widthPx, color565)` — задаёт контур; если не вызывать, контура не будет
+- `fill(...)` и `border(...)` можно использовать вместе или по отдельности
+- отдельных fluent-методов `fillRect()`, `fillCircle()`, `fillEllipse()`, `fillTriangle()`, `fillSquircleRect()` больше нет
 
 ## 7.1 Линия
 
@@ -524,78 +561,57 @@ ui.drawLine()
 ## 7.2 Прямоугольник
 
 ```cpp
-ui.fillRect()
+ui.drawRect()
     .pos(20, 40)
     .size(100, 40)
-    .color(ui.rgb(0, 120, 255))
-```
-
-```cpp
-ui.drawRect()
-    .pos(20, 90)
-    .size(100, 40)
-    .color(ui.rgb(255, 255, 255))
     .radius({10})
+    .fill(ui.rgb(0, 120, 255))
+    .border(1, ui.rgb(255, 255, 255))
 ```
 
-`drawRect()` и `fillRect()` умеют:
+`drawRect()` умеет:
 
 - `radius({r})` — один радиус для всех углов;
-- `radius({tl, tr, br, bl})` — отдельные радиусы по углам.
+- `radius({tl, tr, br, bl})` — отдельные радиусы по углам
 - `pos(...)` и `size(...)` задают левый верхний угол и размер
-- `fillRect()` рисует сплошную фигуру, `drawRect()` только контур
 
 ## 7.3 Круг
-
-```cpp
-ui.fillCircle()
-    .pos(50, 50)
-    .radius(18)
-    .color(ui.rgb(0, 87, 250))
-```
 
 ```cpp
 ui.drawCircle()
     .pos(50, 50)
     .radius(18)
-    .color(ui.rgb(255, 255, 255))
+    .fill(ui.rgb(0, 87, 250))
+    .border(1, ui.rgb(255, 255, 255))
 ```
 
 - `pos(...)` - центр круга
 - `radius(...)` - радиус
-- `fillCircle()` рисует диск, `drawCircle()` только окружность
 
 ## 7.4 Треугольник
-
-```cpp
-ui.fillTriangle()
-    .point0(40, 120)
-    .point1(70, 80)
-    .point2(100, 120)
-    .color(ui.rgb(0, 200, 120))
-```
 
 ```cpp
 ui.drawTriangle()
     .point0(40, 120)
     .point1(70, 80)
     .point2(100, 120)
-    .color(ui.rgb(255, 255, 255))
+    .fill(ui.rgb(0, 200, 120))
+    .border(1, ui.rgb(255, 255, 255))
 ```
 
 - `point0/1/2(...)` задают три вершины
 - `radius(...)` можно добавить для скругления углов
-- `fillTriangle()` заливает фигуру, `drawTriangle()` рисует контур
 
 ## 7.5 Скруглённый треугольник
 
 ```cpp
-ui.fillTriangle()
+ui.drawTriangle()
     .point0(140, 120)
     .point1(170, 80)
     .point2(200, 120)
     .radius(10)
-    .color(ui.rgb(0, 120, 255))
+    .fill(ui.rgb(0, 120, 255))
+    .border(1, ui.rgb(255, 255, 255))
 ```
 
 - `radius(...)` здесь задаёт степень скругления вершин
@@ -622,47 +638,31 @@ ui.drawArc()
 ## 7.7 Эллипс
 
 ```cpp
-ui.fillEllipse()
-    .pos(120, 50)
-    .radiusX(28)
-    .radiusY(16)
-    .color(ui.rgb(255, 0, 72))
-```
-
-```cpp
 ui.drawEllipse()
     .pos(120, 50)
     .radiusX(28)
     .radiusY(16)
-    .color(ui.rgb(255, 255, 255))
+    .fill(ui.rgb(255, 0, 72))
+    .border(1, ui.rgb(255, 255, 255))
 ```
 
 - `radiusX(...)` и `radiusY(...)` задают полуоси
-- `fillEllipse()` заливает фигуру, `drawEllipse()` рисует контур
 
 ## 7.8 Сквиркль
 
 ```cpp
-ui.fillSquircleRect()
+ui.drawSquircleRect()
     .pos(54, 134)
     .size(52, 52)
     .radius({26})
-    .color(ui.rgb(255, 128, 0))
-```
-
-```cpp
-ui.drawSquircleRect()
-    .pos(124, 134)
-    .size(52, 52)
-    .radius({26})
-    .color(ui.rgb(255, 255, 255))
+    .fill(ui.rgb(255, 128, 0))
+    .border(1, ui.rgb(255, 255, 255))
 ```
 
 - `pos(...)` - левый верхний угол области
 - `size(...)` - размер прямоугольного squircle
 - `radius({r})` - один радиус на все углы
 - `radius({tl, tr, br, bl})` - отдельные радиусы по углам
-- `fillSquircleRect()` рисует заливку, `drawSquircleRect()` только контур
 
 # 8. Градиенты
 
@@ -1067,6 +1067,7 @@ ui.configureList()
     })
     .inactive(ui.rgb(12, 12, 12))
     .active(ui.rgb(0, 120, 255))
+    .checked(1)
     .radius(8)
     .cardSize(0, 0)
     .mode(Cards)
@@ -1098,6 +1099,8 @@ SCREEN(ScreenMainMenu, 1)
 - короткое отпускание `PREV` переключает пункт назад;
 - удержание `NEXT` открывает `targetScreen` выбранного пункта;
 - удержание `PREV` возвращает на предыдущий экран из navigation-history.
+- `.checked(index)` рисует справа галочку у выбранного пункта;
+- если `.checked(...)` не задан, список остаётся без маркера.
 
 Режимы списка:
 
@@ -1474,12 +1477,17 @@ ui.setNotificationButtonDown(btnOk.isDown());
 ## 14.3. Popup menu
 
 ```cpp
+auto button = ui.updateButton()
+    .label("Open menu")
+    .pos(center, 188)
+    .size(180, 32)
+    .baseColor(ui.rgb(0, 87, 250))
+    .radius(10);
+
 ui.showPopupMenu()
     .items(&itemProvider, userData, itemCount)
-    .pos(160, 40)
-    .width(120)
-    .selected(0)
-    .maxVisible(6);
+    .anchor(button)
+    .width(120);
 ```
 
 Во время активности:
@@ -1499,6 +1507,9 @@ if (ui.popupMenuActive())
 - `popupMenuActive()` показывает, что меню перехватило ввод
 - `popupMenuHasResult()` сообщает, что выбор уже готов
 - `popupMenuTakeResult()` возвращает индекс и одновременно сбрасывает флаг результата
+- `.selected(index)` теперь нужен только если надо вручную поставить стартовый курсор
+- `.anchor(component)` берёт прямоугольник fluent-компонента и открывает меню по центру над/под ним
+- `.anchor(x, y, w, h)` оставлен для произвольной якорной области, если меню надо привязать не к компоненту
 
 Можно использовать и более короткий паттерн без `popupMenuHasResult()`:
 

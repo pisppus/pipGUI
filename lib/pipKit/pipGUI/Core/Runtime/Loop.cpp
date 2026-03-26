@@ -71,11 +71,6 @@ namespace pipgui
                 renderNotificationOverlay();
                 wroteOverlay = true;
             }
-            if (_flags.popupActive)
-            {
-                renderPopupMenuOverlay(now);
-                wroteOverlay = true;
-            }
             if (_flags.toastActive)
             {
                 renderToastOverlay(now);
@@ -160,17 +155,65 @@ namespace pipgui
             _flags.inSpritePass = prevRender;
         };
 
-        const auto serviceToast = [&]()
+        const auto serviceOverlays = [&](bool forceFullPresent)
         {
             if (_flags.notifActive)
-                return;
+                return false;
             if (!_flags.spriteEnabled || !_disp.display)
-                return;
+                return false;
 
+            const uint32_t popupDur = _popup.animDurationMs ? _popup.animDurationMs : 1;
+            const bool popupCloseFinished = _flags.popupClosing && (now - _popup.startMs) >= popupDur;
+            if (popupCloseFinished)
+            {
+                _flags.popupActive = 0;
+                _flags.popupClosing = 0;
+            }
+
+            DirtyRect curPopup = {};
+            const bool curVisible = computePopupBounds(now, curPopup);
             DirtyRect curToast = {};
-            const bool curVisible = computeToastBounds(now, curToast);
-            if (!curVisible && !_toast.lastRectValid)
-                return;
+            const bool curToastVisible = computeToastBounds(now, curToast);
+            if (!curVisible && !_popup.lastRectValid && !curToastVisible && !_toast.lastRectValid && !forceFullPresent && _dirty.count == 0)
+                return false;
+
+            bool paintSet = forceFullPresent;
+            DirtyRect paint = {0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight};
+            const auto expandPaint = [&](const DirtyRect &rect)
+            {
+                if (rect.w <= 0 || rect.h <= 0)
+                    return;
+                if (!paintSet)
+                {
+                    paint = rect;
+                    paintSet = true;
+                    return;
+                }
+                const int16_t x1 = (paint.x < rect.x) ? paint.x : rect.x;
+                const int16_t y1 = (paint.y < rect.y) ? paint.y : rect.y;
+                const int16_t x2a = (int16_t)(paint.x + paint.w);
+                const int16_t x2b = (int16_t)(rect.x + rect.w);
+                const int16_t y2a = (int16_t)(paint.y + paint.h);
+                const int16_t y2b = (int16_t)(rect.y + rect.h);
+                paint.x = x1;
+                paint.y = y1;
+                paint.w = ((x2a > x2b) ? x2a : x2b) - x1;
+                paint.h = ((y2a > y2b) ? y2a : y2b) - y1;
+            };
+
+            for (uint8_t i = 0; i < _dirty.count; ++i)
+                expandPaint(_dirty.rects[i]);
+            if (curVisible)
+                expandPaint(curPopup);
+            if (_popup.lastRectValid)
+                expandPaint(_popup.lastRect);
+            if (curToastVisible)
+                expandPaint(curToast);
+            if (_toast.lastRectValid)
+                expandPaint(_toast.lastRect);
+
+            if (!paintSet)
+                return false;
 
             if (currentCb)
                 renderScreenToMainSprite(currentCb, _screen.current);
@@ -178,16 +221,22 @@ namespace pipgui
                 clear(_render.bgColor565 ? _render.bgColor565 : (uint16_t)_render.bgColor);
             renderStatusBar();
             if (curVisible)
+                renderPopupMenuOverlay(now);
+            if (curToastVisible)
                 renderToastOverlay(now);
-            presentSprite(0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight, "present");
+
+            presentSprite(paint.x, paint.y, paint.w, paint.h, "present");
             _dirty.count = 0;
             Debug::clearRects();
 
+            _popup.lastRect = curPopup;
+            _popup.lastRectValid = curVisible;
             _toast.lastRect = curToast;
-            _toast.lastRectValid = curVisible;
+            _toast.lastRectValid = curToastVisible;
+            return true;
         };
 
-        if ((_flags.notifActive || _flags.popupActive) && _flags.spriteEnabled)
+        if (_flags.notifActive && _flags.spriteEnabled)
         {
             if (currentCb)
             {
@@ -245,9 +294,9 @@ namespace pipgui
                     renderScreenToMainSprite(currentCb, _screen.current);
                     renderStatusBar();
 
-                    if (_flags.toastActive || _toast.lastRectValid)
+                    if (_flags.popupActive || _popup.lastRectValid || _flags.toastActive || _toast.lastRectValid)
                     {
-                        serviceToast();
+                        serviceOverlays(true);
                         return;
                     }
 
@@ -280,11 +329,11 @@ namespace pipgui
             renderNotificationOverlay();
         if (_flags.popupActive && !_flags.spriteEnabled)
             renderPopupMenuOverlay(now);
+        if (_flags.popupActive || _popup.lastRectValid || _flags.toastActive || _toast.lastRectValid)
+            serviceOverlays(false);
         if (!_flags.needRedraw && _dirty.count > 0 && _flags.spriteEnabled && _disp.display &&
-            !_flags.toastActive && !_toast.lastRectValid)
+            !_flags.toastActive && !_toast.lastRectValid && !_flags.popupActive && !_popup.lastRectValid)
             flushDirty();
-        if (_flags.toastActive || _toast.lastRectValid)
-            serviceToast();
 
 #if PIPGUI_SCREENSHOTS && (PIPGUI_SCREENSHOT_MODE == 2)
         const bool galleryHot = (_shots.lastUseMs != 0) && ((now - _shots.lastUseMs) <= kIdleShotGalleryCacheMs);

@@ -689,10 +689,10 @@ namespace pipgui
                                  viewport))
             return;
 
-        fillRect()
+        drawRect()
             .pos(viewport.left, viewport.top)
             .size(viewport.usableW, viewport.usableH)
-            .color(_render.bgColor)
+            .fill(_render.bgColor)
             .draw();
 
         TileGridMetrics grid;
@@ -773,7 +773,7 @@ namespace pipgui
             tileRectAtIndex(m, i, grid, x, y, tileW, tileH);
 
             const uint16_t bg = detail::color888To565((i == m.selectedIndex) ? m.style.cardActiveColor : m.style.cardColor);
-            fillSquircleRect(x, y, tileW, tileH, grid.radius, bg);
+            drawSquircleRect().pos(x, y).size(tileW, tileH).radius({grid.radius}).fill(bg);
 
             uint16_t txtCol = detail::autoTextColor(bg, 140);
             uint16_t subCol = (txtCol == 0xFFFF) ? (uint16_t)0xC618 : (uint16_t)0x8410;

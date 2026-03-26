@@ -634,12 +634,14 @@ namespace pipgui
                                       void *itemUser,
                                       uint8_t count,
                                       uint8_t selectedIndex,
-                                      int16_t x,
-                                      int16_t y,
                                       int16_t w,
-                                      uint8_t maxVisible)
+                                      uint8_t maxVisible,
+                                      int16_t anchorX,
+                                      int16_t anchorY,
+                                      int16_t anchorW,
+                                      int16_t anchorH)
             {
-                gui.showPopupMenuInternal(itemFn, itemUser, count, selectedIndex, x, y, w, maxVisible);
+                gui.showPopupMenuInternal(itemFn, itemUser, count, selectedIndex, w, maxVisible, anchorX, anchorY, anchorW, anchorH);
             }
 
             static void drawToggleSwitch(GUI &gui,
