@@ -354,7 +354,10 @@ namespace pipgui
             return;
         detail::ButtonState &state = detail::GuiAccess::resolveButtonState(*_gui, _label, _x, _y, _w, _h, _baseColor, _radius, _iconId);
         state.enabled = _modeSet ? _enabled : true;
-        state.loading = _modeSet ? _loading : false;
+        state.progressEnabled = _showProgress;
+        state.progressFillColor = _fillColor;
+        state.progressTarget = _progressValue > 100 ? 100 : _progressValue;
+        state.loading = _showProgress ? false : (_modeSet ? _loading : false);
         detail::GuiAccess::stepButtonState(*_gui, state, _downSet ? _down : false);
         detail::callByMode<IsUpdate>(
             [&] { detail::GuiAccess::updateButton(*_gui, _label, _x, _y, _w, _h, _baseColor, _radius, _iconId, state); },
@@ -362,6 +365,25 @@ namespace pipgui
     }
     template void ButtonFluentT<false>::draw();
     template void ButtonFluentT<true>::draw();
+
+    template <bool IsUpdate>
+    void SliderFluentT<IsUpdate>::draw()
+    {
+        if (!_value || !beginCommit())
+            return;
+        const int32_t inactiveColor = detail::optionalColor32(_inactiveColor);
+        const int32_t thumbColor = detail::optionalColor32(_thumbColor);
+        detail::SliderState &state = detail::GuiAccess::resolveSliderState(*_gui, _x, _y, _w, _h, _minValue, _maxValue, _step, _activeColor, inactiveColor, thumbColor);
+        state.enabled = _enabledSet ? _enabled : true;
+        const bool changed = detail::GuiAccess::stepSliderState(*_gui, state, *_value, _inputSet ? _nextDown : false, _inputSet ? _prevDown : false);
+        if (_changed)
+            *_changed = changed;
+        detail::callByMode<IsUpdate>(
+            [&] { detail::GuiAccess::updateSlider(*_gui, _x, _y, _w, _h, state, _activeColor, inactiveColor, thumbColor); },
+            [&] { detail::GuiAccess::drawSlider(*_gui, _x, _y, _w, _h, state, _activeColor, inactiveColor, thumbColor); });
+    }
+    template void SliderFluentT<false>::draw();
+    template void SliderFluentT<true>::draw();
 
     template <bool IsUpdate>
     void ProgressFluentT<IsUpdate>::draw()

@@ -696,7 +696,7 @@ namespace pipgui
                                    uint16_t baseColor,
                                    uint8_t radius,
                                    IconId iconId,
-                                   const ButtonState &state)
+                                   ButtonState &state)
             {
                 gui.drawButton(label, x, y, w, h, baseColor, radius, iconId, state);
             }
@@ -710,7 +710,7 @@ namespace pipgui
                                      uint16_t baseColor,
                                      uint8_t radius,
                                      IconId iconId,
-                                     const ButtonState &state)
+                                     ButtonState &state)
             {
                 gui.updateButton(label, x, y, w, h, baseColor, radius, iconId, state);
             }
@@ -731,6 +731,52 @@ namespace pipgui
             static void stepButtonState(GUI &gui, ButtonState &state, bool isDown)
             {
                 gui.stepButtonState(state, isDown);
+            }
+
+            static void drawSlider(GUI &gui,
+                                   int16_t x,
+                                   int16_t y,
+                                   int16_t w,
+                                   int16_t h,
+                                   SliderState &state,
+                                   uint16_t activeColor,
+                                   int32_t inactiveColor,
+                                   int32_t thumbColor)
+            {
+                gui.drawSlider(x, y, w, h, state, activeColor, inactiveColor, thumbColor);
+            }
+
+            static void updateSlider(GUI &gui,
+                                     int16_t x,
+                                     int16_t y,
+                                     int16_t w,
+                                     int16_t h,
+                                     SliderState &state,
+                                     uint16_t activeColor,
+                                     int32_t inactiveColor,
+                                     int32_t thumbColor)
+            {
+                gui.updateSlider(x, y, w, h, state, activeColor, inactiveColor, thumbColor);
+            }
+
+            static SliderState &resolveSliderState(GUI &gui,
+                                                   int16_t x,
+                                                   int16_t y,
+                                                   int16_t w,
+                                                   int16_t h,
+                                                   int16_t minValue,
+                                                   int16_t maxValue,
+                                                   int16_t step,
+                                                   uint16_t activeColor,
+                                                   int32_t inactiveColor,
+                                                   int32_t thumbColor)
+            {
+                return gui.resolveSliderState(x, y, w, h, minValue, maxValue, step, activeColor, inactiveColor, thumbColor);
+            }
+
+            static bool stepSliderState(GUI &gui, SliderState &state, int16_t &value, bool nextDown, bool prevDown)
+            {
+                return gui.stepSliderState(state, value, nextDown, prevDown);
             }
 
             static void drawProgress(GUI &gui,

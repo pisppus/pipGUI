@@ -6,8 +6,8 @@
 #include <pipGUI/Core/Internal/GuiAccess.hpp>
 #include <pipGUI/Graphics/Draw/Blend.hpp>
 #include <pipGUI/Graphics/Utils/Colors.hpp>
-#include <pipGUI/Graphics/Text/Fonts/KronaOne/metrics.hpp>
-#include <pipGUI/Graphics/Text/Fonts/WixMadeForDisplay/metrics.hpp>
+#include <pipGUI/Graphics/Text/Fonts/KronaOne/Metrics.hpp>
+#include <pipGUI/Graphics/Text/Fonts/WixMadeForDisplay/Metrics.hpp>
 
 namespace pipgui
 {

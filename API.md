@@ -501,17 +501,17 @@ ui.drawIcon()
     .color(ui.rgb(0, 200, 120));
 ```
 
-### Свои SVG-иконки
+### Свои иконки из `Sources`
 
 Кастомные иконки добавляются так:
 
-1. положить SVG в `tools/icons/SVG/`
-2. пересобрать проект — генератор сам обновит `lib/pipKit/pipGUI/Graphics/Text/Icons/icons.cpp` и `lib/pipKit/pipGUI/Graphics/Text/Icons/metrics.hpp`
+1. положить source-файл в `tools/icons/Sources/`
+2. пересобрать проект — генератор сам обновит готовые файлы в `lib/pipKit/pipGUI/Graphics/Text/Icons/`
 3. использовать иконку по имени файла
 
 Пример:
 
-- файл `tools/icons/SVG/checkmark.svg`
+- файл `tools/icons/Sources/checkmark.svg`
 - в коде: `.icon(checkmark)`
 
 Что генерируется:
@@ -519,8 +519,19 @@ ui.drawIcon()
 - для однослойной иконки из `name.svg` появляется alias `name`
 - для многослойной иконки появляются alias вида `name_l0`, `name_l1`, `name_l2`
 - дополнительно экспортируются и enum-константы `IconName`, `IconNameL0`, `IconNameL1` и т.д.
+- для анимированной иконки из `name.json` появляется alias `name_anim`
 
 Если в имени файла есть `-`, пробелы или другие неподходящие символы, генератор сам приводит имя к валидному C++-идентификатору через `_`
+
+Для Lottie JSON генератор сейчас собирает scalable animated icon:
+
+```cpp
+ui.updateAnimatedIcon(setting_anim, 92, 120, 56, ui.rgb(235, 235, 235), ui.rgb(10, 10, 10), millis());
+```
+
+- `.svg` идет в обычный static PSDF pipeline
+- `.json` идет в animated PSDF pipeline
+- runtime не интерпретирует Lottie JSON; он использует уже сгенерированные C++-данные библиотеки
 
 ---
 
@@ -892,13 +903,29 @@ ui.updateButton()
 ;
 ```
 
+Кнопка с прогрессом использует тот же fluent, без отдельного виджета:
+
+```cpp
+ui.updateButton()
+    .label("Updating 56%")
+    .pos(center, 180)
+    .size(170, 38)
+    .baseColor(ui.rgb(24, 24, 24))
+    .fillColor(ui.rgb(0, 120, 255))
+    .value(56)
+    .radius(12)
+    .icon(battery_l1);
+```
+
 Параметры:
 
 - `label(...)` - текст внутри кнопки
 - `pos(x, y)` - позиция левого верхнего угла;
 - `size(w, h)` - размер кнопки
 - `baseColor(...)` - основной цвет кнопки 
+- `fillColor(...)` - цвет прогресс-заливки, если у кнопки задан `value(...)`
 - `radius(...)` - squircle-радиус кнопки
+- `value(...)` - включает встроенный progress-режим кнопки и задает значение `0..100`
 - `icon(...)` - иконка внутри кнопки
 - `mode(enabled, loading)` - сразу задает активное и loading-состояние
 - `down(bool)` - текущее физическое нажатие для press-анимации
@@ -906,6 +933,50 @@ ui.updateButton()
 `drawButton()` и `updateButton()` используют один и тот же API. Для обычных статичных экранов достаточно `drawButton()`. Для анимируемой или интерактивной кнопки используй `updateButton()`.
 
 Если заданы и текст, и иконка, иконка рисуется слева от текста как единый центрированный блок. Если текст пустой, иконка рисуется по центру кнопки.
+Если задан `value(...)`, кнопка рисует встроенный progress-fill под текстом и иконкой. `loading` и `progress` одновременно не используются: progress-режим приоритетнее.
+
+## 10.3.1. Slider
+
+Слайдер подходит для настроек вроде громкости, яркости и подобных значений.
+
+```cpp
+int16_t volume = 56;
+bool changed = false;
+
+ui.updateSlider()
+    .pos(center, 114)
+    .size(186, 24)
+    .value(volume)
+    .range(0, 100)
+    .step(2)
+    .nextDown(btnNext.isDown())
+    .prevDown(btnPrev.isDown())
+    .changed(changed)
+    .activeColor(ui.rgb(0, 87, 250))
+    .thumbColor(0xFFFF);
+```
+
+Параметры:
+
+- `pos(x, y)` - позиция левого верхнего угла
+- `size(w, h)` - размер слайдера
+- `value(...)` - ссылка на текущее значение; библиотека сама меняет его при удержании кнопок
+- `range(min, max)` - допустимый диапазон
+- `step(...)` - шаг изменения
+- `nextDown(...)` / `prevDown(...)` - текущее удержание кнопок вправо/влево
+- `changed(...)` - сюда вернется `true`, если значение изменилось в этом кадре
+- `enabled(false)` - временно блокирует ввод, но оставляет отображение
+- `activeColor(...)` - цвет заполненной части
+- `inactiveColor(...)` - цвет трека
+- `thumbColor(...)` - цвет бегунка
+
+`drawSlider()` и `updateSlider()` используют один и тот же fluent API. Для интерактивного сценария нужен `updateSlider()`.
+
+Поведение:
+
+- удержание кнопки сначала двигает значение обычным шагом, потом ускоряет и частоту, и величину шага;
+- анимация бегунка time-based и не зависит от FPS;
+- по умолчанию бегунок белый, трек темнее активной части.
 
 ## 10.4. Toggle switch
 

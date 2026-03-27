@@ -1,5 +1,0 @@
-fonts_psdf_cfg_v3
-5aeff9ac82e80fdab515fe3015f17507bd10d4bef19dea5c21c1a2b25fb74952
-fda319fd670dbc6b10ca0c62418bc4b9710cab9b9d0be690dbbb2ce73b36f759
-6c8cfa508300b930b1fae00e70a8b410ec80e5a8c2cf2367b18e8da82de513c1
-{"charset": "C:\\Users\\Pisppus\\Documents\\PlatformIO\\Projects\\pipGUI\\tools\\fonts\\PSDF\\WixMadeForDisplay\\charset.txt", "font": "C:\\Users\\Pisppus\\Documents\\PlatformIO\\Projects\\pipGUI\\tools\\fonts\\TTF\\WixMadeforDisplay.ttf", "potr": "1", "pxrange": "8", "size": "48", "type": "psdf"}

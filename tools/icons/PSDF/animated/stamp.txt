@@ -1,0 +1,5 @@
+icons_animated_atlas_v2
+48
+8
+["9b2e19d42079910738b5076d81bbdf0c7a15898f6bb1d1e377473e938ea815f7"]
+[{"alias": "setting_anim", "firstLayer": 0, "frameCount": 28, "frameRateX100": 2400, "height": 24, "layerCount": 1, "name": "Setting", "width": 24}]

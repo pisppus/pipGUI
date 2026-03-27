@@ -1,5 +1,0 @@
-fonts_psdf_cfg_v3
-6f708fb72914e09244b186297c402ace84a014fc578435ce5144c7c7cd475fc9
-236b6b26a66bbb176070bb9ebdea41b716d98b8b4f6f9d822de3a83194b08c9d
-6c8cfa508300b930b1fae00e70a8b410ec80e5a8c2cf2367b18e8da82de513c1
-{"charset": "C:\\Users\\Pisppus\\Documents\\PlatformIO\\Projects\\pipGUI\\tools\\fonts\\PSDF\\KronaOne\\charset.txt", "font": "C:\\Users\\Pisppus\\Documents\\PlatformIO\\Projects\\pipGUI\\tools\\fonts\\TTF\\krona-one.ttf", "potr": "1", "pxrange": "8", "size": "48", "type": "psdf"}

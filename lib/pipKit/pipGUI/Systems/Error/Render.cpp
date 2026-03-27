@@ -1,6 +1,6 @@
 #include <pipGUI/Core/pipGUI.hpp>
 #include <pipGUI/Graphics/Utils/Easing.hpp>
-#include <pipGUI/Graphics/Text/Icons/metrics.hpp>
+#include <pipGUI/Graphics/Text/Icons/Metrics.hpp>
 
 namespace pipgui
 {

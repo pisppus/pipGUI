@@ -1,7 +1,7 @@
 #include <pipGUI/Core/pipGUI.hpp>
 #include <pipGUI/Core/Debug.hpp>
 #if PIPGUI_STATUS_BAR
-#include <pipGUI/Graphics/Text/Icons/metrics.hpp>
+#include <pipGUI/Graphics/Text/Icons/Metrics.hpp>
 #include <algorithm>
 #endif
 

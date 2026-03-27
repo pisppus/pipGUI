@@ -62,6 +62,7 @@ namespace
 
   uint8_t g_buttonsDemoStyle = 0;
   uint8_t g_buttonsDemoSize = 1;
+  int16_t g_sliderValue = 56;
 
   float g_graphPhase = 0.0f;
   uint32_t g_lastGraphUpdateMs = 0;
@@ -400,6 +401,8 @@ void configureListMenus()
           {"List menu 2", "Text-focused list with active highlight panel", listMenuPlain},
           {"ToggleSwitch", "Toggle switch interaction and state preview", toggleSwitch},
           {"Buttons", "Different button forms, sizes and states", buttonsDemo},
+          {"Slider", "Settings-style slider with animated thumb", sliderDemo},
+          {"Animated icons", "Lottie JSON compiled into scalable animated PSDF icons", animatedIconsDemo},
           {"Scroll dots", "Page indicator dots with animated transitions", scrollDots},
           {"Error", "Full-screen error overlay presentation", errorOverlay},
           {"Warning", "Full-screen warning overlay presentation", warningOverlay},
@@ -436,6 +439,8 @@ void configureListMenus()
           {"Graph osc", "Live full-buffer oscilloscope preview", graphOsc},
           {"Tile menu", "Grid menu with icons, title, and subtitle", tileMenu},
           {"ToggleSwitch", "Toggle switch interaction and state preview", toggleSwitch},
+          {"Slider", "Settings-style slider with animated thumb", sliderDemo},
+          {"Animated icons", "Lottie JSON compiled into scalable animated PSDF icons", animatedIconsDemo},
           {"Screenshots", "Captured frames gallery", screenshotGallery},
           {"Font compare", "PSDF", fontCompare},
       })
@@ -621,6 +626,12 @@ void loop()
         break;
       case buttonsDemo:
         updateButtonsDemo(nowMs, nextPressed, nextDown, prevPressed, prevDown, comboDown);
+        break;
+      case sliderDemo:
+        updateSliderDemo(nowMs, nextDown, prevDown, comboDown);
+        break;
+      case animatedIconsDemo:
+        updateAnimatedIconsDemo(nowMs, comboDown);
         break;
       case scrollDots:
         updateScrollDotsDemo(nowMs, nextPressed, prevPressed);

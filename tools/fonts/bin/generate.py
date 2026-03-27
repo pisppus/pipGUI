@@ -7,10 +7,11 @@ import sys
 
 sys.dont_write_bytecode = True
 
-_TOOLS_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_TOOLS_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _TOOLS_DIR not in sys.path:
     sys.path.insert(0, _TOOLS_DIR)
 from psdf import (
+    _file_stat_signature,
     _write_png_gray8,
     _fmt_f,
     _read_json,
@@ -110,19 +111,6 @@ def _hash_text(s: str) -> str:
     return hashlib.sha256(s.encode("utf-8")).hexdigest()
 
 
-def _file_stat_signature(path: str) -> str:
-    norm_path = os.path.normcase(os.path.abspath(path))
-    try:
-        st = os.stat(path)
-    except OSError:
-        return f"missing:{norm_path}"
-    return json.dumps({
-        "path": norm_path,
-        "size": st.st_size,
-        "mtime_ns": st.st_mtime_ns,
-    }, sort_keys=True)
-
-
 def _font_folder_from_base(font_base: str) -> str:
     font_folder = _snake_to_camel(font_base)
     if font_base.lower() == "wixmadefordisplay":
@@ -131,13 +119,13 @@ def _font_folder_from_base(font_base: str) -> str:
 
 
 def _project_stamp_path(project_dir: str) -> str:
-    return os.path.join(project_dir, "tools", "fonts", "bin", "PSDF", "project.stamp")
+    return os.path.join(project_dir, "tools", "fonts", "PSDF", "project.stamp")
 
 
 def _project_stamp(project_dir: str, cfg_path: str, ttf_files: list[str], msdf_exe: str) -> str:
     psdf_path = os.path.join(project_dir, "tools", "psdf.py")
     parts = [
-        "fonts_project_cache_v1",
+        "fonts_project_cache_v2",
         _hash_file(cfg_path),
         _hash_file(os.path.abspath(__file__)),
         _hash_file(psdf_path),
@@ -155,7 +143,7 @@ def _project_stamp(project_dir: str, cfg_path: str, ttf_files: list[str], msdf_e
 
 
 def _project_outputs_exist(project_dir: str, ttf_files: list[str]) -> bool:
-    fonts_metrics_path = os.path.join(_out_fonts_root(project_dir), "metrics.hpp")
+    fonts_metrics_path = os.path.join(_out_fonts_root(project_dir), "Metrics.hpp")
     if not os.path.isfile(fonts_metrics_path):
         return False
 
@@ -165,7 +153,7 @@ def _project_outputs_exist(project_dir: str, ttf_files: list[str]) -> bool:
         out_fonts_dir = os.path.join(_out_fonts_root(project_dir), font_folder)
         if not (
             os.path.isfile(os.path.join(out_fonts_dir, f"{font_folder}.cpp"))
-            and os.path.isfile(os.path.join(out_fonts_dir, "metrics.hpp"))
+            and os.path.isfile(os.path.join(out_fonts_dir, "Metrics.hpp"))
         ):
             return False
 
@@ -205,7 +193,7 @@ def is_up_to_date(project_dir: str, announce: bool = False) -> bool:
 
 def _gen_atlas_def_cpp(var_name: str, data: bytes) -> str:
     out = []
-    out.append("#include \"metrics.hpp\"\n\n")
+    out.append("#include \"Metrics.hpp\"\n\n")
     out.append(f"const uint8_t {var_name}[] = {{\n")
 
     for i in range(0, len(data), 16):
@@ -246,13 +234,13 @@ def _gen_metrics_header(atlas: dict, font_ident: str, font_folder: str, font_ent
     out.append("\n")
     out.append("namespace pipgui\n{")
     out.append(f"\nnamespace {ns_name}\n{{")
-    out.append(f"\nstatic constexpr uint16_t AtlasWidth = {width};")
-    out.append(f"\nstatic constexpr uint16_t AtlasHeight = {height};")
-    out.append(f"\nstatic constexpr float DistanceRange = {_fmt_f(distance_range)}f;")
-    out.append(f"\nstatic constexpr float NominalSizePx = {_fmt_f(nominal_size)}f;")
-    out.append(f"\nstatic constexpr float Ascender = {_fmt_f(ascender)}f;")
-    out.append(f"\nstatic constexpr float Descender = {_fmt_f(descender)}f;")
-    out.append(f"\nstatic constexpr float LineHeight = {_fmt_f(line_height)}f;\n")
+    out.append(f"\ninline constexpr uint16_t AtlasWidth = {width};")
+    out.append(f"\ninline constexpr uint16_t AtlasHeight = {height};")
+    out.append(f"\ninline constexpr float DistanceRange = {_fmt_f(distance_range)}f;")
+    out.append(f"\ninline constexpr float NominalSizePx = {_fmt_f(nominal_size)}f;")
+    out.append(f"\ninline constexpr float Ascender = {_fmt_f(ascender)}f;")
+    out.append(f"\ninline constexpr float Descender = {_fmt_f(descender)}f;")
+    out.append(f"\ninline constexpr float LineHeight = {_fmt_f(line_height)}f;\n")
 
     out.append("\nstruct Glyph\n{")
     out.append("\n    uint32_t codepoint;")
@@ -306,8 +294,8 @@ def _gen_metrics_header(atlas: dict, font_ident: str, font_folder: str, font_ent
 
     items.sort(key=lambda x: x["code"])
 
-    out.append(f"\nstatic constexpr uint16_t GlyphCount = {len(items)};\n")
-    out.append("\nstatic const Glyph Glyphs[GlyphCount] =\n{")
+    out.append(f"\ninline constexpr uint16_t GlyphCount = {len(items)};\n")
+    out.append("\ninline constexpr Glyph Glyphs[GlyphCount] =\n{")
     for it in items:
         adv_u16 = max(0, min(65535, int(it['adv'] * 256.0 + 0.5)))
         pl_i8 = max(-128, min(127, int(it['pl'] * 128.0 + (0.5 if it['pl'] >= 0 else -0.5))))
@@ -328,10 +316,10 @@ def _gen_metrics_header(atlas: dict, font_ident: str, font_folder: str, font_ent
             "},"
         )
     out.append("\n};\n")
-    out.append(f"\nstatic constexpr int8_t Tracking128 = {tracking128};\n")
-    out.append(f"\nstatic constexpr uint16_t KerningPairCount = {len(kerning_pairs)};\n")
+    out.append(f"\ninline constexpr int8_t Tracking128 = {tracking128};\n")
+    out.append(f"\ninline constexpr uint16_t KerningPairCount = {len(kerning_pairs)};\n")
     if kerning_pairs:
-        out.append("\nstatic const KerningPair KerningPairs[KerningPairCount] =\n{")
+        out.append("\ninline constexpr KerningPair KerningPairs[KerningPairCount] =\n{")
         for pair in kerning_pairs:
             out.append(
                 "\n    {"
@@ -340,32 +328,14 @@ def _gen_metrics_header(atlas: dict, font_ident: str, font_folder: str, font_ent
             )
         out.append("\n};\n")
     else:
-        out.append("\nstatic const KerningPair *const KerningPairs = nullptr;\n")
+        out.append("\ninline constexpr const KerningPair *KerningPairs = nullptr;\n")
     out.append("\n}\n}")
-    out.append("\n\n#include <pipGUI/Core/pipGUI.hpp>")
-    out.append("\nstatic inline pipgui::FontId registerFont_" + font_folder + "(pipgui::GUI &gui)")
-    out.append("{\n")
-    out.append("    return gui.registerFont(")
-    out.append(f"\n        ::{font_folder},")
-    out.append(f"\n        pipgui::{ns_name}::AtlasWidth,")
-    out.append(f"\n        pipgui::{ns_name}::AtlasHeight,")
-    out.append(f"\n        pipgui::{ns_name}::DistanceRange,")
-    out.append(f"\n        pipgui::{ns_name}::NominalSizePx,")
-    out.append(f"\n        pipgui::{ns_name}::Ascender,")
-    out.append(f"\n        pipgui::{ns_name}::Descender,")
-    out.append(f"\n        pipgui::{ns_name}::LineHeight,")
-    out.append(f"\n        pipgui::{ns_name}::Glyphs,")
-    out.append(f"\n        pipgui::{ns_name}::GlyphCount,")
-    out.append(f"\n        pipgui::{ns_name}::KerningPairs,")
-    out.append(f"\n        pipgui::{ns_name}::KerningPairCount,")
-    out.append(f"\n        pipgui::{ns_name}::Tracking128);")
-    out.append("\n}")
     out.append("\n")
     
     return "".join(out)
 
 
-def _gen_fonts_metrics_hpp(font_names: list, font_idents: list) -> str:
+def _gen_fonts_metrics_hpp(font_idents: list) -> str:
     out = []
     out.append("#pragma once\n")
     out.append("#include <cstdint>\n\n")
@@ -377,18 +347,18 @@ def _gen_fonts_metrics_hpp(font_names: list, font_idents: list) -> str:
         comma = "," if i + 1 < len(font_idents) else ""
         out.append(f"    Font{name} = {i}{comma}\n")
     out.append("};\n")
-    out.append("\nstatic constexpr uint16_t FontCount = ")
+    out.append("\ninline constexpr uint16_t FontCount = ")
     out.append(f"{len(font_idents)};\n")
     out.append("}\n}\n\n")
     
     out.append("namespace pipgui\n{\n")
     out.append("using FontId = ::pipgui::psdf_fonts::FontId;\n")
     for name in font_idents:
-        out.append(f"static constexpr FontId Font{name} = ::pipgui::psdf_fonts::Font{name};\n")
+        out.append(f"inline constexpr FontId Font{name} = ::pipgui::psdf_fonts::Font{name};\n")
     out.append("}\n\n")
     
     for name in font_idents:
-        out.append(f"constexpr pipgui::FontId {name} = ::pipgui::psdf_fonts::Font{name};\n")
+        out.append(f"inline constexpr pipgui::FontId {name} = ::pipgui::psdf_fonts::Font{name};\n")
     
     return "".join(out)
 
@@ -450,7 +420,6 @@ def generate_all(project_dir: str) -> bool:
     generated = 0
     uptodate = 0
     
-    font_names = []
     font_idents = []
 
     for ttf_file in ttf_files:
@@ -462,12 +431,11 @@ def generate_all(project_dir: str) -> bool:
         font_folder = _font_folder_from_base(font_base)
         font_ident = _safe_ident(font_folder)
         
-        font_names.append(font_folder)
         font_idents.append(font_ident)
 
         out_fonts_dir = os.path.join(_out_fonts_root(project_dir), font_folder)
         out_atlas_cpp = os.path.join(out_fonts_dir, f"{font_folder}.cpp")
-        out_metrics_hpp = os.path.join(out_fonts_dir, "metrics.hpp")
+        out_metrics_hpp = os.path.join(out_fonts_dir, "Metrics.hpp")
 
         work_dir = os.path.join(tools_fonts_dir, "PSDF", font_folder)
         os.makedirs(work_dir, exist_ok=True)
@@ -510,10 +478,12 @@ def generate_all(project_dir: str) -> bool:
         }
 
         stamp_in = "\n".join([
-            "fonts_psdf_cfg_v4",
+            "fonts_psdf_cfg_v6",
             _hash_file(ttf_path),
             _hash_text(charset_content),
             _hash_file(cfg_path),
+            _hash_file(os.path.abspath(__file__)),
+            _hash_file(os.path.join(project_dir, "tools", "psdf.py")),
             json.dumps(params, sort_keys=True),
         ])
 
@@ -561,9 +531,6 @@ def generate_all(project_dir: str) -> bool:
                 f.write(stamp_in)
 
         atlas = _read_json(json_path)
-        metrics_h = _gen_metrics_header(atlas, font_ident, font_folder, font_ent)
-        _write_if_changed(out_metrics_hpp, metrics_h)
-
         with open(bin_path, "rb") as f:
             data = f.read()
 
@@ -583,6 +550,9 @@ def generate_all(project_dir: str) -> bool:
         if not os.path.isfile(os.path.join(work_dir, "atlas.png")):
             _write_png_gray8(os.path.join(work_dir, "atlas.png"), w, h, data)
 
+        metrics_h = _gen_metrics_header(atlas, font_ident, font_folder, font_ent)
+        _write_if_changed(out_metrics_hpp, metrics_h)
+
         stale_hpp = os.path.join(out_fonts_dir, f"{font_folder}.hpp")
         if os.path.isfile(stale_hpp):
             os.remove(stale_hpp)
@@ -590,9 +560,9 @@ def generate_all(project_dir: str) -> bool:
         generated += 1
 
     if font_idents:
-        fonts_metrics_path = os.path.join(_out_fonts_root(project_dir), "metrics.hpp")
+        fonts_metrics_path = os.path.join(_out_fonts_root(project_dir), "Metrics.hpp")
         os.makedirs(os.path.dirname(fonts_metrics_path), exist_ok=True)
-        central_metrics = _gen_fonts_metrics_hpp(font_names, font_idents)
+        central_metrics = _gen_fonts_metrics_hpp(font_idents)
         _write_if_changed(fonts_metrics_path, central_metrics)
 
     os.makedirs(os.path.dirname(project_stamp_path), exist_ok=True)

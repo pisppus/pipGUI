@@ -63,6 +63,11 @@ namespace pipgui
     using UpdateButtonFluent = ButtonFluentT<true>;
 
     template <bool IsUpdate>
+    struct SliderFluentT;
+    using DrawSliderFluent = SliderFluentT<false>;
+    using UpdateSliderFluent = SliderFluentT<true>;
+
+    template <bool IsUpdate>
     struct ProgressFluentT;
     using DrawProgressFluent = ProgressFluentT<false>;
     using UpdateProgressFluent = ProgressFluentT<true>;
@@ -230,6 +235,8 @@ namespace pipgui
 
         [[nodiscard]] DrawButtonFluent drawButton();
         [[nodiscard]] UpdateButtonFluent updateButton();
+        [[nodiscard]] DrawSliderFluent drawSlider();
+        [[nodiscard]] UpdateSliderFluent updateSlider();
 
         [[nodiscard]] DrawProgressFluent drawProgress();
         [[nodiscard]] UpdateProgressFluent updateProgress();
@@ -259,6 +266,8 @@ namespace pipgui
         [[nodiscard]] uint16_t graphSamplesVisible(uint8_t screenId) const noexcept;
 
         [[nodiscard]] DrawIconFluent drawIcon();
+        void drawAnimatedIcon(AnimatedIconId iconId, int16_t x, int16_t y, uint16_t sizePx, uint16_t fg565, uint32_t nowMs = 0);
+        void updateAnimatedIcon(AnimatedIconId iconId, int16_t x, int16_t y, uint16_t sizePx, uint16_t fg565, uint16_t bg565, uint32_t nowMs = 0);
         [[nodiscard]] DrawTextFluent drawText();
         [[nodiscard]] UpdateTextFluent updateText();
         [[nodiscard]] DrawTextMarqueeFluent drawTextMarquee();
@@ -366,6 +375,7 @@ namespace pipgui
         detail::Flags _flags = {};
         detail::DiagnosticsState _diag;
         detail::ButtonCacheState _buttonCache;
+        detail::SliderCacheState _sliderCache;
         detail::TextCacheState _textCache;
         detail::ToggleCacheState _toggleCache;
         detail::DrumRollCacheState _drumRollCache;
@@ -413,7 +423,11 @@ namespace pipgui
         detail::ButtonState &resolveButtonState(const String &label, int16_t x, int16_t y,
                                                int16_t w, int16_t h, uint16_t baseColor, uint8_t radius,
                                                IconId iconId);
+        detail::SliderState &resolveSliderState(int16_t x, int16_t y, int16_t w, int16_t h,
+                                                int16_t minValue, int16_t maxValue, int16_t step,
+                                                uint16_t activeColor, int32_t inactiveColor, int32_t thumbColor);
         void stepButtonState(detail::ButtonState &s, bool isDown);
+        bool stepSliderState(detail::SliderState &state, int16_t &value, bool nextDown, bool prevDown);
         detail::ToggleState &resolveToggleState(int16_t x, int16_t y, int16_t w, int16_t h,
                                                uint16_t activeColor, int32_t inactiveColor, int32_t knobColor);
         detail::DrumRollAnimState &resolveDrumRollState(uint32_t key, uint8_t selectedIndex, uint16_t durationMs);
@@ -528,6 +542,8 @@ namespace pipgui
                                      uint8_t fadePx);
         void drawIconInternal(uint16_t iconId, int16_t x, int16_t y, uint16_t sizePx, uint16_t fg565);
         void updateIconInternal(uint16_t iconId, int16_t x, int16_t y, uint16_t sizePx, uint16_t fg565, uint16_t bg565);
+        void drawAnimatedIconInternal(uint16_t iconId, int16_t x, int16_t y, uint16_t sizePx, uint16_t fg565, uint32_t nowMs);
+        void updateAnimatedIconInternal(uint16_t iconId, int16_t x, int16_t y, uint16_t sizePx, uint16_t fg565, uint16_t bg565, uint32_t nowMs);
         void drawBootTitleBlock(const String &title, const String &subtitle, uint16_t fg565, uint16_t bg565);
         void drawText(const String &text, int16_t x, int16_t y, uint16_t fg565, uint16_t bg565, TextAlign align = TextAlign::Left);
         void updateText(const String &text, int16_t x, int16_t y, uint16_t fg565, uint16_t bg565, TextAlign align = TextAlign::Left);
@@ -601,6 +617,10 @@ namespace pipgui
         void updateProgress(ProgressState &s, int16_t x, int16_t y, int16_t w,
                             int16_t h, uint8_t value, uint16_t baseColor, uint16_t fillColor,
                             uint8_t radius = 6, ProgressAnim anim = None);
+        void drawLinearProgressRange(int16_t x, int16_t y, int16_t w, int16_t h,
+                                     int16_t fillLeft, int16_t fillRight,
+                                     uint16_t baseColor, uint16_t fillColor,
+                                     uint8_t radius);
 
         void drawCircleProgress(int16_t x, int16_t y, int16_t r, uint8_t thickness,
                                 uint8_t value, uint16_t baseColor, uint16_t fillColor, ProgressAnim anim = None);
@@ -613,10 +633,20 @@ namespace pipgui
 
         void drawButton(const String &label, int16_t x, int16_t y, int16_t w,
                         int16_t h, uint16_t baseColor, uint8_t radius,
-                        IconId iconId, const detail::ButtonState &state);
+                        IconId iconId, detail::ButtonState &state);
         void updateButton(const String &label, int16_t x, int16_t y, int16_t w,
                           int16_t h, uint16_t baseColor, uint8_t radius,
-                          IconId iconId, const detail::ButtonState &state);
+                          IconId iconId, detail::ButtonState &state);
+        void drawSlider(int16_t x, int16_t y, int16_t w, int16_t h,
+                        detail::SliderState &state,
+                        uint16_t activeColor,
+                        int32_t inactiveColor = -1,
+                        int32_t thumbColor = -1);
+        void updateSlider(int16_t x, int16_t y, int16_t w, int16_t h,
+                          detail::SliderState &state,
+                          uint16_t activeColor,
+                          int32_t inactiveColor = -1,
+                          int32_t thumbColor = -1);
         void drawToggleSwitch(int16_t x, int16_t y, int16_t w, int16_t h,
                               detail::ToggleState &state, uint16_t activeColor,
                               int32_t inactiveColor = -1, int32_t knobColor = -1);

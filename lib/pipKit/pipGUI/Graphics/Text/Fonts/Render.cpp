@@ -160,6 +160,8 @@ namespace pipgui
 
             inline uint8_t sample(int32_t u16) const
             {
+                if (!row0 || !row1)
+                    return 0;
                 const int x0Raw = u16 >> 16;
                 const int x1Raw = x0Raw + 1;
                 const uint32_t fx = (uint32_t)u16 & 0xFFFFu;

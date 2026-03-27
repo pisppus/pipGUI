@@ -5,11 +5,14 @@ import sys
 import time
 from pathlib import Path
 
+os.environ.setdefault("PYTHONDONTWRITEBYTECODE", "1")
+sys.dont_write_bytecode = True
+
 TOOLS_DIR = Path(__file__).resolve().parents[2]
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
-from _menu import choose, choose_existing_path, prompt_text
+from menu import choose, choose_existing_path, prompt_text
 
 
 MAGIC = b"PSCR"

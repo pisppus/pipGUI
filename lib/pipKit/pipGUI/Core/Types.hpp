@@ -5,7 +5,8 @@
 #include <pipCore/Input/Button.hpp>
 #include <pipGUI/Core/UiLayout.hpp>
 #include <pipGUI/Graphics/Utils/Colors.hpp>
-#include <pipGUI/Graphics/Text/Icons/metrics.hpp>
+#include <pipGUI/Graphics/Text/Icons/Metrics.hpp>
+#include <pipGUI/Graphics/Text/Icons/AnimMetrics.hpp>
 
 namespace pipgui
 {

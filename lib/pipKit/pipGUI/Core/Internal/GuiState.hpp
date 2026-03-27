@@ -17,10 +17,28 @@ namespace pipgui::detail
     {
         bool enabled = false;
         uint8_t pressLevel = 0;
+        uint8_t pressFrom = 0;
+        uint8_t pressTo = 0;
         uint8_t fadeLevel = 0;
         bool prevEnabled = false;
         bool loading = false;
+        bool labelInitialized = false;
+        bool labelTransitionActive = false;
+        bool progressEnabled = false;
+        bool progressInitialized = false;
         uint32_t lastUpdateMs = 0;
+        uint32_t pressAnimStartMs = 0;
+        uint32_t labelAnimStartMs = 0;
+        uint32_t progressAnimStartMs = 0;
+        uint16_t pressAnimDurationMs = 0;
+        uint16_t progressAnimDurationMs = 0;
+        uint16_t progressFillColor = 0xFFFF;
+        uint8_t progressValue = 0;
+        uint8_t progressFrom = 0;
+        uint8_t progressTarget = 0;
+        uint8_t progressTo = 0;
+        String currentLabel;
+        String previousLabel;
     };
 
     struct ToggleState
@@ -36,6 +54,31 @@ namespace pipgui::detail
         uint8_t enabledAnimFrom = 255;
         uint8_t enabledAnimTo = 255;
         uint32_t enabledAnimStartMs = 0;
+    };
+
+    struct SliderState
+    {
+        bool initialized = false;
+        bool enabled = true;
+        int16_t value = 0;
+        int16_t minValue = 0;
+        int16_t maxValue = 100;
+        int16_t step = 1;
+        uint8_t pos = 0;
+        uint8_t animFrom = 0;
+        uint8_t animTo = 0;
+        uint32_t animStartMs = 0;
+        uint16_t animDurationMs = 0;
+        uint8_t enabledLevel = 255;
+        uint8_t enabledAnimFrom = 255;
+        uint8_t enabledAnimTo = 255;
+        uint32_t enabledAnimStartMs = 0;
+        uint32_t nextHoldStartMs = 0;
+        uint32_t prevHoldStartMs = 0;
+        uint32_t nextRepeatMs = 0;
+        uint32_t prevRepeatMs = 0;
+        bool lastNextDown = false;
+        bool lastPrevDown = false;
     };
 
     struct DisplayState
@@ -359,6 +402,21 @@ namespace pipgui::detail
     struct ToggleCacheState
     {
         ToggleCacheEntry entries[TOGGLE_CACHE_MAX] = {};
+    };
+
+    struct SliderCacheEntry
+    {
+        uint32_t key = 0;
+        uint32_t lastUseMs = 0;
+        bool used = false;
+        SliderState state{};
+    };
+
+    inline constexpr uint8_t SLIDER_CACHE_MAX = 16;
+
+    struct SliderCacheState
+    {
+        SliderCacheEntry entries[SLIDER_CACHE_MAX] = {};
     };
 
     struct DrumRollAnimState

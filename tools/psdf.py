@@ -82,6 +82,22 @@ def _hash_bytes(data: bytes) -> str:
     return h.hexdigest()
 
 
+def _file_stat_signature(path: str) -> str:
+    norm_path = os.path.normcase(os.path.abspath(path))
+    try:
+        st = os.stat(path)
+    except OSError:
+        return f"missing:{norm_path}"
+    return json.dumps(
+        {
+            "path": norm_path,
+            "size": st.st_size,
+            "mtime_ns": st.st_mtime_ns,
+        },
+        sort_keys=True,
+    )
+
+
 def _safe_ident(s: str) -> str:
     s2 = re.sub(r"[^A-Za-z0-9_]", "_", s)
     if not s2:
@@ -129,3 +145,4 @@ def _default_charset_text() -> str:
     parts.append("[0x0410, 0x044f]")
     parts.append("\"\u0401\u0451\u2116\u20bd\u00b0\"")
     return "\n".join(parts) + "\n"
+

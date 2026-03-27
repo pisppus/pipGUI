@@ -120,25 +120,31 @@ namespace pipgui
         String _label;
         int16_t _x, _y, _w, _h;
         uint16_t _baseColor;
+        uint16_t _fillColor;
         uint8_t _radius;
         IconId _iconId;
         bool _enabled;
         bool _loading;
         bool _down;
+        bool _showProgress;
         bool _modeSet;
         bool _downSet;
+        uint8_t _progressValue;
         ButtonFluentT(GUI *g)
             : detail::FluentLifetime(g),
               _label(),
               _x(0), _y(0), _w(0), _h(0),
               _baseColor(0),
+              _fillColor(0xFFFF),
               _radius(6),
               _iconId(static_cast<IconId>(0xFFFF)),
               _enabled(true),
               _loading(false),
               _down(false),
+              _showProgress(false),
               _modeSet(false),
-              _downSet(false)
+              _downSet(false),
+              _progressValue(0)
         {
         }
 
@@ -186,6 +192,23 @@ namespace pipgui
             return *this;
         }
 
+        ButtonFluentT &value(uint8_t v)
+        {
+            if (!canMutate())
+                return *this;
+            _progressValue = v;
+            _showProgress = true;
+            return *this;
+        }
+
+        ButtonFluentT &fillColor(uint16_t c)
+        {
+            if (!canMutate())
+                return *this;
+            _fillColor = c;
+            return *this;
+        }
+
         ButtonFluentT &icon(IconId id)
         {
             if (!canMutate())
@@ -210,6 +233,151 @@ namespace pipgui
                 return *this;
             _down = v;
             _downSet = true;
+            return *this;
+        }
+
+        void draw();
+    };
+
+    template <bool IsUpdate>
+    struct SliderFluentT : detail::FluentLifetime
+    {
+        PIPGUI_DEFAULT_FLUENT_MOVE(SliderFluentT);
+        int16_t _x, _y, _w, _h;
+        int16_t *_value;
+        bool *_changed;
+        int16_t _minValue;
+        int16_t _maxValue;
+        int16_t _step;
+        bool _nextDown;
+        bool _prevDown;
+        bool _enabled;
+        bool _inputSet;
+        bool _enabledSet;
+        uint16_t _activeColor;
+        std::optional<uint16_t> _inactiveColor;
+        std::optional<uint16_t> _thumbColor;
+
+        SliderFluentT(GUI *g)
+            : detail::FluentLifetime(g),
+              _x(0), _y(0), _w(0), _h(0),
+              _value(nullptr),
+              _changed(nullptr),
+              _minValue(0),
+              _maxValue(100),
+              _step(1),
+              _nextDown(false),
+              _prevDown(false),
+              _enabled(true),
+              _inputSet(false),
+              _enabledSet(false),
+              _activeColor(0xFFFF),
+              _inactiveColor(std::nullopt),
+              _thumbColor(std::nullopt)
+        {
+        }
+
+        ~SliderFluentT() { draw(); }
+
+        SliderFluentT &pos(int16_t x, int16_t y)
+        {
+            if (!canMutate())
+                return *this;
+            _x = x;
+            _y = y;
+            return *this;
+        }
+
+        SliderFluentT &size(int16_t w, int16_t h)
+        {
+            if (!canMutate())
+                return *this;
+            _w = w;
+            _h = h;
+            return *this;
+        }
+
+        SliderFluentT &value(int16_t &v)
+        {
+            if (!canMutate())
+                return *this;
+            _value = &v;
+            return *this;
+        }
+
+        SliderFluentT &range(int16_t minValue, int16_t maxValue)
+        {
+            if (!canMutate())
+                return *this;
+            _minValue = minValue;
+            _maxValue = maxValue;
+            return *this;
+        }
+
+        SliderFluentT &step(int16_t v)
+        {
+            if (!canMutate())
+                return *this;
+            _step = v;
+            return *this;
+        }
+
+        SliderFluentT &nextDown(bool v)
+        {
+            if (!canMutate())
+                return *this;
+            _nextDown = v;
+            _inputSet = true;
+            return *this;
+        }
+
+        SliderFluentT &prevDown(bool v)
+        {
+            if (!canMutate())
+                return *this;
+            _prevDown = v;
+            _inputSet = true;
+            return *this;
+        }
+
+        SliderFluentT &enabled(bool v = true)
+        {
+            if (!canMutate())
+                return *this;
+            _enabled = v;
+            _enabledSet = true;
+            return *this;
+        }
+
+        SliderFluentT &changed(bool &v)
+        {
+            if (!canMutate())
+                return *this;
+            _changed = &v;
+            return *this;
+        }
+
+        SliderFluentT &activeColor(uint16_t c)
+        {
+            if (!canMutate())
+                return *this;
+            _activeColor = c;
+            return *this;
+        }
+
+        SliderFluentT &inactiveColor(int32_t c)
+        {
+            if (!canMutate())
+                return *this;
+            detail::assignOptionalColor(_inactiveColor, c);
+            return *this;
+        }
+
+        SliderFluentT &thumbColor(int32_t c)
+        {
+            if (!canMutate())
+                return *this;
+            detail::assignOptionalColor(_thumbColor, c);
             return *this;
         }
 

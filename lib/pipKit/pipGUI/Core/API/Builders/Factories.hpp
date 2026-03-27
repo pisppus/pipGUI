@@ -41,6 +41,8 @@ namespace pipgui
 
     inline DrawButtonFluent GUI::drawButton() { return DrawButtonFluent(this); }
     inline UpdateButtonFluent GUI::updateButton() { return UpdateButtonFluent(this); }
+    inline DrawSliderFluent GUI::drawSlider() { return DrawSliderFluent(this); }
+    inline UpdateSliderFluent GUI::updateSlider() { return UpdateSliderFluent(this); }
 
     inline DrawProgressFluent GUI::drawProgress() { return DrawProgressFluent(this); }
     inline UpdateProgressFluent GUI::updateProgress() { return UpdateProgressFluent(this); }

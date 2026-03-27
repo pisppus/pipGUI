@@ -546,6 +546,20 @@ void updateToggleDemo(bool nextPressed, bool prevPressed)
 
 void updateButtonsDemo(uint32_t nowMs, bool nextPressed, bool nextDown, bool prevPressed, bool prevDown, bool comboDown)
 {
+  static uint32_t labelSwitchMs = 0;
+  static uint32_t progressStepMs = 0;
+  static uint8_t labelIndex = 0;
+  static uint8_t buttonProgress = 12;
+  static bool buttonProgressDirDown = false;
+  static bool previewHold = false;
+  constexpr const char *kButtonTransitionLabels[] = {
+      "Sync",
+      "Syncing profile",
+      "Saved",
+      "Ready to continue",
+  };
+  constexpr uint8_t kButtonTransitionLabelCount = static_cast<uint8_t>(sizeof(kButtonTransitionLabels) / sizeof(kButtonTransitionLabels[0]));
+
   struct DemoPreset
   {
     int16_t heroW;
@@ -611,6 +625,24 @@ void updateButtonsDemo(uint32_t nowMs, bool nextPressed, bool nextDown, bool pre
   if (layoutChanged)
     ui.requestRedraw();
 
+  if (labelSwitchMs == 0)
+    labelSwitchMs = nowMs;
+  else if ((nowMs - labelSwitchMs) >= 1300U)
+  {
+    labelSwitchMs = nowMs;
+    labelIndex = static_cast<uint8_t>((labelIndex + 1) % kButtonTransitionLabelCount);
+  }
+
+  if (progressStepMs == 0)
+    progressStepMs = nowMs;
+  else if ((nowMs - progressStepMs) >= 45U)
+  {
+    progressStepMs = nowMs;
+    stepPingPong(buttonProgress, buttonProgressDirDown);
+  }
+
+  previewHold = ((nowMs / 900U) & 1U) != 0;
+
   const DemoPreset &size = kSizePresets[g_buttonsDemoSize];
   const DemoStyle &style = kStyles[g_buttonsDemoStyle];
   const uint16_t bg565 = ui.rgb(10, 10, 10);
@@ -624,9 +656,18 @@ void updateButtonsDemo(uint32_t nowMs, bool nextPressed, bool nextDown, bool pre
   ui.updateText().text("                              ").pos(138, 76).color(bg565).bgColor(bg565);
   ui.updateText().text(String("Size: ") + String((unsigned)(g_buttonsDemoSize + 1))).pos(138, 76).color(line565).bgColor(bg565);
 
+  ui.updateButton()
+      .label(kButtonTransitionLabels[labelIndex])
+      .pos(center, 98)
+      .size(194, 36)
+      .baseColor(style.primary)
+      .radius(style.heroRadius)
+      .icon(battery_l1)
+      .down(previewHold);
+
   auto heroButton = ui.updateButton()
                         .label("NEXT")
-                        .pos(18, 98)
+                        .pos(18, 146)
                         .size(size.heroW, size.heroH)
                         .baseColor(style.primary)
                         .radius(style.heroRadius)
@@ -634,29 +675,32 @@ void updateButtonsDemo(uint32_t nowMs, bool nextPressed, bool nextDown, bool pre
   heroButton.derive().down(nextDown);
   heroButton.derive()
       .label("")
-      .pos(static_cast<int16_t>(sw - 18 - size.heroW), 98)
+      .pos(static_cast<int16_t>(sw - 18 - size.heroW), 146)
       .baseColor(style.secondary)
       .icon(error)
       .down(prevDown);
 
   auto wideButton = ui.updateButton()
-                        .label("Loading")
-                        .pos(center, 146)
+                        .label(String("Updating ") + String(buttonProgress) + "%")
+                        .pos(center, 192)
                         .size(size.wideW, size.heroH)
-                        .baseColor(style.accent)
+                        .baseColor(ui.rgb(24, 24, 24))
                         .radius(style.wideRadius)
                         .icon(battery_l1);
-  wideButton.derive().mode(true, true).down(comboDown);
+  wideButton.derive()
+      .value(buttonProgress)
+      .fillColor(style.accent)
+      .down(comboDown);
   wideButton.derive()
       .label("Disabled")
-      .pos(center, 192)
+      .pos(center, 238)
       .baseColor(style.primary)
       .icon(battery_l0)
       .mode(false, false);
 
   ui.updateButton()
       .label("XS")
-      .pos(28, 242)
+      .pos(28, 286)
       .size(size.miniW, size.miniH)
       .baseColor(style.secondary)
       .radius(style.miniRadius)
@@ -664,14 +708,138 @@ void updateButtonsDemo(uint32_t nowMs, bool nextPressed, bool nextDown, bool pre
 
   ui.updateButton()
       .label("")
-      .pos(static_cast<int16_t>(sw - 28 - size.wideW), 242)
+      .pos(static_cast<int16_t>(sw - 28 - size.wideW), 286)
       .size(size.wideW, size.miniH)
       .baseColor(style.primary)
       .radius(static_cast<uint8_t>(size.miniH / 2))
       .icon(error);
 
   ui.setTextStyle(Caption);
-  ui.updateText().text("Press Next/Prev, tap to switch style/size").pos(center, 286).color(hint565).bgColor(bg565).align(Center);
+  ui.updateText().text("Top: auto text fade, lower: press scale + progress").pos(center, 126).color(hint565).bgColor(bg565).align(Center);
+}
+
+void updateSliderDemo(uint32_t nowMs, bool nextDown, bool prevDown, bool comboDown)
+{
+  static uint32_t comboHoldStartMs = 0;
+  static int16_t autoSliderValue = 18;
+  static bool autoSliderDirDown = false;
+  static uint32_t lastAutoStepMs = 0;
+
+  if (comboDown)
+  {
+    if (comboHoldStartMs == 0)
+      comboHoldStartMs = nowMs;
+    else if ((nowMs - comboHoldStartMs) >= 450U)
+    {
+      comboHoldStartMs = 0;
+      ui.prevScreen();
+      return;
+    }
+  }
+  else
+  {
+    comboHoldStartMs = 0;
+  }
+
+  if (nowMs - lastAutoStepMs >= 28U)
+  {
+    lastAutoStepMs = nowMs;
+    if (autoSliderDirDown)
+    {
+      if (autoSliderValue > 12)
+        --autoSliderValue;
+      else
+        autoSliderDirDown = false;
+    }
+    else
+    {
+      if (autoSliderValue < 88)
+        ++autoSliderValue;
+      else
+        autoSliderDirDown = true;
+    }
+  }
+
+  const uint16_t bg565 = ui.rgb(10, 10, 10);
+  const uint16_t dim565 = ui.rgb(135, 135, 135);
+  const uint16_t active565 = ui.rgb(0, 87, 250);
+  const uint16_t warm565 = ui.rgb(255, 145, 48);
+
+  ui.setTextStyle(Caption);
+  ui.updateText()
+      .text(String("Volume ") + String((int)g_sliderValue))
+      .pos(26, 96)
+      .color(dim565)
+      .bgColor(bg565);
+  ui.updateSlider()
+      .pos(center, 114)
+      .size(186, 24)
+      .value(g_sliderValue)
+      .range(0, 100)
+      .step(2)
+      .nextDown(nextDown)
+      .prevDown(prevDown)
+      .activeColor(active565)
+      .thumbColor(0xFFFF);
+
+  ui.updateText()
+      .text("Auto motion")
+      .pos(26, 166)
+      .color(dim565)
+      .bgColor(bg565);
+  ui.updateSlider()
+      .pos(center, 184)
+      .size(186, 24)
+      .value(autoSliderValue)
+      .range(0, 100)
+      .step(1)
+      .activeColor(warm565)
+      .thumbColor(0xFFFF);
+
+  int16_t disabledValue = 72;
+  ui.updateText()
+      .text("Disabled")
+      .pos(26, 236)
+      .color(dim565)
+      .bgColor(bg565);
+  ui.updateSlider()
+      .pos(center, 254)
+      .size(186, 24)
+      .value(disabledValue)
+      .range(0, 100)
+      .step(1)
+      .activeColor(ui.rgb(90, 90, 90))
+      .thumbColor(0xFFFF)
+      .enabled(false);
+}
+
+void updateAnimatedIconsDemo(uint32_t nowMs, bool comboDown)
+{
+  static uint32_t comboHoldStartMs = 0;
+  if (comboDown)
+  {
+    if (comboHoldStartMs == 0)
+      comboHoldStartMs = nowMs;
+    else if ((nowMs - comboHoldStartMs) >= 450U)
+    {
+      comboHoldStartMs = 0;
+      ui.prevScreen();
+      return;
+    }
+  }
+  else
+  {
+    comboHoldStartMs = 0;
+  }
+
+  const uint16_t bg565 = ui.rgb(10, 10, 10);
+  const uint16_t fg565 = ui.rgb(235, 235, 235);
+  const uint16_t dim565 = ui.rgb(130, 130, 130);
+
+  ui.setTextStyle(Caption);
+  ui.updateText().text("92 px").pos(center, 96).color(dim565).bgColor(bg565).align(Center);
+
+  ui.updateAnimatedIcon(setting_anim, center - 16, 112, 92, fg565, bg565, nowMs);
 }
 
 void updateScrollDotsDemo(uint32_t nowMs, bool nextPressed, bool prevPressed)

@@ -60,6 +60,30 @@ namespace pipgui
             return hash ? hash : 1u;
         }
 
+        uint32_t hashSliderKey(int16_t x, int16_t y, int16_t w, int16_t h,
+                               int16_t minValue, int16_t maxValue, int16_t step,
+                               uint16_t activeColor, int32_t inactiveColor, int32_t thumbColor) noexcept
+        {
+            uint32_t hash = 2166136261u;
+            auto mix = [&](uint32_t v)
+            {
+                hash ^= v;
+                hash *= 16777619u;
+            };
+
+            mix(static_cast<uint16_t>(x));
+            mix(static_cast<uint16_t>(y));
+            mix(static_cast<uint16_t>(w));
+            mix(static_cast<uint16_t>(h));
+            mix(static_cast<uint16_t>(minValue));
+            mix(static_cast<uint16_t>(maxValue));
+            mix(static_cast<uint16_t>(step));
+            mix(activeColor);
+            mix(static_cast<uint32_t>(inactiveColor));
+            mix(static_cast<uint32_t>(thumbColor));
+            return hash ? hash : 1u;
+        }
+
         float drumRollCurrentIndex(const detail::DrumRollAnimState &state, uint32_t now) noexcept
         {
             if (state.startMs == 0 || state.durationMs == 0 || now <= state.startMs)
@@ -180,6 +204,36 @@ namespace pipgui
         best->key = key;
         best->lastUseMs = now;
         best->state = {};
+        return best->state;
+    }
+
+    detail::SliderState &GUI::resolveSliderState(int16_t x, int16_t y, int16_t w, int16_t h,
+                                                 int16_t minValue, int16_t maxValue, int16_t step,
+                                                 uint16_t activeColor, int32_t inactiveColor, int32_t thumbColor)
+    {
+        const uint32_t key = hashSliderKey(x, y, w, h, minValue, maxValue, step, activeColor, inactiveColor, thumbColor);
+        const uint32_t now = nowMs();
+        detail::SliderCacheEntry *best = &_sliderCache.entries[0];
+
+        for (uint8_t i = 0; i < detail::SLIDER_CACHE_MAX; ++i)
+        {
+            detail::SliderCacheEntry &entry = _sliderCache.entries[i];
+            if (entry.used && entry.key == key)
+            {
+                entry.lastUseMs = now;
+                return entry.state;
+            }
+            if (!entry.used)
+                best = &entry;
+            else if (best->used && entry.lastUseMs < best->lastUseMs)
+                best = &entry;
+        }
+
+        best->used = true;
+        best->key = key;
+        best->lastUseMs = now;
+        best->state = {};
+        best->state.enabled = true;
         return best->state;
     }
 

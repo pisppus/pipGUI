@@ -6,6 +6,11 @@ namespace pipgui
 {
     namespace
     {
+        [[nodiscard]] int16_t centerExtent(float centerPos, int16_t extent) noexcept
+        {
+            return static_cast<int16_t>(lroundf(centerPos - static_cast<float>(extent) * 0.5f));
+        }
+
         [[nodiscard]] uint32_t hashDrumRollKey(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t count, bool vertical) noexcept
         {
             uint32_t hash = 2166136261u;
@@ -158,12 +163,12 @@ namespace pipgui
             setFontSize(itemPx >= 8 ? itemPx : 8);
             if (!measureText(options[i], tw, th))
                 continue;
-            const int16_t tx = static_cast<int16_t>(itemCenterX - tw * 0.5f);
+            const int16_t tx = centerExtent(itemCenterX, tw);
             if (tx + tw < x || tx > x + w)
                 continue;
 
             const uint16_t text565 = (visual.alpha < 255) ? detail::blend565(bg565, fg565, visual.alpha) : fg565;
-            const int16_t itemY = y + (h - th) / 2;
+            const int16_t itemY = centerExtent(static_cast<float>(y + h / 2), th);
             drawTextAligned(options[i], tx, itemY >= y ? itemY : y, text565, bg565, TextAlign::Left);
         }
 
@@ -264,12 +269,12 @@ namespace pipgui
             int16_t tw = 0, th = 0;
             if (!measureText(options[i], tw, th))
                 continue;
-            const int16_t ty = static_cast<int16_t>(itemCenterY - th * 0.5f);
+            const int16_t ty = centerExtent(itemCenterY, th);
             if (ty + th < y || ty > y + h)
                 continue;
 
             const uint16_t text565 = (visual.alpha < 255) ? detail::blend565(bg565, fg565, visual.alpha) : fg565;
-            const int16_t itemX = x + (w - tw) / 2;
+            const int16_t itemX = centerExtent(static_cast<float>(x + w / 2), tw);
             drawTextAligned(options[i], itemX >= x ? itemX : x, ty, text565, bg565, TextAlign::Left);
         }
 

@@ -477,8 +477,8 @@ namespace pipgui
             if (drawBtnH < 12)
                 drawBtnH = 12;
 
-            int16_t drawBtnX = (int16_t)(cardX + btnInsetX + (btnW - drawBtnW) / 2);
-            int16_t drawBtnY = (int16_t)(btnY + (btnH - drawBtnH) / 2);
+            int16_t drawBtnX = (int16_t)lroundf((float)(cardX + btnInsetX) + (float)(btnW - drawBtnW) * 0.5f);
+            int16_t drawBtnY = (int16_t)lroundf((float)btnY + (float)(btnH - drawBtnH) * 0.5f);
             int16_t drawBtnRadius = (int16_t)max(5, (int)(9 * scale + 0.5f));
             if (drawBtnRadius < 5)
                 drawBtnRadius = 5;
@@ -493,12 +493,12 @@ namespace pipgui
             measureText(label, btnTextW, btnTextH);
 
             const uint16_t btnTextColor = detail::autoTextColor(btnBg);
-            int16_t btnTextY = (int16_t)(drawBtnY + (drawBtnH - btnTextH) / 2);
+            int16_t btnTextY = (int16_t)lroundf((float)drawBtnY + (float)(drawBtnH - btnTextH) * 0.5f);
             if (btnTextY < drawBtnY)
                 btnTextY = drawBtnY;
 
             drawTextAligned(label,
-                            (int16_t)(drawBtnX + drawBtnW / 2),
+                            (int16_t)lroundf((float)drawBtnX + (float)drawBtnW * 0.5f),
                             btnTextY,
                             btnTextColor,
                             btnBg,

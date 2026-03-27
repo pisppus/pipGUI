@@ -17,9 +17,9 @@ SCREEN(buttonsDemo, 42)
                       .color(ui.rgb(150, 150, 150))
                       .bgColor(bg565)
                       .align(Center);
-  hintText.derive().text("Next: style  Prev: size");
+  hintText.derive().text("Top button auto-switches text");
   hintText.derive()
-      .text("Hold both: back")
+      .text("Next: style  Prev: size  Hold both: back")
       .pos(-1, 58)
       .color(ui.rgb(120, 120, 120));
 }

@@ -140,6 +140,28 @@ namespace pipgui
         return radius > static_cast<uint8_t>(limit) ? static_cast<uint8_t>(limit) : radius;
     }
 
+    void GUI::drawLinearProgressRange(int16_t x, int16_t y, int16_t w, int16_t h,
+                                      int16_t fillLeft, int16_t fillRight,
+                                      uint16_t baseColor, uint16_t fillColor,
+                                      uint8_t radius)
+    {
+        if (w <= 0 || h <= 0)
+            return;
+
+        const uint8_t rounded = clampRoundRadius(w, h, radius);
+        fillRoundRect(x, y, w, h, rounded, baseColor);
+
+        if (fillLeft < x)
+            fillLeft = x;
+        if (fillRight > x + w)
+            fillRight = x + w;
+        if (fillRight <= fillLeft)
+            return;
+
+        const int16_t fillW = fillRight - fillLeft;
+        fillRoundRect(fillLeft, y, fillW, h, clampRoundRadius(fillW, h, rounded), fillColor);
+    }
+
     void GUI::drawProgress(int16_t x, int16_t y,
                            int16_t w, int16_t h,
                            uint8_t value,
@@ -167,45 +189,17 @@ namespace pipgui
             y = AutoY(h);
 
         const uint8_t rounded = clampRoundRadius(w, h, radius);
-        fillRoundRect(x, y, w, h, rounded, baseColor);
+        int16_t fillLeft = x;
+        int16_t fillRight = x;
+        resolveLinearProgressFillRange(x, w, value, anim, nowMs(), fillLeft, fillRight);
+        drawLinearProgressRange(x, y, w, h, fillLeft, fillRight, baseColor, fillColor, rounded);
 
         if (anim == Indeterminate)
-        {
-            const uint32_t now = nowMs();
-            int16_t segmentW = w / 4;
-            if (segmentW < 20)
-                segmentW = 20;
-            if (segmentW > w)
-                segmentW = w;
-
-            const int32_t totalDist = static_cast<int32_t>(w) + segmentW;
-            const float p = static_cast<float>(now % kIndeterminatePeriodMs) / static_cast<float>(kIndeterminatePeriodMs);
-            const float eased = detail::motion::smoothstep(p);
-            const int32_t offset = static_cast<int32_t>(eased * static_cast<float>(totalDist)) - segmentW;
-
-            const int16_t segX = x + static_cast<int16_t>(offset);
-            int16_t segLeft = segX;
-            int16_t segRight = segX + segmentW;
-            if (segLeft < x)
-                segLeft = x;
-            if (segRight > x + w)
-                segRight = x + w;
-            const int16_t segW = segRight - segLeft;
-
-            if (segW > 0)
-                fillRoundRect(segLeft, y, segW, h, clampRoundRadius(segW, h, rounded), fillColor);
-
-            return;
-        }
-
-        if (value == 0)
             return;
 
-        const int16_t fillW = fillWidthForValue(w, value);
+        const int16_t fillW = fillRight - x;
         if (fillW <= 0)
             return;
-
-        fillRoundRect(x, y, fillW, h, clampRoundRadius(fillW, h, rounded), fillColor);
 
         if (anim == ProgressAnimNone)
             return;

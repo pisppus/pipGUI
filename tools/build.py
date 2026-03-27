@@ -1,11 +1,12 @@
-import sys
-
-sys.dont_write_bytecode = True
-
 import argparse
+import atexit
 import importlib.util
 import os
 import subprocess
+import sys
+
+os.environ.setdefault("PYTHONDONTWRITEBYTECODE", "1")
+sys.dont_write_bytecode = True
 
 try:
     Import("env")
@@ -31,9 +32,34 @@ def detect_project_dir():
     return os.path.abspath(os.getcwd())
 
 
+def _remove_pycache_dirs(root_dir):
+    for current_root, dirnames, _ in os.walk(root_dir, topdown=False):
+        for dirname in dirnames:
+            if dirname != "__pycache__":
+                continue
+            path = os.path.join(current_root, dirname)
+            try:
+                for walk_root, walk_dirs, walk_files in os.walk(path, topdown=False):
+                    for filename in walk_files:
+                        try:
+                            os.remove(os.path.join(walk_root, filename))
+                        except OSError:
+                            pass
+                    for subdir in walk_dirs:
+                        try:
+                            os.rmdir(os.path.join(walk_root, subdir))
+                        except OSError:
+                            pass
+                os.rmdir(path)
+            except OSError:
+                pass
+
+
 def build_assets(targets=None):
     project_dir = detect_project_dir()
     tools_dir = os.path.join(project_dir, "tools")
+    _remove_pycache_dirs(tools_dir)
+    atexit.register(_remove_pycache_dirs, tools_dir)
     
     if not os.path.isdir(project_dir):
         print(f"[build] Error: Project directory not found: {project_dir}")

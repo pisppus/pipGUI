@@ -1,0 +1,28 @@
+{
+  "atlas": {
+    "width": 48,
+    "height": 48,
+    "distanceRange": 8,
+    "size": 48
+  },
+  "glyphs": [
+    {
+      "x": 0,
+      "y": 0,
+      "w": 48,
+      "h": 48
+    }
+  ],
+  "icons": [
+    {
+      "name": "Setting",
+      "alias": "setting_anim",
+      "width": 24,
+      "height": 24,
+      "frameRateX100": 2400,
+      "frameCount": 28,
+      "firstLayer": 0,
+      "layerCount": 1
+    }
+  ]
+}
