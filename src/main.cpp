@@ -315,17 +315,14 @@ namespace
     }
   }
 
-  void runBootAnimation(GUI &ui, BootAnimation anim, uint32_t durationMs, const String &title, const String &subtitle)
+  void runBootAnimation(GUI &ui, BootAnimation anim, const String &title, const String &subtitle)
   {
+    constexpr uint32_t bootDurationMs = 1800;
     ui.showLogo()
-      .title(title)
-      .subtitle(subtitle)
-      .anim(anim)
-      .fgColor(0xFFFF)
-      .bgColor(0x0000)
-      .duration(durationMs);
+      .text(title, subtitle)
+      .anim(anim);
     const uint32_t start = millis();
-    while ((millis() - start) < (durationMs + 180U))
+    while ((millis() - start) < (bootDurationMs + 180U))
     {
       ui.loop();
     }
@@ -517,12 +514,12 @@ void setup()
   ui.otaConfigure();
 #endif
 
-  ui.configureDisplay()
+  ui.configDisplay()
       .pins({11, 12, 10, 9, 14})
       .size(240, 320);
 
-  ui.begin(3, 0);
-  ui.setScreenAnim(SlideX, 320);
+  ui.begin(3);
+  ui.setScreenAnim(SlideY, 320);
   ui.configureStatusBar()
       .enabled(PIPGUI_STATUS_BAR != 0)
       .bgColor(0x0000)
@@ -539,7 +536,7 @@ void setup()
 
   btnNext.begin();
   btnPrev.begin();
-  runBootAnimation(ui, FadeIn, 900, "PISPPUS", "Fade in");
+  runBootAnimation(ui, FadeIn, "PISPPUS", "Fade in");
   configureListMenus();
   configureTileMenus();
 

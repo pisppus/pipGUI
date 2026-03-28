@@ -100,7 +100,7 @@ namespace pipcore
         virtual void *alloc(size_t bytes, AllocCaps caps = AllocCaps::Default) noexcept = 0;
         virtual void free(void *ptr) noexcept = 0;
 
-        [[nodiscard]] virtual bool configureDisplay(const DisplayConfig &) noexcept
+        [[nodiscard]] virtual bool configDisplay(const DisplayConfig &) noexcept
         {
             return false;
         }

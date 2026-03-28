@@ -247,7 +247,7 @@ namespace pipgui
     inline constexpr detail::PulseToken Pulse{};
 
     using ScreenCallback = void (*)(GUI &ui);
-    using BacklightCallback = void (*)(uint16_t level);
+    using BacklightHandler = void (*)(uint16_t level);
     using StatusBarCustomCallback = void (*)(GUI &ui, int16_t x, int16_t y, int16_t w, int16_t h);
 
     struct ListItemDef

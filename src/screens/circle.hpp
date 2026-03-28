@@ -18,25 +18,25 @@ SCREEN(circle, 29)
       .pos(88, 52)
       .size(140, 44)
       .fill(ui.rgb(80, 255, 120))
-      .radius({12});
+      .radius(12);
 
   ui.drawRect()
       .pos(88, 104)
       .size(140, 44)
       .fill(ui.rgb(255, 128, 0))
-      .radius({20, 6, 20, 6});
+      .radius(20, 6, 20, 6);
 
   ui.drawRect()
       .pos(12, 160)
       .size(100, 44)
       .border(1, ui.rgb(255, 255, 255))
-      .radius({12});
+      .radius(12);
 
   ui.drawRect()
       .pos(12, 214)
       .size(100, 44)
       .border(1, ui.rgb(255, 255, 255))
-      .radius({20, 6, 20, 6});
+      .radius(20, 6, 20, 6);
 
   ui.drawEllipse()
       .pos(175, 190)
@@ -47,8 +47,8 @@ SCREEN(circle, 29)
   ui.drawArc()
       .pos(175, 250)
       .radius(24)
-      .startDeg(-90.0f)
-      .endDeg(180.0f)
+      .start(-90.0f)
+      .end(180.0f)
       .color(ui.rgb(255, 255, 255));
 
   ui.drawLine()

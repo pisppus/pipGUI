@@ -436,12 +436,12 @@ namespace pipgui
         drawSquircleRect()
             .pos((int16_t)(frame.x + 2), (int16_t)(frame.y + 2))
             .size(frame.w, frame.h)
-            .radius({_popup.radius})
+            .radius(_popup.radius)
             .fill(shadow565);
         drawSquircleRect()
             .pos(frame.x, frame.y)
             .size(frame.w, frame.h)
-            .radius({_popup.radius})
+            .radius(_popup.radius)
             .fill(_popup.bg565)
             .border(1, _popup.border565);
         renderListState(_popup.list, frame.x + 8, frame.y + 8, frame.w - 16, frame.visibleCount * _popup.itemHeight, _popup.bg565, false);

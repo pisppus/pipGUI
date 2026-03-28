@@ -61,29 +61,29 @@ SCREEN(progress, 6)
 
   ui.drawText()
       .pos(50, 200)
+      .font(ui.fontId(), 12)
       .text(valueRaw)
-      .size(12)
       .color(ui.rgb(180, 180, 180))
       .align(Center);
 
   ui.drawText()
       .pos(105, 200)
+      .font(ui.fontId(), 12)
       .text(valuePercent)
-      .size(12)
       .color(ui.rgb(180, 180, 180))
       .align(Center);
 
   ui.drawText()
       .pos(160, 200)
+      .font(ui.fontId(), 12)
       .text(valueFraction)
-      .size(12)
       .color(ui.rgb(180, 180, 180))
       .align(Center);
 
   ui.drawText()
       .pos(215, 200)
+      .font(ui.fontId(), 12)
       .text(valueRange)
-      .size(12)
       .color(ui.rgb(180, 180, 180))
       .align(Center);
 }

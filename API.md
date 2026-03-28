@@ -32,7 +32,7 @@
 Полный пример:
 
 ```cpp
-ui.configureDisplay()
+ui.configDisplay()
     .pins(11, 12, 10, 9, -1)   // mosi, sclk, cs, dc, rst
     .size(240, 320)            // width, height
     .hz(80000000)              // частота SPI
@@ -45,15 +45,10 @@ ui.configureDisplay()
 Минимальный пример:
 
 ```cpp
-ui.configureDisplay()
+ui.configDisplay()
     .pins(11, 12, 10, 9, -1)
     .size(240, 320);
 ```
-
-Обязательно указать:
-
-- `pins(...)` задаёт пины SPI и управляющие пины дисплея.
-- `size(width, height)` задаёт логический размер панели.
 
 Можно не писать и оставить дефолт библиотеки:
 
@@ -63,19 +58,21 @@ ui.configureDisplay()
 - `swap(bool)` по умолчанию `false`
 - `offset(x, y)` по умолчанию `(0, 0)`
 
+Обязательно указать:
+
+- `pins(...)` задаёт пины SPI и управляющие пины дисплея.
+- `size(width, height)` задаёт логический размер панели.
+
 ## 2.2. Запуск GUI
 
 После конфигурации дисплея вызывается `begin()`:
 
 ```cpp
-ui.begin(
-    0,                  // rotation: 0..3
-    ui.rgb(0, 0, 0)   // bgColor
-);
+ui.begin(0);   // rotation: 0..3
 ```
-
+ 
 - `rotation` принимает значения `0..3`.
-- `bgColor` задаёт цвет фона GUI при старте.
+- стартовый фон GUI фиксированно чёрный (`0x0000`).
 
 ## 2.3. Подсветка и яркость
 
@@ -108,22 +105,35 @@ ui.setMaxBrightness(70);   // ограничить максимум 70%
 
 ```cpp
 ui.setBrightness(35);
-uint8_t now = ui.brightness();
 ```
-- диапазон `0..100`
-- меняет текущую яркость сразу
-- значение ограничивается `maxBrightness()`
-- текущее значение не сохраняется в prefs
 
-### Низкоуровневые helpers подсветки и дисплея
+- диапазон `0..100`
+- сразу отправляет новое значение в текущий backlight runtime, то есть эффект виден без перезапуска GUI
+- если backlight настроен через `setBacklight(...)` или `setBacklightHandler(...)`, библиотека сразу применяет новый уровень к активной подсветке
+- значение всегда clamp-ится сверху через `maxBrightness()`, поэтому `setBrightness(90)` при `setMaxBrightness(70)` даст фактические `70`
 
 ```cpp
-bool ok = ui.displayReady();
-ui.setBacklightCallback(myBacklightFn);
+ui.brightness();
 ```
 
-- `displayReady()` показывает, что backend дисплея уже поднят и готов к выводу
-- `setBacklightCallback(...)` позволяет подставить свой callback для управления подсветкой
+- возвращает именно текущее runtime-значение, а не сохранённый лимит
+- это временное пользовательское состояние на текущую сессию: после reboot оно не восстанавливается из prefs автоматически
+- если нужен сохраняемый предел яркости, для этого используется `setMaxBrightness(...)`
+
+### Низкоуровневые helpers
+
+```cpp
+void myBacklight(uint16_t level) {
+    // свой способ применить яркость
+}
+
+ui.setBacklightHandler(myBacklight);
+```
+
+- `setBacklightHandler(...)` позволяет подставить свой handler для управления подсветкой
+- callback имеет сигнатуру `void (*)(uint16_t level)`
+- `level` это целевой уровень яркости, который библиотека хочет применить
+- это low-level хук для своего драйвера подсветки, если стандартного `setBacklight()` недостаточно
 - обычно этот API не нужен, если хватает `setBacklight()`
 
 ---
@@ -144,10 +154,15 @@ ui.screenHeight();  // высота вашего экрана
 
 ```cpp
 ui.rgb(255, 255, 255);
+0xFFFF;     // RGB565
+0xFF6200;   // RGB888
 ```
 
-- переводит обычный `RGB888` в внутренний `RGB565`
-- это основной helper для всех цветов в fluent API
+- Библиотека поддерживает два практических способа задания цвета:
+- `ui.rgb(r, g, b)` - обычный и основной способ. На вход подаётся `RGB888`, на выходе получается `RGB565`.
+- прямой hex-литерал - если ты уже знаешь нужное значение заранее
+- если метод принимает `uint16_t`, туда нужно передавать `RGB565`
+- если метод принимает `uint32_t`, туда нужно передавать `RGB888` в виде `0xRRGGBB`
 
 Для повторно используемых системных accent-цветов есть короткие semantic-токены:
 
@@ -157,7 +172,6 @@ Error;   // #FF0048
 ```
 
 - их можно передавать в `color(...)`, `fillColor(...)`, `bgColor(...)` и другие места, где ожидается `RGB565`
-- те же токены уже используются и как semantic-type в API уведомлений/ошибок, так что отдельный namespace для цветов не нужен
 
 ## 3.3. Очистка экрана
 
@@ -166,7 +180,6 @@ ui.clear(ui.rgb(0, 0, 0));
 ```
 
 - очищает весь текущий draw target указанным цветом
-- обычно используется в начале screen-callback перед остальной отрисовкой
 
 ## 3.4. Клип
 
@@ -184,23 +197,12 @@ ui.clearClip();
 - удобно для локальных redraw, списков, анимаций и виджетов в карточках
 - `clearClip()` возвращает обычную отрисовку без ограничений
 
-Если прямоугольник уже посчитан вручную, можно передать его одной fluent-операцией:
-
-```cpp
-ui.setClip().rect(10, 20, 120, 80);
-```
-
 ## 4. Логотип
 
 ```cpp
 ui.showLogo()
-    .title("PISPPUS")
-    .subtitle("Digital Thermometer")
-    .anim(FadeIn)
-    .fgColor(ui.rgb(255, 255, 255))
-    .bgColor(ui.rgb(0, 0, 0))
-    .duration(1800)
-    .pos(center, 40);
+    .text("PISPPUS", "Digital Thermometer")
+    .anim(FadeIn);
 ```
 
 `showLogo()` запускает полноэкранную boot-анимацию с логотипом.
@@ -208,11 +210,8 @@ ui.showLogo()
 
 Параметры:
 
-- `title` и `subtitle` — строки логотипа;
+- `text(title, subtitle)` — две строки логотипа;
 - `anim(...)` — `None`, `FadeIn`, `LightFade`;
-- `fgColor` и `bgColor` — цвета логотипа и фона; можно передавать как `ui.rgb(...)`, так и `RGB565`
-- `duration(...)` — длительность анимации;
-- `pos(x, y)` — позиция.
 
 Что делают анимации:
 
@@ -273,18 +272,18 @@ void loop()
 Вспомогательный вариант, если есть две кнопки `Button`:
 
 ```cpp
-Button btnNext(1, Pullup);
-Button btnPrev(2, Pullup);
+Button Next(1, Pullup);
+Button Prev(2, Pullup);
 
 void setup()
 {
-    btnNext.begin();
-    btnPrev.begin();
+    Next.begin();
+    Prev.begin();
 }
 
 void loop()
 {
-    ui.loopWithInput(btnNext, btnPrev);
+    ui.loopWithInput(Next, Prev);
 }
 ```
 
@@ -297,30 +296,40 @@ void loop()
 Если нужен готовый snapshot ввода для собственного state-machine:
 
 ```cpp
-GUI::InputState input = ui.pollInput(btnNext, btnPrev);
+InputState input = ui.pollInput(Next, Prev);
 ```
 
-В `InputState` есть поля:
+`pollInput(...)` сам обновляет обе кнопки и возвращает готовый снимок их состояния на текущий тик.
 
-- `nextDown`
-- `prevDown`
-- `nextPressed`
-- `prevPressed`
-- `comboDown`
+Поля `InputState`:
+
+- `nextDown` - кнопка `Next` сейчас удерживается
+- `prevDown` - кнопка `Prev` сейчас удерживается
+- `nextPressed` - кнопка `Next` была нажата именно в этом тике
+- `prevPressed` - кнопка `Prev` была нажата именно в этом тике
+- `comboDown` - обе кнопки сейчас зажаты одновременно
+
+Разница простая:
+
+- `Down` - состояние удержания
+- `Pressed` - одноразовое событие нажатия
 
 ## 5.3. Управление экранами
 
+Эти методы управляют активным экраном и переходами между экранами.
+
 ```cpp
-ui.setScreen(ScreenHome);
-uint8_t cur = ui.currentScreen();
-ui.nextScreen();
-ui.prevScreen();
-ui.screenTransitionActive();
+ui.setScreen(ScreenHome);      // сразу переключает на указанный экран
+ui.currentScreen();            // возвращает id текущего активного экрана
+ui.nextScreen();               // переходит на следующий экран по порядку регистрации
+ui.prevScreen();               // возвращает назад по navigation-history
+ui.screenTransitionActive();   // показывает, что переход между экранами сейчас ещё идёт
 ```
 
-- `currentScreen()` возвращает id текущего активного экрана
-- библиотека автоматически ведёт navigation-history при переходах между экранами
-- `prevScreen()` возвращает по navigation-history, а не по порядку
+Что важно:
+
+- библиотека сама ведёт history переходов между экранами
+- если экран меняется через `setScreen(...)`, текущий экран добавляется в history автоматически
 
 ## 5.4. Принудительная перерисовка
 
@@ -328,7 +337,7 @@ ui.screenTransitionActive();
 ui.requestRedraw();
 ```
 
-Нужно, когда вы изменили данные экрана извне и хотите гарантированно перерисовать следующий кадр.
+Нужно, когда данные экрана изменились вне обычного render-flow, и вы хотите гарантированно перерисовать следующий кадр.
 
 ## 5.5. Анимация переходов
 
@@ -336,11 +345,13 @@ ui.requestRedraw();
 ui.setScreenAnim(SlideX, 250);
 ```
 
+`setScreenAnim(mode, durationMs)` задаёт стиль и длительность перехода между экранами.
+
 Доступные режимы:
 
-- `None`
-- `SlideX`
-- `SlideY`
+- `None` - переход без анимации
+- `SlideX` - горизонтальный слайд
+- `SlideY` - вертикальный слайд
 
 ---
 
@@ -348,34 +359,22 @@ ui.setScreenAnim(SlideX, 250);
 
 ## 6.1. Встроенные шрифты
 
-Выбирать шрифт можно так:
+Текущий шрифт настраивается отдельными методами:
 
 ```cpp
-ui.setFont(WixMadeForDisplay);
-ui.setFontSize(18);
+ui.setFont(WixMadeForDisplay);   // выбирает семейство шрифта
+ui.setFontSize(18);              // задаёт текущий размер в пикселях
 ```
 
-Доступны встроенные в библиотеку:
+В библиотеке сейчас есть два встроенных семейства:
+
 - `WixMadeForDisplay`
 - `KronaOne`
 
-Что за что отвечает:
-
-- `setFont(...)` выбирает семейство шрифта
-- `setFontSize(...)` задаёт текущий размер в пикселях
-- `setFontWeight(...)` задаёт насыщенность начертания для PSDF-рендера
-
-Текущие значения можно читать:
+Для веса можно передавать либо число, либо готовый токен:
 
 ```cpp
-ui.fontId();      // текущий FontId
-ui.fontSize();    // текущий размер шрифта
-ui.fontWeight();  // текущая толщина шрифта
-```
-
-Доступные токены толщины:
-
-```cpp
+ui.setFontWeight(450);        // обычно это диапазон `100..900`
 ui.setFontWeight(Semibold);
 ```
 
@@ -387,13 +386,23 @@ ui.setFontWeight(Semibold);
 - `Bold`
 - `Black`
 
+Текущее состояние тоже можно читать:
+
+```cpp
+ui.fontId();      // текущий FontId
+ui.fontSize();    // текущий размер шрифта
+ui.fontWeight();  // текущая толщина шрифта
+```
+
 ## 6.2. Текстовые стили
 
 ```cpp
 ui.setTextStyle(H1);
 ```
 
-`TextStyle`:
+`setTextStyle(...)` быстро выставляет готовый пресет под тип текста.
+
+Доступные стили:
 
 - `H1` - крупный заголовок
 - `H2` - подзаголовок или вторичный заголовок
@@ -404,86 +413,105 @@ ui.setTextStyle(H1);
 
 ```cpp
 ui.drawText()
-    .pos(center, 32)
-    .font(WixMadeForDisplay)
-    .size(18)
-    .weight(Semibold)
-    .text("Hello")
-    .color(ui.rgb(255, 255, 255))
-    .bgColor(ui.rgb(0, 0, 0))
-    .align(Center)
+    .pos(center, 32)                   // точка привязки текста
+    .font(WixMadeForDisplay, 18)       // конкретный шрифт, размер и насыщенность
+    .weight(Semibold)                  // вес текста
+    .text("Hello")                     // сама строка
+    .color(ui.rgb(255, 255, 255))      // цвет текста
+    .bgColor(ui.rgb(0, 0, 0))          // фон под текстом
+    .align(Center);                    // выравнивание относительно точки `pos(...)`
 ```
 
-Что задают параметры:
+`drawText()` рисует строку сразу в текущий кадр.
 
-- `pos(x, y)` - точка привязки текста
-- `font(...)`, `size(...)`, `weight(...)` - конкретный шрифт, размер и насыщенность
-- `text(...)` - сама строка
-- `color(...)` - цвет текста
-- `bgColor(...)` - фон под текстом; особенно полезен для `updateText()`, чтобы корректно затирать старое значение
-- `align(...)` - выравнивание относительно точки `pos(...)`
-
-Для in-place обновления есть такой же builder:
+Если текст обновляется на одном и том же месте, используйте `updateText()`:
 
 ```cpp
 ui.updateText()
     .pos(center, 32)
     .text("Updated")
     .color(ui.rgb(255, 255, 255))
-    .align(Center)
+    .align(Center);
 ```
 
 - `drawText()` рисует текст как есть
-- `updateText()` сначала чистит прошлую область и потом рисует новое значение на том же месте
+- `updateText()` сначала очищает прошлую область и потом рисует новое значение на том же месте
 
 ## 6.4. Бегущая строка и многоточие
 
 ```cpp
 ui.drawTextMarquee()
-    .pos(20, 80)
-    .maxWidth(140)
-    .text("Very long text that does not fit")
-    .color(ui.rgb(255, 255, 255))
-    .speed(30)
-    .holdStart(700)
+    .pos(20, 80)                                  // точка привязки строки
+    .width(140)                                   // ширина области, внутри которой идёт прокрутка
+    .font(WixMadeForDisplay, 18)                  // конкретный шрифт и его размер
+    .weight(Semibold)                             // насыщенность начертания
+    .text("Very long text that does not fit")     // сама строка
+    .color(ui.rgb(255, 255, 255))                 // цвет текста
+    .speed(30)                                    // скорость движения в пикселях в секунду
+    .holdStart(700)                               // пауза перед началом движения
+    .phaseStart(0)                                // стартовая фаза, если нужна синхронизация
+    .align(Left);                                 // выравнивание строки внутри заданной ширины
 ```
 
-- `maxWidth(...)` задаёт ширину области, внутри которой строка должна уместиться
-- `speed(...)` задаёт скорость прокрутки в пикселях в секунду
-- `holdStart(...)` задаёт паузу перед началом движения
-- `phaseStart(...)` позволяет стартовать marquee не с нуля, если нужна синхронизация
-- `align(...)` определяет якорь строки внутри области
+`drawTextMarquee()` нужен для длинной строки, которая должна прокручиваться внутри ограниченной ширины.
 
 ```cpp
 ui.drawTextEllipsized()
-    .pos(20, 110)
-    .maxWidth(140)
-    .text("Very long text that does not fit")
-    .color(ui.rgb(255, 255, 255))
+    .pos(20, 110)                                 // точка привязки строки
+    .width(140)                                   // ширина области, в которую текст должен уместиться
+    .font(WixMadeForDisplay, 18)                  // конкретный шрифт и его размер
+    .weight(Semibold)                             // насыщенность начертания
+    .text("Very long text that does not fit")     // сама строка
+    .color(ui.rgb(255, 255, 255));                // цвет текста
 ```
 
-- `drawTextEllipsized()` обрезает строку по `maxWidth(...)` и добавляет многоточие
+`drawTextEllipsized()` обрезает строку по `width(...)` и добавляет многоточие
 
 ## 6.5. Иконки
 
+### Создание иконок из `sources`
+
+Чтобы добавить свою иконку:
+
+1. положить source-файл в `tools/icons/sources/`
+2. пересобрать проект — генератор сам обновит готовые файлы в `lib/pipKit/pipGUI/Graphics/Text/Icons/`
+3. использовать иконку по имени файла
+
+Пример:
+
+- файл `tools/icons/sources/checkmark.svg`
+- в коде: `.icon(checkmark)`
+
+Что важно:
+
+- генератор читает и `.svg`, и `.json` рекурсивно
+- файлы могут лежать как прямо в корне `sources`, так и в любых подпапках
+- имя для C++ генерируется из относительного пути, так что вложенные папки тоже поддерживаются
+
+Что появится в коде:
+
+- для обычной однослойной иконки из `name.svg` появляется alias `name`
+- для многослойной иконки появляются alias вида `name_l0`, `name_l1`, `name_l2`
+- дополнительно экспортируются и enum-константы `IconName`, `IconNameL0`, `IconNameL1` и т.д.
+- для анимированной иконки из `name.json` появляется alias `name_anim`
+
+Если в имени файла есть `-`, пробелы или другие неподходящие символы, генератор сам приводит имя к валидному C++-идентификатору через `_`.
+
+- `.svg` идёт в обычный static PSDF pipeline.
+- `.json` идёт в animated PSDF pipeline.
+
+### Обычные иконки берутся из набора `IconId`
+
 ```cpp
 ui.drawIcon()
-    .pos(20, 20)
-    .size(18)
-    .icon(warning)
-    .color(ui.rgb(255, 255, 255))
-    .bgColor(ui.rgb(0, 0, 0))
+    .pos(20, 20)                      // позиция иконки
+    .size(18)                         // итоговый размер в пикселях
+    .icon(warning)                    // конкретный `IconId`
+    .color(ui.rgb(255, 255, 255))     // основной цвет слоя
+    .bgColor(ui.rgb(0, 0, 0));        // фон под иконкой
 ```
 
-Иконки берутся из вашего набора `IconId`.
-
-Что задают параметры:
-
-- `pos(...)` - позиция иконки
-- `size(...)` - итоговый размер в пикселях
-- `icon(...)` - конкретный `IconId`
-- `color(...)` - основной цвет слоя
-- `bgColor(...)` - фон под иконкой, полезен для чистого обновления поверх уже нарисованного интерфейса
+Отдельного `updateIcon()` нет. 
 
 Если иконка многослойная, слои можно рисовать отдельно разными цветами:
 
@@ -501,49 +529,42 @@ ui.drawIcon()
     .color(ui.rgb(0, 200, 120));
 ```
 
-### Свои иконки из `Sources`
+Для animated icons используются отдельные runtime-вызовы.
 
-Кастомные иконки добавляются так:
-
-1. положить source-файл в `tools/icons/Sources/`
-2. пересобрать проект — генератор сам обновит готовые файлы в `lib/pipKit/pipGUI/Graphics/Text/Icons/`
-3. использовать иконку по имени файла
-
-Пример:
-
-- файл `tools/icons/Sources/checkmark.svg`
-- в коде: `.icon(checkmark)`
-
-Что генерируется:
-
-- для однослойной иконки из `name.svg` появляется alias `name`
-- для многослойной иконки появляются alias вида `name_l0`, `name_l1`, `name_l2`
-- дополнительно экспортируются и enum-константы `IconName`, `IconNameL0`, `IconNameL1` и т.д.
-- для анимированной иконки из `name.json` появляется alias `name_anim`
-
-Если в имени файла есть `-`, пробелы или другие неподходящие символы, генератор сам приводит имя к валидному C++-идентификатору через `_`
-
-Для Lottie JSON генератор сейчас собирает scalable animated icon:
+Обычная отрисовка:
 
 ```cpp
-ui.updateAnimatedIcon(setting_anim, 92, 120, 56, ui.rgb(235, 235, 235), ui.rgb(10, 10, 10), millis());
+ui.drawAnimIcon()
+    .pos(92, 120)
+    .size(56)
+    .icon(setting_anim)
+    .color(ui.rgb(235, 235, 235));
 ```
 
-- `.svg` идет в обычный static PSDF pipeline
-- `.json` идет в animated PSDF pipeline
-- runtime не интерпретирует Lottie JSON; он использует уже сгенерированные C++-данные библиотеки
+`drawAnimIcon()` рисует анимированную иконку как есть
+
+Локальное обновление поверх известного фона:
+
+```cpp
+ui.updateAnimIcon()
+    .pos(92, 120)
+    .size(56)
+    .icon(setting_anim)
+    .color(ui.rgb(235, 235, 235))
+    .bgColor(ui.rgb(10, 10, 10));
+```
+
+`updateAnimIcon()` сначала очищает область через `bgColor`, потом рисует новый кадр
 
 ---
 
 # 7. Фигуры
 
-Заливка и контур комбинируются прямо в одном builder:
-
 ```cpp
 ui.drawRect()
     .pos(20, 40)
     .size(100, 40)
-    .radius({10})
+    .radius(10)
     .fill(ui.rgb(0, 120, 255))
     .border(1, ui.rgb(255, 255, 255));
 ```
@@ -553,127 +574,86 @@ ui.drawRect()
 - `fill(color565)` — задаёт заливку; если не вызывать, фигура остаётся без заливки
 - `border(widthPx, color565)` — задаёт контур; если не вызывать, контура не будет
 - `fill(...)` и `border(...)` можно использовать вместе или по отдельности
-- отдельных fluent-методов `fillRect()`, `fillCircle()`, `fillEllipse()`, `fillTriangle()`, `fillSquircleRect()` больше нет
 
-## 7.1 Линия
+## 7.1 Линия 
 
 ```cpp
 ui.drawLine()
-    .from(20, 20)
-    .to(140, 60)
-    .thickness(2)
-    .color(ui.rgb(255, 255, 255))
+    .from(20, 20)                      // начало линии
+    .to(140, 60)                       // конец линии
+    .thickness(2)                      // толщина линии; по умолчанию `1`
+    .color(ui.rgb(255, 255, 255))      // цвет линии
 ```
-
-- `from(...)` и `to(...)` задают начало и конец линии
-- `thickness(...)` задаёт толщину линии; по умолчанию `1`
-- `color(...)` задаёт цвет линии
 
 ## 7.2 Прямоугольник
 
 ```cpp
 ui.drawRect()
-    .pos(20, 40)
-    .size(100, 40)
-    .radius({10})
-    .fill(ui.rgb(0, 120, 255))
-    .border(1, ui.rgb(255, 255, 255))
+    .pos(20, 40)                          // левый верхний угол прямоугольника
+    .size(100, 40)                        // ширина и высота
+    .radius(10)                           // один радиус для всех углов
+    // .radius(10, 14, 18, 22)            // или отдельные радиусы: tl, tr, br, bl
+    .fill(ui.rgb(0, 120, 255))            // цвет заливки
+    .border(1, ui.rgb(255, 255, 255))     // толщина и цвет контура
 ```
-
-`drawRect()` умеет:
-
-- `radius({r})` — один радиус для всех углов;
-- `radius({tl, tr, br, bl})` — отдельные радиусы по углам
-- `pos(...)` и `size(...)` задают левый верхний угол и размер
 
 ## 7.3 Круг
 
 ```cpp
 ui.drawCircle()
-    .pos(50, 50)
-    .radius(18)
-    .fill(ui.rgb(0, 87, 250))
-    .border(1, ui.rgb(255, 255, 255))
+    .pos(50, 50)                          // центр круга
+    .radius(18)                           // радиус
+    .fill(ui.rgb(0, 87, 250))             // цвет заливки
+    .border(1, ui.rgb(255, 255, 255))     // толщина и цвет контура
 ```
-
-- `pos(...)` - центр круга
-- `radius(...)` - радиус
 
 ## 7.4 Треугольник
 
 ```cpp
 ui.drawTriangle()
-    .point0(40, 120)
-    .point1(70, 80)
-    .point2(100, 120)
-    .fill(ui.rgb(0, 200, 120))
-    .border(1, ui.rgb(255, 255, 255))
+    .point0(40, 120)                      // первая вершина
+    .point1(70, 80)                       // вторая вершина
+    .point2(100, 120)                     // третья вершина
+    // .radius(8)                         // опционально: скругление углов
+    .fill(ui.rgb(0, 200, 120))            // цвет заливки
+    .border(1, ui.rgb(255, 255, 255))     // толщина и цвет контура
 ```
 
-- `point0/1/2(...)` задают три вершины
-- `radius(...)` можно добавить для скругления углов
-
-## 7.5 Скруглённый треугольник
-
-```cpp
-ui.drawTriangle()
-    .point0(140, 120)
-    .point1(170, 80)
-    .point2(200, 120)
-    .radius(10)
-    .fill(ui.rgb(0, 120, 255))
-    .border(1, ui.rgb(255, 255, 255))
-```
-
-- `radius(...)` здесь задаёт степень скругления вершин
-
-## 7.6 Дуга
+## 7.5 Дуга
 
 ```cpp
 ui.drawArc()
-    .pos(100, 80)
-    .radius(28)
-    .thickness(6)
-    .startDeg(-90.0f)
-    .endDeg(90.0f)
-    .color(ui.rgb(80, 255, 120))
+    .pos(100, 80)                     // центр дуги
+    .radius(28)                       // внешний радиус
+    .thickness(6)                     // толщина; по умолчанию 1
+    .start(-90.0f)                    // начальный угол в градусах
+    .end(90.0f)                       // конечный угол в градусах
+    .color(ui.rgb(80, 255, 120))      // цвет дуги
 ```
+У дуги концы всегда скруглённые, а диапазон `0..360` рисует полный круг.
 
-- `pos(...)` - центр дуги
-- `radius(...)` - внешний радиус дуги
-- `thickness(...)` - толщина дуги; по умолчанию `1`
-- `startDeg(...)` и `endDeg(...)` задают углы в градусах
-- концы дуги всегда скруглённые
-- `0..360` рисует полный круг
-
-## 7.7 Эллипс
+## 7.6 Эллипс
 
 ```cpp
 ui.drawEllipse()
-    .pos(120, 50)
-    .radiusX(28)
-    .radiusY(16)
-    .fill(ui.rgb(255, 0, 72))
-    .border(1, ui.rgb(255, 255, 255))
+    .pos(120, 50)                         // центр эллипса
+    .radiusX(28)                          // горизонтальная полуось
+    .radiusY(16)                          // вертикальная полуось
+    .fill(ui.rgb(255, 0, 72))             // цвет заливки
+    .border(1, ui.rgb(255, 255, 255))     // толщина и цвет контура
 ```
 
-- `radiusX(...)` и `radiusY(...)` задают полуоси
-
-## 7.8 Сквиркль
+## 7.7 Сквиркль
 
 ```cpp
 ui.drawSquircleRect()
-    .pos(54, 134)
-    .size(52, 52)
-    .radius({26})
-    .fill(ui.rgb(255, 128, 0))
-    .border(1, ui.rgb(255, 255, 255))
+    .pos(54, 134)                         // левый верхний угол области
+    .size(52, 52)                         // ширина и высота
+    .radius(26)                           // один радиус для всех углов
+    // .radius(18, 22, 26, 30)            // или отдельные радиусы: tl, tr, br, bl
+    .fill(ui.rgb(255, 128, 0))            // цвет заливки
+    .border(1, ui.rgb(255, 255, 255))     // толщина и цвет контура
 ```
-
-- `pos(...)` - левый верхний угол области
-- `size(...)` - размер прямоугольного squircle
-- `radius({r})` - один радиус на все углы
-- `radius({tl, tr, br, bl})` - отдельные радиусы по углам
 
 # 8. Градиенты
 
@@ -685,8 +665,8 @@ ui.drawSquircleRect()
 ui.gradientVertical()
     .pos(20, 20)
     .size(120, 40)
-    .topColor(ui.rgb(255, 0, 72))
-    .bottomColor(ui.rgb(0, 87, 250))
+    .TColor(ui.rgb(255, 0, 72))
+    .BColor(ui.rgb(0, 87, 250))
 ```
 
 - цвет плавно меняется сверху вниз
@@ -697,8 +677,8 @@ ui.gradientVertical()
 ui.gradientHorizontal()
     .pos(20, 70)
     .size(120, 40)
-    .leftColor(ui.rgb(255, 128, 0))
-    .rightColor(ui.rgb(80, 255, 120))
+    .LColor(ui.rgb(255, 128, 0))
+    .RColor(ui.rgb(80, 255, 120))
 ```
 
 - цвет плавно меняется слева направо
@@ -709,14 +689,13 @@ ui.gradientHorizontal()
 ui.gradientCorners()
     .pos(20, 120)
     .size(120, 40)
-    .topLeftColor(ui.rgb(255, 0, 72))
-    .topRightColor(ui.rgb(0, 87, 250))
-    .bottomLeftColor(ui.rgb(80, 255, 120))
-    .bottomRightColor(ui.rgb(255, 128, 0))
+    .TLColor(ui.rgb(255, 0, 72))
+    .TRColor(ui.rgb(0, 87, 250))
+    .BLColor(ui.rgb(80, 255, 120))
+    .BRColor(ui.rgb(255, 128, 0))
 ```
 
-- каждая вершина прямоугольника получает свой цвет
-- внутри идёт двунаправленная интерполяция между четырьмя углами
+- каждая вершина прямоугольника получает свой цвет, внутри идёт двунаправленная интерполяция между четырьмя углами
 
 ## 8.4. Диагональный
 
@@ -724,8 +703,8 @@ ui.gradientCorners()
 ui.gradientDiagonal()
     .pos(20, 170)
     .size(120, 40)
-    .topLeftColor(ui.rgb(255, 255, 255))
-    .bottomRightColor(ui.rgb(30, 30, 30))
+    .TLColor(ui.rgb(255, 255, 255))
+    .BRColor(ui.rgb(30, 30, 30))
 ```
 
 - плавный переход по диагонали от верхнего левого к нижнему правому углу
@@ -752,31 +731,38 @@ ui.gradientRadial()
 
 ```cpp
 ui.drawBlur()
-    .pos(0, 180)
-    .size(240, 40)
-    .radius(10)
-    .direction(TopDown)
-    .gradient(true)
-    .materialStrength(160)
-    .materialColor(-1)
+    .pos(0, 180)                  // левый верхний угол blur-области
+    .size(240, 40)                // ширина и высота области
+    .radius(10)                   // сила blur; чем больше, тем мягче и тяжелее эффект
+    .direction(TopDown)           // если указать, material пойдёт по этому направлению
+    .material(160, -1)            // сила material и его цвет; -1 = цвет фона библиотеки
 ```
 
 Для обновления части экрана:
 
 ```cpp
 ui.updateBlur()
-    .pos(0, 180)
-    .size(240, 40)
-    .radius(10)
-    .direction(TopDown)
+    .pos(0, 180)                  // та же область, которую нужно перерисовать
+    .size(240, 40)                // тот же размер blur-региона
+    .radius(10)                   // тот же blur-радиус
+    .direction(TopDown)           // то же направление материала
+    .material(160, -1)            // те же параметры material
 ```
+`updateBlur()` нужен для in-place перерисовки той же blur-области без полной перерисовки экрана.
 
-Что делают параметры:
+`direction(...)` поддерживает:
 
-- `materialStrength(...)` задаёт силу цветного материала поверх blur
-- `materialColor(...)` задаёт цвет материала в `RGB565`; `-1` значит взять текущий цвет фона библиотеки
-- `direction(...)` задаёт направление усиления blur-материала
-- `gradient(true)` делает материал не плоским, а с мягким переходом
+- `TopDown` - материал и его усиление идут сверху вниз
+- `BottomUp` - материал и его усиление идут снизу вверх
+- `LeftRight` - материал и его усиление идут слева направо
+- `RightLeft` - материал и его усиление идут справа налево
+
+`material(strength, color)` управляет только верхним tinted-слоем поверх blur:
+
+- чем больше `strength`, тем заметнее tinted-слой поверх blur
+- `color = -1` - взять текущий цвет фона библиотеки
+
+То есть blur остаётся тем же, а меняется только то, как поверх него распределяется tinted-слой.
 
 ## 9.2. Glow
 
@@ -784,39 +770,23 @@ ui.updateBlur()
 
 ```cpp
 ui.drawGlowCircle()
-    .pos(60, 90)
-    .radius(18)
-    .fillColor(ui.rgb(255, 255, 255))
-    .glowColor(ui.rgb(0, 120, 255))
-    .glowSize(16)
-    .glowStrength(220)
-    .anim(Pulse)
-    .pulsePeriodMs(1200)
+    .pos(60, 90)                          // центр круга
+    .radius(18)                           // радиус фигуры
+    .fillColor(ui.rgb(255, 255, 255))     // цвет самой фигуры
+    .glowColor(ui.rgb(0, 120, 255))       // цвет свечения вокруг
+    .glowSize(16)                         // толщина зоны свечения
+    .glowStrength(220)                    // интенсивность свечения
+    .anim(Pulse)                          // тип анимации свечения
+    .pulseMs(1200)                        // период пульсации в миллисекундах
 ```
 
-Прямоугольник:
+Для in-place обновления есть `updateGlowCircle()`.
+Если glow нужно обновлять на месте без грязных хвостов, добавь `bgColor(...)` с цветом фона под фигурой.
 
-```cpp
-ui.drawGlowRect()
-    .pos(30, 140)
-    .size(120, 46)
-    .radius(12)
-    .fillColor(ui.rgb(20, 20, 20))
-    .glowColor(ui.rgb(0, 120, 255))
-    .glowSize(14)
-    .glowStrength(220)
-```
+`anim(...)` поддерживает:
 
-Для in-place обновления есть `updateGlowCircle()` и `updateGlowRect()`.
-
-Что задают параметры glow:
-
-- `fillColor(...)` - цвет самой фигуры
-- `bgColor(...)` - цвет фона под фигурой, нужен для чистого in-place обновления
-- `glowColor(...)` - цвет свечения
-- `glowSize(...)` - толщина зоны свечения
-- `glowStrength(...)` - интенсивность свечения
-- `anim(...)` и `pulsePeriodMs(...)` - анимация свечения
+- `None` - свечение статичное, без анимации
+- `Pulse` - свечение плавно пульсирует по силе
 
 ---
 
@@ -1282,6 +1252,18 @@ ui.drawGraphGrid()
 
 - цвет сетки вычисляется автоматически из `bgColor()`
 
+Для локального dirty-redraw доступен тот же fluent через `updateGraphGrid()`:
+
+```cpp
+ui.updateGraphGrid()
+    .pos(10, 50)
+    .size(220, 120)
+    .radius(8)
+    .direction(LeftToRight)
+    .bgColor(ui.rgb(10, 10, 10))
+    .speed(1.0f);
+```
+
 ## Линия графика:
 
 ```cpp
@@ -1320,6 +1302,7 @@ ui.drawGraphSamples()
 
 - `drawGraphSamples()` рисует переданный массив сразу, не накапливает внутреннюю историю точек. Для streaming-режима с накоплением используйте `drawGraphLine()`
 - `thickness(...)` задаёт толщину линии; по умолчанию `1`
+- `updateGraphSamples()` использует тот же API, но подходит для локального in-place обновления
 
 Осциллограф можно настроить отдельно:
 
@@ -1529,6 +1512,7 @@ ui.showNotification()
     .button("OK")
     .delay(0)
     .type(Normal)
+    .icon(warning)
     .show();
 ```
 
@@ -1537,6 +1521,15 @@ ui.showNotification()
 - `Normal`
 - `Warning`
 - `Error`
+
+Параметры:
+
+- `title(...)` - заголовок карточки уведомления
+- `message(...)` - основной текст
+- `button(...)` - подпись кнопки подтверждения
+- `delay(...)` - автозакрытие в секундах; `0` означает без таймера
+- `type(...)` - semantic-тип уведомления
+- `icon(...)` - необязательная иконка; если не задана, библиотека рисует builtin visual для выбранного `type(...)`
 
 Управление:
 
@@ -1829,7 +1822,7 @@ ui.wifiLocalIpV4();     // IPv4 как packed uint32_t
 Сгенерировать ключ:
 
 ```bash
-python tools/ota/keygen.py
+python tools/ota/key.py
 ```
 
 Если запустить без параметров, tool покажет меню и даст выбрать путь сохранения числом.
@@ -1837,19 +1830,19 @@ python tools/ota/keygen.py
 Сделать stable release:
 
 ```bash
-python tools/ota/make_release.py
+python tools/ota/release.py
 ```
 
 Сделать beta release:
 
 ```bash
-python tools/ota/make_release.py --beta --interactive
+python tools/ota/release.py --beta --interactive
 ```
 
 Проверка manifest + bin:
 
 ```bash
-python tools/ota/verify_manifest.py
+python tools/ota/verify.py
 ```
 
 При запуске без параметров tool покажет меню: manifest, firmware source и signature check.

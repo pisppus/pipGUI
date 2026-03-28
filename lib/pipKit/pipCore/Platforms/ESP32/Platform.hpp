@@ -38,7 +38,7 @@ namespace pipcore::esp32
         void *alloc(size_t bytes, AllocCaps caps = AllocCaps::Default) noexcept override;
         void free(void *ptr) noexcept override;
 
-        [[nodiscard]] bool configureDisplay(const DisplayConfig &cfg) noexcept override;
+        [[nodiscard]] bool configDisplay(const DisplayConfig &cfg) noexcept override;
         [[nodiscard]] bool beginDisplay(uint8_t rotation) noexcept override;
         [[nodiscard]] pipcore::Display *display() noexcept override;
 

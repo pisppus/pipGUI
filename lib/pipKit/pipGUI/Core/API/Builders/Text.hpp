@@ -39,18 +39,11 @@ namespace pipgui
             return *this;
         }
 
-        TextFluentT &font(FontId fontId)
+        TextFluentT &font(FontId fontId, uint16_t sizePx)
         {
             if (!canMutate())
                 return *this;
             _fontId = fontId;
-            return *this;
-        }
-
-        TextFluentT &size(uint16_t sizePx)
-        {
-            if (!canMutate())
-                return *this;
             _sizePx = sizePx;
             return *this;
         }
@@ -138,7 +131,7 @@ namespace pipgui
             return *this;
         }
 
-        DrawTextMarqueeFluent &maxWidth(int16_t width)
+        DrawTextMarqueeFluent &width(int16_t width)
         {
             if (!canMutate())
                 return *this;
@@ -146,18 +139,11 @@ namespace pipgui
             return *this;
         }
 
-        DrawTextMarqueeFluent &font(FontId fontId)
+        DrawTextMarqueeFluent &font(FontId fontId, uint16_t sizePx)
         {
             if (!canMutate())
                 return *this;
             _fontId = fontId;
-            return *this;
-        }
-
-        DrawTextMarqueeFluent &size(uint16_t sizePx)
-        {
-            if (!canMutate())
-                return *this;
             _sizePx = sizePx;
             return *this;
         }
@@ -267,7 +253,7 @@ namespace pipgui
             return *this;
         }
 
-        DrawTextEllipsizedFluent &maxWidth(int16_t width)
+        DrawTextEllipsizedFluent &width(int16_t width)
         {
             if (!canMutate())
                 return *this;
@@ -275,18 +261,11 @@ namespace pipgui
             return *this;
         }
 
-        DrawTextEllipsizedFluent &font(FontId fontId)
+        DrawTextEllipsizedFluent &font(FontId fontId, uint16_t sizePx)
         {
             if (!canMutate())
                 return *this;
             _fontId = fontId;
-            return *this;
-        }
-
-        DrawTextEllipsizedFluent &size(uint16_t sizePx)
-        {
-            if (!canMutate())
-                return *this;
             _sizePx = sizePx;
             return *this;
         }

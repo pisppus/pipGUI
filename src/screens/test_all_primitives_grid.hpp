@@ -43,7 +43,7 @@ SCREEN(testAllPrimitivesGrid, 35)
       }
       else if (type == 1)
       {
-        ui.drawRect().pos(x - 18, y - 12).size(36, 24).radius({6}).fill(c).border(1, white);
+        ui.drawRect().pos(x - 18, y - 12).size(36, 24).radius(6).fill(c).border(1, white);
       }
       else if (type == 2)
       {
@@ -55,11 +55,11 @@ SCREEN(testAllPrimitivesGrid, 35)
       }
       else if (type == 4)
       {
-        ui.drawArc().pos(x, y).radius(14).startDeg(0).endDeg(270).color(c);
+        ui.drawArc().pos(x, y).radius(14).start(0).end(270).color(c);
       }
       else if (type == 5)
       {
-        ui.drawRect().pos(x - 18, y - 12).size(36, 24).radius({8, 3, 8, 3}).fill(c).border(1, white);
+        ui.drawRect().pos(x - 18, y - 12).size(36, 24).radius(8, 3, 8, 3).fill(c).border(1, white);
       }
       else if (type == 6)
       {

@@ -1064,7 +1064,7 @@ namespace pipgui
             area->bgColor != bgColor;
 
         const uint8_t outerRadius = resolvedRadius;
-        drawSquircleRect().pos(x, y).size(w, h).radius({outerRadius}).fill(deriveGraphGridColor565(bg565));
+        drawSquircleRect().pos(x, y).size(w, h).radius(outerRadius).fill(deriveGraphGridColor565(bg565));
 
         const int16_t innerX = (int16_t)(x + 2);
         const int16_t innerY = (int16_t)(y + 2);
@@ -1103,7 +1103,7 @@ namespace pipgui
             return;
 
         const int16_t innerRadius = (outerRadius > 2) ? (int16_t)(outerRadius - 2) : (outerRadius > 0 ? (int16_t)(outerRadius - 1) : 0);
-        drawSquircleRect().pos(innerX, innerY).size(innerW, innerH).radius({(uint8_t)innerRadius}).fill(bg565);
+        drawSquircleRect().pos(innerX, innerY).size(innerW, innerH).radius((uint8_t)innerRadius).fill(bg565);
 
         int16_t cellsX = (int16_t)((float)innerW / 12.0f + 0.5f);
         int16_t cellsY = (int16_t)((float)innerH / 12.0f + 0.5f);

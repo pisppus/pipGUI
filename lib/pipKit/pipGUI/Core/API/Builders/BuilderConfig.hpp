@@ -2,20 +2,20 @@
 
 namespace pipgui
 {
-    struct ConfigureDisplayFluent : detail::FluentLifetime
+    struct ConfigDisplayFluent : detail::FluentLifetime
     {
-        PIPGUI_DEFAULT_FLUENT_MOVE(ConfigureDisplayFluent);
+        PIPGUI_DEFAULT_FLUENT_MOVE(ConfigDisplayFluent);
         pipcore::DisplayConfig _cfg;
         bool _touched;
 
-        ConfigureDisplayFluent(GUI *g)
+        ConfigDisplayFluent(GUI *g)
             : detail::FluentLifetime(g), _cfg(detail::defaultDisplayConfig()), _touched(false)
         {
         }
 
-        ~ConfigureDisplayFluent() { apply(); }
+        ~ConfigDisplayFluent() { apply(); }
 
-        ConfigureDisplayFluent &pins(const DisplayPins &p)
+        ConfigDisplayFluent &pins(const DisplayPins &p)
         {
             if (!canMutate())
                 return *this;
@@ -28,7 +28,7 @@ namespace pipgui
             return *this;
         }
 
-        ConfigureDisplayFluent &pins(int8_t mosi, int8_t sclk, int8_t cs, int8_t dc, int8_t rst)
+        ConfigDisplayFluent &pins(int8_t mosi, int8_t sclk, int8_t cs, int8_t dc, int8_t rst)
         {
             if (!canMutate())
                 return *this;
@@ -41,7 +41,7 @@ namespace pipgui
             return *this;
         }
 
-        ConfigureDisplayFluent &size(uint16_t w, uint16_t h)
+        ConfigDisplayFluent &size(uint16_t w, uint16_t h)
         {
             if (!canMutate())
                 return *this;
@@ -51,7 +51,7 @@ namespace pipgui
             return *this;
         }
 
-        ConfigureDisplayFluent &hz(uint32_t v)
+        ConfigDisplayFluent &hz(uint32_t v)
         {
             if (!canMutate())
                 return *this;
@@ -60,7 +60,7 @@ namespace pipgui
             return *this;
         }
 
-        ConfigureDisplayFluent &order(const char *v)
+        ConfigDisplayFluent &order(const char *v)
         {
             if (!canMutate())
                 return *this;
@@ -75,7 +75,7 @@ namespace pipgui
             return *this;
         }
 
-        ConfigureDisplayFluent &invert(bool v = true)
+        ConfigDisplayFluent &invert(bool v = true)
         {
             if (!canMutate())
                 return *this;
@@ -84,7 +84,7 @@ namespace pipgui
             return *this;
         }
 
-        ConfigureDisplayFluent &swap(bool v = true)
+        ConfigDisplayFluent &swap(bool v = true)
         {
             if (!canMutate())
                 return *this;
@@ -93,7 +93,7 @@ namespace pipgui
             return *this;
         }
 
-        ConfigureDisplayFluent &offset(int16_t x, int16_t y)
+        ConfigDisplayFluent &offset(int16_t x, int16_t y)
         {
             if (!canMutate())
                 return *this;
@@ -197,18 +197,6 @@ namespace pipgui
             return *this;
         }
 
-        SetClipFluent &rect(int16_t x, int16_t y, int16_t w, int16_t h)
-        {
-            if (!canMutate())
-                return *this;
-            _x = x;
-            _y = y;
-            _w = w;
-            _h = h;
-            _touched = true;
-            return *this;
-        }
-
         void apply();
     };
 
@@ -218,11 +206,6 @@ namespace pipgui
         String _title;
         String _subtitle;
         BootAnimation _anim = None;
-        uint32_t _fg = 0xFFFFFF;
-        uint32_t _bg = 0x000000;
-        uint32_t _dur = 0;
-        int16_t _x = -1;
-        int16_t _y = -1;
         bool _touched = false;
 
         explicit ShowLogoFluent(GUI *g)
@@ -232,20 +215,12 @@ namespace pipgui
 
         ~ShowLogoFluent() { apply(); }
 
-        ShowLogoFluent &title(const String &v)
+        ShowLogoFluent &text(const String &title, const String &subtitle = "")
         {
             if (!canMutate())
                 return *this;
-            _title = v;
-            _touched = true;
-            return *this;
-        }
-
-        ShowLogoFluent &subtitle(const String &v)
-        {
-            if (!canMutate())
-                return *this;
-            _subtitle = v;
+            _title = title;
+            _subtitle = subtitle;
             _touched = true;
             return *this;
         }
@@ -255,79 +230,6 @@ namespace pipgui
             if (!canMutate())
                 return *this;
             _anim = v;
-            _touched = true;
-            return *this;
-        }
-
-        ShowLogoFluent &fgColor(uint32_t v)
-        {
-            if (!canMutate())
-                return *this;
-            _fg = v;
-            _touched = true;
-            return *this;
-        }
-
-        ShowLogoFluent &fgColor(int32_t v)
-        {
-            if (!canMutate())
-                return *this;
-            _fg = (v >= 0 && static_cast<uint32_t>(v) <= 0xFFFFu) ? detail::color565To888(static_cast<uint16_t>(v)) : static_cast<uint32_t>(v);
-            _touched = true;
-            return *this;
-        }
-
-        ShowLogoFluent &fgColor(uint16_t v)
-        {
-            if (!canMutate())
-                return *this;
-            _fg = detail::color565To888(v);
-            _touched = true;
-            return *this;
-        }
-
-        ShowLogoFluent &bgColor(uint32_t v)
-        {
-            if (!canMutate())
-                return *this;
-            _bg = v;
-            _touched = true;
-            return *this;
-        }
-
-        ShowLogoFluent &bgColor(int32_t v)
-        {
-            if (!canMutate())
-                return *this;
-            _bg = (v >= 0 && static_cast<uint32_t>(v) <= 0xFFFFu) ? detail::color565To888(static_cast<uint16_t>(v)) : static_cast<uint32_t>(v);
-            _touched = true;
-            return *this;
-        }
-
-        ShowLogoFluent &bgColor(uint16_t v)
-        {
-            if (!canMutate())
-                return *this;
-            _bg = detail::color565To888(v);
-            _touched = true;
-            return *this;
-        }
-
-        ShowLogoFluent &duration(uint32_t v)
-        {
-            if (!canMutate())
-                return *this;
-            _dur = v;
-            _touched = true;
-            return *this;
-        }
-
-        ShowLogoFluent &pos(int16_t x, int16_t y)
-        {
-            if (!canMutate())
-                return *this;
-            _x = x;
-            _y = y;
             _touched = true;
             return *this;
         }

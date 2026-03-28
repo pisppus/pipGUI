@@ -208,9 +208,11 @@ namespace pipgui
         if (!beginCommit())
             return;
         const int32_t materialColor = detail::optionalColor32(_materialColor);
+        const BlurDirection dir = _dir.value_or(TopDown);
+        const bool gradient = _dir.has_value();
         detail::callByMode<IsUpdate>(
-            [&] { detail::GuiAccess::updateBlurRegion(*_gui, _x, _y, _w, _h, _radius, _dir, _gradient, _materialStrength, materialColor); },
-            [&] { detail::GuiAccess::drawBlurRegion(*_gui, _x, _y, _w, _h, _radius, _dir, _gradient, _materialStrength, materialColor); });
+            [&] { detail::GuiAccess::updateBlurRegion(*_gui, _x, _y, _w, _h, _radius, dir, gradient, _materialStrength, materialColor); },
+            [&] { detail::GuiAccess::drawBlurRegion(*_gui, _x, _y, _w, _h, _radius, dir, gradient, _materialStrength, materialColor); });
     }
     template void BlurRegionFluentT<false>::draw();
     template void BlurRegionFluentT<true>::draw();
@@ -276,29 +278,6 @@ namespace pipgui
     }
     template void GlowCircleFluentT<false>::draw();
     template void GlowCircleFluentT<true>::draw();
-
-    template <bool IsUpdate>
-    void GlowRectFluentT<IsUpdate>::draw()
-    {
-        if (!beginCommit())
-            return;
-        const int16_t bgColor = detail::optionalColor16(_bgColor);
-        const int16_t glowColor = detail::optionalColor16(_glowColor);
-        if (_perCorner)
-        {
-            detail::callByMode<IsUpdate>(
-                [&] { detail::GuiAccess::updateGlowRect(*_gui, _x, _y, _w, _h, _radiusTL, _radiusTR, _radiusBR, _radiusBL, _fillColor, bgColor, glowColor, _glowSize, _glowStrength, _anim, _pulsePeriodMs); },
-                [&] { detail::GuiAccess::drawGlowRect(*_gui, _x, _y, _w, _h, _radiusTL, _radiusTR, _radiusBR, _radiusBL, _fillColor, bgColor, glowColor, _glowSize, _glowStrength, _anim, _pulsePeriodMs); });
-        }
-        else
-        {
-            detail::callByMode<IsUpdate>(
-                [&] { detail::GuiAccess::updateGlowRect(*_gui, _x, _y, _w, _h, _radius, _fillColor, bgColor, glowColor, _glowSize, _glowStrength, _anim, _pulsePeriodMs); },
-                [&] { detail::GuiAccess::drawGlowRect(*_gui, _x, _y, _w, _h, _radius, _fillColor, bgColor, glowColor, _glowSize, _glowStrength, _anim, _pulsePeriodMs); });
-        }
-    }
-    template void GlowRectFluentT<false>::draw();
-    template void GlowRectFluentT<true>::draw();
 
     void ToastFluent::commit()
     {

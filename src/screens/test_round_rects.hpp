@@ -9,23 +9,23 @@ SCREEN(testRoundRects, 31)
   ui.drawText().text("drawRect fill / border (1 & 4 radius)").pos(-1, 28).color(ui.rgb(180, 200, 180)).bgColor(bg565).align(Center);
   ui.drawText().text("Single radius:").pos(60, 45).color(ui.rgb(180, 220, 180)).bgColor(bg565).align(Center);
 
-  ui.drawRect().pos(15, 58).size(40, 30).radius({4}).fill(ui.rgb(0, 87, 250)).border(1, ui.rgb(255, 255, 255));
+  ui.drawRect().pos(15, 58).size(40, 30).radius(4).fill(ui.rgb(0, 87, 250)).border(1, ui.rgb(255, 255, 255));
 
-  ui.drawRect().pos(65, 58).size(50, 35).radius({8}).fill(ui.rgb(255, 0, 72)).border(1, ui.rgb(255, 255, 255));
+  ui.drawRect().pos(65, 58).size(50, 35).radius(8).fill(ui.rgb(255, 0, 72)).border(1, ui.rgb(255, 255, 255));
 
-  ui.drawRect().pos(125, 58).size(60, 40).radius({12}).fill(ui.rgb(80, 255, 120)).border(1, ui.rgb(255, 255, 255));
+  ui.drawRect().pos(125, 58).size(60, 40).radius(12).fill(ui.rgb(80, 255, 120)).border(1, ui.rgb(255, 255, 255));
 
-  ui.drawRect().pos(195, 58).size(50, 45).radius({15}).fill(ui.rgb(255, 128, 0)).border(1, ui.rgb(255, 255, 255));
+  ui.drawRect().pos(195, 58).size(50, 45).radius(15).fill(ui.rgb(255, 128, 0)).border(1, ui.rgb(255, 255, 255));
   ui.drawText().text("4-corner radii:").pos(60, 110).color(ui.rgb(220, 180, 180)).bgColor(bg565).align(Center);
-  ui.drawRect().pos(15, 125).size(50, 40).radius({2, 8, 2, 8}).fill(ui.rgb(180, 80, 255)).border(1, ui.rgb(255, 255, 255));
-  ui.drawRect().pos(75, 125).size(60, 45).radius({12, 4, 12, 4}).fill(ui.rgb(0, 200, 200)).border(1, ui.rgb(255, 255, 255));
-  ui.drawRect().pos(145, 125).size(70, 50).radius({3, 10, 18, 6}).fill(ui.rgb(200, 200, 80)).border(1, ui.rgb(255, 255, 255));
+  ui.drawRect().pos(15, 125).size(50, 40).radius(2, 8, 2, 8).fill(ui.rgb(180, 80, 255)).border(1, ui.rgb(255, 255, 255));
+  ui.drawRect().pos(75, 125).size(60, 45).radius(12, 4, 12, 4).fill(ui.rgb(0, 200, 200)).border(1, ui.rgb(255, 255, 255));
+  ui.drawRect().pos(145, 125).size(70, 50).radius(3, 10, 18, 6).fill(ui.rgb(200, 200, 80)).border(1, ui.rgb(255, 255, 255));
   ui.drawText().text("drawRoundRect only:").pos(70, 185).color(ui.rgb(200, 200, 200)).bgColor(bg565).align(Center);
 
-  ui.drawRect().pos(20, 200).size(45, 35).radius({6}).border(1, ui.rgb(255, 255, 255));
-  ui.drawRect().pos(75, 205).size(50, 40).radius({10}).border(1, ui.rgb(0, 255, 255));
-  ui.drawRect().pos(135, 200).size(55, 45).radius({5, 15, 5, 15}).border(1, ui.rgb(255, 200, 0));
-  ui.drawRect().pos(200, 205).size(50, 40).radius({15, 5, 15, 5}).border(1, ui.rgb(255, 100, 200));
+  ui.drawRect().pos(20, 200).size(45, 35).radius(6).border(1, ui.rgb(255, 255, 255));
+  ui.drawRect().pos(75, 205).size(50, 40).radius(10).border(1, ui.rgb(0, 255, 255));
+  ui.drawRect().pos(135, 200).size(55, 45).radius(5, 15, 5, 15).border(1, ui.rgb(255, 200, 0));
+  ui.drawRect().pos(200, 205).size(50, 40).radius(15, 5, 15, 5).border(1, ui.rgb(255, 100, 200));
 
   ui.drawText().text("Check corner AA quality!").pos(-1, 260).color(ui.rgb(200, 200, 100)).bgColor(bg565).align(Center);
 }

@@ -28,29 +28,24 @@ void updateGlowDemoFrame(uint32_t nowMs)
       .pos(70, 95)
       .radius(28)
       .fillColor(ui.rgb(255, 40, 40))
-      .bgColor(bg565)
       .glowSize(20)
       .glowStrength(240)
       .anim(Pulse)
-      .pulsePeriodMs(900);
+      .pulseMs(900);
 
-  ui.updateGlowRect()
-      .pos(center, 70)
-      .size(150, 78)
-      .radius(18)
+  ui.updateGlowCircle()
+      .pos(170, 95)
+      .radius(34)
       .fillColor(ui.rgb(80, 150, 255))
-      .bgColor(bg565)
       .glowSize(18)
       .glowStrength(220)
       .anim(Pulse)
-      .pulsePeriodMs(1400);
+      .pulseMs(1400);
 
-  ui.updateGlowRect()
-      .pos(140, 175)
-      .size(150, 78)
-      .radius(18)
+  ui.updateGlowCircle()
+      .pos(180, 182)
+      .radius(28)
       .fillColor(ui.rgb(255, 180, 0))
-      .bgColor(bg565)
       .glowSize(16)
       .glowStrength(180);
 }
@@ -67,36 +62,60 @@ void updateBlurDemoFrame(uint32_t nowMs)
 
   const uint16_t bg565 = ui.rgb(10, 10, 10);
   const int16_t w = (int16_t)ui.screenWidth();
-  const int16_t bandY = kStatusBarHeight;
-  const int16_t bandH = 80;
-  BlurRect row1[kBlurRectCount];
-  BlurRect row2[kBlurRectCount];
+  const int16_t contentY = kStatusBarHeight;
+  const int16_t contentH = (int16_t)ui.screenHeight() - contentY;
+  BlurRect rowTop[kBlurRectCount];
+  BlurRect rowMid[kBlurRectCount];
+  BlurRect rowBottom[kBlurRectCount];
 
   ui.drawRect()
-      .pos(0, bandY)
-      .size(w, bandH)
+      .pos(0, contentY)
+      .size(w, contentH)
       .fill(bg565);
 
-  buildBlurRow(g_blurPhase, w, bandY + 15, 22, 18, row1);
-  drawBlurRow(ui, row1);
+  buildBlurRow(g_blurPhase, w, contentY + 16, 24, 18, rowTop);
+  buildBlurRow(g_blurPhase + 7.0f, w, contentY + 76, 20, 16, rowMid);
+  buildBlurRow(g_blurPhase + 13.0f, w, contentY + 138, 18, 14, rowBottom);
 
-  if (g_blurRow2Trail.initialized)
-    clearBlurRow(ui, g_blurRow2Trail.rects, bg565);
-
-  buildBlurRow(g_blurPhase, w, bandY + bandH + 10, 18, 16, row2);
-  drawBlurRow(ui, row2);
-  for (uint8_t i = 0; i < kBlurRectCount; ++i)
-    g_blurRow2Trail.rects[i] = row2[i];
-  g_blurRow2Trail.initialized = true;
+  drawBlurRow(ui, rowTop);
+  drawBlurRow(ui, rowMid);
+  drawBlurRow(ui, rowBottom);
 
   ui.updateBlur()
-      .pos(0, bandY)
-      .size(w, bandH)
+      .pos(14, contentY + 8)
+      .size(98, 48)
       .radius(10)
       .direction(TopDown)
-      .gradient(false)
-      .materialStrength(0)
-      .materialColor(ui.rgb(10, 10, 10));
+      .material(120, -1);
+
+  ui.updateBlur()
+      .pos(128, contentY + 8)
+      .size(98, 48)
+      .radius(10)
+      .direction(BottomUp)
+      .material(120, -1);
+
+  ui.updateBlur()
+      .pos(14, contentY + 70)
+      .size(98, 48)
+      .radius(10)
+      .direction(LeftRight)
+      .material(120, -1);
+
+  ui.updateBlur()
+      .pos(128, contentY + 70)
+      .size(98, 48)
+      .radius(10)
+      .direction(RightLeft)
+      .material(120, -1);
+
+  ui.setTextStyle(Caption);
+  ui.drawText().text("TopDown").pos(63, contentY + 61).color(color565To888(0xFFFF)).bgColor(bg565).align(Center);
+  ui.drawText().text("BottomUp").pos(177, contentY + 61).color(color565To888(0xFFFF)).bgColor(bg565).align(Center);
+  ui.drawText().text("LeftRight").pos(63, contentY + 123).color(color565To888(0xFFFF)).bgColor(bg565).align(Center);
+  ui.drawText().text("RightLeft").pos(177, contentY + 123).color(color565To888(0xFFFF)).bgColor(bg565).align(Center);
+  ui.drawText().text("Blur directions").pos(-1, (int16_t)(contentY + contentH - 28)).color(color565To888(0xFFFF)).bgColor(bg565).align(Center);
+  ui.drawText().text("Moving shapes stay visible under each panel").pos(-1, (int16_t)(contentY + contentH - 12)).color(ui.rgb(160, 160, 160)).bgColor(bg565).align(Center);
 }
 
 void updateGraphScreen(uint8_t screenId, uint32_t nowMs)
@@ -204,32 +223,32 @@ void updateProgressDemoFrame(uint32_t nowMs)
 
   ui.updateText()
       .pos(50, 200)
+      .font(ui.fontId(), 12)
       .text(valueRaw)
-      .size(12)
       .color(ui.rgb(180, 180, 180))
       .bgColor(bg565)
       .align(Center);
 
   ui.updateText()
       .pos(105, 200)
+      .font(ui.fontId(), 12)
       .text(valuePercent)
-      .size(12)
       .color(ui.rgb(180, 180, 180))
       .bgColor(bg565)
       .align(Center);
 
   ui.updateText()
       .pos(160, 200)
+      .font(ui.fontId(), 12)
       .text(valueFraction)
-      .size(12)
       .color(ui.rgb(180, 180, 180))
       .bgColor(bg565)
       .align(Center);
 
   ui.updateText()
       .pos(215, 200)
+      .font(ui.fontId(), 12)
       .text(valueRange)
-      .size(12)
       .color(ui.rgb(180, 180, 180))
       .bgColor(bg565)
       .align(Center);
@@ -839,7 +858,12 @@ void updateAnimatedIconsDemo(uint32_t nowMs, bool comboDown)
   ui.setTextStyle(Caption);
   ui.updateText().text("92 px").pos(center, 96).color(dim565).bgColor(bg565).align(Center);
 
-  ui.updateAnimatedIcon(setting_anim, center - 16, 112, 92, fg565, bg565, nowMs);
+  ui.updateAnimIcon()
+    .pos(center - 16, 112)
+    .size(92)
+    .icon(setting_anim)
+    .color(fg565)
+    .bgColor(bg565);
 }
 
 void updateScrollDotsDemo(uint32_t nowMs, bool nextPressed, bool prevPressed)

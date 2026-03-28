@@ -7,6 +7,9 @@ namespace pipgui
         constexpr uint16_t kBootMinTitlePx = 16;
         constexpr uint16_t kBootMaxTitlePx = 36;
         constexpr uint16_t kBootEndHoldMs = 180;
+        constexpr uint32_t kBootDefaultDurationMs = 1800;
+        constexpr uint16_t kBootFg565 = 0xFFFF;
+        constexpr uint16_t kBootBg565 = 0x0000;
 
         struct BootTextMetrics
         {
@@ -68,8 +71,8 @@ namespace pipgui
         }
 
         layout.totalH = layout.titleH + (layout.hasSubtitle ? layout.spacing + layout.subtitleH : 0);
-        const int16_t topY = (_boot.y != -1) ? _boot.y : static_cast<int16_t>((_render.screenHeight - layout.totalH) >> 1);
-        const int16_t centerX = (_boot.x != -1) ? _boot.x : static_cast<int16_t>(_render.screenWidth >> 1);
+        const int16_t topY = static_cast<int16_t>((_render.screenHeight - layout.totalH) >> 1);
+        const int16_t centerX = static_cast<int16_t>(_render.screenWidth >> 1);
 
         static_cast<void>(setFont(KronaOne));
         setFontSize(layout.titlePx);
@@ -87,17 +90,12 @@ namespace pipgui
         setFontWeight(prevWeight);
     }
 
-    void GUI::startLogo(const String &t, const String &s, BootAnimation a, uint32_t fg, uint32_t bg, uint32_t dur, int16_t x, int16_t y)
+    void GUI::startLogo(const String &t, const String &s, BootAnimation a)
     {
         _flags.bootActive = 1;
         _boot.anim = a;
         _boot.title = t;
         _boot.subtitle = s;
-        _boot.fgColor = fg;
-        _boot.bgColor = bg;
-        _boot.durationMs = dur;
-        _boot.x = x;
-        _boot.y = y;
         _boot.startMs = nowMs();
     }
 
@@ -107,10 +105,9 @@ namespace pipgui
             return;
 
         const uint32_t elapsed = now - _boot.startMs;
-        const uint32_t duration = _boot.durationMs > 0 ? _boot.durationMs : 1;
+        const uint32_t duration = kBootDefaultDurationMs;
         const uint32_t totalDuration = duration + kBootEndHoldMs;
         bool done = elapsed >= totalDuration;
-        const uint16_t bg565 = detail::color888To565(_boot.bgColor);
 
         auto renderBootScreen = [&](uint16_t fg565)
         {
@@ -124,7 +121,7 @@ namespace pipgui
                 _flags.inSpritePass = 1;
             }
 
-            drawBootTitleBlock(_boot.title, _boot.subtitle, fg565, bg565);
+            drawBootTitleBlock(_boot.title, _boot.subtitle, fg565, kBootBg565);
 
             _flags.inSpritePass = prevSpritePass;
             _render.activeSprite = prevActive;
@@ -136,15 +133,10 @@ namespace pipgui
             }
         };
 
-        auto draw = [&](uint32_t fg888)
-        {
-            renderBootScreen(detail::color888To565(fg888));
-        };
-
         switch (_boot.anim)
         {
         case BootAnimNone:
-            draw(_boot.fgColor);
+            renderBootScreen(kBootFg565);
             done = true;
             break;
 
@@ -152,9 +144,9 @@ namespace pipgui
         {
             const uint32_t animElapsed = clampElapsed(elapsed, duration);
             const uint32_t brightness = done ? _disp.brightnessMax : (animElapsed * static_cast<uint32_t>(_disp.brightnessMax)) / duration;
-            if (_disp.backlightCb)
-                _disp.backlightCb(min(static_cast<uint32_t>(_disp.brightnessMax), brightness));
-            draw(_boot.fgColor);
+            if (_disp.backlightHandler)
+                _disp.backlightHandler(min(static_cast<uint32_t>(_disp.brightnessMax), brightness));
+            renderBootScreen(kBootFg565);
             break;
         }
 
@@ -162,7 +154,7 @@ namespace pipgui
         {
             const uint32_t animElapsed = clampElapsed(elapsed, duration);
             const uint8_t alpha = done ? 255 : static_cast<uint8_t>((animElapsed * 255U) / duration);
-            draw(detail::blend888(_boot.bgColor, _boot.fgColor, alpha));
+            renderBootScreen(detail::blend565(kBootBg565, kBootFg565, alpha));
             break;
         }
         }
@@ -171,8 +163,8 @@ namespace pipgui
         {
             _flags.bootActive = 0;
             _flags.needRedraw = 1;
-            if (_boot.anim == LightFade && _disp.backlightCb)
-                _disp.backlightCb(_disp.brightnessMax);
+            if (_boot.anim == LightFade && _disp.backlightHandler)
+                _disp.backlightHandler(_disp.brightnessMax);
         }
     }
 }

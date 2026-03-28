@@ -324,12 +324,12 @@ namespace pipgui
         drawSquircleRect()
             .pos(boxX, boxY)
             .size(drawW, drawH)
-            .radius({(uint8_t)drawRadius})
+            .radius((uint8_t)drawRadius)
             .fill(borderColor);
         drawSquircleRect()
             .pos((int16_t)(boxX + 1), (int16_t)(boxY + 1))
             .size((int16_t)(drawW - 2), (int16_t)(drawH - 2))
-            .radius({(uint8_t)(drawRadius > 2 ? drawRadius - 2 : drawRadius)})
+            .radius((uint8_t)(drawRadius > 2 ? drawRadius - 2 : drawRadius))
             .fill(bgColor);
 
         int16_t textX = boxX + (drawW - tw) / 2;

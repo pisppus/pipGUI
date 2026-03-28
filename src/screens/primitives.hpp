@@ -31,7 +31,7 @@ SCREEN(primitives, 23)
   ui.drawSquircleRect()
       .pos(44, 109)
       .size(52, 52)
-      .radius({26})
+      .radius(26)
       .fill(ui.rgb(255, 128, 0))
       .border(1, ui.rgb(255, 255, 255));
 
@@ -40,10 +40,9 @@ SCREEN(primitives, 23)
       .size(80, 40)
       .fill(bg565);
 
-  ui.drawGlowRect()
+  ui.drawGlowCircle()
       .pos(250, 185)
-      .size(80, 40)
-      .radius(12)
+      .radius(20)
       .fillColor(ui.rgb(40, 120, 255))
       .bgColor(bg565)
       .glowSize(10)
@@ -57,15 +56,15 @@ SCREEN(primitives, 23)
   ui.drawArc()
       .pos(170, 135)
       .radius(28)
-      .startDeg(-90.0f)
-      .endDeg(90.0f)
+      .start(-90.0f)
+      .end(90.0f)
       .color(ui.rgb(80, 255, 120));
 
   ui.drawArc()
       .pos(170, 135)
       .radius(22)
-      .startDeg(90.0f)
-      .endDeg(270.0f)
+      .start(90.0f)
+      .end(270.0f)
       .color(ui.rgb(100, 160, 255));
 
   ui.drawLine()
@@ -86,22 +85,22 @@ SCREEN(primitives, 23)
   ui.drawArc()
       .pos(250, 135)
       .radius(14)
-      .startDeg(-180.0f)
-      .endDeg(180.0f)
+      .start(-180.0f)
+      .end(180.0f)
       .color(ui.rgb(255, 255, 255));
 
   ui.drawArc()
       .pos(250, 135)
       .radius(10)
-      .startDeg(-180.0f)
-      .endDeg(180.0f)
+      .start(-180.0f)
+      .end(180.0f)
       .color(ui.rgb(80, 255, 120));
 
   ui.drawRect()
       .pos(10, 180)
       .size(80, 40)
       .fill(ui.rgb(30, 30, 30))
-      .radius({16, 4, 16, 4});
+      .radius(16, 4, 16, 4);
 
   ui.drawLine()
       .from(10, 225)

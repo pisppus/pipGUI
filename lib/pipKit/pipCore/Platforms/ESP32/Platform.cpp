@@ -59,7 +59,7 @@ namespace pipcore::esp32
         _heap.free(ptr);
     }
 
-    bool Platform::configureDisplay(const DisplayConfig &cfg) noexcept
+    bool Platform::configDisplay(const DisplayConfig &cfg) noexcept
     {
         _lastError = PlatformError::None;
         _displayConfigured = false;

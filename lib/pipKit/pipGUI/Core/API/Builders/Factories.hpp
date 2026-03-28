@@ -23,8 +23,6 @@ namespace pipgui
 
     inline DrawGlowCircleFluent GUI::drawGlowCircle() { return DrawGlowCircleFluent(this); }
     inline UpdateGlowCircleFluent GUI::updateGlowCircle() { return UpdateGlowCircleFluent(this); }
-    inline DrawGlowRectFluent GUI::drawGlowRect() { return DrawGlowRectFluent(this); }
-    inline UpdateGlowRectFluent GUI::updateGlowRect() { return UpdateGlowRectFluent(this); }
 
     inline DrawScrollDotsFluent GUI::drawScrollDots() { return DrawScrollDotsFluent(this); }
     inline UpdateScrollDotsFluent GUI::updateScrollDots() { return UpdateScrollDotsFluent(this); }
@@ -58,6 +56,8 @@ namespace pipgui
     inline ConfigGraphScopeFluent GUI::configGraphScope() { return ConfigGraphScopeFluent(this); }
 
     inline DrawIconFluent GUI::drawIcon() { return DrawIconFluent(this); }
+    inline DrawAnimIconFluent GUI::drawAnimIcon() { return DrawAnimIconFluent(this); }
+    inline UpdateAnimIconFluent GUI::updateAnimIcon() { return UpdateAnimIconFluent(this); }
     inline DrawScreenshotFluent GUI::drawScreenshot() { return DrawScreenshotFluent(this); }
     inline DrawTextFluent GUI::drawText() { return DrawTextFluent(this); }
     inline UpdateTextFluent GUI::updateText() { return UpdateTextFluent(this); }

@@ -86,7 +86,7 @@ namespace pipgui::detail
         pipcore::Display *display = nullptr;
         pipcore::DisplayConfig cfg;
         bool cfgConfigured = false;
-        BacklightCallback backlightCb = nullptr;
+        BacklightHandler backlightHandler = nullptr;
         uint8_t brightness = 100;
         uint8_t brightnessMax = 100;
     };
@@ -152,12 +152,7 @@ namespace pipgui::detail
         BootAnimation anim = None;
         String title;
         String subtitle;
-        uint32_t fgColor = 0;
-        uint32_t bgColor = 0;
         uint32_t startMs = 0;
-        uint32_t durationMs = 0;
-        int16_t x = 0;
-        int16_t y = 0;
     };
 
     struct TypographyState

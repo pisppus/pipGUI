@@ -168,7 +168,7 @@ namespace pipgui
 
         void fillButtonBody(GUI &gui, const ButtonFrame &frame, uint16_t color565)
         {
-            gui.drawSquircleRect().pos(frame.x, frame.y).size(frame.w, frame.h).radius({(uint8_t)frame.radius}).fill(color565);
+            gui.drawSquircleRect().pos(frame.x, frame.y).size(frame.w, frame.h).radius((uint8_t)frame.radius).fill(color565);
         }
 
         [[nodiscard]] String loadingLabel(const String &label, bool loading, uint32_t now) noexcept
@@ -378,7 +378,7 @@ namespace pipgui
             const uint16_t progressFill = static_cast<uint16_t>(detail::blend565(bg, state.progressFillColor, state.fadeLevel));
             const int16_t progressW = progressWidthForValue(frame.w, state.progressValue);
             if (progressW > 0)
-                drawSquircleRect().pos(frame.x, frame.y).size(progressW, frame.h).radius({(uint8_t)frame.radius}).fill(progressFill);
+                drawSquircleRect().pos(frame.x, frame.y).size(progressW, frame.h).radius((uint8_t)frame.radius).fill(progressFill);
         }
 
         const uint16_t fgActive = detail::autoTextColor(bg, 140);

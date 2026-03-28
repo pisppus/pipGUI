@@ -531,12 +531,12 @@ namespace pipgui
         return nullDisplay;
     }
 
-    ConfigureDisplayFluent GUI::configureDisplay()
+    ConfigDisplayFluent GUI::configDisplay()
     {
-        return ConfigureDisplayFluent(this);
+        return ConfigDisplayFluent(this);
     }
 
-    void GUI::configureDisplay(const pipcore::DisplayConfig &cfg)
+    void GUI::configDisplay(const pipcore::DisplayConfig &cfg)
     {
         pipcore::Platform *plat = pipcore::GetPlatform();
         if (!plat)
@@ -546,7 +546,7 @@ namespace pipgui
         if (normalized.hz == 0)
             normalized.hz = 80000000;
 
-        if (!plat->configureDisplay(normalized))
+        if (!plat->configDisplay(normalized))
         {
             return;
         }
@@ -563,17 +563,17 @@ namespace pipgui
         if (!plat)
             return;
         plat->configureBacklightPin(pin, channel, freqHz, resolutionBits);
-        setBacklightCallback(backlightPlatformCallback);
+        setBacklightHandler(backlightPlatformCallback);
     }
 
-    void ConfigureDisplayFluent::apply()
+    void ConfigDisplayFluent::apply()
     {
         if (_consumed || !_touched)
             return;
         _consumed = true;
         if (!_gui)
             return;
-        detail::GuiAccess::configureDisplay(*_gui, _cfg);
+        detail::GuiAccess::configDisplay(*_gui, _cfg);
     }
 
     void ConfigureBacklightFluent::apply()
@@ -603,7 +603,7 @@ namespace pipgui
         _consumed = true;
         if (!_gui)
             return;
-        detail::GuiAccess::startLogo(*_gui, _title, _subtitle, _anim, _fg, _bg, _dur, _x, _y);
+        detail::GuiAccess::startLogo(*_gui, _title, _subtitle, _anim);
     }
 
     void ListInputFluent::apply()
@@ -647,11 +647,13 @@ namespace pipgui
         detail::GuiAccess::setStatusBarIcon(*_gui, _side, _iconId, detail::optionalColor32(_color565), _sizePx);
     }
 
-    void GUI::begin(uint8_t rotation, uint16_t bgColor)
+    void GUI::begin(uint8_t rotation)
     {
         pipcore::Platform *plat = pipcore::GetPlatform();
         if (!plat)
             return;
+
+        constexpr uint16_t bgColor = 0x0000;
 
         resetDisplayRuntime();
 
@@ -670,7 +672,7 @@ namespace pipgui
 
         if (_disp.cfgConfigured)
         {
-            if (!plat->configureDisplay(_disp.cfg))
+            if (!plat->configDisplay(_disp.cfg))
             {
                 return;
             }
@@ -889,9 +891,9 @@ namespace pipgui
         return pipcore::ota::status();
     }
 
-    void GUI::setBacklightCallback(BacklightCallback cb) noexcept
+    void GUI::setBacklightHandler(BacklightHandler handler) noexcept
     {
-        _disp.backlightCb = cb;
+        _disp.backlightHandler = handler;
     }
 
     void GUI::setBrightness(uint8_t percent)
@@ -901,8 +903,8 @@ namespace pipgui
         if (percent > _disp.brightnessMax)
             percent = _disp.brightnessMax;
         _disp.brightness = percent;
-        if (_disp.backlightCb)
-            _disp.backlightCb(_disp.brightness);
+        if (_disp.backlightHandler)
+            _disp.backlightHandler(_disp.brightness);
     }
 
     void GUI::setMaxBrightness(uint8_t percent)
@@ -913,8 +915,8 @@ namespace pipgui
         if (_disp.brightness > _disp.brightnessMax)
             _disp.brightness = _disp.brightnessMax;
         pipcore::GetPlatform()->storeMaxBrightnessPercent(_disp.brightnessMax);
-        if (_disp.backlightCb)
-            _disp.backlightCb(_disp.brightness);
+        if (_disp.backlightHandler)
+            _disp.backlightHandler(_disp.brightness);
     }
 
     void GUI::setScreenAnim(ScreenAnim anim, uint32_t durationMs)

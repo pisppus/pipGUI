@@ -532,27 +532,23 @@ namespace pipgui
             invalidateRect(rx - pad, ry - pad, sizePx + pad * 2, sizePx + pad * 2);
     }
 
-    void GUI::drawAnimatedIcon(AnimatedIconId iconId, int16_t x, int16_t y, uint16_t sizePx, uint16_t fg565, uint32_t timeMs)
-    {
-        if (_flags.spriteEnabled && _disp.display && !_flags.inSpritePass)
-        {
-            updateAnimatedIcon(iconId, x, y, sizePx, fg565, _render.bgColor565, timeMs);
-            return;
-        }
-        const uint32_t drawNow = timeMs ? timeMs : this->nowMs();
-        drawAnimatedIconInternal((uint16_t)iconId, x, y, sizePx, fg565, drawNow);
-    }
-
-    void GUI::updateAnimatedIcon(AnimatedIconId iconId, int16_t x, int16_t y, uint16_t sizePx, uint16_t fg565, uint16_t bg565, uint32_t timeMs)
-    {
-        const uint32_t drawNow = timeMs ? timeMs : this->nowMs();
-        updateAnimatedIconInternal((uint16_t)iconId, x, y, sizePx, fg565, bg565, drawNow);
-    }
-
     void DrawIconFluent::draw()
     {
         if (_sizePx == 0 || !beginCommit())
             return;
         detail::GuiAccess::drawIcon(*_gui, _iconId, _x, _y, _sizePx, _fg565, _bg565);
     }
+
+    template <bool IsUpdate>
+    void AnimIconFluentT<IsUpdate>::draw()
+    {
+        if (_sizePx == 0 || !beginCommit())
+            return;
+        if constexpr (IsUpdate)
+            detail::GuiAccess::updateAnimIcon(*_gui, _iconId, _x, _y, _sizePx, _fg565, _bg565, 0);
+        else
+            detail::GuiAccess::drawAnimIcon(*_gui, _iconId, _x, _y, _sizePx, _fg565, 0);
+    }
+    template void AnimIconFluentT<false>::draw();
+    template void AnimIconFluentT<true>::draw();
 }

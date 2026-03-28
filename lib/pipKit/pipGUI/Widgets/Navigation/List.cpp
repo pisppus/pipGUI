@@ -577,7 +577,7 @@ namespace pipgui
                 if (!cardMode)
                 {
                     if (active)
-                        drawSquircleRect().pos(cardX, itemY).size(cardW, cardH).radius({radius}).fill(bg);
+                        drawSquircleRect().pos(cardX, itemY).size(cardW, cardH).radius(radius).fill(bg);
 
                     const int16_t textOffsetX = drawItemIcon(item.iconId, cardX + 8, itemY, (cardH > 30) ? 22 : 18, 6,
                                                              active ? textColor : inactiveTextColor,
@@ -628,7 +628,7 @@ namespace pipgui
                     continue;
                 }
 
-                drawSquircleRect().pos(cardX, itemY).size(cardW, cardH).radius({radius}).fill(bg);
+                drawSquircleRect().pos(cardX, itemY).size(cardW, cardH).radius(radius).fill(bg);
 
                 const String &subtitle = item.subtitle;
                 const bool hasSub = subtitle.length() > 0;

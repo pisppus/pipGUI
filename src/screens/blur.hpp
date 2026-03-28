@@ -1,30 +1,60 @@
+#pragma once
+
 SCREEN(blur, 17)
 {
-  ui.clear(ui.rgb(10, 10, 10));
+  const uint16_t bg565 = ui.rgb(10, 10, 10);
+  ui.clear(bg565);
 
-  const uint16_t w = ui.screenWidth();
-  const int16_t bandY = kStatusBarHeight;
-  const int16_t bandH = 80;
+  const int16_t w = (int16_t)ui.screenWidth();
+  const int16_t contentY = kStatusBarHeight;
+  const int16_t contentH = (int16_t)ui.screenHeight() - contentY;
   const float t = g_blurPhase;
-  BlurRect row[kBlurRectCount];
-  buildBlurRow(t, (int16_t)w, bandY + 15, 22, 18, row);
-  drawBlurRow(ui, row);
+
+  BlurRect rowTop[kBlurRectCount];
+  BlurRect rowMid[kBlurRectCount];
+  BlurRect rowBottom[kBlurRectCount];
+
+  buildBlurRow(t, w, contentY + 16, 24, 18, rowTop);
+  buildBlurRow(t + 7.0f, w, contentY + 76, 20, 16, rowMid);
+  buildBlurRow(t + 13.0f, w, contentY + 138, 18, 14, rowBottom);
+
+  drawBlurRow(ui, rowTop);
+  drawBlurRow(ui, rowMid);
+  drawBlurRow(ui, rowBottom);
 
   ui.drawBlur()
-      .pos(0, bandY)
-      .size((int16_t)w, bandH)
+      .pos(14, contentY + 8)
+      .size(98, 48)
       .radius(10)
       .direction(TopDown)
-      .gradient(false)
-      .materialStrength(0)
-      .materialColor(ui.rgb(10, 10, 10));
+      .material(120, -1);
 
-  buildBlurRow(t, (int16_t)w, bandY + bandH + 10, 18, 16, row);
-  drawBlurRow(ui, row);
+  ui.drawBlur()
+      .pos(128, contentY + 8)
+      .size(98, 48)
+      .radius(10)
+      .direction(BottomUp)
+      .material(120, -1);
 
-  ui.setTextStyle(H2);
-  ui.drawText().text("Blur strip").pos(-1, (int16_t)(bandY + bandH + 60)).color(color565To888(0xFFFF)).bgColor(ui.rgb(10, 10, 10)).align(Center);
+  ui.drawBlur()
+      .pos(14, contentY + 70)
+      .size(98, 48)
+      .radius(10)
+      .direction(LeftRight)
+      .material(120, -1);
+
+  ui.drawBlur()
+      .pos(128, contentY + 70)
+      .size(98, 48)
+      .radius(10)
+      .direction(RightLeft)
+      .material(120, -1);
+
   ui.setTextStyle(Caption);
-  ui.drawText().text("Next: change screen").pos(-1, (int16_t)(bandY + bandH + 80)).color(ui.rgb(160, 160, 160)).bgColor(ui.rgb(10, 10, 10)).align(Center);
-  ui.drawText().text("Prev: back / OK").pos(-1, (int16_t)(bandY + bandH + 96)).color(ui.rgb(160, 160, 160)).bgColor(ui.rgb(10, 10, 10)).align(Center);
+  ui.drawText().text("TopDown").pos(63, contentY + 61).color(color565To888(0xFFFF)).bgColor(bg565).align(Center);
+  ui.drawText().text("BottomUp").pos(177, contentY + 61).color(color565To888(0xFFFF)).bgColor(bg565).align(Center);
+  ui.drawText().text("LeftRight").pos(63, contentY + 123).color(color565To888(0xFFFF)).bgColor(bg565).align(Center);
+  ui.drawText().text("RightLeft").pos(177, contentY + 123).color(color565To888(0xFFFF)).bgColor(bg565).align(Center);
+  ui.drawText().text("Blur directions").pos(-1, (int16_t)(contentY + contentH - 28)).color(color565To888(0xFFFF)).bgColor(bg565).align(Center);
+  ui.drawText().text("Moving shapes stay visible under each panel").pos(-1, (int16_t)(contentY + contentH - 12)).color(ui.rgb(160, 160, 160)).bgColor(bg565).align(Center);
 }

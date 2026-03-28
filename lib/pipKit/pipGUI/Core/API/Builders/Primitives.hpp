@@ -53,24 +53,23 @@ namespace pipgui
             _borderColor = c;
             return *this;
         }
-        DrawRectFluent &radius(std::initializer_list<uint8_t> radii)
+        DrawRectFluent &radius(uint8_t r)
         {
             if (!canMutate())
                 return *this;
-            if (radii.size() == 1)
-            {
-                _radius = *radii.begin();
-                _perCorner = false;
-            }
-            else if (radii.size() == 4)
-            {
-                auto it = radii.begin();
-                _radiusTL = *it++;
-                _radiusTR = *it++;
-                _radiusBR = *it++;
-                _radiusBL = *it++;
-                _perCorner = true;
-            }
+            _radius = r;
+            _perCorner = false;
+            return *this;
+        }
+        DrawRectFluent &radius(uint8_t tl, uint8_t tr, uint8_t br, uint8_t bl)
+        {
+            if (!canMutate())
+                return *this;
+            _radiusTL = tl;
+            _radiusTR = tr;
+            _radiusBR = br;
+            _radiusBL = bl;
+            _perCorner = true;
             return *this;
         }
         void draw();
@@ -99,28 +98,28 @@ namespace pipgui
             _h = h;
             return *this;
         }
-        GradientVerticalFluent &topColor(uint32_t c)
+        GradientVerticalFluent &TColor(uint32_t c)
         {
             if (!canMutate())
                 return *this;
             _topColor = c;
             return *this;
         }
-        GradientVerticalFluent &topColor(uint16_t c565)
+        GradientVerticalFluent &TColor(uint16_t c565)
         {
             if (!canMutate())
                 return *this;
             _topColor = detail::color565To888(c565);
             return *this;
         }
-        GradientVerticalFluent &bottomColor(uint32_t c)
+        GradientVerticalFluent &BColor(uint32_t c)
         {
             if (!canMutate())
                 return *this;
             _bottomColor = c;
             return *this;
         }
-        GradientVerticalFluent &bottomColor(uint16_t c565)
+        GradientVerticalFluent &BColor(uint16_t c565)
         {
             if (!canMutate())
                 return *this;
@@ -153,28 +152,28 @@ namespace pipgui
             _h = h;
             return *this;
         }
-        GradientHorizontalFluent &leftColor(uint32_t c)
+        GradientHorizontalFluent &LColor(uint32_t c)
         {
             if (!canMutate())
                 return *this;
             _leftColor = c;
             return *this;
         }
-        GradientHorizontalFluent &leftColor(uint16_t c565)
+        GradientHorizontalFluent &LColor(uint16_t c565)
         {
             if (!canMutate())
                 return *this;
             _leftColor = detail::color565To888(c565);
             return *this;
         }
-        GradientHorizontalFluent &rightColor(uint32_t c)
+        GradientHorizontalFluent &RColor(uint32_t c)
         {
             if (!canMutate())
                 return *this;
             _rightColor = c;
             return *this;
         }
-        GradientHorizontalFluent &rightColor(uint16_t c565)
+        GradientHorizontalFluent &RColor(uint16_t c565)
         {
             if (!canMutate())
                 return *this;
@@ -207,56 +206,56 @@ namespace pipgui
             _h = h;
             return *this;
         }
-        GradientCornersFluent &topLeftColor(uint32_t color)
+        GradientCornersFluent &TLColor(uint32_t color)
         {
             if (!canMutate())
                 return *this;
             _c00 = color;
             return *this;
         }
-        GradientCornersFluent &topLeftColor(uint16_t color565)
+        GradientCornersFluent &TLColor(uint16_t color565)
         {
             if (!canMutate())
                 return *this;
             _c00 = detail::color565To888(color565);
             return *this;
         }
-        GradientCornersFluent &topRightColor(uint32_t color)
+        GradientCornersFluent &TRColor(uint32_t color)
         {
             if (!canMutate())
                 return *this;
             _c10 = color;
             return *this;
         }
-        GradientCornersFluent &topRightColor(uint16_t color565)
+        GradientCornersFluent &TRColor(uint16_t color565)
         {
             if (!canMutate())
                 return *this;
             _c10 = detail::color565To888(color565);
             return *this;
         }
-        GradientCornersFluent &bottomLeftColor(uint32_t color)
+        GradientCornersFluent &BLColor(uint32_t color)
         {
             if (!canMutate())
                 return *this;
             _c01 = color;
             return *this;
         }
-        GradientCornersFluent &bottomLeftColor(uint16_t color565)
+        GradientCornersFluent &BLColor(uint16_t color565)
         {
             if (!canMutate())
                 return *this;
             _c01 = detail::color565To888(color565);
             return *this;
         }
-        GradientCornersFluent &bottomRightColor(uint32_t color)
+        GradientCornersFluent &BRColor(uint32_t color)
         {
             if (!canMutate())
                 return *this;
             _c11 = color;
             return *this;
         }
-        GradientCornersFluent &bottomRightColor(uint16_t color565)
+        GradientCornersFluent &BRColor(uint16_t color565)
         {
             if (!canMutate())
                 return *this;
@@ -289,28 +288,28 @@ namespace pipgui
             _h = h;
             return *this;
         }
-        GradientDiagonalFluent &topLeftColor(uint32_t c)
+        GradientDiagonalFluent &TLColor(uint32_t c)
         {
             if (!canMutate())
                 return *this;
             _tlColor = c;
             return *this;
         }
-        GradientDiagonalFluent &topLeftColor(uint16_t c565)
+        GradientDiagonalFluent &TLColor(uint16_t c565)
         {
             if (!canMutate())
                 return *this;
             _tlColor = detail::color565To888(c565);
             return *this;
         }
-        GradientDiagonalFluent &bottomRightColor(uint32_t c)
+        GradientDiagonalFluent &BRColor(uint32_t c)
         {
             if (!canMutate())
                 return *this;
             _brColor = c;
             return *this;
         }
-        GradientDiagonalFluent &bottomRightColor(uint16_t c565)
+        GradientDiagonalFluent &BRColor(uint16_t c565)
         {
             if (!canMutate())
                 return *this;
@@ -509,14 +508,14 @@ namespace pipgui
             _thickness = t;
             return *this;
         }
-        DrawArcFluent &startDeg(float d)
+        DrawArcFluent &start(float d)
         {
             if (!canMutate())
                 return *this;
             _startDeg = d;
             return *this;
         }
-        DrawArcFluent &endDeg(float d)
+        DrawArcFluent &end(float d)
         {
             if (!canMutate())
                 return *this;
@@ -679,24 +678,23 @@ namespace pipgui
             _h = h;
             return *this;
         }
-        DrawSquircleRectFluent &radius(std::initializer_list<uint8_t> radii)
+        DrawSquircleRectFluent &radius(uint8_t r)
         {
             if (!canMutate())
                 return *this;
-            if (radii.size() == 1)
-            {
-                _radius = *radii.begin();
-                _perCorner = false;
-            }
-            else if (radii.size() == 4)
-            {
-                auto it = radii.begin();
-                _radiusTL = *it++;
-                _radiusTR = *it++;
-                _radiusBR = *it++;
-                _radiusBL = *it++;
-                _perCorner = true;
-            }
+            _radius = r;
+            _perCorner = false;
+            return *this;
+        }
+        DrawSquircleRectFluent &radius(uint8_t tl, uint8_t tr, uint8_t br, uint8_t bl)
+        {
+            if (!canMutate())
+                return *this;
+            _radiusTL = tl;
+            _radiusTR = tr;
+            _radiusBR = br;
+            _radiusBL = bl;
+            _perCorner = true;
             return *this;
         }
         DrawSquircleRectFluent &fill(uint16_t c)

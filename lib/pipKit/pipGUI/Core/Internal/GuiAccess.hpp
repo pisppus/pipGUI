@@ -8,9 +8,9 @@ namespace pipgui
     {
         struct GuiAccess
         {
-            static void configureDisplay(GUI &gui, const pipcore::DisplayConfig &cfg)
+            static void configDisplay(GUI &gui, const pipcore::DisplayConfig &cfg)
             {
-                gui.configureDisplay(cfg);
+                gui.configDisplay(cfg);
             }
 
             static void setClip(GUI &gui, int16_t x, int16_t y, int16_t w, int16_t h)
@@ -21,14 +21,9 @@ namespace pipgui
             static void startLogo(GUI &gui,
                                   const String &title,
                                   const String &subtitle,
-                                  BootAnimation anim,
-                                  uint32_t fg,
-                                  uint32_t bg,
-                                  uint32_t dur,
-                                  int16_t x,
-                                  int16_t y)
+                                  BootAnimation anim)
             {
-                gui.startLogo(title, subtitle, anim, fg, bg, dur, x, y);
+                gui.startLogo(title, subtitle, anim);
             }
 
             static void configureBacklight(GUI &gui,
@@ -527,80 +522,6 @@ namespace pipgui
                 gui.updateGlowCircle(x, y, r, fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
             }
 
-            static void drawGlowRect(GUI &gui,
-                                     int16_t x,
-                                     int16_t y,
-                                     int16_t w,
-                                     int16_t h,
-                                     uint8_t radius,
-                                     uint16_t fillColor,
-                                     int16_t bgColor,
-                                     int16_t glowColor,
-                                     uint8_t glowSize,
-                                     uint8_t glowStrength,
-                                     GlowAnim anim,
-                                     uint16_t pulsePeriodMs)
-            {
-                gui.drawGlowRect(x, y, w, h, radius, fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
-            }
-
-            static void updateGlowRect(GUI &gui,
-                                       int16_t x,
-                                       int16_t y,
-                                       int16_t w,
-                                       int16_t h,
-                                       uint8_t radius,
-                                       uint16_t fillColor,
-                                       int16_t bgColor,
-                                       int16_t glowColor,
-                                       uint8_t glowSize,
-                                       uint8_t glowStrength,
-                                       GlowAnim anim,
-                                       uint16_t pulsePeriodMs)
-            {
-                gui.updateGlowRect(x, y, w, h, radius, fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
-            }
-
-            static void drawGlowRect(GUI &gui,
-                                     int16_t x,
-                                     int16_t y,
-                                     int16_t w,
-                                     int16_t h,
-                                     uint8_t tl,
-                                     uint8_t tr,
-                                     uint8_t br,
-                                     uint8_t bl,
-                                     uint16_t fillColor,
-                                     int16_t bgColor,
-                                     int16_t glowColor,
-                                     uint8_t glowSize,
-                                     uint8_t glowStrength,
-                                     GlowAnim anim,
-                                     uint16_t pulsePeriodMs)
-            {
-                gui.drawGlowRect(x, y, w, h, tl, tr, br, bl, fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
-            }
-
-            static void updateGlowRect(GUI &gui,
-                                       int16_t x,
-                                       int16_t y,
-                                       int16_t w,
-                                       int16_t h,
-                                       uint8_t tl,
-                                       uint8_t tr,
-                                       uint8_t br,
-                                       uint8_t bl,
-                                       uint16_t fillColor,
-                                       int16_t bgColor,
-                                       int16_t glowColor,
-                                       uint8_t glowSize,
-                                       uint8_t glowStrength,
-                                       GlowAnim anim,
-                                       uint16_t pulsePeriodMs)
-            {
-                gui.updateGlowRect(x, y, w, h, tl, tr, br, bl, fillColor, bgColor, glowColor, glowSize, glowStrength, anim, pulsePeriodMs);
-            }
-
             static void showToast(GUI &gui,
                                   const String &text,
                                   bool fromTop,
@@ -938,6 +859,29 @@ namespace pipgui
                     gui.updateIconInternal(iconId, x, y, sizePx, fg565, bg565);
                 else
                     gui.drawIconInternal(iconId, x, y, sizePx, fg565);
+            }
+
+            static void drawAnimIcon(GUI &gui,
+                                     uint16_t iconId,
+                                     int16_t x,
+                                     int16_t y,
+                                     uint16_t sizePx,
+                                     uint16_t fg565,
+                                     uint32_t nowMs)
+            {
+                gui.drawAnimatedIconInternal(iconId, x, y, sizePx, fg565, nowMs ? nowMs : gui.nowMs());
+            }
+
+            static void updateAnimIcon(GUI &gui,
+                                       uint16_t iconId,
+                                       int16_t x,
+                                       int16_t y,
+                                       uint16_t sizePx,
+                                       uint16_t fg565,
+                                       uint16_t bg565,
+                                       uint32_t nowMs)
+            {
+                gui.updateAnimatedIconInternal(iconId, x, y, sizePx, fg565, bg565, nowMs ? nowMs : gui.nowMs());
             }
 
             static void configureStatusBar(GUI &gui, bool enabled, uint32_t bgColor, uint8_t height, StatusBarPosition pos)

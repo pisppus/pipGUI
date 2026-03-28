@@ -15,7 +15,7 @@
 
 namespace pipgui
 {
-    struct ConfigureDisplayFluent;
+    struct ConfigDisplayFluent;
     struct ConfigureBacklightFluent;
     struct SetClipFluent;
     struct ShowLogoFluent;
@@ -46,11 +46,6 @@ namespace pipgui
     struct GlowCircleFluentT;
     using DrawGlowCircleFluent = GlowCircleFluentT<false>;
     using UpdateGlowCircleFluent = GlowCircleFluentT<true>;
-
-    template <bool IsUpdate>
-    struct GlowRectFluentT;
-    using DrawGlowRectFluent = GlowRectFluentT<false>;
-    using UpdateGlowRectFluent = GlowRectFluentT<true>;
 
     template <bool IsUpdate>
     struct ToggleSwitchFluentT;
@@ -101,6 +96,10 @@ namespace pipgui
     struct NotificationFluent;
     struct PopupMenuFluent;
     struct DrawIconFluent;
+    template <bool IsUpdate>
+    struct AnimIconFluentT;
+    using DrawAnimIconFluent = AnimIconFluentT<false>;
+    using UpdateAnimIconFluent = AnimIconFluentT<true>;
     struct DrawScreenshotFluent;
     struct ConfigGraphScopeFluent;
 
@@ -151,13 +150,13 @@ namespace pipgui
 
         [[nodiscard]] pipcore::Platform *platform() const noexcept;
 
-        [[nodiscard]] ConfigureDisplayFluent configureDisplay();
+        [[nodiscard]] ConfigDisplayFluent configDisplay();
         [[nodiscard]] ConfigureBacklightFluent setBacklight();
         [[nodiscard]] SetClipFluent setClip();
         [[nodiscard]] ShowLogoFluent showLogo();
-        void begin(uint8_t rotation = 0, uint16_t bgColor = 0x0000);
+        void begin(uint8_t rotation = 0);
 
-        void setBacklightCallback(BacklightCallback cb) noexcept;
+        void setBacklightHandler(BacklightHandler handler) noexcept;
         void setBrightness(uint8_t percent);
         void setMaxBrightness(uint8_t percent);
         [[nodiscard]] uint8_t brightness() const noexcept { return _disp.brightness; }
@@ -218,8 +217,6 @@ namespace pipgui
 
         [[nodiscard]] DrawGlowCircleFluent drawGlowCircle();
         [[nodiscard]] UpdateGlowCircleFluent updateGlowCircle();
-        [[nodiscard]] DrawGlowRectFluent drawGlowRect();
-        [[nodiscard]] UpdateGlowRectFluent updateGlowRect();
 
         [[nodiscard]] DrawScrollDotsFluent drawScrollDots();
         [[nodiscard]] UpdateScrollDotsFluent updateScrollDots();
@@ -266,8 +263,8 @@ namespace pipgui
         [[nodiscard]] uint16_t graphSamplesVisible(uint8_t screenId) const noexcept;
 
         [[nodiscard]] DrawIconFluent drawIcon();
-        void drawAnimatedIcon(AnimatedIconId iconId, int16_t x, int16_t y, uint16_t sizePx, uint16_t fg565, uint32_t nowMs = 0);
-        void updateAnimatedIcon(AnimatedIconId iconId, int16_t x, int16_t y, uint16_t sizePx, uint16_t fg565, uint16_t bg565, uint32_t nowMs = 0);
+        [[nodiscard]] DrawAnimIconFluent drawAnimIcon();
+        [[nodiscard]] UpdateAnimIconFluent updateAnimIcon();
         [[nodiscard]] DrawTextFluent drawText();
         [[nodiscard]] UpdateTextFluent updateText();
         [[nodiscard]] DrawTextMarqueeFluent drawTextMarquee();
@@ -387,10 +384,8 @@ namespace pipgui
         void initFonts();
         void applyClip(int16_t x, int16_t y, int16_t w, int16_t h);
         void startLogo(const String &t, const String &s,
-                       BootAnimation a = None, uint32_t fg = 0xFFFFFF,
-                       uint32_t bg = 0x000000, uint32_t dur = 0,
-                       int16_t x = -1, int16_t y = -1);
-        void configureDisplay(const pipcore::DisplayConfig &cfg);
+                       BootAnimation a = None);
+        void configDisplay(const pipcore::DisplayConfig &cfg);
         void configureBacklight(uint8_t pin, uint8_t channel = 0, uint32_t freqHz = 5000, uint8_t resolutionBits = 12);
         void setBackgroundColorCache(uint16_t color565) noexcept;
         void resetDisplayRuntime() noexcept;
@@ -664,34 +659,6 @@ namespace pipgui
                               int16_t bgColor, int16_t glowColor,
                               uint8_t glowSize, uint8_t glowStrength,
                               GlowAnim anim, uint16_t pulsePeriodMs);
-        void drawGlowRect(int16_t x, int16_t y,
-                          int16_t w, int16_t h,
-                          uint8_t radius, uint16_t fillColor,
-                          int16_t bgColor, int16_t glowColor,
-                          uint8_t glowSize, uint8_t glowStrength,
-                          GlowAnim anim, uint16_t pulsePeriodMs);
-        void updateGlowRect(int16_t x, int16_t y,
-                            int16_t w, int16_t h,
-                            uint8_t radius, uint16_t fillColor,
-                            int16_t bgColor, int16_t glowColor,
-                            uint8_t glowSize, uint8_t glowStrength,
-                            GlowAnim anim, uint16_t pulsePeriodMs);
-        void drawGlowRect(int16_t x, int16_t y,
-                          int16_t w, int16_t h,
-                          uint8_t radiusTL, uint8_t radiusTR,
-                          uint8_t radiusBR, uint8_t radiusBL,
-                          uint16_t fillColor, int16_t bgColor,
-                          int16_t glowColor, uint8_t glowSize,
-                          uint8_t glowStrength, GlowAnim anim,
-                          uint16_t pulsePeriodMs);
-        void updateGlowRect(int16_t x, int16_t y,
-                            int16_t w, int16_t h,
-                            uint8_t radiusTL, uint8_t radiusTR,
-                            uint8_t radiusBR, uint8_t radiusBL,
-                            uint16_t fillColor, int16_t bgColor,
-                            int16_t glowColor, uint8_t glowSize,
-                            uint8_t glowStrength, GlowAnim anim,
-                            uint16_t pulsePeriodMs);
 
         GraphArea *ensureGraphArea(uint8_t screenId);
         void beginGraphFrame(uint8_t screenId) noexcept;
@@ -759,4 +726,6 @@ namespace pipgui
         bool ensureErrorCapacity(uint8_t need);
         void freeErrors(pipcore::Platform *plat) noexcept;
     };
+
+    using InputState = GUI::InputState;
 }

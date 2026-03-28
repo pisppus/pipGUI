@@ -78,7 +78,7 @@ SCREEN(firmwareUpdate, 40)
   auto cardRect = ui.drawRect()
                       .pos(l.cardX, l.infoY)
                       .size(l.cardW, l.infoH)
-                      .radius({14})
+                      .radius(14)
                       .fill(cardBg);
   cardRect.derive()
       .pos(l.cardX, l.notesY)

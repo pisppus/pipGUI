@@ -1304,6 +1304,72 @@ namespace pipgui
         void draw();
     };
 
+    template <bool IsUpdate>
+    struct AnimIconFluentT : detail::FluentLifetime
+    {
+        PIPGUI_DEFAULT_FLUENT_MOVE(AnimIconFluentT);
+        int16_t _x, _y;
+        uint16_t _sizePx;
+        uint16_t _iconId;
+        uint16_t _fg565;
+        uint16_t _bg565;
+
+        AnimIconFluentT(GUI *g)
+            : detail::FluentLifetime(g),
+              _x(-1), _y(-1),
+              _sizePx(0),
+              _iconId(0),
+              _fg565(0xFFFF),
+              _bg565(0x0000)
+        {
+        }
+
+        ~AnimIconFluentT() { draw(); }
+
+        AnimIconFluentT &pos(int16_t x, int16_t y)
+        {
+            if (!canMutate())
+                return *this;
+            _x = x;
+            _y = y;
+            return *this;
+        }
+
+        AnimIconFluentT &size(uint16_t sizePx)
+        {
+            if (!canMutate())
+                return *this;
+            _sizePx = sizePx;
+            return *this;
+        }
+
+        AnimIconFluentT &icon(uint16_t iconId)
+        {
+            if (!canMutate())
+                return *this;
+            _iconId = iconId;
+            return *this;
+        }
+
+        AnimIconFluentT &color(uint16_t fg565)
+        {
+            if (!canMutate())
+                return *this;
+            _fg565 = fg565;
+            return *this;
+        }
+
+        AnimIconFluentT &bgColor(uint16_t bg565)
+        {
+            if (!canMutate())
+                return *this;
+            _bg565 = bg565;
+            return *this;
+        }
+
+        void draw();
+    };
+
     struct DrawScreenshotFluent : detail::FluentLifetime
     {
         PIPGUI_DEFAULT_FLUENT_MOVE(DrawScreenshotFluent);
