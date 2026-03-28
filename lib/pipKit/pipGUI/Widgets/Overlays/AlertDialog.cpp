@@ -210,7 +210,7 @@ namespace pipgui
             int16_t cTop = 0;
             int16_t cH = (int16_t)_render.screenHeight;
             const int16_t sb = statusBarHeight();
-            if (_flags.statusBarEnabled && sb > 0 && _status.style == StatusBarStyleSolid)
+            if (_flags.statusBarEnabled && sb > 0 && _status.style == Solid)
             {
                 if (_status.pos == Top)
                 {

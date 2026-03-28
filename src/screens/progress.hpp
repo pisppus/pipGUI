@@ -13,22 +13,22 @@ SCREEN(progress, 6)
                      .baseColor(ui.rgb(10, 10, 10))
                      .fillColor(ui.rgb(0, 87, 250))
                      .radius(6)
-                     .label("Indeterminate")
+                     .label("Indeterminate", Left)
                      .labelColor(ui.rgb(255, 255, 255))
-                     .percent()
+                     .percent(Right)
                      .percentColor(ui.rgb(200, 200, 200))
                      .anim(Indeterminate);
 
   barBase.derive()
       .value(g_progressValue)
       .pos(center, 74)
-      .label("Shimmer")
+      .label("Shimmer", Left)
       .anim(Shimmer);
 
   barBase.derive()
       .value(g_progressValue)
       .pos(center, 88)
-      .label("Determinate")
+      .label("Determinate", Left)
       .fillColor(ui.rgb(255, 0, 72))
       .anim(None);
 

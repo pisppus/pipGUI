@@ -262,7 +262,7 @@ namespace pipgui
 
                     if (!overlaysActive && currentIsList)
                     {
-                        updateList(_screen.current);
+                        updateListScreen(_screen.current);
                         renderStatusBar();
                         _flags.dirtyRedrawPending = 0;
                         if (_dirty.count > 0)

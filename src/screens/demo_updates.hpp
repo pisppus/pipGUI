@@ -13,6 +13,8 @@ namespace
       "Rename",
   };
   constexpr uint8_t kPopupMenuDemoItemCount = static_cast<uint8_t>(sizeof(kPopupMenuDemoItems) / sizeof(kPopupMenuDemoItems[0]));
+  constexpr uint8_t kOtaStablePopupCap = 16;
+  const char *g_otaStablePopupItems[kOtaStablePopupCap] = {};
 }
 
 void updateGlowDemoFrame(uint32_t nowMs)
@@ -153,9 +155,9 @@ void updateProgressDemoFrame(uint32_t nowMs)
       .baseColor(ui.rgb(10, 10, 10))
       .fillColor(ui.rgb(0, 87, 250))
       .radius(6)
-      .label("Indeterminate")
+      .label("Indeterminate", Left)
       .labelColor(ui.rgb(255, 255, 255))
-      .percent()
+      .percent(Right)
       .percentColor(ui.rgb(200, 200, 200))
       .anim(Indeterminate);
 
@@ -166,9 +168,9 @@ void updateProgressDemoFrame(uint32_t nowMs)
       .baseColor(ui.rgb(10, 10, 10))
       .fillColor(ui.rgb(255, 0, 72))
       .radius(6)
-      .label("Determinate")
+      .label("Determinate", Left)
       .labelColor(ui.rgb(255, 255, 255))
-      .percent()
+      .percent(Right)
       .percentColor(ui.rgb(200, 200, 200))
       .anim(None);
 
@@ -179,9 +181,9 @@ void updateProgressDemoFrame(uint32_t nowMs)
       .baseColor(ui.rgb(10, 10, 10))
       .fillColor(ui.rgb(255, 128, 0))
       .radius(6)
-      .label("Shimmer")
+      .label("Shimmer", Left)
       .labelColor(ui.rgb(255, 255, 255))
-      .percent()
+      .percent(Right)
       .percentColor(ui.rgb(200, 200, 200))
       .anim(Shimmer);
 
@@ -272,8 +274,7 @@ void updateSettingsDemoFrame(uint32_t nowMs, bool buttonPressed, bool buttonDown
     g_settingsLoadingUntil = nowMs + kSettingsLoadingDurationMs;
     loading = true;
     ui.showNotification()
-        .title("Sync paused")
-        .message("Cloud sync is paused.\nConfirm changes to continue.")
+        .text("Sync paused", "Cloud sync is paused.\nConfirm changes to continue.")
         .button("OK")
         .delay(2)
         .type(Error);
@@ -305,6 +306,13 @@ void updateFirmwareUpdateScreen(uint32_t nowMs, bool nextPressed, bool nextDown,
       (st.state == OtaState::FetchingManifest) ||
       (st.state == OtaState::Downloading) ||
       (st.state == OtaState::Installing);
+  const struct
+  {
+    int16_t _x;
+    int16_t _y;
+    int16_t _w;
+    int16_t _h;
+  } rollbackAnchor = {l.btnX1, l.btnY, l.btnW, l.btnH};
   const int16_t picked = ui.popupMenuTakeResult();
   if (picked >= 0 && !busy)
   {
@@ -348,13 +356,13 @@ void updateFirmwareUpdateScreen(uint32_t nowMs, bool nextPressed, bool nextDown,
         if (ui.otaStableListReady() && ui.otaStableListCount() > 0)
         {
           const uint8_t count = ui.otaStableListCount();
-          const uint8_t maxVisible = 7;
+          for (uint8_t i = 0; i < count && i < kOtaStablePopupCap; ++i)
+            g_otaStablePopupItems[i] = ui.otaStableListVersion(i);
           ui.showPopupMenu()
-              .items(&otaStableVersionItem, nullptr, count)
-              .anchor(l.btnX1, l.btnY, l.btnW, l.btnH)
+              .items(g_otaStablePopupItems, count)
+              .anchor(rollbackAnchor)
               .width(l.btnW)
-              .selected(0)
-              .maxVisible(maxVisible);
+              .selected(0);
         }
         else
         {
@@ -377,13 +385,13 @@ void updateFirmwareUpdateScreen(uint32_t nowMs, bool nextPressed, bool nextDown,
       }
       else if (!busy)
       {
-        const uint8_t maxVisible = 7;
+        for (uint8_t i = 0; i < count && i < kOtaStablePopupCap; ++i)
+          g_otaStablePopupItems[i] = ui.otaStableListVersion(i);
         ui.showPopupMenu()
-            .items(&otaStableVersionItem, nullptr, count)
-            .anchor(l.btnX1, l.btnY, l.btnW, l.btnH)
+            .items(g_otaStablePopupItems, count)
+            .anchor(rollbackAnchor)
             .width(l.btnW)
-            .selected(0)
-            .maxVisible(maxVisible);
+            .selected(0);
       }
     }
 
@@ -737,7 +745,7 @@ void updateButtonsDemo(uint32_t nowMs, bool nextPressed, bool nextDown, bool pre
   ui.updateText().text("Top: auto text fade, lower: press scale + progress").pos(center, 126).color(hint565).bgColor(bg565).align(Center);
 }
 
-void updateSliderDemo(uint32_t nowMs, bool nextDown, bool prevDown, bool comboDown)
+void updateSliderDemo(uint32_t nowMs, bool comboDown)
 {
   static uint32_t comboHoldStartMs = 0;
   static int16_t autoSliderValue = 18;
@@ -793,11 +801,7 @@ void updateSliderDemo(uint32_t nowMs, bool nextDown, bool prevDown, bool comboDo
   ui.updateSlider()
       .pos(center, 114)
       .size(186, 24)
-      .value(g_sliderValue)
-      .range(0, 100)
-      .step(2)
-      .nextDown(nextDown)
-      .prevDown(prevDown)
+      .bind(g_sliderValue)
       .activeColor(active565)
       .thumbColor(0xFFFF);
 
@@ -809,9 +813,7 @@ void updateSliderDemo(uint32_t nowMs, bool nextDown, bool prevDown, bool comboDo
   ui.updateSlider()
       .pos(center, 184)
       .size(186, 24)
-      .value(autoSliderValue)
-      .range(0, 100)
-      .step(1)
+      .bind(autoSliderValue)
       .activeColor(warm565)
       .thumbColor(0xFFFF);
 
@@ -824,9 +826,7 @@ void updateSliderDemo(uint32_t nowMs, bool nextDown, bool prevDown, bool comboDo
   ui.updateSlider()
       .pos(center, 254)
       .size(186, 24)
-      .value(disabledValue)
-      .range(0, 100)
-      .step(1)
+      .bind(disabledValue)
       .activeColor(ui.rgb(90, 90, 90))
       .thumbColor(0xFFFF)
       .enabled(false);
@@ -967,7 +967,7 @@ void updatePopupMenuDemo(bool nextPressed, bool nextDown, bool prevPressed, bool
     return;
 
   ui.showPopupMenu()
-      .items(kPopupMenuDemoItems, kPopupMenuDemoItemCount)
+      .items(kPopupMenuDemoItems)
       .anchor(button)
       .width(156);
 }

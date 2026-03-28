@@ -7,7 +7,7 @@ namespace pipgui
 {
     namespace ssd = screenshots::detail;
 
-    void GUI::configureScreenshotGallery(uint8_t maxShots, uint16_t thumbW, uint16_t thumbH, uint16_t padding)
+    void GUI::syncScreenshotGalleryLayout(uint8_t maxShots, uint16_t thumbW, uint16_t thumbH, uint16_t padding)
     {
 #if !PIPGUI_SCREENSHOTS
         (void)maxShots;
@@ -23,6 +23,11 @@ namespace pipgui
             thumbW = 64;
             thumbH = 40;
         }
+        if (_shots.maxShots == maxShots &&
+            _shots.thumbW == thumbW &&
+            _shots.thumbH == thumbH &&
+            _shots.padding == padding)
+            return;
         if (_shots.entries)
             freeScreenshotGallery(platform());
         _shots.maxShots = maxShots;

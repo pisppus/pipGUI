@@ -10,6 +10,68 @@ namespace pipgui
     {
         constexpr uint8_t kDefaultTileRadius = 17;
 
+        static uint32_t hashStr(uint32_t h, const char *s)
+        {
+            if (!s)
+                return (h ^ 0xFFu) * 16777619u;
+            while (*s)
+            {
+                h ^= static_cast<uint8_t>(*s++);
+                h *= 16777619u;
+            }
+            return (h ^ 0u) * 16777619u;
+        }
+
+        static uint32_t hashU32(uint32_t h, uint32_t v)
+        {
+            for (uint8_t i = 0; i < 4; ++i)
+            {
+                h ^= static_cast<uint8_t>((v >> (i * 8)) & 0xFFu);
+                h *= 16777619u;
+            }
+            return h;
+        }
+
+        static uint32_t makeTileConfigHash(const TileItemDef *items,
+                                           uint8_t itemCount,
+                                           const TileStyle &style,
+                                           const TilePlacementDef *placements,
+                                           uint8_t gridCols,
+                                           uint8_t gridRows,
+                                           bool customLayout)
+        {
+            uint32_t h = 2166136261u;
+            h = hashU32(h, itemCount);
+            h = hashU32(h, style.cardColor);
+            h = hashU32(h, style.cardActiveColor);
+            h = hashU32(h, style.radius);
+            h = hashU32(h, style.spacing);
+            h = hashU32(h, style.columns);
+            h = hashU32(h, static_cast<uint16_t>(style.tileWidth));
+            h = hashU32(h, static_cast<uint16_t>(style.tileHeight));
+            h = hashU32(h, style.lineGapPx);
+            h = hashU32(h, style.contentMode);
+            h = hashU32(h, customLayout ? 1u : 0u);
+            h = hashU32(h, gridCols);
+            h = hashU32(h, gridRows);
+
+            for (uint8_t i = 0; i < itemCount; ++i)
+            {
+                h = hashStr(h, items[i].title);
+                h = hashStr(h, items[i].subtitle);
+                h = hashU32(h, items[i].targetScreen);
+                h = hashU32(h, items[i].iconId);
+                if (customLayout && placements)
+                {
+                    h = hashU32(h, placements[i].col);
+                    h = hashU32(h, placements[i].row);
+                    h = hashU32(h, placements[i].colSpan);
+                    h = hashU32(h, placements[i].rowSpan);
+                }
+            }
+            return h;
+        }
+
         struct TileLayoutCell
         {
             uint8_t col;
@@ -70,6 +132,8 @@ namespace pipgui
                 out.spacing = 8;
             if (out.columns == 0)
                 out.columns = 2;
+            if (out.lineGapPx == 0)
+                out.lineGapPx = 5;
 
             return out;
         }
@@ -271,155 +335,76 @@ namespace pipgui
         return pipgui::detail::ensureCapacity(self->platform(), m.items, m.itemCapacity, need);
     }
 
-    static bool parseTileLayoutSpec(const char *const *rows,
-                                    uint8_t rowCount,
-                                    uint8_t itemCount,
-                                    TileLayoutCell *outCells,
-                                    uint8_t &outCellCount,
-                                    uint8_t &outCols,
-                                    uint8_t &outRows)
-    {
-        outCellCount = 0;
-        outCols = 0;
-        outRows = rowCount;
-
-        if (!rows || rowCount == 0)
-            return true;
-
-        const size_t cols = rows[0] ? strlen(rows[0]) : 0;
-        if (cols == 0 || cols > 255)
-            return false;
-
-        struct Bounds
-        {
-            uint8_t minCol = 255;
-            uint8_t minRow = 255;
-            uint8_t maxCol = 0;
-            uint8_t maxRow = 0;
-            uint16_t count = 0;
-            bool used = false;
-        };
-
-        Bounds bounds[256] = {};
-        uint8_t symbolToIndex[256];
-        std::fill_n(symbolToIndex, 256, 0xFF);
-        uint8_t order[256] = {};
-
-        for (uint8_t row = 0; row < rowCount; ++row)
-        {
-            if (!rows[row] || strlen(rows[row]) != cols)
-                return false;
-
-            for (uint8_t col = 0; col < cols; ++col)
-            {
-                const uint8_t key = static_cast<uint8_t>(rows[row][col]);
-                if (key == ' ' || key == '.')
-                    continue;
-
-                uint8_t index = symbolToIndex[key];
-                if (index == 0xFF)
-                {
-                    if (outCellCount >= itemCount)
-                        return false;
-                    index = outCellCount;
-                    symbolToIndex[key] = index;
-                    order[outCellCount++] = key;
-                }
-
-                Bounds &b = bounds[index];
-                if (!b.used)
-                {
-                    b.minCol = b.maxCol = col;
-                    b.minRow = b.maxRow = row;
-                    b.used = true;
-                }
-                else
-                {
-                    if (col < b.minCol)
-                        b.minCol = col;
-                    if (col > b.maxCol)
-                        b.maxCol = col;
-                    if (row < b.minRow)
-                        b.minRow = row;
-                    if (row > b.maxRow)
-                        b.maxRow = row;
-                }
-                ++b.count;
-            }
-        }
-
-        for (uint8_t i = 0; i < outCellCount; ++i)
-        {
-            const uint8_t key = order[i];
-            const Bounds &b = bounds[i];
-            if (!b.used)
-                return false;
-
-            const uint8_t spanCols = (uint8_t)(b.maxCol - b.minCol + 1);
-            const uint8_t spanRows = (uint8_t)(b.maxRow - b.minRow + 1);
-            const uint16_t area = static_cast<uint16_t>(spanCols) * static_cast<uint16_t>(spanRows);
-            if (area != b.count)
-                return false;
-
-            for (uint8_t row = b.minRow; row <= b.maxRow; ++row)
-            {
-                for (uint8_t col = b.minCol; col <= b.maxCol; ++col)
-                {
-                    if (static_cast<uint8_t>(rows[row][col]) != key)
-                        return false;
-                }
-            }
-
-            outCells[i] = TileLayoutCell(b.minCol, b.minRow, spanCols, spanRows);
-        }
-
-        outCols = static_cast<uint8_t>(cols);
-        return true;
-    }
-
     void TileInputFluent::apply()
     {
         if (_consumed || !_gui)
             return;
         _consumed = true;
-        detail::GuiAccess::handleTileInput(*_gui, _screenId, _nextDown, _prevDown);
+        const uint8_t screenId = _gui->currentScreen();
+        if (screenId == INVALID_SCREEN_ID)
+            return;
+        detail::GuiAccess::handleTileInput(*_gui, screenId, _nextDown, _prevDown);
     }
 
-    void ConfigureTileFluent::apply()
+    void UpdateTileFluent::apply()
     {
-        if (_consumed || !_gui || !_items || _itemCount == 0)
+        if (_consumed || !_gui)
             return;
         _consumed = true;
-        if (_screenId == INVALID_SCREEN_ID)
+
+        const uint8_t screenId = _gui->currentScreen();
+        if (screenId == INVALID_SCREEN_ID)
             return;
 
-        const TileStyle style = {
-            _cardColor,
-            _cardActiveColor,
-            _radius,
-            _spacing,
-            _columns,
-            _tileWidth,
-            _tileHeight,
-            _lineGapPx,
-            _contentMode};
-        detail::GuiAccess::configureTile(*_gui, _screenId, _items, _itemCount, style);
-        if (_layoutConfigured)
+        if (_ownedItems.data && _itemCount > 0)
         {
-            TileLayoutCell layoutCells[255] = {};
-            uint8_t layoutCount = 0;
-            uint8_t layoutCols = 0;
-            uint8_t layoutRows = 0;
-            if (parseTileLayoutSpec(_layoutRowsSpec, _layoutRowCount, _itemCount, layoutCells, layoutCount, layoutCols, layoutRows))
+            const TileStyle style = {
+                _cardColor,
+                _cardActiveColor,
+                _radius,
+                _spacing,
+                _columns,
+                _tileWidth,
+                _tileHeight,
+                0,
+                _contentMode};
+            const uint8_t layoutCols = _customLayout ? _gridCols : 0;
+            const uint8_t layoutRows = _customLayout ? _gridRows : 0;
+            const uint32_t configHash = makeTileConfigHash(_ownedItems.data, _itemCount, style, _ownedPlacements.data, layoutCols, layoutRows, _customLayout);
+            TileState *menu = detail::GuiAccess::getTile(*_gui, screenId);
+            if (!menu || !menu->configured || menu->configHash != configHash)
             {
-                TileState *menu = detail::GuiAccess::getTile(*_gui, _screenId);
+                detail::GuiAccess::setupTileState(*_gui, screenId, _ownedItems.data, _itemCount, style);
+                menu = detail::GuiAccess::getTile(*_gui, screenId);
+                if (_customLayout && menu)
+                {
+                    TileLayoutCell layoutCells[255] = {};
+                    const uint8_t layoutCount = _itemCount;
+                    uint8_t inferredCols = _gridCols;
+                    uint8_t inferredRows = _gridRows;
+                    if ((inferredCols == 0 || inferredRows == 0) && _ownedPlacements.data)
+                    {
+                        for (uint8_t i = 0; i < _itemCount; ++i)
+                        {
+                            inferredCols = std::max<uint8_t>(inferredCols, static_cast<uint8_t>(_ownedPlacements.data[i].col + std::max<uint8_t>(1, _ownedPlacements.data[i].colSpan)));
+                            inferredRows = std::max<uint8_t>(inferredRows, static_cast<uint8_t>(_ownedPlacements.data[i].row + std::max<uint8_t>(1, _ownedPlacements.data[i].rowSpan)));
+                        }
+                    }
+                    for (uint8_t i = 0; i < _itemCount; ++i)
+                        layoutCells[i] = TileLayoutCell(_ownedPlacements.data[i].col, _ownedPlacements.data[i].row,
+                                                        _ownedPlacements.data[i].colSpan, _ownedPlacements.data[i].rowSpan);
+                    applyTileLayout(*menu, inferredCols, inferredRows, layoutCells, layoutCount);
+                }
                 if (menu)
-                    applyTileLayout(*menu, layoutCols, layoutRows, layoutCells, layoutCount);
+                    menu->configHash = configHash;
             }
         }
+
+        if (screenId == _gui->currentScreen())
+            detail::GuiAccess::renderTileScreen(*_gui, screenId);
     }
 
-    void GUI::configureTile(uint8_t screenId, const TileItemDef *items, uint8_t itemCount, const TileStyle &style)
+    void GUI::setupTileState(uint8_t screenId, const TileItemDef *items, uint8_t itemCount, const TileStyle &style)
     {
         if (screenId == INVALID_SCREEN_ID || !items || itemCount == 0)
             return;
@@ -568,7 +553,7 @@ namespace pipgui
 
         if (!_flags.spriteEnabled || !_disp.display)
         {
-            renderTile(screenId);
+            renderTileScreen(screenId);
             return;
         }
 
@@ -633,7 +618,7 @@ namespace pipgui
         {
             const DirtyRect &dirty = dirtyRects[i];
             _render.sprite.setClipRect(dirty.x, dirty.y, dirty.w, dirty.h);
-            renderTile(screenId);
+            renderTileScreen(screenId);
         }
 
         _render.sprite.setClipRect(clipX, clipY, clipW, clipH);
@@ -651,7 +636,7 @@ namespace pipgui
         }
     }
 
-    void GUI::renderTile(uint8_t screenId)
+    void GUI::renderTileScreen(uint8_t screenId)
     {
         if (screenId == INVALID_SCREEN_ID)
             return;

@@ -222,10 +222,10 @@ namespace pipgui
         }
     }
 
-    void GUI::configureStatusBar(bool enabled, uint32_t bgColor, uint8_t height, StatusBarPosition pos)
+    void GUI::configStatusBar(uint8_t height, StatusBarPosition pos, StatusBarStyle style)
     {
         _flags.statusBarConfigured = 1;
-        _flags.statusBarEnabled = enabled;
+        _flags.statusBarEnabled = 1;
 
         _status.dirtyMask = detail::StatusBarDirtyAll;
         _status.lastLeft = {};
@@ -233,14 +233,9 @@ namespace pipgui
         _status.lastRight = {};
         _status.lastBattery = {};
 
-        if (!_flags.statusBarEnabled)
-        {
-            _status.height = 0;
-            return;
-        }
-
-        _status.bg = bgColor;
+        _status.bg = 0x000000;
         _status.pos = (pos == Bottom) ? Bottom : Top;
+        _status.style = style;
 
         uint8_t hLocal = height ? height : 18;
 
@@ -252,7 +247,7 @@ namespace pipgui
             _status.height = hLocal;
         }
 
-        _status.fg = detail::autoTextColor(detail::color888To565(bgColor), 128);
+        _status.fg = detail::autoTextColor(0x0000, 128);
     }
 
     void GUI::setStatusBarText(const String &left, const String &center, const String &right)
@@ -376,7 +371,7 @@ namespace pipgui
 
         auto redrawBlurBackdrop = [&]()
         {
-            if (_status.style != StatusBarStyleBlur)
+            if (_status.style != Blur)
                 return;
 
             const ClipState prevClip = _clip;
@@ -457,7 +452,7 @@ namespace pipgui
         if ((mask & detail::StatusBarDirtyBattery) != 0)
             trackDirty(layout.batteryRect, _status.lastBattery);
 
-        if (_status.style == StatusBarStyleBlur)
+        if (_status.style == Blur)
         {
             redrawBlurBackdrop();
             renderStatusBar();
@@ -493,7 +488,7 @@ namespace pipgui
     {
         if (!_flags.statusBarEnabled || _status.height == 0)
             return 0;
-        if (_status.style != StatusBarStyleSolid)
+        if (_status.style != Solid)
             return 0;
         return (int16_t)_status.height;
     }
@@ -535,7 +530,7 @@ namespace pipgui
             return;
         }
 
-        if (_status.style == StatusBarStyleSolid)
+        if (_status.style == Solid)
         {
             drawRect()
                 .pos(x, y)
@@ -543,7 +538,7 @@ namespace pipgui
                 .fill(bg565)
                 .draw();
         }
-        else if (_status.style == StatusBarStyleBlur)
+        else if (_status.style == Blur)
         {
             BlurDirection dir = (_status.pos == Bottom) ? BottomUp : TopDown;
             int16_t dim = (h > w) ? h : w;
@@ -679,10 +674,11 @@ namespace pipgui
 
 #else
 
-    void GUI::configureStatusBar(bool enabled, uint32_t, uint8_t, StatusBarPosition)
+    void GUI::configStatusBar(uint8_t, StatusBarPosition, StatusBarStyle style)
     {
         _flags.statusBarConfigured = 1;
-        _flags.statusBarEnabled = enabled ? 1 : 0;
+        _flags.statusBarEnabled = 1;
+        _status.style = style;
         _status.height = 0;
     }
 

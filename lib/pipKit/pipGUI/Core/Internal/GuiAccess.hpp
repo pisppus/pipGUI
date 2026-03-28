@@ -67,9 +67,19 @@ namespace pipgui
                 gui.handleListInput(screenId, nextDown, prevDown);
             }
 
+            static bool updateListScreen(GUI &gui, uint8_t screenId)
+            {
+                return gui.updateListScreen(screenId);
+            }
+
             static void handleTileInput(GUI &gui, uint8_t screenId, bool nextDown, bool prevDown)
             {
                 gui.handleTileInput(screenId, nextDown, prevDown);
+            }
+
+            static void renderTileScreen(GUI &gui, uint8_t screenId)
+            {
+                gui.renderTileScreen(screenId);
             }
 
             static void handlePopupMenuInput(GUI &gui, bool nextDown, bool prevDown)
@@ -77,22 +87,18 @@ namespace pipgui
                 gui.handlePopupMenuInput(nextDown, prevDown);
             }
 
-            static void configGraphScope(GUI &gui,
-                                         uint8_t screenId,
-                                         uint16_t sampleRateHz,
-                                         uint16_t timebaseMs,
-                                         uint16_t visibleSamples)
+            static const GUI::InputState &inputState(GUI &gui)
             {
-                gui.configGraphScope(screenId, sampleRateHz, timebaseMs, visibleSamples);
+                return gui._input;
             }
 
-            static void configureTile(GUI &gui,
-                                      uint8_t screenId,
-                                      const TileItemDef *items,
-                                      uint8_t itemCount,
-                                      const TileStyle &style)
+            static void setupTileState(GUI &gui,
+                                       uint8_t screenId,
+                                       const TileItemDef *items,
+                                       uint8_t itemCount,
+                                       const TileStyle &style)
             {
-                gui.configureTile(screenId, items, itemCount, style);
+                gui.setupTileState(screenId, items, itemCount, style);
             }
 
             static void fillRect(GUI &gui, int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color)
@@ -242,6 +248,42 @@ namespace pipgui
             static void fillCircle(GUI &gui, int16_t cx, int16_t cy, int16_t r, uint16_t color)
             {
                 gui.fillCircle(cx, cy, r, color);
+            }
+
+            static void drawGraphGrid(GUI &gui,
+                                      int16_t x,
+                                      int16_t y,
+                                      int16_t w,
+                                      int16_t h,
+                                      uint8_t radius,
+                                      GraphDirection dir,
+                                      uint32_t bgColor,
+                                      float speed,
+                                      bool autoScale,
+                                      uint16_t scopeRateHz,
+                                      uint16_t scopeTimebaseMs,
+                                      uint16_t scopeVisibleSamples)
+            {
+                gui.drawGraphGrid(x, y, w, h, radius, dir, bgColor, speed, autoScale,
+                                  scopeRateHz, scopeTimebaseMs, scopeVisibleSamples);
+            }
+
+            static void updateGraphGrid(GUI &gui,
+                                        int16_t x,
+                                        int16_t y,
+                                        int16_t w,
+                                        int16_t h,
+                                        uint8_t radius,
+                                        GraphDirection dir,
+                                        uint32_t bgColor,
+                                        float speed,
+                                        bool autoScale,
+                                        uint16_t scopeRateHz,
+                                        uint16_t scopeTimebaseMs,
+                                        uint16_t scopeVisibleSamples)
+            {
+                gui.updateGraphGrid(x, y, w, h, radius, dir, bgColor, speed, autoScale,
+                                    scopeRateHz, scopeTimebaseMs, scopeVisibleSamples);
             }
 
             static void drawArc(GUI &gui,
@@ -428,9 +470,10 @@ namespace pipgui
                                       uint8_t radius,
                                       GraphDirection dir,
                                       uint32_t bgColor,
-                                      float speed)
+                                      float speed,
+                                      bool autoScale)
             {
-                gui.drawGraphGrid(x, y, w, h, radius, dir, bgColor, speed);
+                gui.drawGraphGrid(x, y, w, h, radius, dir, bgColor, speed, autoScale);
             }
 
             static void updateGraphGrid(GUI &gui,
@@ -441,9 +484,10 @@ namespace pipgui
                                         uint8_t radius,
                                         GraphDirection dir,
                                         uint32_t bgColor,
-                                        float speed)
+                                        float speed,
+                                        bool autoScale)
             {
-                gui.updateGraphGrid(x, y, w, h, radius, dir, bgColor, speed);
+                gui.updateGraphGrid(x, y, w, h, radius, dir, bgColor, speed, autoScale);
             }
 
             static void drawGraphLine(GUI &gui,
@@ -551,18 +595,16 @@ namespace pipgui
             }
 
             static void showPopupMenu(GUI &gui,
-                                      PopupMenuItemFn itemFn,
-                                      void *itemUser,
+                                      const char *const *items,
                                       uint8_t count,
                                       uint8_t selectedIndex,
                                       int16_t w,
-                                      uint8_t maxVisible,
                                       int16_t anchorX,
                                       int16_t anchorY,
                                       int16_t anchorW,
                                       int16_t anchorH)
             {
-                gui.showPopupMenuInternal(itemFn, itemUser, count, selectedIndex, w, maxVisible, anchorX, anchorY, anchorW, anchorH);
+                gui.showPopupMenuInternal(items, count, selectedIndex, w, anchorX, anchorY, anchorW, anchorH);
             }
 
             static void drawToggleSwitch(GUI &gui,
@@ -776,6 +818,38 @@ namespace pipgui
                                             showPercent, percentColor, percentAlign, percentFontPx);
             }
 
+            static void drawDrumRollHorizontal(GUI &gui,
+                                               int16_t x,
+                                               int16_t y,
+                                               int16_t w,
+                                               int16_t h,
+                                               const String *options,
+                                               uint8_t count,
+                                               uint8_t selectedIndex,
+                                               uint32_t fgColor,
+                                               uint32_t bgColor,
+                                               uint16_t fontPx,
+                                               uint16_t animDurationMs)
+            {
+                gui.drawDrumRollHorizontal(x, y, w, h, options, count, selectedIndex, fgColor, bgColor, fontPx, animDurationMs);
+            }
+
+            static void drawDrumRollVertical(GUI &gui,
+                                             int16_t x,
+                                             int16_t y,
+                                             int16_t w,
+                                             int16_t h,
+                                             const String *options,
+                                             uint8_t count,
+                                             uint8_t selectedIndex,
+                                             uint32_t fgColor,
+                                             uint32_t bgColor,
+                                             uint16_t fontPx,
+                                             uint16_t animDurationMs)
+            {
+                gui.drawDrumRollVertical(x, y, w, h, options, count, selectedIndex, fgColor, bgColor, fontPx, animDurationMs);
+            }
+
             static void drawCircleProgress(GUI &gui,
                                            int16_t x,
                                            int16_t y,
@@ -884,9 +958,9 @@ namespace pipgui
                 gui.updateAnimatedIconInternal(iconId, x, y, sizePx, fg565, bg565, nowMs ? nowMs : gui.nowMs());
             }
 
-            static void configureStatusBar(GUI &gui, bool enabled, uint32_t bgColor, uint8_t height, StatusBarPosition pos)
+            static void configStatusBar(GUI &gui, uint8_t height, StatusBarPosition pos, StatusBarStyle style)
             {
-                gui.configureStatusBar(enabled, bgColor, height, pos);
+                gui.configStatusBar(height, pos, style);
             }
 
             static void setStatusBarText(GUI &gui, const String &left, const String &center, const String &right)

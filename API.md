@@ -138,66 +138,7 @@ ui.setBacklightHandler(myBacklight);
 
 ---
 
-# 3. Базовые helpers
-
-## 3.1. Размеры
-
-```cpp
-ui.screenWidth();   // ширина вашего экрана
-ui.screenHeight();  // высота вашего экрана
-```
-
-- `screenWidth()` и `screenHeight()` возвращают уже активный логический размер экрана
-- удобно для центровки, адаптивных отступов и расчёта layout без хардкода
-
-## 3.2. Цвет
-
-```cpp
-ui.rgb(255, 255, 255);
-0xFFFF;     // RGB565
-0xFF6200;   // RGB888
-```
-
-- Библиотека поддерживает два практических способа задания цвета:
-- `ui.rgb(r, g, b)` - обычный и основной способ. На вход подаётся `RGB888`, на выходе получается `RGB565`.
-- прямой hex-литерал - если ты уже знаешь нужное значение заранее
-- если метод принимает `uint16_t`, туда нужно передавать `RGB565`
-- если метод принимает `uint32_t`, туда нужно передавать `RGB888` в виде `0xRRGGBB`
-
-Для повторно используемых системных accent-цветов есть короткие semantic-токены:
-
-```cpp
-Warning; // #FF6200
-Error;   // #FF0048
-```
-
-- их можно передавать в `color(...)`, `fillColor(...)`, `bgColor(...)` и другие места, где ожидается `RGB565`
-
-## 3.3. Очистка экрана
-
-```cpp
-ui.clear(ui.rgb(0, 0, 0));
-```
-
-- очищает весь текущий draw target указанным цветом
-
-## 3.4. Клип
-
-```cpp
-ui.setClip()
-    .pos(10, 20)
-    .size(120, 80);
-
-// ... рисование только внутри области ...
-
-ui.clearClip();
-```
-
-- `setClip()` ограничивает всю последующую отрисовку прямоугольной областью
-- удобно для локальных redraw, списков, анимаций и виджетов в карточках
-- `clearClip()` возвращает обычную отрисовку без ограничений
-
-## 4. Логотип
+# 3. Логотип
 
 ```cpp
 ui.showLogo()
@@ -221,139 +162,168 @@ ui.showLogo()
 
 ---
 
-# 5. Экраны и цикл
+# 4. Базовые helpers
 
-## 5.1. Регистрация экранов
-
-Экраны регистрируются через макрос `SCREEN(name, order)`:
+## 4.1. Размеры
 
 ```cpp
-SCREEN(ScreenHome, 0)
-{
-    ui.clear(ui.rgb(0, 0, 0));
-}
-
-SCREEN(ScreenSettings, 1)
-{
-    ui.clear(ui.rgb(8, 8, 8));
-}
+ui.screenWidth();   // ширина вашего экрана
+ui.screenHeight();  // высота вашего экрана
 ```
 
-Что создаёт макрос:
+- `screenWidth()` и `screenHeight()` возвращают уже активный логический размер экрана
+- удобно для центровки, адаптивных отступов и расчёта layout без хардкода
 
-- callback-функцию экрана;
-- числовой id экрана;
-- автоматическую регистрацию экрана в таблице GUI.
-
-Что важно:
-
-- `name` становится константой id, её потом можно передавать в `setScreen(...)`, `configureList(...)`, `configureTile(...)` и другие API
-- `order` задаёт порядок регистрации экрана
-- `order` должен быть уникальным для каждого экрана
-- обычно первый экран делают с `order = 0`
-
-После этого экран можно активировать:
+## 4.2. Цвет
 
 ```cpp
-ui.setScreen(ScreenHome);
+ui.rgb(255, 255, 255);
+0xFFFF;     // RGB565
+0xFF6200;   // RGB888
 ```
 
-## 5.2. Основной цикл
+- Библиотека поддерживает два практических способа задания цвета:
+- `ui.rgb(r, g, b)` - обычный и основной способ. На вход подаётся `RGB888`, на выходе получается `RGB565`.
+- прямой hex-литерал - если ты уже знаешь нужное значение заранее
+- если метод принимает `uint16_t`, туда нужно передавать `RGB565`
+- если метод принимает `uint32_t`, туда нужно передавать `RGB888` в виде `0xRRGGBB`
 
-Базовый вариант:
+Для повторно используемых системных accent-цветов есть короткие semantic-токены:
 
 ```cpp
-void loop()
-{
-    ui.loop();
-}
+Warning; // #FF6200
+Error;   // #FF0048
 ```
 
-Вспомогательный вариант, если есть две кнопки `Button`:
+- их можно передавать в `color(...)`, `fillColor(...)`, `bgColor(...)` и другие места, где ожидается `RGB565`
+
+## 4.3. Очистка экрана
 
 ```cpp
-Button Next(1, Pullup);
-Button Prev(2, Pullup);
-
-void setup()
-{
-    Next.begin();
-    Prev.begin();
-}
-
-void loop()
-{
-    ui.loopWithInput(Next, Prev);
-}
+ui.clear(ui.rgb(0, 0, 0));
 ```
 
-`loopWithInput(...)` только обновляет сами объекты `Button` и потом вызывает `ui.loop()`.
-Логику экранов, списков и плиток вы всё равно задаёте отдельно.
+- очищает весь текущий draw target указанным цветом
 
-Если `loopWithInput(...)` не используется, вызывайте `btn.update()` сами в начале каждого `loop()`.
-После этого `wasPressed()` и `isDown()` читают уже обновлённое состояние кнопки.
-
-Если нужен готовый snapshot ввода для собственного state-machine:
+## 4.4. Клип
 
 ```cpp
-InputState input = ui.pollInput(Next, Prev);
+ui.setClip()
+    .pos(10, 20)
+    .size(120, 80);
+
+// ... рисование только внутри области ...
+
+ui.clearClip();
 ```
 
-`pollInput(...)` сам обновляет обе кнопки и возвращает готовый снимок их состояния на текущий тик.
+- `setClip()` ограничивает всю последующую отрисовку прямоугольной областью
+- удобно для локальных redraw, списков, анимаций и виджетов в карточках
+- `clearClip()` возвращает обычную отрисовку без ограничений
 
-Поля `InputState`:
+## 4.5. Наследование стиля fluent
 
-- `nextDown` - кнопка `Next` сейчас удерживается
-- `prevDown` - кнопка `Prev` сейчас удерживается
-- `nextPressed` - кнопка `Next` была нажата именно в этом тике
-- `prevPressed` - кнопка `Prev` была нажата именно в этом тике
-- `comboDown` - обе кнопки сейчас зажаты одновременно
+У fluent-объектов есть `derive()`. Это позволяет собрать базовый стиль один раз, а потом сделать на его основе несколько вариантов без копирования всей цепочки.
 
-Разница простая:
-
-- `Down` - состояние удержания
-- `Pressed` - одноразовое событие нажатия
-
-## 5.3. Управление экранами
-
-Эти методы управляют активным экраном и переходами между экранами.
+Пример:
 
 ```cpp
-ui.setScreen(ScreenHome);      // сразу переключает на указанный экран
-ui.currentScreen();            // возвращает id текущего активного экрана
-ui.nextScreen();               // переходит на следующий экран по порядку регистрации
-ui.prevScreen();               // возвращает назад по navigation-history
-ui.screenTransitionActive();   // показывает, что переход между экранами сейчас ещё идёт
+auto base = ui.drawButton()
+    .size(120, 40)
+    .baseColor(ui.rgb(0, 120, 255))
+    .radius(10);
+
+auto compact = base.derive()
+    .size(96, 34);
+
+base
+    .label("Main")
+    .pos(20, 160);
+
+compact
+    .label("Mini")
+    .pos(20, 210);
 ```
 
-Что важно:
+После `derive()` исходный fluent становится шаблоном и сам больше не коммитится. Рисуется уже производная цепочка или финальная донастройка исходного объекта.
 
-- библиотека сама ведёт history переходов между экранами
-- если экран меняется через `setScreen(...)`, текущий экран добавляется в history автоматически
+# 5. Layout helpers
 
-## 5.4. Принудительная перерисовка
+Это лёгкие helper-ы для раскладки UI без тяжёлой layout-системы.
+
+Базовые типы:
 
 ```cpp
-ui.requestRedraw();
+UiSize   size{120, 40};
+UiRect   rect{0, 0, 240, 320};
+UiInsets insets{10, 10, 10, 10};
 ```
 
-Нужно, когда данные экрана изменились вне обычного render-flow, и вы хотите гарантированно перерисовать следующий кадр.
-
-## 5.5. Анимация переходов
+## 5.1. Slicing API
 
 ```cpp
-ui.setScreenAnim(SlideX, 250);
+UiRect root{0, 0, 240, 320};
+UiRect work = inset(root, 10);
+
+UiRect header = takeTop(work, 24, 8);
+UiRect footer = takeBottom(work, 28, 8);
+UiRect content = work;
 ```
 
-`setScreenAnim(mode, durationMs)` задаёт стиль и длительность перехода между экранами.
+Доступно:
 
-Доступные режимы:
+- `inset(rect, all)`
+- `inset(rect, l, t, r, b)`
+- `inset(rect, UiInsets{...})`
+- `takeTop(...)`
+- `takeBottom(...)`
+- `takeLeft(...)`
+- `takeRight(...)`
+- `placeInside(...)`
+- `centerIn(...)`
 
-- `None` - переход без анимации
-- `SlideX` - горизонтальный слайд
-- `SlideY` - вертикальный слайд
+## 5.2. Flow API
 
----
+```cpp
+UiSize sizes[3] = {{40, 20}, {60, 20}, {40, 20}};
+UiRect out[3];
+
+flowRow(area, sizes, out, 3, 10, Center, Center);
+flowColumn(area, sizes, out, 3, 8, Center, Center);
+```
+
+Для распределения доступны:
+
+- `Start`
+- `Center`
+- `End`
+- `layout::SpaceBetween`
+- `layout::SpaceEvenly`
+
+## 5.3. Cursor-based API
+
+```cpp
+UiFlowRow<3> row(area, 10, layout::SpaceEvenly, Center);
+
+row.next(40, 24);
+row.next(60, 24);
+row.next(40, 24);
+row.finish();
+```
+
+Аналогично работает `UiFlowColumn<N>`.
+
+Как этим пользоваться правильно:
+
+- `next(w, h)` резервирует следующий slot
+- после всех `next(...)` нужно вызвать `finish()`
+- итоговые прямоугольники потом берутся через `row[i]` или `column[i]`
+
+Для позиционирования и выравнивания часто используются короткие шорткаты:
+
+- `center` для автоматического центрирования по оси
+- `Left`, `Center`, `Right`
+- `Top`, `Bottom`
 
 # 6. Текст, шрифты и иконки
 
@@ -469,37 +439,6 @@ ui.drawTextEllipsized()
 
 ## 6.5. Иконки
 
-### Создание иконок из `sources`
-
-Чтобы добавить свою иконку:
-
-1. положить source-файл в `tools/icons/sources/`
-2. пересобрать проект — генератор сам обновит готовые файлы в `lib/pipKit/pipGUI/Graphics/Text/Icons/`
-3. использовать иконку по имени файла
-
-Пример:
-
-- файл `tools/icons/sources/checkmark.svg`
-- в коде: `.icon(checkmark)`
-
-Что важно:
-
-- генератор читает и `.svg`, и `.json` рекурсивно
-- файлы могут лежать как прямо в корне `sources`, так и в любых подпапках
-- имя для C++ генерируется из относительного пути, так что вложенные папки тоже поддерживаются
-
-Что появится в коде:
-
-- для обычной однослойной иконки из `name.svg` появляется alias `name`
-- для многослойной иконки появляются alias вида `name_l0`, `name_l1`, `name_l2`
-- дополнительно экспортируются и enum-константы `IconName`, `IconNameL0`, `IconNameL1` и т.д.
-- для анимированной иконки из `name.json` появляется alias `name_anim`
-
-Если в имени файла есть `-`, пробелы или другие неподходящие символы, генератор сам приводит имя к валидному C++-идентификатору через `_`.
-
-- `.svg` идёт в обычный static PSDF pipeline.
-- `.json` идёт в animated PSDF pipeline.
-
 ### Обычные иконки берутся из набора `IconId`
 
 ```cpp
@@ -556,6 +495,37 @@ ui.updateAnimIcon()
 
 `updateAnimIcon()` сначала очищает область через `bgColor`, потом рисует новый кадр
 
+### Создание иконок из `sources`
+
+Чтобы добавить свою иконку:
+
+1. положить source-файл в `tools/icons/sources/`
+2. пересобрать проект — генератор сам обновит готовые файлы в `lib/pipKit/pipGUI/Graphics/Text/Icons/`
+3. использовать иконку по имени файла
+
+Пример:
+
+- файл `tools/icons/sources/checkmark.svg`
+- в коде: `.icon(checkmark)`
+
+Что важно:
+
+- генератор читает и `.svg`, и `.json` рекурсивно
+- файлы могут лежать как прямо в корне `sources`, так и в любых подпапках
+- имя для C++ генерируется из относительного пути, так что вложенные папки тоже поддерживаются
+
+Что появится в коде:
+
+- для обычной однослойной иконки из `name.svg` появляется alias `name`
+- для многослойной иконки появляются alias вида `name_l0`, `name_l1`, `name_l2`
+- дополнительно экспортируются и enum-константы `IconName`, `IconNameL0`, `IconNameL1` и т.д.
+- для анимированной иконки из `name.json` появляется alias `name_anim`
+
+Если в имени файла есть `-`, пробелы или другие неподходящие символы, генератор сам приводит имя к валидному C++-идентификатору через `_`.
+
+- `.svg` идёт в обычный static PSDF pipeline.
+- `.json` идёт в animated PSDF pipeline.
+
 ---
 
 # 7. Фигуры
@@ -607,7 +577,18 @@ ui.drawCircle()
     .border(1, ui.rgb(255, 255, 255))     // толщина и цвет контура
 ```
 
-## 7.4 Треугольник
+## 7.4 Эллипс
+
+```cpp
+ui.drawEllipse()
+    .pos(120, 50)                         // центр эллипса
+    .radiusX(28)                          // горизонтальная полуось
+    .radiusY(16)                          // вертикальная полуось
+    .fill(ui.rgb(255, 0, 72))             // цвет заливки
+    .border(1, ui.rgb(255, 255, 255))     // толщина и цвет контура
+```
+
+## 7.5 Треугольник
 
 ```cpp
 ui.drawTriangle()
@@ -619,7 +600,7 @@ ui.drawTriangle()
     .border(1, ui.rgb(255, 255, 255))     // толщина и цвет контура
 ```
 
-## 7.5 Дуга
+## 7.6 Дуга
 
 ```cpp
 ui.drawArc()
@@ -631,17 +612,6 @@ ui.drawArc()
     .color(ui.rgb(80, 255, 120))      // цвет дуги
 ```
 У дуги концы всегда скруглённые, а диапазон `0..360` рисует полный круг.
-
-## 7.6 Эллипс
-
-```cpp
-ui.drawEllipse()
-    .pos(120, 50)                         // центр эллипса
-    .radiusX(28)                          // горизонтальная полуось
-    .radiusY(16)                          // вертикальная полуось
-    .fill(ui.rgb(255, 0, 72))             // цвет заливки
-    .border(1, ui.rgb(255, 255, 255))     // толщина и цвет контура
-```
 
 ## 7.7 Сквиркль
 
@@ -683,7 +653,19 @@ ui.gradientHorizontal()
 
 - цвет плавно меняется слева направо
 
-## 8.3. 4 угла
+## 8.3. Диагональный
+
+```cpp
+ui.gradientDiagonal()
+    .pos(20, 170)
+    .size(120, 40)
+    .TLColor(ui.rgb(255, 255, 255))
+    .BRColor(ui.rgb(30, 30, 30))
+```
+
+- плавный переход по диагонали от верхнего левого к нижнему правому углу
+
+## 8.4. 4 угла
 
 ```cpp
 ui.gradientCorners()
@@ -696,18 +678,6 @@ ui.gradientCorners()
 ```
 
 - каждая вершина прямоугольника получает свой цвет, внутри идёт двунаправленная интерполяция между четырьмя углами
-
-## 8.4. Диагональный
-
-```cpp
-ui.gradientDiagonal()
-    .pos(20, 170)
-    .size(120, 40)
-    .TLColor(ui.rgb(255, 255, 255))
-    .BRColor(ui.rgb(30, 30, 30))
-```
-
-- плавный переход по диагонали от верхнего левого к нижнему правому углу
 
 ## 8.5. Радиальный
 
@@ -790,562 +760,143 @@ ui.drawGlowCircle()
 
 ---
 
-# 10. Виджеты
+# 10. Экраны и цикл
 
-## 10.1. Scroll dots
+## 10.1. Регистрация экранов
 
-```cpp
-ui.drawScrollDots()
-    .pos(center, 220)
-    .count(5)
-    .activeIndex(2)
-    .activeColor(ui.rgb(0, 87, 250))
-    .inactiveColor(ui.rgb(60, 60, 60)) 
-    .radius(3)
-    .spacing(14);
-```
-
-Есть и `updateScrollDots()` с теми же параметрами.
-
-Что задают параметры:
-
-- `count(...)` - общее число страниц/точек
-- `activeIndex(...)` - текущая активная страница
-- `radius(...)` - базовый радиус точки
-- `spacing(...)` - шаг между центрами соседних точек
-
-Поведение:
-
-- при смене `activeIndex` индикатор сам (time-based) анимирует активную точку как `circle -> capsule -> circle`
-- при `count > 7` включается оконный режим: показывается компактное окно точек с taper по краям
-
-## 10.2. Наследование стиля fluent
-
-У fluent-объектов есть `derive()`. Это позволяет собрать базовый стиль один раз, а потом сделать на его основе несколько вариантов без копирования всей цепочки.
-
-Пример:
+Экраны регистрируются через макрос `SCREEN(name, order)`:
 
 ```cpp
-auto base = ui.drawButton()
-    .size(120, 40)
-    .baseColor(ui.rgb(0, 120, 255))
-    .radius(10);
-
-auto compact = base.derive()
-    .size(96, 34);
-
-base
-    .label("Main")
-    .pos(20, 160);
-
-compact
-    .label("Mini")
-    .pos(20, 210);
-```
-
-После `derive()` исходный fluent становится шаблоном и сам больше не коммитится. Рисуется уже производная цепочка или финальная донастройка исходного объекта.
-
-## 10.3. Универсальная кнопка
-
-Обычная отрисовка:
-
-```cpp
-ui.drawButton()
-    .label("Save")
-    .pos(center, 180)
-    .size(120, 40)
-    .baseColor(ui.rgb(0, 120, 255))
-    .radius(10);
-```
-
-Обновление с состоянием кнопки:
-
-```cpp
-ui.updateButton()
-    .label("Save")
-    .pos(center, 180)
-    .size(120, 40)
-    .baseColor(ui.rgb(0, 120, 255))
-    .radius(10)
-    .icon(warning)
-    .mode(true, false)
-    .down(isDown)
-;
-```
-
-Кнопка с прогрессом использует тот же fluent, без отдельного виджета:
-
-```cpp
-ui.updateButton()
-    .label("Updating 56%")
-    .pos(center, 180)
-    .size(170, 38)
-    .baseColor(ui.rgb(24, 24, 24))
-    .fillColor(ui.rgb(0, 120, 255))
-    .value(56)
-    .radius(12)
-    .icon(battery_l1);
-```
-
-Параметры:
-
-- `label(...)` - текст внутри кнопки
-- `pos(x, y)` - позиция левого верхнего угла;
-- `size(w, h)` - размер кнопки
-- `baseColor(...)` - основной цвет кнопки 
-- `fillColor(...)` - цвет прогресс-заливки, если у кнопки задан `value(...)`
-- `radius(...)` - squircle-радиус кнопки
-- `value(...)` - включает встроенный progress-режим кнопки и задает значение `0..100`
-- `icon(...)` - иконка внутри кнопки
-- `mode(enabled, loading)` - сразу задает активное и loading-состояние
-- `down(bool)` - текущее физическое нажатие для press-анимации
-
-`drawButton()` и `updateButton()` используют один и тот же API. Для обычных статичных экранов достаточно `drawButton()`. Для анимируемой или интерактивной кнопки используй `updateButton()`.
-
-Если заданы и текст, и иконка, иконка рисуется слева от текста как единый центрированный блок. Если текст пустой, иконка рисуется по центру кнопки.
-Если задан `value(...)`, кнопка рисует встроенный progress-fill под текстом и иконкой. `loading` и `progress` одновременно не используются: progress-режим приоритетнее.
-
-## 10.3.1. Slider
-
-Слайдер подходит для настроек вроде громкости, яркости и подобных значений.
-
-```cpp
-int16_t volume = 56;
-bool changed = false;
-
-ui.updateSlider()
-    .pos(center, 114)
-    .size(186, 24)
-    .value(volume)
-    .range(0, 100)
-    .step(2)
-    .nextDown(btnNext.isDown())
-    .prevDown(btnPrev.isDown())
-    .changed(changed)
-    .activeColor(ui.rgb(0, 87, 250))
-    .thumbColor(0xFFFF);
-```
-
-Параметры:
-
-- `pos(x, y)` - позиция левого верхнего угла
-- `size(w, h)` - размер слайдера
-- `value(...)` - ссылка на текущее значение; библиотека сама меняет его при удержании кнопок
-- `range(min, max)` - допустимый диапазон
-- `step(...)` - шаг изменения
-- `nextDown(...)` / `prevDown(...)` - текущее удержание кнопок вправо/влево
-- `changed(...)` - сюда вернется `true`, если значение изменилось в этом кадре
-- `enabled(false)` - временно блокирует ввод, но оставляет отображение
-- `activeColor(...)` - цвет заполненной части
-- `inactiveColor(...)` - цвет трека
-- `thumbColor(...)` - цвет бегунка
-
-`drawSlider()` и `updateSlider()` используют один и тот же fluent API. Для интерактивного сценария нужен `updateSlider()`.
-
-Поведение:
-
-- удержание кнопки сначала двигает значение обычным шагом, потом ускоряет и частоту, и величину шага;
-- анимация бегунка time-based и не зависит от FPS;
-- по умолчанию бегунок белый, трек темнее активной части.
-
-## 10.4. Toggle switch
-
-Снаружи нужен только обычный `bool`:
-
-```cpp
-bool wifiEnabled = false;
-bool changed = false;
-```
-
-Отрисовка:
-
-```cpp
-ui.updateToggleSwitch()
-    .pos(center, 140)
-    .size(78, 36)
-    .value(wifiEnabled)                // текущий bool; библиотека сама обновит его при нажатии
-    .pressed(btn.wasPressed())         // событие нажатия этого кадра
-    .changed(changed)                  // сюда вернется true, если значение переключилось
-    .enabled(!wifiBusy)                // можно временно отключить ввод, пока идет внешняя операция
-    .activeColor(ui.rgb(21, 180, 110));
-```
-
-Дополнительно можно задать:
-
-- `inactiveColor(...)` - цвет выключенного track
-- `knobColor(...)` - цвет бегунка
-- `enabled(false)` - временно делает переключатель неактивным, но сохраняет текущее состояние
-
-`drawToggleSwitch()` и `updateToggleSwitch()` используют один и тот же fluent API. Разница только в режиме вывода:
-
-- `drawToggleSwitch()` - обычная отрисовка
-- `updateToggleSwitch()` - локальный dirty-update
-
-Если хочется просто показать состояние без ввода, можно не передавать `pressed(...)` и `changed(...)`:
-
-```cpp
-ui.drawToggleSwitch()
-    .pos(center, 140)
-    .size(78, 36)
-    .value(wifiEnabled)
-    .activeColor(ui.rgb(21, 180, 110));
-```
-
-## 10.5. Прогресс
-
-```cpp
-ui.drawProgress()
-    .pos(20, 220)
-    .size(180, 16)
-    .value(65)
-    .baseColor(ui.rgb(30, 30, 30))
-    .fillColor(ui.rgb(0, 120, 255))
-    .radius(8)
-    .anim(Shimmer);
-```
-
-Для локального обновления без полной перерисовки есть `updateProgress()`:
-
-```cpp
-ui.updateProgress()
-    .pos(20, 220)
-    .size(180, 16)
-    .value(65)
-    .baseColor(ui.rgb(30, 30, 30))
-    .fillColor(ui.rgb(0, 120, 255))
-    .radius(8)
-    .anim(Shimmer);
-```
-
-Текст у линейного прогресса задаётся прямо на самом progress:
-
-```cpp
-ui.drawProgress()
-    .pos(20, 246)
-    .size(180, 14)
-    .value(65)
-    .baseColor(ui.rgb(20, 20, 20))
-    .fillColor(ui.rgb(0, 120, 255))
-    .label("Downloading")
-    .labelAlign(Left)
-    .labelColor(ui.rgb(255, 255, 255))
-    .percent()
-    .percentAlign(Right)
-    .percentColor(ui.rgb(200, 200, 200));
-```
-
-- `label(...)` привязывает произвольный текст к конкретному линейному progress
-- `percent()` выводит текущее значение этого же progress в формате `65%`
-- `labelAlign(...)`, `labelColor(...)`, `labelFont(...)` настраивают label
-- `percentAlign(...)`, `percentColor(...)`, `percentFont(...)` настраивают числовой индикатор
-- текст поддерживается только у линейного progress; у `drawCircleProgress()` его нет
-
-## 10.6. Круговой прогресс
-
-```cpp
-ui.drawCircleProgress()
-    .pos(center, 140)
-    .radius(34)
-    .thickness(8)
-    .value(72)
-    .baseColor(ui.rgb(30, 30, 30))
-    .fillColor(ui.rgb(0, 120, 255))
-    .anim(None);
-```
-
-Локальное обновление:
-
-```cpp
-ui.updateCircleProgress()
-    .pos(center, 140)
-    .radius(34)
-    .thickness(8)
-    .value(72)
-    .baseColor(ui.rgb(30, 30, 30))
-    .fillColor(ui.rgb(0, 120, 255))
-    .anim(None);
-```
-
-## 10.7. Drum roll
-
-Горизонтальный:
-
-```cpp
-String options[] = {"Low", "Medium", "High"};
-
-ui.drawDrumRollHorizontal(
-    20, 60, 200, 40,
-    options, 3,
-    1,             // selectedIndex
-    ui.rgb(255, 255, 255),
-    ui.rgb(0, 0, 0),
-    16,            // fontPx
-    280            // animDurationMs
-);
-```
-
-Вертикальный есть отдельной функцией `drawDrumRollVertical(...)`.
-
-- анимация у `DrumRoll` теперь внутренняя time-based
-- снаружи передаётся только новый `selectedIndex`
-- `animDurationMs` задаёт длительность перелистывания в миллисекундах
-
----
-
-# 11. Списки и плитки
-
-## 11.1. Списочное меню
-
-Конфигурация:
-
-```cpp
-ui.configureList()
-    .screen(ScreenMainMenu)
-    .items({
-        {"Settings", "Device configuration", ScreenSettings},
-        {"About",    "Firmware info",        ScreenAbout},
-        {"Restart",  "Reboot device",        ScreenRestart}
-    })
-    .inactive(ui.rgb(12, 12, 12))
-    .active(ui.rgb(0, 120, 255))
-    .checked(1)
-    .radius(8)
-    .cardSize(0, 0)
-    .mode(Cards)
-    .apply();
-```
-
-Ввод в `loop()`:
-
-```cpp
-// btnNext.update() и btnPrev.update() уже вызваны в начале этого loop()
-ui.listInput(ScreenMainMenu)
-    .nextDown(btnNext.isDown())
-    .prevDown(btnPrev.isDown())
-    .apply();
-```
-
-Отрисовка в screen-callback:
-
-```cpp
-SCREEN(ScreenMainMenu, 1)
+SCREEN(ScreenHome, 0)
 {
-    ui.updateList(ScreenMainMenu);
+    ui.clear(ui.rgb(0, 0, 0));
+}
+
+SCREEN(ScreenSettings, 1)
+{
+    ui.clear(ui.rgb(8, 8, 8));
 }
 ```
 
-Поведение:
+Что создаёт макрос:
 
-- короткое отпускание `NEXT` переключает пункт вперёд;
-- короткое отпускание `PREV` переключает пункт назад;
-- удержание `NEXT` открывает `targetScreen` выбранного пункта;
-- удержание `PREV` возвращает на предыдущий экран из navigation-history.
-- `.checked(index)` рисует справа галочку у выбранного пункта;
-- если `.checked(...)` не задан, список остаётся без маркера.
+- callback-функцию экрана;
+- числовой id экрана;
+- автоматическую регистрацию экрана в таблице GUI.
 
-Режимы списка:
+Что важно:
 
-- `Cards`
-- `Plain`
+- `name` становится константой id, её потом можно передавать в `setScreen(...)`, `updateList(...)`, `updateTile(...)` и другие API
+- `order` задаёт порядок регистрации экрана
+- `order` должен быть уникальным для каждого экрана
+- обычно первый экран делают с `order = 0`
 
-Дефолты:
-
-- `radius = 17`
-
-## 11.2. Плиточное меню
-
-Конфигурация:
+После этого экран можно активировать:
 
 ```cpp
-ui.configureTile()
-    .screen(ScreenTiles)
-    .items({
-        {"Main",     "Главный экран", ScreenHome},
-        {"Settings", "Настройки",     ScreenSettings},
-        {"Info",     "Инфо",          ScreenInfo},
-        {"Graph",    "Графики",       ScreenGraph}
-    })
-    .inactive(ui.rgb(16, 16, 16))
-    .active(ui.rgb(0, 120, 255))
-    .radius(12)
-    .spacing(10)
-    .columns(2)
-    .tileSize(100, 70)
-    .lineGap(5)
-    .mode(TextSubtitle)
-    .apply();
+ui.setScreen(ScreenHome);
 ```
 
-Ввод:
+## 10.2. Основной цикл
+
+Базовый вариант:
 
 ```cpp
-ui.tileInput(ScreenTiles)
-    .nextDown(btnNext.isDown())
-    .prevDown(btnPrev.isDown())
-    .apply();
-```
-
-Отрисовка:
-
-```cpp
-SCREEN(ScreenTiles, 2)
+void loop()
 {
-    ui.renderTile(ScreenTiles);
+    ui.loop();
 }
 ```
 
-Режимы плитки:
+Вспомогательный вариант, если есть две кнопки `Button`:
 
-- `TextOnly`
-- `TextSubtitle`
+```cpp
+Button Next(1, Pullup);
+Button Prev(2, Pullup);
+
+void setup()
+{
+    Next.begin();
+    Prev.begin();
+}
+
+void loop()
+{
+    ui.loopWithInput(Next, Prev);
+}
+```
+
+`loopWithInput(...)` только обновляет сами объекты `Button` и потом вызывает `ui.loop()`.
+Логику экранов, списков и плиток вы всё равно задаёте отдельно.
+
+Если `loopWithInput(...)` не используется, вызывайте `btn.update()` сами в начале каждого `loop()`.
+После этого `wasPressed()` и `isDown()` читают уже обновлённое состояние кнопки.
+
+Если нужен готовый snapshot ввода для собственного state-machine:
+
+```cpp
+InputState input = ui.pollInput(Next, Prev);
+```
+
+`pollInput(...)` сам обновляет обе кнопки и возвращает готовый снимок их состояния на текущий тик.
+
+Поля `InputState`:
+
+- `nextDown` - кнопка `Next` сейчас удерживается
+- `prevDown` - кнопка `Prev` сейчас удерживается
+- `nextPressed` - кнопка `Next` была нажата именно в этом тике
+- `prevPressed` - кнопка `Prev` была нажата именно в этом тике
+- `comboDown` - обе кнопки сейчас зажаты одновременно
+
+Разница простая:
+
+- `Down` - состояние удержания
+- `Pressed` - одноразовое событие нажатия
+
+## 10.3. Управление экранами
+
+Эти методы управляют активным экраном и переходами между экранами.
+
+```cpp
+ui.setScreen(ScreenHome);      // сразу переключает на указанный экран
+ui.currentScreen();            // возвращает id текущего активного экрана
+ui.nextScreen();               // переходит на следующий экран по порядку регистрации
+ui.prevScreen();               // возвращает назад по navigation-history
+ui.screenTransitionActive();   // показывает, что переход между экранами сейчас ещё идёт
+```
 
 Что важно:
 
-- `columns(...)` управляет обычной равномерной сеткой
-- `tileSize(...)` задаёт желаемый размер плитки, но layout всё равно ужимается в доступную область экрана
-- `lineGap(...)` влияет только на расстояние между title и subtitle внутри плитки
-- `mode(TextSubtitle)` не гарантирует subtitle любой ценой — если по высоте не влезает, subtitle скрывается
+- библиотека сама ведёт history переходов между экранами
+- если экран меняется через `setScreen(...)`, текущий экран добавляется в history автоматически
 
-## 11.3. Кастомная раскладка плиток
-
-Если стандартной сетки мало, можно описать layout строками:
+## 10.4. Принудительная перерисовка
 
 ```cpp
-ui.configureTile()
-    .screen(ScreenTiles)
-    .items({
-        {"Main",     "Главный экран", ScreenHome},
-        {"Settings", "Настройки",     ScreenSettings},
-        {"Info",     "Инфо",          ScreenInfo},
-        {"Graph",    "Графики",       ScreenGraph}
-    })
-    .layout({
-        "AA",
-        "BC",
-        "BD"
-    })
+ui.requestRedraw();
 ```
 
-Это advanced-режим. Для большинства экранов хватает обычных `columns(...)`, `spacing(...)` и `tileSize(...)`.
+Нужно, когда данные экрана изменились вне обычного render-flow, и вы хотите гарантированно перерисовать следующий кадр.
 
-Что важно:
+## 10.5. Анимация переходов
 
-- `layout(...)` переключает плитки в кастомную сетку
-- в этом режиме `columns(...)` уже не управляет раскладкой
-- каждая буква — отдельная плитка, прямоугольный блок одинаковых букв задаёт её span
+```cpp
+ui.setScreenAnim(SlideX, 250);
+```
+
+`setScreenAnim(mode, durationMs)` задаёт стиль и длительность перехода между экранами.
+
+Доступные режимы:
+
+- `None` - переход без анимации
+- `SlideX` - горизонтальный слайд
+- `SlideY` - вертикальный слайд
 
 ---
 
-# 12. Графики
+# 11. Статус-бар
 
-## Фон и сетка:
-
-```cpp
-ui.drawGraphGrid()
-    .pos(10, 50)
-    .size(220, 120)
-    .radius(8)
-    .direction(LeftToRight)
-    .bgColor(ui.rgb(10, 10, 10))
-    .speed(1.0f);
-```
-
-- цвет сетки вычисляется автоматически из `bgColor()`
-
-Для локального dirty-redraw доступен тот же fluent через `updateGraphGrid()`:
-
-```cpp
-ui.updateGraphGrid()
-    .pos(10, 50)
-    .size(220, 120)
-    .radius(8)
-    .direction(LeftToRight)
-    .bgColor(ui.rgb(10, 10, 10))
-    .speed(1.0f);
-```
-
-## Линия графика:
-
-```cpp
-ui.drawGraphLine()
-    .line(0)
-    .value(sensorValue)
-    .thickness(2)
-    .color(ui.rgb(0, 255, 140))
-    .range(0, 100);
-```
-
-- `drawGraphLine()` добавляет новую точку в уже настроенный график
-- `updateGraphLine()` подходит для in-place обновления, когда графику нужно самому зачистить и перерисовать нужную область
-- `thickness(...)` задаёт толщину линии графика; по умолчанию `1`
-
-## Auto-scale:
-
-```cpp
-ui.setGraphScale(true);
-```
-
-- `setGraphScale(true)` включает автоматический диапазон по данным, auto-scale применяется ко всем buffered-линиям графика
-
-## Пакетная отрисовка готового массива:
-
-```cpp
-int16_t samples[] = {10, 15, 12, 18, 20, 17};
-
-ui.drawGraphSamples()
-    .line(0)
-    .samples(samples, 6)
-    .thickness(2)
-    .color(ui.rgb(0, 255, 140))
-    .range(0, 100);
-```
-
-- `drawGraphSamples()` рисует переданный массив сразу, не накапливает внутреннюю историю точек. Для streaming-режима с накоплением используйте `drawGraphLine()`
-- `thickness(...)` задаёт толщину линии; по умолчанию `1`
-- `updateGraphSamples()` использует тот же API, но подходит для локального in-place обновления
-
-Осциллограф можно настроить отдельно:
-
-```cpp
-ui.configGraphScope()
-    .screen(ScreenGraph)
-    .rate(2000)
-    .timebase(100)
-    .visible(0);
-```
-
-Чтение текущих настроек:
-
-```cpp
-uint16_t hz = ui.graphRate(ScreenGraph);
-uint16_t timeMs = ui.graphTimebase(ScreenGraph);
-uint16_t visible = ui.graphSamplesVisible(ScreenGraph);
-```
-
-Что важно по lifecycle:
-
-- `drawGraphGrid()` задаёт активную область графика и должен вызываться в screen-callback этого экрана
-- buffered-график (`drawGraphLine()`) живёт только пока экран реально рисует граф в текущих кадрах
-- если экран перестал вызывать graph API или вы ушли на другой screen, внутренние буферы графа освобождаются
-- при возврате граф начинает собирать историю заново
-
-Что важно по режимам:
-
-- `LeftToRight` и `RightToLeft` используют rolling-history
-- `Oscilloscope` использует фиксированное окно видимых samples
-- если `visibleSamples == 0`, окно для `Oscilloscope` вычисляется из `sampleRateHz * timebaseMs`
-
-Режимы направления:
-
-- `LeftToRight`
-- `RightToLeft`
-- `Oscilloscope`
-
----
-
-# 13. Статус-бар
-
-## 13.0. Build-time флаги
+## 11.1. Build-time флаги
 
 - `PIPGUI_STATUS_BAR`
   - `1` включает код статус-бара
@@ -1353,14 +904,13 @@ uint16_t visible = ui.graphSamplesVisible(ScreenGraph);
 
 Обычно эти флаги задаются в `include/config.hpp`.
 
-## 13.1. Включение
+## 11.2. Включение
 
 ```cpp
-ui.configureStatusBar()
-    .enabled(true)
-    .bgColor(ui.rgb(0, 0, 0))
+ui.configStatusBar()
     .height(18)
-    .position(Top);
+    .pos(Top)
+    .style(Blur);
 ```
 
 Позиции:
@@ -1368,20 +918,12 @@ ui.configureStatusBar()
 - `Top`
 - `Bottom`
 
-## 13.2. Стиль
+Стили:
 
-```cpp
-ui.setStatusBarStyle(StatusBarStyleSolid);
-// или
-ui.setStatusBarStyle(StatusBarStyleBlur);
-```
+- `Solid` — обычная непрозрачная полоса; layout резервирует под неё высоту
+- `Blur` — блюр-полоса поверх контента; layout не должен откусывать под неё safe area
 
-Режимы:
-
-- `StatusBarStyleSolid` — обычная непрозрачная полоса; layout резервирует под неё высоту
-- `StatusBarStyleBlur` — блюр-полоса поверх контента; layout не должен откусывать под неё safe area
-
-## 13.3. Текст
+## 11.3. Текст
 
 ```cpp
 ui.setStatusBarText()
@@ -1390,7 +932,7 @@ ui.setStatusBarText()
     .right("Wi-Fi");
 ```
 
-## 13.4. Батарея
+## 11.4. Батарея
 
 ```cpp
 ui.setStatusBarBattery(87, Numeric);
@@ -1406,7 +948,7 @@ ui.setStatusBarBattery(-1, Hidden);
 - `WarningBar`
 - `ErrorBar`
 
-## 13.5. Кастомная дорисовка
+## 11.5. Кастомная дорисовка
 
 ```cpp
 void statusBarCustom(GUI &ui, int16_t x, int16_t y, int16_t w, int16_t h)
@@ -1431,10 +973,10 @@ ui.renderStatusBar();
 
 Что важно:
 
-- `statusBarHeight()` возвращает ненулевую высоту только для `StatusBarStyleSolid`
-- при `StatusBarStyleBlur` helper возвращает `0`, потому что layout не должен резервировать fixed-height safe area под blur-панель
+- `statusBarHeight()` возвращает ненулевую высоту только для `Solid`
+- при `Blur` helper возвращает `0`, потому что layout не должен резервировать fixed-height safe area под blur-панель
 
-## 13.6. Иконки слотов
+## 11.6. Иконки слотов
 
 Можно повесить отдельную иконку в левый, центральный или правый слот статус-бара:
 
@@ -1480,40 +1022,487 @@ ui.clearStatusBarIcon(Right);
 
 ---
 
-# 14. Уведомления, toast, ошибки
+# 12. Виджеты
 
-## 14.1. Toast
+## 12.1. Scroll dots
+
+```cpp
+ui.drawScrollDots()
+    .pos(center, 220)
+    .count(5)
+    .activeIndex(2)
+    .activeColor(ui.rgb(0, 87, 250))
+    .inactiveColor(ui.rgb(60, 60, 60)) 
+    .radius(3)
+    .spacing(14);
+```
+
+Есть и `updateScrollDots()` с теми же параметрами.
+
+Что задают параметры:
+
+- `count(...)` - общее число страниц/точек
+- `activeIndex(...)` - текущая активная страница
+- `radius(...)` - базовый радиус точки
+- `spacing(...)` - шаг между центрами соседних точек
+
+Поведение:
+
+- при `count > 7` включается оконный режим: показывается компактное окно точек с taper по краям
+
+## 12.2. Buttons
+
+Обычная отрисовка:
+
+```cpp
+ui.drawButton()
+    .label("Save")                       // текст внутри кнопки
+    .pos(center, 180)                    // центр по X, координата Y
+    .size(120, 40)                       // ширина и высота кнопки
+    .baseColor(ui.rgb(0, 120, 255))      // основной цвет кнопки
+    .radius(10);                         // радиус
+```
+
+Обновление с состоянием кнопки:
+
+```cpp
+ui.updateButton()
+    .label("Save")                       // текст внутри кнопки
+    .pos(center, 180)                    // центр по X, координата Y
+    .size(120, 40)                       // ширина и высота кнопки
+    .baseColor(ui.rgb(0, 120, 255))      // основной цвет кнопки
+    .radius(10)                          // радиус
+    .icon(warning)                       // иконка внутри кнопки
+    .mode(true, false)                   // enabled, loading
+    .down(isDown)                        // текущее физическое нажатие для press-анимации
+;
+```
+
+Кнопка с прогрессом:
+
+```cpp
+ui.updateButton()
+    .label("Updating 56%")               // текст внутри кнопки
+    .pos(center, 180)                    // центр по X, координата Y
+    .size(170, 38)                       // ширина и высота кнопки
+    .baseColor(ui.rgb(24, 24, 24))       // базовый цвет корпуса кнопки
+    .fillColor(ui.rgb(0, 120, 255))      // цвет progress-заливки
+    .value(56)                           // значение встроенного progress: 0..100
+    .radius(12)                          // радиус
+    .icon(battery_l1);                   // иконка внутри кнопки
+```
+
+`drawButton()` и `updateButton()` используют один и тот же API. Для обычных статичных экранов достаточно `drawButton()`. Для анимируемой или интерактивной кнопки используй `updateButton()`.
+
+Если заданы и текст, и иконка - иконка рисуется слева от текста как единый центрированный блок. Если текст пустой, иконка рисуется по центру кнопки.
+Если задан `value(...)`, кнопка рисует встроенный progress-fill под текстом и иконкой. `loading` и `progress` одновременно не используются: progress-режим приоритетнее.
+
+## 12.3. Toggle switch
+
+Снаружи нужен только обычный `bool`:
+
+```cpp
+bool wifiEnabled = false;
+bool changed = false;
+```
+
+Отрисовка:
+
+```cpp
+ui.updateToggleSwitch()
+    .pos(center, 140)
+    .size(78, 36)
+    .value(wifiEnabled)                   // текущий bool; библиотека сама обновит его при нажатии
+    .pressed(btn.wasPressed())            // событие нажатия этого кадра
+    .changed(changed)                     // сюда вернется true, если значение переключилось
+    .enabled(!wifiBusy)                   // можно временно отключить ввод, пока идет внешняя операция
+    .activeColor(ui.rgb(21, 180, 110))    // цвет включенного track
+    .inactiveColor(ui.rgb(46, 46, 46))    // цвет выключенного track
+    .knobColor(0xFFFF);                   // цвет бегунка
+```
+
+`drawToggleSwitch()` и `updateToggleSwitch()` используют один и тот же fluent API. Разница только в режиме вывода:
+
+- `drawToggleSwitch()` - обычная отрисовка
+- `updateToggleSwitch()` - локальный dirty-update
+
+Если хочется просто показать состояние без ввода, можно не передавать `pressed(...)` и `changed(...)`:
+
+```cpp
+ui.drawToggleSwitch()
+    .pos(center, 140)
+    .size(78, 36)
+    .value(wifiEnabled)
+    .activeColor(ui.rgb(21, 180, 110));
+```
+
+## 12.4. Slider
+
+Слайдер подходит для настроек вроде громкости, яркости и подобных значений.
+
+```cpp
+ui.updateSlider()
+    .pos(center, 114)                     // центр по X, координата Y
+    .size(186, 24)                        // ширина и высота трека
+    .bind(value)                          // привязка переменной; библиотека обновляет ее сама
+    .activeColor(ui.rgb(0, 87, 250))      // цвет заполненной части
+    .inactiveColor(ui.rgb(36, 36, 36))    // цвет неактивной части трека
+    // .enabled(false)                    // опционально: показать slider без реакции на ввод
+    .thumbColor(0xFFFF);                  // цвет бегунка
+```
+
+`drawSlider()` и `updateSlider()` используют один и тот же fluent API. Для интерактивного сценария нужен `updateSlider()`.
+Ввод `Next/Prev` slider берет сам из последнего `pollInput(...)`.
+
+Поведение:
+
+- удержание кнопки сначала двигает значение обычным шагом, потом ускоряет и частоту, и величину шага;
+- по умолчанию бегунок белый, трек темнее активной части.
+
+## 12.5. Прогресс
+
+```cpp
+ui.drawProgress()
+    .pos(20, 220)                        // левый верхний угол
+    .size(180, 16)                       // ширина и высота
+    .value(65)                           // значение progress: 0..100
+    .baseColor(ui.rgb(30, 30, 30))       // цвет пустой части
+    .fillColor(ui.rgb(0, 120, 255))      // цвет заполненной части
+    .radius(8)                           // скругление краев
+    .anim(Shimmer);                      // тип анимации progress
+```
+
+Для локального обновления без полной перерисовки есть `updateProgress()`:
+
+```cpp
+ui.updateProgress()
+    .pos(20, 220)                        // та же область, которую нужно обновить
+    .size(180, 16)                       // тот же размер
+    .value(65)                           // новое значение: 0..100
+    .baseColor(ui.rgb(30, 30, 30))       // цвет пустой части
+    .fillColor(ui.rgb(0, 120, 255))      // цвет заполненной части
+    .radius(8)                           // скругление краев
+    .anim(Shimmer);                      // тип анимации progress
+```
+
+Текст у линейного прогресса задаётся прямо на самом progress:
+
+```cpp
+ui.drawProgress()
+    .pos(20, 246)                            // левый верхний угол
+    .size(180, 14)                           // ширина и высота
+    .value(65)                               // значение progress: 0..100
+    .baseColor(ui.rgb(20, 20, 20))           // цвет пустой части
+    .fillColor(ui.rgb(0, 120, 255))          // цвет заполненной части
+    .label("Downloading", Left)              // текст и его выравнивание
+    .labelColor(ui.rgb(255, 255, 255))       // цвет label
+    .percent(Right)                          // показать текущее значение как процент и задать выравнивание
+    .percentColor(ui.rgb(200, 200, 200));    // цвет процента
+```
+Текст поддерживается только у линейного progress; у `drawCircleProgress()` его нет.
+
+Для `label(...)` и `percent(...)` доступны:
+
+- `Left` - прижать текст к левому краю progress
+- `Center` - выровнять текст по центру progress
+- `Right` - прижать текст к правому краю progress
+
+`anim(...)` у progress поддерживает:
+
+- `None` - progress статичный, без анимации
+- `Shimmer` - по заполненной части идет мягкий движущийся блик
+
+## 12.6. Круговой прогресс
+
+```cpp
+ui.drawCircleProgress()
+    .pos(center, 140)                    // центр кольца
+    .radius(34)                          // внешний радиус
+    .thickness(8)                        // толщина кольца
+    .value(72)                           // значение progress: 0..100
+    .baseColor(ui.rgb(30, 30, 30))       // цвет пустой части
+    .fillColor(ui.rgb(0, 120, 255))      // цвет заполненной части
+    .anim(None);                         // тип анимации progress
+```
+
+Локальное обновление:
+
+```cpp
+ui.updateCircleProgress()
+    .pos(center, 140)                    // тот же центр
+    .radius(34)                          // тот же внешний радиус
+    .thickness(8)                        // та же толщина кольца
+    .value(72)                           // новое значение: 0..100
+    .baseColor(ui.rgb(30, 30, 30))       // цвет пустой части
+    .fillColor(ui.rgb(0, 120, 255))      // цвет заполненной части
+    .anim(None);                         // тип анимации progress
+```
+
+## 12.7. Drum roll
+
+Горизонтальный:
+
+```cpp
+ui.drawDrumRoll()
+    .pos(20, 60)                            // левый верхний угол
+    .size(200, 40)                          // ширина и высота области
+    .options(16, "Low", "Medium", "High")   // шрифт и список опций; количество считается автоматически
+    .selected(1)                            // текущий выбранный индекс
+    .fgColor(ui.rgb(255, 255, 255))         // цвет текста
+    .bgColor(ui.rgb(0, 0, 0));              // цвет фона
+```
+
+Вертикальный:
+
+```cpp
+ui.drawDrumRoll()
+    .pos(220, 100)                          // левый верхний угол
+    .size(70, 90)                           // ширина и высота области
+    .options(16, "Low", "Medium", "High")   // шрифт и список опций; количество считается автоматически
+    .selected(1)                            // текущий выбранный индекс
+    .fgColor(ui.rgb(255, 255, 255))         // цвет текста
+    .bgColor(ui.rgb(0, 0, 0))               // цвет фона
+    .vertical();                            // включить вертикальный режим
+```
+
+---
+
+# 13. Списки и плитки
+
+## 13.1. Списочное меню
+
+Прямо в `SCREEN(...)`:
+
+```cpp
+SCREEN(ScreenMainMenu, 1)
+{
+    ui.clear(0x0000);
+
+    ui.updateList()
+    .items(
+        listItem("Settings", "Device configuration", ScreenSettings),
+        listItem("About",    "Firmware info",        ScreenAbout),
+        listItem("Restart",  "Reboot device",        ScreenRestart))
+        .inactive(ui.rgb(12, 12, 12))      // цвет обычной карточки
+        .active(ui.rgb(0, 120, 255))       // цвет активной карточки
+        // .checked(1)                        // опционально: справа рисовать галочку у этого пункта
+        .radius(8)                         // радиус карточек
+        .cardSize(0, 0)                    // 0,0 = размер подберётся автоматически
+        .mode(Cards);                      // режим списка
+}
+```
+
+Режимы списка:
+
+- `Cards`
+- `Plain`
+
+Ввод в `loop()`:
+
+```cpp
+ui.listInput()
+    .nextDown(btnNext.isDown())            // кнопка NEXT сейчас удерживается
+    .prevDown(btnPrev.isDown());           // кнопка PREV сейчас удерживается
+```
+
+Поведение:
+
+- короткое отпускание `NEXT` переключает пункт вперёд;
+- короткое отпускание `PREV` переключает пункт назад;
+- удержание `NEXT` открывает `targetScreen` выбранного пункта;
+- удержание `PREV` возвращает на предыдущий экран из navigation-history.
+
+## 13.2. Плиточное меню
+
+Прямо в `SCREEN(...)`:
+
+```cpp
+SCREEN(ScreenTiles, 2)
+{
+    ui.updateTile()
+    .items(
+        tileItem("Main",     "Главный экран", ScreenHome),
+        tileItem("Settings", "Настройки",     ScreenSettings),
+        tileItem("Info",     "Инфо",          ScreenInfo),
+        tileItem("Graph",    "Графики",       ScreenGraph))
+        .inactive(ui.rgb(16, 16, 16))     // обычная плитка
+        .active(ui.rgb(0, 120, 255))      // активная плитка
+        .radius(12)                       // радиус плитки
+        .spacing(10)                      // расстояние между плитками
+        .columns(2)                       // количество колонок в обычной сетке
+        .tileSize(100, 70)                // желаемый размер плитки
+        .mode(TextSubtitle);              // контент плитки
+}
+```
+
+Ввод:
+
+```cpp
+ui.tileInput()
+    .nextDown(btnNext.isDown())           // кнопка NEXT сейчас удерживается
+    .prevDown(btnPrev.isDown());          // кнопка PREV сейчас удерживается
+```
+
+Режимы плитки:
+
+- `TextOnly`
+- `TextSubtitle`
+
+## 13.3. Кастомная раскладка плиток
+
+Если обычной сетки мало, можно задать свою понятную раскладку:
+
+```cpp
+ui.updateTile()
+    .grid(2, 3)                                      // сетка: 2 колонки, 3 строки
+    .tile("Main", "Главный экран", ScreenHome)
+    .at(0, 0)                                        // колонка 0, строка 0
+    .span(2, 1)                                      // ширина 2 клетки, высота 1 клетка
+    .tile("Settings", "Настройки", ScreenSettings)
+    .at(0, 1)                                        // колонка 0, строка 1
+    .tile("Info", "Инфо", ScreenInfo)
+    .at(1, 1)                                        // колонка 1, строка 1
+    .tile("Graph", "Графики", ScreenGraph)
+    .at(1, 2)                                        // колонка 1, строка 2
+```
+
+Что важно:
+
+- `grid(cols, rows)` включает кастомную сетку
+- `tile(...)` добавляет очередную плитку
+- `at(col, row)` ставит последнюю добавленную плитку в нужную клетку
+- `span(cols, rows)` растягивает последнюю добавленную плитку на несколько клеток
+- в этом режиме `columns(...)` уже не влияет на раскладку
+
+---
+
+# 14. Графики
+
+## 14.1. Фон и сетка:
+
+```cpp
+ui.drawGraphGrid()
+    .pos(10, 50)
+    .size(220, 120)
+    .radius(8)
+    .direction(LeftToRight)           // задаёт режим движения и раскладки данных внутри этой graph-area
+    .bgColor(ui.rgb(10, 10, 10))      // цвет сетки вычисляется автоматически из bgColor()
+    .speed(1.0f);
+```
+
+- `drawGraphGrid()` / `updateGraphGrid()` должны использовать тот же `direction(...)`, в котором потом рисуются линии этого графа
+
+Направления:
+
+- `LeftToRight` - новые точки приходят справа, старая история уезжает влево
+- `RightToLeft` - новые точки приходят слева, старая история уезжает вправо
+- `Oscilloscope` - фиксированное окно по всей ширине графика без rolling-shift; точки раскладываются по видимому буферу как осциллограф
+
+Для локального dirty-redraw доступен тот же fluent через `updateGraphGrid()`:
+
+```cpp
+ui.updateGraphGrid()
+    .pos(10, 50)
+    .size(220, 120)
+    .radius(8)
+    .direction(LeftToRight)
+    .bgColor(ui.rgb(10, 10, 10))
+    .speed(1.0f);
+```
+
+## 14.2. Линия графика:
+
+```cpp
+ui.drawGraphLine()
+    .line(0)
+    .value(sensorValue)
+    .thickness(2)                   // задаёт толщину линии графика; по умолчанию `1`
+    .color(ui.rgb(0, 255, 140))
+    .range(0, 100);
+    .scale(true);                   // вкл/выкл автоматический диапазон по данным для этой graph-area
+```
+
+- `drawGraphLine()` добавляет новую точку в уже настроенный график
+- `updateGraphLine()` подходит для in-place обновления, когда графику нужно самому зачистить и перерисовать нужную область
+
+## 14.3. Пакетная отрисовка готового массива:
+
+```cpp
+int16_t samples[] = {10, 15, 12, 18, 20, 17};
+
+ui.drawGraphSamples()
+    .line(0)
+    .samples(samples, 6)
+    .thickness(2)
+    .color(ui.rgb(0, 255, 140))
+    .range(0, 100);
+```
+
+- `drawGraphSamples()` рисует переданный массив сразу, не накапливает внутреннюю историю точек. Для streaming-режима с накоплением используйте `drawGraphLine()`
+- `updateGraphSamples()` использует тот же API, но подходит для локального in-place обновления
+
+Для `Oscilloscope` эти настройки задаются прямо у сетки:
+
+```cpp
+ui.drawGraphGrid()
+    .pos(center, center)
+    .size(200, 170)
+    .direction(Oscilloscope)
+    .scope(2000, 100)                  // частота входных samples и длительность окна в мс
+    .visible(0);
+```
+
+Что важно по lifecycle:
+
+- `drawGraphGrid()` задаёт активную область графика и должен вызываться в screen-callback этого экрана
+- buffered-график (`drawGraphLine()`) живёт только пока экран реально рисует граф в текущих кадрах
+- если экран перестал вызывать graph API или вы ушли на другой screen, внутренние буферы графа освобождаются
+- при возврате граф начинает собирать историю заново
+
+Что важно по режимам:
+
+- `LeftToRight` и `RightToLeft` используют rolling-history
+- `Oscilloscope` использует фиксированное окно видимых samples
+- если `visible(0)`, окно для `Oscilloscope` вычисляется из `rateHz * timebaseMs`
+
+---
+
+# 15. Уведомления, toast, ошибки
+
+## 15.1. Toast
 
 ```cpp
 ui.showToast()
-    .text("Saved")
-    .icon(error)
-    .pos(top);
+    .text("Saved")    // основной текст toast; можно оставить пустым, если нужен только значок
+    .icon(error)      // необязательная иконка слева
+    .pos(top);        // `top` или `down`; по умолчанию используется `down`
 ```
 
-Параметры:
+Позиции toast:
 
-- `text(...)` — текст toast (можно не задавать, если toast только с иконкой)
-- `pos(top | down)` — появление сверху или снизу (`down` по умолчанию)
-- `icon(id)` — иконка (если не задана, toast будет только текстом)
+- `top` — появляется сверху
+- `down` — появляется снизу
 
 Проверка активности:
 
 ```cpp
-bool active = ui.toastActive();
+bool active = ui.toastActive();    // `true`, пока toast еще анимируется или висит на экране
 ```
 
-## 14.2. Notification
+Поведение:
+
+- если не заданы и текст, и иконка, toast не показывается
+- toast сам показывается, держится на экране и затем скрывается с анимацией
+
+## 15.2. Notification
 
 ```cpp
 ui.showNotification()
-    .title("Settings")
-    .message("Changes applied")
-    .button("OK")
-    .delay(0)
-    .type(Normal)
-    .icon(warning)
-    .show();
+    .text("Settings", "Changes applied") // заголовок и основной текст карточки
+    .button("OK")                        // подпись кнопки подтверждения
+    .delay(0)                            // автозакрытие в секундах; `0` значит без таймера
+    .type(Normal)                        // semantic-тип уведомления
+    .icon(warning);                      // необязательная иконка; без нее библиотека берет visual от `type(...)`
 ```
 
 Типы уведомления:
@@ -1522,15 +1511,6 @@ ui.showNotification()
 - `Warning`
 - `Error`
 
-Параметры:
-
-- `title(...)` - заголовок карточки уведомления
-- `message(...)` - основной текст
-- `button(...)` - подпись кнопки подтверждения
-- `delay(...)` - автозакрытие в секундах; `0` означает без таймера
-- `type(...)` - semantic-тип уведомления
-- `icon(...)` - необязательная иконка; если не задана, библиотека рисует builtin visual для выбранного `type(...)`
-
 Управление:
 
 ```cpp
@@ -1538,9 +1518,13 @@ bool active = ui.notificationActive();
 ui.setNotificationButtonDown(btnOk.isDown());
 ```
 
-## 14.3. Popup menu
+## 15.3. Popup menu
+
+Самый обычный сценарий:
 
 ```cpp
+static const char *menuItems[] = {"Edit", "Rename", "Delete"};
+
 auto button = ui.updateButton()
     .label("Open menu")
     .pos(center, 188)
@@ -1549,38 +1533,35 @@ auto button = ui.updateButton()
     .radius(10);
 
 ui.showPopupMenu()
-    .items(&itemProvider, userData, itemCount)
-    .anchor(button)
-    .width(120);
+    .items(menuItems)                  // обычный массив строк
+    .anchor(button)                    // привязка к fluent-компоненту; меню само откроется над ним или под ним
+    .width(120)                        // ширина меню; если не задать, библиотека подберет сама
+    .selected(0);                      // стартовый выделенный пункт; если не задавать, берется дефолт
 ```
 
-Во время активности:
+Во время активности меню:
 
 ```cpp
-if (ui.popupMenuActive())
+if (ui.popupMenuActive())                             // значит, что меню сейчас открыто и перехватило ввод
 {
-    ui.popupMenuInput().nextDown(btnNext.isDown()).prevDown(btnPrev.isDown());
+    ui.popupMenuInput()
+        .nextDown(btnNext.isDown())                   // перемещение вперед по пунктам
+        .prevDown(btnPrev.isDown());                  // перемещение назад по пунктам
 
-    if (ui.popupMenuHasResult())
+    if (ui.popupMenuHasResult())                      // говорит, что пользователь уже выбрал пункт
     {
-        int16_t picked = ui.popupMenuTakeResult();
+        int16_t picked = ui.popupMenuTakeResult();    // возвращает индекс выбранного пункта и сразу сбрасывает флаг результата
     }
 }
 ```
 
-- `popupMenuActive()` показывает, что меню перехватило ввод
-- `popupMenuHasResult()` сообщает, что выбор уже готов
-- `popupMenuTakeResult()` возвращает индекс и одновременно сбрасывает флаг результата
-- `.selected(index)` теперь нужен только если надо вручную поставить стартовый курсор
-- `.anchor(component)` берёт прямоугольник fluent-компонента и открывает меню по центру над/под ним
-- `.anchor(x, y, w, h)` оставлен для произвольной якорной области, если меню надо привязать не к компоненту
+Что важно:
 
-Можно использовать и более короткий паттерн без `popupMenuHasResult()`:
-
-- `popupMenuTakeResult() == -1` — результата пока нет
-- `popupMenuTakeResult() >= 0` — это индекс выбранного пункта
-
-## 14.4. Ошибки
+- `.selected(index)` нужен только если хочешь вручную задать стартовый курсор
+- `.anchor(component)` берет прямоугольник fluent-компонента и открывает меню по центру над ним или под ним
+- если использовать короткий паттерн без `popupMenuHasResult()`, то `popupMenuTakeResult() == -1` значит, что результата пока нет
+ 
+## 15.4. Ошибки
 
 ```cpp
 ui.showError()
@@ -1609,90 +1590,8 @@ ui.setErrorButtonsDown(btnNext.isDown(), btnPrev.isDown(), btnCombo.isDown());  
 Поведение:
 
 - если ошибок несколько, первой показывается последняя добавленная
-- header берется из `type(...)`: `Warning` или `Error/Crash`
-- пользователь задает только `message(...)` и `code(...)`; строка `Code:` собирается библиотекой сама
 - `Warning` можно закрыть
 - `Error` не закрывается пользовательской кнопкой
-
----
-
-# 15. Layout helpers
-
-Это лёгкие helper-ы для раскладки UI без тяжёлой layout-системы.
-
-Базовые типы:
-
-```cpp
-UiSize   size{120, 40};
-UiRect   rect{0, 0, 240, 320};
-UiInsets insets{10, 10, 10, 10};
-```
-
-## 15.1. Slicing API
-
-```cpp
-UiRect root{0, 0, 240, 320};
-UiRect work = inset(root, 10);
-
-UiRect header = takeTop(work, 24, 8);
-UiRect footer = takeBottom(work, 28, 8);
-UiRect content = work;
-```
-
-Доступно:
-
-- `inset(rect, all)`
-- `inset(rect, l, t, r, b)`
-- `inset(rect, UiInsets{...})`
-- `takeTop(...)`
-- `takeBottom(...)`
-- `takeLeft(...)`
-- `takeRight(...)`
-- `placeInside(...)`
-- `centerIn(...)`
-
-## 15.2. Flow API
-
-```cpp
-UiSize sizes[3] = {{40, 20}, {60, 20}, {40, 20}};
-UiRect out[3];
-
-flowRow(area, sizes, out, 3, 10, Center, Center);
-flowColumn(area, sizes, out, 3, 8, Center, Center);
-```
-
-Для распределения доступны:
-
-- `Start`
-- `Center`
-- `End`
-- `layout::SpaceBetween`
-- `layout::SpaceEvenly`
-
-## 15.3. Cursor-based API
-
-```cpp
-UiFlowRow<3> row(area, 10, layout::SpaceEvenly, Center);
-
-row.next(40, 24);
-row.next(60, 24);
-row.next(40, 24);
-row.finish();
-```
-
-Аналогично работает `UiFlowColumn<N>`.
-
-Как этим пользоваться правильно:
-
-- `next(w, h)` резервирует следующий slot
-- после всех `next(...)` нужно вызвать `finish()`
-- итоговые прямоугольники потом берутся через `row[i]` или `column[i]`
-
-Для позиционирования и выравнивания часто используются короткие шорткаты:
-
-- `center` для автоматического центрирования по оси
-- `Left`, `Center`, `Right`
-- `Top`, `Bottom`
 
 ---
 
@@ -1717,11 +1616,6 @@ row.finish();
 python tools/screenshots/bin/capture.py
 ```
 
-Что важно:
-
-- serial header теперь фиксированный: magic `PSCR`, затем `width`, `height`, `payloadSize`
-- формат payload один: lossless `Packed565`
-- отдельного поля `format` в header больше нет
 - при запуске без параметров tool покажет меню: port, baud и output directory
 
 Быстрый прямой запуск тоже можно:
@@ -1730,7 +1624,7 @@ python tools/screenshots/bin/capture.py
 python tools/screenshots/bin/capture.py --port COM9 --baud 1000000
 ```
 
-## 16.3. Скриншоты во flash (LittleFS)
+## 16.3. Flash (LittleFS)
 
 В режиме `2` сохраняются:
 
@@ -1748,24 +1642,12 @@ bool started = ui.startScreenshot();
 - `startScreenshot()` запускает захват асинхронно
 - если snapshot-buffer не удалось выделить, функция вернёт `false`
 - built-in shortcut фиксированный: удержание `Next + Prev` `300 ms`
-- shortcut настраивать нельзя и отдельного API для него больше нет
 
 ## 16.5. Галерея миниатюр
 
-Настройка кеша и thumb-геометрии:
-
-```cpp
-ui.configureScreenshotGallery(
-    12, // maxShots: сколько screenshot entries держать в галерее
-    64, // thumbW: ширина одной миниатюры
-    40, // thumbH: высота одной миниатюры
-    6   // padding: внутренний отступ между миниатюрами
-);
-```
-
 Отрисовка галереи:
 
-```cpp
+```cpp 
 ui.drawScreenshot()
     .pos(8, 28)     // x, y области галереи
     .size(224, 284) // w, h области галереи
@@ -1777,6 +1659,7 @@ ui.drawScreenshot()
 
 - рисует текущую screenshot gallery в заданной области
 - сам берёт entries из внутреннего screenshot store
+- сам вычисляет размер миниатюр и вместимость галереи из `size(...)`, `grid(...)` и `padding(...)`
 - в serial mode просто покажет пустое состояние, если gallery backend не используется
 
 Дополнительно:
@@ -1849,51 +1732,79 @@ python tools/ota/verify.py
 
 ## 18.2. Конфигурация
 
-- `PIPGUI_OTA` — `1` включает OTA subsystem
-- `PIPGUI_OTA_PROJECT_URL` — base URL на `/fw/<project>`
-- `PIPGUI_OTA_ED25519_PUBKEY_HEX` — обязательный Ed25519 public key в hex
-- `PIPGUI_FIRMWARE_TITLE` — имя прошивки для UI
-- `PIPGUI_FIRMWARE_VER_MAJOR`, `PIPGUI_FIRMWARE_VER_MINOR`, `PIPGUI_FIRMWARE_VER_PATCH` — текущая версия
+Обычно всё задаётся в `include/config.hpp`: 
+
+```cpp
+#define PIPGUI_OTA 1
+#define PIPGUI_OTA_PROJECT_URL "https://example.com/fw/pipGUI"
+#define PIPGUI_OTA_ED25519_PUBKEY_HEX "..."
+
+#define PIPGUI_FIRMWARE_TITLE "pipGUI"
+#define PIPGUI_FIRMWARE_VER_MAJOR 1
+#define PIPGUI_FIRMWARE_VER_MINOR 0
+#define PIPGUI_FIRMWARE_VER_PATCH 2
+```
+
+Что это значит:
+
+- `PIPGUI_OTA` включает сам OTA subsystem
+- `PIPGUI_OTA_PROJECT_URL` это базовый URL проекта, откуда берутся manifest и бинарники
+- `PIPGUI_OTA_ED25519_PUBKEY_HEX` это публичный ключ, которым проверяется подпись manifest и firmware
+- `PIPGUI_FIRMWARE_TITLE` это имя прошивки в UI
+- `PIPGUI_FIRMWARE_VER_MAJOR / MINOR / PATCH` это текущая версия прошивки, с которой backend сравнивает remote release
+
+Что обычно важно:
+
+- без `PIPGUI_OTA_ED25519_PUBKEY_HEX` нормальная защищенная OTA-схема не имеет смысла
+- URL и версия это то, что меняют чаще всего
+- если OTA не нужен, достаточно держать `PIPGUI_OTA 0`
 
 ## 18.3. Использование
 
-Типы `OtaChannel`, `OtaCheckMode`, `OtaState`, `OtaError`, `OtaManifest`, `OtaStatus`, `OtaStatusCallback` экспортируются из `pipGUI/Systems/Update/Ota.hpp`.
-
-### Базовый lifecycle
+### Минимальный сценарий
 
 ```cpp
-ui.otaConfigure();
-ui.otaRequestCheck();
-const OtaStatus& st = ui.otaStatus();
+ui.otaConfigure();                    // один раз на старте
+ui.otaRequestCheck();                 // запустить проверку обновления
+
+const OtaStatus& st = ui.otaStatus(); // текущее состояние OTA state-machine
 ```
 
-- `otaConfigure()` вызывается один раз на старте
-- `otaRequestCheck()` запускает проверку обновления
-- `otaStatus()` возвращает live status state-machine
+Этого уже хватает для обычного сценария, потому что `GUI::loop()` сам обслуживает OTA backend.
 
-### Проверка и установка
+### Проверка обновления
 
 ```cpp
 ui.otaRequestCheck();
-ui.otaRequestCheck(OtaCheckMode::NewerOnly);
-ui.otaRequestCheck(OtaCheckMode::AllowDowngrade);
-ui.otaRequestInstall();
-ui.otaCancel();
+ui.otaRequestCheck(NewerOnly);
+ui.otaRequestCheck(AllowDowngrade);
 ```
 
-- порядок каналов: `stable -> beta`
-- если в `stable` ничего нового нет, backend проверяет `beta`
-- `otaCancel()` отменяет текущую OTA-операцию
+- `ui.otaRequestCheck()` это обычная проверка
+- `NewerOnly` разрешает только обновление вверх
+- `AllowDowngrade` разрешает откат на более старую версию
+- backend идет по каналам в порядке `stable -> beta`
+- если в `stable` ничего подходящего нет, потом проверяется `beta`
+
+### Установка и отмена
+
+```cpp
+ui.otaRequestInstall();   // начать установку уже найденного релиза
+ui.otaCancel();           // отменить текущую OTA-операцию
+```
 
 ### История stable-версий
 
 ```cpp
-ui.otaRequestStableList();
-bool ready = ui.otaStableListReady();
-uint8_t count = ui.otaStableListCount();
-const char* ver = ui.otaStableListVersion(i);
+ui.otaRequestStableList();                    // запросить список stable-версий
+bool ready = ui.otaStableListReady();         // список уже загружен
+uint8_t count = ui.otaStableListCount();      // сколько stable-версий доступно
+const char* ver = ui.otaStableListVersion(i); // строка версии по индексу
+
 ui.otaRequestInstallStableVersion("1.2.3");
 ```
+
+Это нужно только если хочешь показывать пользователю список старых stable-сборок и давать выбрать rollback вручную.
 
 ### Дополнительно
 
@@ -1902,8 +1813,9 @@ ui.otaService();
 ui.otaMarkAppValid();
 ```
 
-- `otaService()` публичный, но обычно вручную не нужен: `GUI::loop()` уже его вызывает сам
-- после reboot в `pendingVerify` можно явно подтвердить новую прошивку через `otaMarkAppValid()`
+- `otaService()` публичный, но обычно вручную не нужен, потому что `GUI::loop()` уже вызывает его сам
+- `otaMarkAppValid()` нужен после reboot, если новая прошивка стартовала в режиме ожидания подтверждения
+- в обычном UI-коде чаще всего достаточно `otaConfigure()`, `otaRequestCheck()`, `otaRequestInstall()` и `otaStatus()`
 
 ### Ошибки `OtaError`
 
@@ -1927,3 +1839,11 @@ ui.otaMarkAppValid();
 - `HashMismatch`
 - `UpdateEndFailed`
 - `UrlTooLong`
+
+На практике чаще всего встречаются:
+
+- `WifiNotConnected` — нет соединения
+- `HttpStatusNotOk` — сервер не отдал корректный HTTP-ответ
+- `ManifestParseFailed` — manifest битый или неожиданный по формату
+- `SignatureInvalid` — подпись не сошлась
+- `HashMismatch` — firmware скачалась, но checksum не совпала

@@ -20,7 +20,7 @@ namespace pipgui
     struct SetClipFluent;
     struct ShowLogoFluent;
     struct ShowErrorFluent;
-    struct ConfigureStatusBarFluent;
+    struct ConfigStatusBarFluent;
     struct SetStatusBarTextFluent;
     struct SetStatusBarIconFluent;
 
@@ -72,6 +72,8 @@ namespace pipgui
     using DrawCircleProgressFluent = CircleProgressFluentT<false>;
     using UpdateCircleProgressFluent = CircleProgressFluentT<true>;
 
+    struct DrawDrumRollFluent;
+
     template <bool IsUpdate>
     struct ScrollDotsFluentT;
     using DrawScrollDotsFluent = ScrollDotsFluentT<false>;
@@ -101,7 +103,6 @@ namespace pipgui
     using DrawAnimIconFluent = AnimIconFluentT<false>;
     using UpdateAnimIconFluent = AnimIconFluentT<true>;
     struct DrawScreenshotFluent;
-    struct ConfigGraphScopeFluent;
 
     template <bool IsUpdate>
     struct TextFluentT;
@@ -112,12 +113,10 @@ namespace pipgui
     struct DrawTextEllipsizedFluent;
 
     struct ListInputFluent;
-    struct ConfigureListFluent;
+    struct UpdateListFluent;
     struct TileInputFluent;
-    struct ConfigureTileFluent;
+    struct UpdateTileFluent;
     struct PopupMenuInputFluent;
-
-    using PopupMenuItemFn = const char *(*)(void *user, uint8_t idx);
 
     struct GraphArea;
     struct ListState;
@@ -167,7 +166,6 @@ namespace pipgui
         [[nodiscard]] bool displayReady() const noexcept { return _disp.display != nullptr; }
 
         [[nodiscard]] bool startScreenshot();
-        void configureScreenshotGallery(uint8_t maxShots = 12, uint16_t thumbW = 64, uint16_t thumbH = 40, uint16_t padding = 6);
         [[nodiscard]] uint8_t screenshotCount() const noexcept { return _shots.count; }
         [[nodiscard]] DrawScreenshotFluent drawScreenshot();
         InputState pollInput(Button &next, Button &prev);
@@ -240,13 +238,13 @@ namespace pipgui
 
         [[nodiscard]] DrawCircleProgressFluent drawCircleProgress();
         [[nodiscard]] UpdateCircleProgressFluent updateCircleProgress();
+        [[nodiscard]] DrawDrumRollFluent drawDrumRoll();
 
         [[nodiscard]] ToastFluent showToast();
         [[nodiscard]] NotificationFluent showNotification();
         [[nodiscard]] ShowErrorFluent showError();
         [[nodiscard]] PopupMenuFluent showPopupMenu();
         [[nodiscard]] PopupMenuInputFluent popupMenuInput();
-        [[nodiscard]] ConfigGraphScopeFluent configGraphScope();
         [[nodiscard]] bool popupMenuActive() const noexcept { return _flags.popupActive; }
         [[nodiscard]] bool popupMenuHasResult() const noexcept { return _popup.resultReady; }
         [[nodiscard]] int16_t popupMenuTakeResult() noexcept
@@ -257,11 +255,6 @@ namespace pipgui
             return _popup.resultIndex;
         }
 
-        void setGraphScale(bool enabled);
-        [[nodiscard]] uint16_t graphRate(uint8_t screenId) const noexcept;
-        [[nodiscard]] uint16_t graphTimebase(uint8_t screenId) const noexcept;
-        [[nodiscard]] uint16_t graphSamplesVisible(uint8_t screenId) const noexcept;
-
         [[nodiscard]] DrawIconFluent drawIcon();
         [[nodiscard]] DrawAnimIconFluent drawAnimIcon();
         [[nodiscard]] UpdateAnimIconFluent updateAnimIcon();
@@ -269,14 +262,6 @@ namespace pipgui
         [[nodiscard]] UpdateTextFluent updateText();
         [[nodiscard]] DrawTextMarqueeFluent drawTextMarquee();
         [[nodiscard]] DrawTextEllipsizedFluent drawTextEllipsized();
-
-        void drawDrumRollHorizontal(int16_t x, int16_t y, int16_t w, int16_t h,
-                                    const String *options, uint8_t count, uint8_t selectedIndex,
-                                    uint32_t fgColor, uint32_t bgColor, uint16_t fontPx = 0, uint16_t animDurationMs = 280);
-
-        void drawDrumRollVertical(int16_t x, int16_t y, int16_t w, int16_t h,
-                                  const String *options, uint8_t count, uint8_t selectedIndex,
-                                  uint32_t fgColor, uint32_t bgColor, uint16_t fontPx = 0, uint16_t animDurationMs = 280);
 
         FontId registerFont(const uint8_t *atlasData,
                             uint16_t atlasWidth, uint16_t atlasHeight,
@@ -295,13 +280,11 @@ namespace pipgui
 
         void setTextStyle(TextStyle style);
 
-        [[nodiscard]] ConfigureListFluent configureList();
-        bool updateList(uint8_t screenId);
-        [[nodiscard]] ListInputFluent listInput(uint8_t screenId);
+        UpdateListFluent updateList();
+        [[nodiscard]] ListInputFluent listInput();
 
-        [[nodiscard]] ConfigureTileFluent configureTile();
-        void renderTile(uint8_t screenId);
-        [[nodiscard]] TileInputFluent tileInput(uint8_t screenId);
+        UpdateTileFluent updateTile();
+        [[nodiscard]] TileInputFluent tileInput();
 
         void setScreen(uint8_t id);
         [[nodiscard]] uint8_t currentScreen() const noexcept;
@@ -324,13 +307,7 @@ namespace pipgui
         void setErrorButtonsDown(bool nextDown, bool prevDown, bool comboDown = false);
         void setErrorButtonDown(bool down);
 
-        [[nodiscard]] ConfigureStatusBarFluent configureStatusBar();
-
-        void setStatusBarStyle(StatusBarStyle style) noexcept
-        {
-            _status.style = style;
-            _status.dirtyMask = detail::StatusBarDirtyAll;
-        }
+        [[nodiscard]] ConfigStatusBarFluent configStatusBar();
 
         [[nodiscard]] SetStatusBarTextFluent setStatusBarText();
         void setStatusBarBattery(int8_t levelPercent, BatteryStyle style);
@@ -371,6 +348,7 @@ namespace pipgui
         detail::BlurState _blur;
         detail::Flags _flags = {};
         detail::DiagnosticsState _diag;
+        InputState _input = {};
         detail::ButtonCacheState _buttonCache;
         detail::SliderCacheState _sliderCache;
         detail::TextCacheState _textCache;
@@ -393,7 +371,7 @@ namespace pipgui
         void reportPlatformErrorOnce(const char *stage);
         void handleScreenshotShortcut(bool comboDown);
         [[nodiscard]] bool statusBarAnimationActive() const noexcept;
-        void configureStatusBar(bool enabled, uint32_t bgColor, uint8_t height, StatusBarPosition pos);
+        void configStatusBar(uint8_t height, StatusBarPosition pos, StatusBarStyle style);
         void setStatusBarText(const String &left, const String &center, const String &right);
         void setStatusBarIcon(TextAlign side, IconId iconId, int32_t color, uint16_t sizePx);
         void freeScreenshotGallery(pipcore::Platform *plat) noexcept;
@@ -401,6 +379,7 @@ namespace pipgui
         void freeScreenshotStream(pipcore::Platform *plat) noexcept;
         void resetScreenshotStreamState(pipcore::Platform *plat) noexcept;
         bool ensureScreenshotGallery(pipcore::Platform *plat);
+        void syncScreenshotGalleryLayout(uint8_t maxShots, uint16_t thumbW, uint16_t thumbH, uint16_t padding);
         void captureScreenshotToGallery();
         void insertShotToGalleryFrom565(const uint16_t *src565be, uint16_t w, uint16_t h, uint32_t stamp, const char *path);
         void renderScreenshotGallery(int16_t x, int16_t y, int16_t w, int16_t h,
@@ -426,6 +405,12 @@ namespace pipgui
         detail::ToggleState &resolveToggleState(int16_t x, int16_t y, int16_t w, int16_t h,
                                                uint16_t activeColor, int32_t inactiveColor, int32_t knobColor);
         detail::DrumRollAnimState &resolveDrumRollState(uint32_t key, uint8_t selectedIndex, uint16_t durationMs);
+        void drawDrumRollHorizontal(int16_t x, int16_t y, int16_t w, int16_t h,
+                                    const String *options, uint8_t count, uint8_t selectedIndex,
+                                    uint32_t fgColor, uint32_t bgColor, uint16_t fontPx = 0, uint16_t animDurationMs = 280);
+        void drawDrumRollVertical(int16_t x, int16_t y, int16_t w, int16_t h,
+                                  const String *options, uint8_t count, uint8_t selectedIndex,
+                                  uint32_t fgColor, uint32_t bgColor, uint16_t fontPx = 0, uint16_t animDurationMs = 280);
         bool stepToggleState(detail::ToggleState &state, bool &value, bool pressed);
         void flushDirty();
         void invalidateRect(int16_t x, int16_t y, int16_t w, int16_t h);
@@ -577,20 +562,20 @@ namespace pipgui
 
         void drawGraphGrid(int16_t x, int16_t y, int16_t w, int16_t h,
                            uint8_t radius, GraphDirection dir, uint32_t bgColor,
-                           float speed = 1.0f);
+                           float speed = 1.0f, bool autoScale = false,
+                           uint16_t scopeRateHz = 0, uint16_t scopeTimebaseMs = 0,
+                           uint16_t scopeVisibleSamples = 0);
         void updateGraphGrid(int16_t x, int16_t y, int16_t w, int16_t h,
                              uint8_t radius, GraphDirection dir, uint32_t bgColor,
-                             float speed = 1.0f);
+                             float speed = 1.0f, bool autoScale = false,
+                             uint16_t scopeRateHz = 0, uint16_t scopeTimebaseMs = 0,
+                             uint16_t scopeVisibleSamples = 0);
         void drawGraphLine(uint8_t lineIndex, int16_t value, uint32_t color, int16_t valueMin, int16_t valueMax, uint8_t thickness = 1);
         void updateGraphLine(uint8_t lineIndex, int16_t value, uint32_t color, int16_t valueMin, int16_t valueMax, uint8_t thickness = 1);
         void drawGraphSamples(uint8_t lineIndex, const int16_t *samples, uint16_t sampleCount,
                               uint32_t color, int16_t valueMin, int16_t valueMax, uint8_t thickness = 1);
         void updateGraphSamples(uint8_t lineIndex, const int16_t *samples, uint16_t sampleCount,
                                 uint32_t color, int16_t valueMin, int16_t valueMax, uint8_t thickness = 1);
-        void configGraphScope(uint8_t screenId,
-                              uint16_t sampleRateHz,
-                              uint16_t timebaseMs,
-                              uint16_t visibleSamples = 0);
 
         struct ProgressState
         {
@@ -676,16 +661,18 @@ namespace pipgui
                              int16_t w, int16_t h,
                              uint16_t bgColor565,
                              bool invalidate);
-        bool updateList(uint8_t screenId,
-                        int16_t x, int16_t y,
-                        int16_t w, int16_t h,
-                        uint16_t bgColor565);
+        bool updateListScreen(uint8_t screenId);
+        bool updateListScreen(uint8_t screenId,
+                              int16_t x, int16_t y,
+                              int16_t w, int16_t h,
+                              uint16_t bgColor565);
         void updateTile(uint8_t screenId, uint8_t prevSelectedIndex);
         void handleTileInput(uint8_t screenId, bool nextDown, bool prevDown);
-        void configureTile(uint8_t screenId,
-                           const TileItemDef *items,
-                           uint8_t itemCount,
-                           const TileStyle &style);
+        void setupTileState(uint8_t screenId,
+                            const TileItemDef *items,
+                            uint8_t itemCount,
+                            const TileStyle &style);
+        void renderTileScreen(uint8_t screenId);
 
         void freeGraphAreas(pipcore::Platform *plat) noexcept;
         void freeLists(pipcore::Platform *plat) noexcept;
@@ -697,12 +684,10 @@ namespace pipgui
         bool computePopupBounds(uint32_t now, DirtyRect &outRect);
         void renderNotificationOverlay();
         void renderPopupMenuOverlay(uint32_t now);
-        void showPopupMenuInternal(PopupMenuItemFn itemFn,
-                                   void *itemUser,
+        void showPopupMenuInternal(const char *const *items,
                                    uint8_t count,
                                    uint8_t selectedIndex,
                                    int16_t w,
-                                   uint8_t maxVisible,
                                    int16_t anchorX,
                                    int16_t anchorY,
                                    int16_t anchorW,

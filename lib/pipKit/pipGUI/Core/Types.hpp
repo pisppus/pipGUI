@@ -12,8 +12,6 @@ namespace pipgui
 {
     class GUI;
 
-    using PopupMenuItemFn = const char *(*)(void *user, uint8_t idx);
-
     struct DisplayPins
     {
         int8_t mosi = -1;
@@ -94,8 +92,8 @@ namespace pipgui
 
     enum StatusBarStyle : uint8_t
     {
-        StatusBarStyleSolid,
-        StatusBarStyleBlur
+        Solid,
+        Blur
     };
 
     enum class ToastPos : uint8_t
@@ -264,6 +262,16 @@ namespace pipgui
             : title(t), subtitle(s), targetScreen(target), iconId(icon) {}
     };
 
+    inline constexpr ListItemDef listItem(const char *title, const char *subtitle, uint8_t target) noexcept
+    {
+        return ListItemDef(title, subtitle, target);
+    }
+
+    inline constexpr ListItemDef listItem(uint16_t icon, const char *title, const char *subtitle, uint8_t target) noexcept
+    {
+        return ListItemDef(icon, title, subtitle, target);
+    }
+
     enum ListMode : uint8_t
     {
         Cards,
@@ -295,10 +303,36 @@ namespace pipgui
         uint8_t targetScreen;
         uint16_t iconId;
 
+        constexpr TileItemDef() noexcept
+            : title(""), subtitle(""), targetScreen(INVALID_SCREEN_ID), iconId(0xFFFF) {}
+
         constexpr TileItemDef(const char *t, const char *s, uint8_t target) noexcept
             : title(t), subtitle(s), targetScreen(target), iconId(0xFFFF) {}
 
         constexpr TileItemDef(uint16_t icon, const char *t, const char *s, uint8_t target) noexcept
             : title(t), subtitle(s), targetScreen(target), iconId(icon) {}
     };
+
+    struct TilePlacementDef
+    {
+        uint8_t col = 0;
+        uint8_t row = 0;
+        uint8_t colSpan = 1;
+        uint8_t rowSpan = 1;
+
+        constexpr TilePlacementDef() noexcept = default;
+
+        constexpr TilePlacementDef(uint8_t c, uint8_t r, uint8_t cs = 1, uint8_t rs = 1) noexcept
+            : col(c), row(r), colSpan(cs), rowSpan(rs) {}
+    };
+
+    inline constexpr TileItemDef tileItem(const char *title, const char *subtitle, uint8_t target) noexcept
+    {
+        return TileItemDef(title, subtitle, target);
+    }
+
+    inline constexpr TileItemDef tileItem(uint16_t icon, const char *title, const char *subtitle, uint8_t target) noexcept
+    {
+        return TileItemDef(icon, title, subtitle, target);
+    }
 }

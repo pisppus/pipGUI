@@ -17,8 +17,7 @@ SCREEN(progressText, 28)
       .fillColor(fill1)
       .radius(7)
       .anim(None)
-      .percent()
-      .percentAlign(Center)
+      .percent(Center)
       .percentColor(ui.rgb(255, 255, 255));
 
   ui.drawProgress()
@@ -29,11 +28,9 @@ SCREEN(progressText, 28)
       .fillColor(fill2)
       .radius(7)
       .anim(Shimmer)
-      .label("Uploading")
-      .labelAlign(Left)
+      .label("Uploading", Left)
       .labelColor(ui.rgb(255, 255, 255))
-      .percent()
-      .percentAlign(Right)
+      .percent(Right)
       .percentColor(ui.rgb(200, 200, 200));
 
   ui.drawCircleProgress()

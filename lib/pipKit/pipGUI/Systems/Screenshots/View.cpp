@@ -53,49 +53,15 @@ namespace pipgui
             if (y < 0)
                 y = 0;
 
-            if (_shots.maxShots == 0)
-                break;
-            if (!_shots.entries && !ensureScreenshotGallery(platform()))
-                break;
-
-            const uint16_t tw = _shots.thumbW;
-            const uint16_t th = _shots.thumbH;
-            if (tw == 0 || th == 0)
-                break;
-
-            const uint16_t pad = padding ? padding : _shots.padding;
-            const uint16_t stepX = static_cast<uint16_t>(tw + pad);
-            const uint16_t stepY = static_cast<uint16_t>(th + pad);
-            if (stepX == 0 || stepY == 0)
-                break;
+            const uint16_t pad = padding ? padding : 6;
 
             if (w <= 0)
             {
-                if (cols)
-                {
-                    const int32_t needW =
-                        static_cast<int32_t>(cols) * static_cast<int32_t>(tw) +
-                        static_cast<int32_t>(cols - 1u) * static_cast<int32_t>(pad);
-                    w = static_cast<int16_t>(needW);
-                }
-                else
-                {
-                    w = static_cast<int16_t>(sw - x);
-                }
+                w = static_cast<int16_t>(sw - x);
             }
             if (h <= 0)
             {
-                if (rows)
-                {
-                    const int32_t needH =
-                        static_cast<int32_t>(rows) * static_cast<int32_t>(th) +
-                        static_cast<int32_t>(rows - 1u) * static_cast<int32_t>(pad);
-                    h = static_cast<int16_t>(needH);
-                }
-                else
-                {
-                    h = static_cast<int16_t>(sh - y);
-                }
+                h = static_cast<int16_t>(sh - y);
             }
 
             if (w <= 0 || h <= 0)
@@ -110,8 +76,24 @@ namespace pipgui
 
             const uint16_t availW = static_cast<uint16_t>(w);
             const uint16_t availH = static_cast<uint16_t>(h);
-            const uint16_t gridCols = cols ? cols : std::max<uint16_t>(1, (uint16_t)(((uint32_t)availW + pad) / stepX));
-            const uint16_t gridRows = rows ? rows : std::max<uint16_t>(1, (uint16_t)(((uint32_t)availH + pad) / stepY));
+            const uint16_t gridCols = cols ? cols : 3;
+            const uint16_t gridRows = rows ? rows : 2;
+            const uint16_t totalPadX = (gridCols > 0) ? static_cast<uint16_t>((gridCols - 1u) * pad) : 0;
+            const uint16_t totalPadY = (gridRows > 0) ? static_cast<uint16_t>((gridRows - 1u) * pad) : 0;
+            uint16_t tw = (gridCols > 0 && availW > totalPadX) ? static_cast<uint16_t>((availW - totalPadX) / gridCols) : 0;
+            uint16_t th = (gridRows > 0 && availH > totalPadY) ? static_cast<uint16_t>((availH - totalPadY) / gridRows) : 0;
+            if (tw == 0 || th == 0)
+                break;
+            syncScreenshotGalleryLayout(static_cast<uint8_t>(gridCols * gridRows), tw, th, pad);
+            if (_shots.maxShots == 0)
+                break;
+            if (!_shots.entries && !ensureScreenshotGallery(platform()))
+                break;
+
+            tw = _shots.thumbW;
+            th = _shots.thumbH;
+            const uint16_t stepX = static_cast<uint16_t>(tw + pad);
+            const uint16_t stepY = static_cast<uint16_t>(th + pad);
             const uint16_t maxVisible = static_cast<uint16_t>(gridCols * gridRows);
 
 #if (PIPGUI_SCREENSHOT_MODE == 2)

@@ -167,11 +167,6 @@ namespace
     return String(maj) + "." + String(min) + "." + String(pat);
   }
 
-  const char *otaStableVersionItem(void *, uint8_t idx)
-  {
-    return ui.otaStableListVersion(idx);
-  }
-
   const char *otaErrorName(OtaError e)
   {
     switch (e)
@@ -366,7 +361,6 @@ void updateBatteryStatus(uint32_t nowMs)
     ui.updateStatusBar();
 }
 
-
 bool isListMenuScreen(uint8_t screenId)
 {
   return screenId == listMenu || screenId == listMenuPlain;
@@ -377,132 +371,6 @@ bool isTileMenuScreen(uint8_t screenId)
   return screenId == tileMenu || screenId == tileMenuLayout || screenId == tileMenu4Cols;
 }
 
-void configureListMenus()
-{
-  ui.configureList()
-      .screen(listMenu)
-      .items({
-          {"Main screen with widgets", "Simple home screen with status bar, overlays, and transitions", mainMenu},
-          {"Settings and alerts preview", "Buttons, notifications, warning states, and input handling", settings},
-          {"Glow demo with blur and bloom", "Bloom, soft edges, layered primitives, and bright composition", glow},
-          {"Graph demo with multiple traces", "Grid, labels, and several moving lines in one viewport", graph},
-          {"Graph small", "Compact graph with automatic scale fitting", graphSmall},
-          {"Graph tall", "Tall graph layout with right-side emphasis", graphTall},
-          {"Graph osc", "Live full-buffer oscilloscope preview", graphOsc},
-          {"Progress demo", "Progress bars with animated fill and labels", progress},
-          {"Progress + text", "Fresh progress styles with text overlays", progressText},
-          {"Popup menu", "Overlay menu with button-driven navigation and selection", popupMenuDemo},
-          {"Tile menu with icon cards", "Grid menu with icons, title, subtitle, and active marquee", tileMenu},
-          {"Tile layout", "Custom tile layout with merged cells", tileMenuLayout},
-          {"Tile 4 cols", "Four compact tiles in a single row", tileMenu4Cols},
-          {"List menu 2", "Text-focused list with active highlight panel", listMenuPlain},
-          {"ToggleSwitch", "Toggle switch interaction and state preview", toggleSwitch},
-          {"Buttons", "Different button forms, sizes and states", buttonsDemo},
-          {"Slider", "Settings-style slider with animated thumb", sliderDemo},
-          {"Animated icons", "Lottie JSON compiled into scalable animated PSDF icons", animatedIconsDemo},
-          {"Scroll dots", "Page indicator dots with animated transitions", scrollDots},
-          {"Error", "Full-screen error overlay presentation", errorOverlay},
-          {"Warning", "Full-screen warning overlay presentation", warningOverlay},
-          {"Blur strip", "Material-style blur strip with moving content", blur},
-          {"Screenshots", "Captured frames gallery", screenshotGallery},
-          {"Firmware update", "WiFi OTA updater (signed manifest)", firmwareUpdate},
-          {"Primitives", "Circle / Arc / Ellipse / Triangle / Squircle", primitives},
-          {"Gradients", "All gradient types", gradients},
-          {"Font compare", "PSDF", fontCompare},
-          {"Font weights", "Test all weights", fontWeight},
-          {"Drum roll", "Horizontal + vertical picker", drumRoll},
-          {"Circle AA", "Gupta-Sproull optimized", circle},
-          {"Test: Circles", "drawCircle fill / border", testCircles},
-          {"Test: RoundRects", "1 & 4 radius variants", testRoundRects},
-          {"Test: Ellipses", "Wu-style AA ellipses", testEllipses},
-          {"Test: Triangles", "4x subpixel AA triangles", testTriangles},
-          {"Test: Arcs+Lines", "sqrt_fraction AA", testArcsAndLines},
-          {"Test: All Grid", "All primitives comparison", testAllPrimitivesGrid},
-          {"Test: RoundTriangles", "SDF AA rounded triangles", testRoundTriangles},
-          {"Test: Squircles", "fill/draw squircle AA", testSquircles},
-          {"Auto text color", "BT.709 luminance test", autoTextColor},
-      })
-      .inactive(ui.rgb(8, 8, 8))
-      .active(ui.rgb(21, 54, 140))
-      .cardSize(310, 50);
-
-  ui.configureList()
-      .screen(listMenuPlain)
-      .items({
-          {"Back", "Return to the card-style list menu", listMenu},
-          {"Main screen with widgets and overlays", "Simple home screen with status bar, overlays, and transitions", mainMenu},
-          {"Settings, alerts, and input handling", "Buttons, notifications, warning states, and input handling", settings},
-          {"Glow demo with blur, bloom, and soft shapes", "Bloom, soft edges, layered primitives, and bright composition", glow},
-          {"Graph osc", "Live full-buffer oscilloscope preview", graphOsc},
-          {"Tile menu", "Grid menu with icons, title, and subtitle", tileMenu},
-          {"ToggleSwitch", "Toggle switch interaction and state preview", toggleSwitch},
-          {"Slider", "Settings-style slider with animated thumb", sliderDemo},
-          {"Animated icons", "Lottie JSON compiled into scalable animated PSDF icons", animatedIconsDemo},
-          {"Screenshots", "Captured frames gallery", screenshotGallery},
-          {"Font compare", "PSDF", fontCompare},
-      })
-      .inactive(ui.rgb(8, 8, 8))
-      .active(ui.rgb(21, 54, 140))
-      .cardSize(310, 34)
-      .mode(Plain);
-}
-void configureTileMenus()
-{
-  ui.configureTile()
-      .screen(tileMenu)
-      .items({
-          {"Main", "Home screen", mainMenu},
-          {"Settings", "Alerts and controls", settings},
-          {battery_l0, "Glow demo", "Glow shapes", glow},
-          {battery_l1, "Graph", "Live graphs", graph},
-          {battery_l2, "Toggle", "Switch", toggleSwitch},
-      })
-      .inactive(ui.rgb(8, 8, 8))
-      .active(ui.rgb(21, 54, 140))
-      .radius(13)
-      .spacing(10)
-      .columns(2)
-      .tileSize(100, 70)
-      .mode(TextSubtitle);
-  ui.configureTile()
-      .screen(tileMenuLayout)
-      .items({
-          {"Back", "", listMenu},
-          {battery_l0, "Small 1", "", mainMenu},
-          {battery_l1, "Small 2", "", settings},
-          {"Big", "Main", glow},
-      })
-      .inactive(ui.rgb(8, 8, 8))
-      .active(ui.rgb(21, 54, 140))
-      .radius(13)
-      .spacing(10)
-      .columns(2)
-      .layout({
-          "AA",
-          "BC",
-          "BD",
-      })
-      .mode(TextOnly);
-  ui.configureTile()
-      .screen(tileMenu4Cols)
-      .items({
-          {"Back", "", listMenu},
-          {battery_l0, "1", "", mainMenu},
-          {battery_l1, "2", "", settings},
-          {battery_l2, "3", "", glow},
-          {"4", "", graph},
-          {"5", "", graphSmall},
-          {battery_l0, "6", "", graphTall},
-          {battery_l1, "7", "", progress},
-          {"8", "", graphOsc},
-      })
-      .inactive(ui.rgb(8, 8, 8))
-      .active(ui.rgb(21, 54, 140))
-      .radius(13)
-      .spacing(8)
-      .columns(4)
-      .mode(TextOnly);
-}
 
 #include "screens/demo_updates.hpp"
 
@@ -520,12 +388,12 @@ void setup()
 
   ui.begin(3);
   ui.setScreenAnim(SlideY, 320);
-  ui.configureStatusBar()
-      .enabled(PIPGUI_STATUS_BAR != 0)
-      .bgColor(0x0000)
+  #if (PIPGUI_STATUS_BAR != 0)
+  ui.configStatusBar()
       .height(kStatusBarHeight)
-      .position(Top);
-  ui.setStatusBarStyle(StatusBarStyleBlur);
+      .pos(Top)
+      .style(Blur);
+  #endif
   ui.setStatusBarText()
       .left("pipGUI")
       .center("00:00")
@@ -537,8 +405,6 @@ void setup()
   btnNext.begin();
   btnPrev.begin();
   runBootAnimation(ui, FadeIn, "PISPPUS", "Fade in");
-  configureListMenus();
-  configureTileMenus();
 
   ui.setScreen(listMenu);
 }
@@ -569,13 +435,13 @@ void loop()
   {
     if (isListMenuScreen(cur))
     {
-      ui.listInput(cur)
+      ui.listInput()
           .nextDown(nextDown)
           .prevDown(prevDown);
     }
     else if (isTileMenuScreen(cur))
     {
-      ui.tileInput(cur)
+      ui.tileInput()
           .nextDown(nextDown)
           .prevDown(prevDown);
     }
@@ -625,7 +491,7 @@ void loop()
         updateButtonsDemo(nowMs, nextPressed, nextDown, prevPressed, prevDown, comboDown);
         break;
       case sliderDemo:
-        updateSliderDemo(nowMs, nextDown, prevDown, comboDown);
+        updateSliderDemo(nowMs, comboDown);
         break;
       case animatedIconsDemo:
         updateAnimatedIconsDemo(nowMs, comboDown);

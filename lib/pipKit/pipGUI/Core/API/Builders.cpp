@@ -235,8 +235,8 @@ namespace pipgui
         if (!beginCommit())
             return;
         detail::callByMode<IsUpdate>(
-            [&] { detail::GuiAccess::updateGraphGrid(*_gui, _x, _y, _w, _h, _radius, _dir, _bgColor, _speed); },
-            [&] { detail::GuiAccess::drawGraphGrid(*_gui, _x, _y, _w, _h, _radius, _dir, _bgColor, _speed); });
+            [&] { detail::GuiAccess::updateGraphGrid(*_gui, _x, _y, _w, _h, _radius, _dir, _bgColor, _speed, _autoScale, _scopeRateHz, _scopeTimebaseMs, _scopeVisibleSamples); },
+            [&] { detail::GuiAccess::drawGraphGrid(*_gui, _x, _y, _w, _h, _radius, _dir, _bgColor, _speed, _autoScale, _scopeRateHz, _scopeTimebaseMs, _scopeVisibleSamples); });
     }
     template void GraphGridFluentT<false>::draw();
     template void GraphGridFluentT<true>::draw();
@@ -304,7 +304,7 @@ namespace pipgui
     {
         if (!beginCommit())
             return;
-        detail::GuiAccess::showPopupMenu(*_gui, _itemFn, _itemUser, _count, _selectedIndex, _w, _maxVisible, _anchorX, _anchorY, _anchorW, _anchorH);
+        detail::GuiAccess::showPopupMenu(*_gui, _items, _count, _selectedIndex, _w, _anchorX, _anchorY, _anchorW, _anchorH);
     }
 
     template <bool IsUpdate>
@@ -352,11 +352,10 @@ namespace pipgui
             return;
         const int32_t inactiveColor = detail::optionalColor32(_inactiveColor);
         const int32_t thumbColor = detail::optionalColor32(_thumbColor);
-        detail::SliderState &state = detail::GuiAccess::resolveSliderState(*_gui, _x, _y, _w, _h, _minValue, _maxValue, _step, _activeColor, inactiveColor, thumbColor);
+        detail::SliderState &state = detail::GuiAccess::resolveSliderState(*_gui, _x, _y, _w, _h, 0, 100, 1, _activeColor, inactiveColor, thumbColor);
         state.enabled = _enabledSet ? _enabled : true;
-        const bool changed = detail::GuiAccess::stepSliderState(*_gui, state, *_value, _inputSet ? _nextDown : false, _inputSet ? _prevDown : false);
-        if (_changed)
-            *_changed = changed;
+        const GUI::InputState &input = detail::GuiAccess::inputState(*_gui);
+        detail::GuiAccess::stepSliderState(*_gui, state, *_value, input.nextDown, input.prevDown);
         detail::callByMode<IsUpdate>(
             [&] { detail::GuiAccess::updateSlider(*_gui, _x, _y, _w, _h, state, _activeColor, inactiveColor, thumbColor); },
             [&] { detail::GuiAccess::drawSlider(*_gui, _x, _y, _w, _h, state, _activeColor, inactiveColor, thumbColor); });
@@ -387,6 +386,17 @@ namespace pipgui
     }
     template void CircleProgressFluentT<false>::draw();
     template void CircleProgressFluentT<true>::draw();
+
+    void DrawDrumRollFluent::draw()
+    {
+        if (!_options || !beginCommit())
+            return;
+
+        if (_vertical)
+            detail::GuiAccess::drawDrumRollVertical(*_gui, _x, _y, _w, _h, _options, _count, _selectedIndex, _fgColor, _bgColor, _fontPx, 280);
+        else
+            detail::GuiAccess::drawDrumRollHorizontal(*_gui, _x, _y, _w, _h, _options, _count, _selectedIndex, _fgColor, _bgColor, _fontPx, 280);
+    }
 
     void DrawScreenshotFluent::draw()
     {

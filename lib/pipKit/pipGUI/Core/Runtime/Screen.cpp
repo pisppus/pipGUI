@@ -140,14 +140,14 @@ namespace pipgui
             ListState *list = getList(screenId);
             if (list && list->configured && list->itemCount > 0)
             {
-                updateList(screenId);
+                updateListScreen(screenId);
             }
             else
             {
                 TileState *tile = getTile(screenId);
                 if (tile && tile->configured && tile->itemCount > 0)
                 {
-                    renderTile(screenId);
+                    renderTileScreen(screenId);
                 }
                 else
                 {

@@ -237,38 +237,21 @@ namespace pipgui
         void apply();
     };
 
-    struct ConfigureStatusBarFluent : detail::FluentLifetime
+    struct ConfigStatusBarFluent : detail::FluentLifetime
     {
-        PIPGUI_DEFAULT_FLUENT_MOVE(ConfigureStatusBarFluent);
-        bool _enabled;
-        uint32_t _bgColor;
+        PIPGUI_DEFAULT_FLUENT_MOVE(ConfigStatusBarFluent);
         uint8_t _height;
         StatusBarPosition _pos;
+        StatusBarStyle _style;
 
-        explicit ConfigureStatusBarFluent(GUI *g)
-            : detail::FluentLifetime(g), _enabled(true), _bgColor(0x000000), _height(0), _pos(Top)
+        explicit ConfigStatusBarFluent(GUI *g)
+            : detail::FluentLifetime(g), _height(0), _pos(Top), _style(Solid)
         {
         }
 
-        ~ConfigureStatusBarFluent() { apply(); }
+        ~ConfigStatusBarFluent() { apply(); }
 
-        ConfigureStatusBarFluent &enabled(bool v = true)
-        {
-            if (!canMutate())
-                return *this;
-            _enabled = v;
-            return *this;
-        }
-
-        ConfigureStatusBarFluent &bgColor(uint32_t v)
-        {
-            if (!canMutate())
-                return *this;
-            _bgColor = v;
-            return *this;
-        }
-
-        ConfigureStatusBarFluent &height(uint8_t v)
+        ConfigStatusBarFluent &height(uint8_t v)
         {
             if (!canMutate())
                 return *this;
@@ -276,11 +259,19 @@ namespace pipgui
             return *this;
         }
 
-        ConfigureStatusBarFluent &position(StatusBarPosition v)
+        ConfigStatusBarFluent &pos(StatusBarPosition v)
         {
             if (!canMutate())
                 return *this;
             _pos = v;
+            return *this;
+        }
+
+        ConfigStatusBarFluent &style(StatusBarStyle v)
+        {
+            if (!canMutate())
+                return *this;
+            _style = v;
             return *this;
         }
 
@@ -385,12 +376,11 @@ namespace pipgui
     struct ListInputFluent : detail::FluentLifetime
     {
         PIPGUI_DEFAULT_FLUENT_MOVE(ListInputFluent);
-        uint8_t _screenId;
         bool _nextDown;
         bool _prevDown;
 
-        ListInputFluent(GUI *g, uint8_t screenId)
-            : detail::FluentLifetime(g), _screenId(screenId), _nextDown(false), _prevDown(false)
+        ListInputFluent(GUI *g)
+            : detail::FluentLifetime(g), _nextDown(false), _prevDown(false)
         {
         }
 
@@ -412,6 +402,7 @@ namespace pipgui
 
         ~ListInputFluent() { apply(); }
 
+    private:
         void apply();
     };
 
@@ -447,64 +438,8 @@ namespace pipgui
         void apply();
     };
 
-    struct ConfigGraphScopeFluent : detail::FluentLifetime
+    struct UpdateListFluent : detail::FluentLifetime
     {
-        PIPGUI_DEFAULT_FLUENT_MOVE(ConfigGraphScopeFluent);
-        uint8_t _screenId = INVALID_SCREEN_ID;
-        uint16_t _sampleRateHz = 0;
-        uint16_t _timebaseMs = 0;
-        uint16_t _visibleSamples = 0;
-        bool _touched = false;
-
-        explicit ConfigGraphScopeFluent(GUI *g)
-            : detail::FluentLifetime(g)
-        {
-        }
-
-        ~ConfigGraphScopeFluent() { apply(); }
-
-        ConfigGraphScopeFluent &screen(uint8_t screenId)
-        {
-            if (!canMutate())
-                return *this;
-            _screenId = screenId;
-            _touched = true;
-            return *this;
-        }
-
-        ConfigGraphScopeFluent &rate(uint16_t hz)
-        {
-            if (!canMutate())
-                return *this;
-            _sampleRateHz = hz;
-            _touched = true;
-            return *this;
-        }
-
-        ConfigGraphScopeFluent &timebase(uint16_t ms)
-        {
-            if (!canMutate())
-                return *this;
-            _timebaseMs = ms;
-            _touched = true;
-            return *this;
-        }
-
-        ConfigGraphScopeFluent &visible(uint16_t samples)
-        {
-            if (!canMutate())
-                return *this;
-            _visibleSamples = samples;
-            _touched = true;
-            return *this;
-        }
-
-        void apply();
-    };
-
-    struct ConfigureListFluent : detail::FluentLifetime
-    {
-        uint8_t _screenId;
         const ListItemDef *_items;
         uint8_t _itemCount;
         detail::OwnedHeapArray<ListItemDef> _ownedItems;
@@ -516,16 +451,15 @@ namespace pipgui
         ListMode _mode;
         uint8_t _checkedIndex;
 
-        ConfigureListFluent(GUI *g)
-            : detail::FluentLifetime(g), _screenId(INVALID_SCREEN_ID), _items(nullptr), _itemCount(0), _ownedItems(detail::resolvePlatform(g)),
+        UpdateListFluent(GUI *g)
+            : detail::FluentLifetime(g), _items(nullptr), _itemCount(0), _ownedItems(detail::resolvePlatform(g)),
               _cardColor(0), _cardActiveColor(0), _radius(0),
               _cardWidth(0), _cardHeight(0), _mode(Cards), _checkedIndex(0xFF)
         {
         }
 
-        ConfigureListFluent(ConfigureListFluent &&other) noexcept
+        UpdateListFluent(UpdateListFluent &&other) noexcept
             : detail::FluentLifetime(std::move(other)),
-              _screenId(other._screenId),
               _items(std::exchange(other._items, nullptr)),
               _itemCount(std::exchange(other._itemCount, 0)),
               _ownedItems(std::move(other._ownedItems)),
@@ -539,12 +473,11 @@ namespace pipgui
         {
         }
 
-        ConfigureListFluent &operator=(ConfigureListFluent &&other) noexcept
+        UpdateListFluent &operator=(UpdateListFluent &&other) noexcept
         {
             if (this != &other)
             {
                 detail::FluentLifetime::operator=(std::move(other));
-                _screenId = other._screenId;
                 _items = std::exchange(other._items, nullptr);
                 _itemCount = std::exchange(other._itemCount, 0);
                 _ownedItems = std::move(other._ownedItems);
@@ -559,10 +492,9 @@ namespace pipgui
             return *this;
         }
 
-        ConfigureListFluent derive()
+        UpdateListFluent derive()
         {
-            ConfigureListFluent copy(_gui);
-            copy._screenId = _screenId;
+            UpdateListFluent copy(_gui);
             copy._itemCount = _itemCount;
             copy._cardColor = _cardColor;
             copy._cardActiveColor = _cardActiveColor;
@@ -586,44 +518,22 @@ namespace pipgui
             return copy;
         }
 
-        ConfigureListFluent &screen(uint8_t screenId)
+        template <typename... Rest>
+        UpdateListFluent &items(ListItemDef first, Rest... rest)
         {
             if (!canMutate())
                 return *this;
-            _screenId = screenId;
-            return *this;
-        }
-
-        ConfigureListFluent &items(std::initializer_list<ListItemDef> items)
-        {
-            if (!canMutate())
-                return *this;
-            _items = nullptr;
-            _itemCount = 0;
-
-            if (items.size() == 0)
-                return *this;
-
-            ListItemDef *copy = _ownedItems.copyFrom(items);
+            const ListItemDef packed[] = {first, static_cast<ListItemDef>(rest)...};
+            const uint8_t count = static_cast<uint8_t>(1 + sizeof...(rest));
+            ListItemDef *copy = _ownedItems.copyFromPtr(packed, count);
             if (!copy)
                 return *this;
-
             _items = copy;
-            _itemCount = static_cast<uint8_t>(items.size());
+            _itemCount = count;
             return *this;
         }
 
-        ConfigureListFluent &items(const ListItemDef *items, uint8_t itemCount)
-        {
-            if (!canMutate())
-                return *this;
-            _ownedItems.reset();
-            _items = items;
-            _itemCount = itemCount;
-            return *this;
-        }
-
-        ConfigureListFluent &inactive(uint16_t color565)
+        UpdateListFluent &inactive(uint16_t color565)
         {
             if (!canMutate())
                 return *this;
@@ -631,7 +541,7 @@ namespace pipgui
             return *this;
         }
 
-        ConfigureListFluent &active(uint16_t color565)
+        UpdateListFluent &active(uint16_t color565)
         {
             if (!canMutate())
                 return *this;
@@ -639,7 +549,7 @@ namespace pipgui
             return *this;
         }
 
-        ConfigureListFluent &radius(uint8_t px)
+        UpdateListFluent &radius(uint8_t px)
         {
             if (!canMutate())
                 return *this;
@@ -647,7 +557,7 @@ namespace pipgui
             return *this;
         }
 
-        ConfigureListFluent &cardSize(int16_t width, int16_t height)
+        UpdateListFluent &cardSize(int16_t width, int16_t height)
         {
             if (!canMutate())
                 return *this;
@@ -656,7 +566,7 @@ namespace pipgui
             return *this;
         }
 
-        ConfigureListFluent &mode(ListMode m)
+        UpdateListFluent &mode(ListMode m)
         {
             if (!canMutate())
                 return *this;
@@ -664,7 +574,7 @@ namespace pipgui
             return *this;
         }
 
-        ConfigureListFluent &checked(uint8_t idx)
+        UpdateListFluent &checked(uint8_t idx)
         {
             if (!canMutate())
                 return *this;
@@ -672,20 +582,20 @@ namespace pipgui
             return *this;
         }
 
-        ~ConfigureListFluent() { apply(); }
+        ~UpdateListFluent() { apply(); }
 
+    private:
         void apply();
     };
 
     struct TileInputFluent : detail::FluentLifetime
     {
         PIPGUI_DEFAULT_FLUENT_MOVE(TileInputFluent);
-        uint8_t _screenId;
         bool _nextDown;
         bool _prevDown;
 
-        TileInputFluent(GUI *g, uint8_t screenId)
-            : detail::FluentLifetime(g), _screenId(screenId), _nextDown(false), _prevDown(false)
+        TileInputFluent(GUI *g)
+            : detail::FluentLifetime(g), _nextDown(false), _prevDown(false)
         {
         }
 
@@ -707,19 +617,21 @@ namespace pipgui
 
         ~TileInputFluent() { apply(); }
 
+    private:
         void apply();
     };
 
-    struct ConfigureTileFluent : detail::FluentLifetime
+    struct UpdateTileFluent : detail::FluentLifetime
     {
-        uint8_t _screenId;
-        const TileItemDef *_items;
         uint8_t _itemCount;
         detail::OwnedHeapArray<TileItemDef> _ownedItems;
-        const char *const *_layoutRowsSpec;
-        detail::OwnedHeapArray<const char *> _ownedLayoutRowsSpec;
-        uint8_t _layoutRowCount;
-        bool _layoutConfigured;
+        uint8_t _itemCapacity;
+        detail::OwnedHeapArray<TilePlacementDef> _ownedPlacements;
+        uint8_t _placementCapacity;
+        uint8_t _lastTileIndex;
+        uint8_t _gridCols;
+        uint8_t _gridRows;
+        bool _customLayout;
         uint32_t _cardColor;
         uint32_t _cardActiveColor;
         uint8_t _radius;
@@ -727,28 +639,29 @@ namespace pipgui
         uint8_t _columns;
         int16_t _tileWidth;
         int16_t _tileHeight;
-        uint16_t _lineGapPx;
         TileMode _contentMode;
 
-        ConfigureTileFluent(GUI *g)
-            : detail::FluentLifetime(g), _screenId(INVALID_SCREEN_ID), _items(nullptr), _itemCount(0), _ownedItems(detail::resolvePlatform(g)),
-              _layoutRowsSpec(nullptr), _ownedLayoutRowsSpec(detail::resolvePlatform(g)), _layoutRowCount(0), _layoutConfigured(false),
+        UpdateTileFluent(GUI *g)
+            : detail::FluentLifetime(g), _itemCount(0), _ownedItems(detail::resolvePlatform(g)), _itemCapacity(0),
+              _ownedPlacements(detail::resolvePlatform(g)), _placementCapacity(0), _lastTileIndex(0xFF),
+              _gridCols(0), _gridRows(0), _customLayout(false),
               _cardColor(0), _cardActiveColor(0), _radius(0), _spacing(8),
-              _columns(2), _tileWidth(0), _tileHeight(0), _lineGapPx(0),
+              _columns(2), _tileWidth(0), _tileHeight(0),
               _contentMode(TextSubtitle)
         {
         }
 
-        ConfigureTileFluent(ConfigureTileFluent &&other) noexcept
+        UpdateTileFluent(UpdateTileFluent &&other) noexcept
             : detail::FluentLifetime(std::move(other)),
-              _screenId(other._screenId),
-              _items(std::exchange(other._items, nullptr)),
               _itemCount(std::exchange(other._itemCount, 0)),
               _ownedItems(std::move(other._ownedItems)),
-              _layoutRowsSpec(std::exchange(other._layoutRowsSpec, nullptr)),
-              _ownedLayoutRowsSpec(std::move(other._ownedLayoutRowsSpec)),
-              _layoutRowCount(std::exchange(other._layoutRowCount, 0)),
-              _layoutConfigured(std::exchange(other._layoutConfigured, false)),
+              _itemCapacity(std::exchange(other._itemCapacity, 0)),
+              _ownedPlacements(std::move(other._ownedPlacements)),
+              _placementCapacity(std::exchange(other._placementCapacity, 0)),
+              _lastTileIndex(std::exchange(other._lastTileIndex, 0xFF)),
+              _gridCols(std::exchange(other._gridCols, 0)),
+              _gridRows(std::exchange(other._gridRows, 0)),
+              _customLayout(std::exchange(other._customLayout, false)),
               _cardColor(other._cardColor),
               _cardActiveColor(other._cardActiveColor),
               _radius(other._radius),
@@ -756,24 +669,24 @@ namespace pipgui
               _columns(other._columns),
               _tileWidth(other._tileWidth),
               _tileHeight(other._tileHeight),
-              _lineGapPx(other._lineGapPx),
               _contentMode(other._contentMode)
         {
         }
 
-        ConfigureTileFluent &operator=(ConfigureTileFluent &&other) noexcept
+        UpdateTileFluent &operator=(UpdateTileFluent &&other) noexcept
         {
             if (this != &other)
             {
                 detail::FluentLifetime::operator=(std::move(other));
-                _screenId = other._screenId;
-                _items = std::exchange(other._items, nullptr);
                 _itemCount = std::exchange(other._itemCount, 0);
                 _ownedItems = std::move(other._ownedItems);
-                _layoutRowsSpec = std::exchange(other._layoutRowsSpec, nullptr);
-                _ownedLayoutRowsSpec = std::move(other._ownedLayoutRowsSpec);
-                _layoutRowCount = std::exchange(other._layoutRowCount, 0);
-                _layoutConfigured = std::exchange(other._layoutConfigured, false);
+                _itemCapacity = std::exchange(other._itemCapacity, 0);
+                _ownedPlacements = std::move(other._ownedPlacements);
+                _placementCapacity = std::exchange(other._placementCapacity, 0);
+                _lastTileIndex = std::exchange(other._lastTileIndex, 0xFF);
+                _gridCols = std::exchange(other._gridCols, 0);
+                _gridRows = std::exchange(other._gridRows, 0);
+                _customLayout = std::exchange(other._customLayout, false);
                 _cardColor = other._cardColor;
                 _cardActiveColor = other._cardActiveColor;
                 _radius = other._radius;
@@ -781,19 +694,21 @@ namespace pipgui
                 _columns = other._columns;
                 _tileWidth = other._tileWidth;
                 _tileHeight = other._tileHeight;
-                _lineGapPx = other._lineGapPx;
                 _contentMode = other._contentMode;
             }
             return *this;
         }
 
-        ConfigureTileFluent derive()
+        UpdateTileFluent derive()
         {
-            ConfigureTileFluent copy(_gui);
-            copy._screenId = _screenId;
+            UpdateTileFluent copy(_gui);
             copy._itemCount = _itemCount;
-            copy._layoutRowCount = _layoutRowCount;
-            copy._layoutConfigured = _layoutConfigured;
+            copy._itemCapacity = _itemCount;
+            copy._placementCapacity = _itemCount;
+            copy._lastTileIndex = _lastTileIndex;
+            copy._gridCols = _gridCols;
+            copy._gridRows = _gridRows;
+            copy._customLayout = _customLayout;
             copy._cardColor = _cardColor;
             copy._cardActiveColor = _cardActiveColor;
             copy._radius = _radius;
@@ -801,103 +716,117 @@ namespace pipgui
             copy._columns = _columns;
             copy._tileWidth = _tileWidth;
             copy._tileHeight = _tileHeight;
-            copy._lineGapPx = _lineGapPx;
             copy._contentMode = _contentMode;
 
             if (_ownedItems.data && _itemCount > 0)
             {
                 TileItemDef *itemsCopy = copy._ownedItems.copyFromPtr(_ownedItems.data, _itemCount);
-                copy._items = itemsCopy;
-            }
-            else
-            {
-                copy._items = _items;
+                (void)itemsCopy;
             }
 
-            if (_ownedLayoutRowsSpec.data && _layoutRowCount > 0)
+            if (_ownedPlacements.data && _itemCount > 0)
             {
-                const char **rowsCopy = copy._ownedLayoutRowsSpec.copyFromPtr(_ownedLayoutRowsSpec.data, _layoutRowCount);
-                copy._layoutRowsSpec = rowsCopy;
-            }
-            else
-            {
-                copy._layoutRowsSpec = _layoutRowsSpec;
+                TilePlacementDef *placementsCopy = copy._ownedPlacements.copyFromPtr(_ownedPlacements.data, _itemCount);
+                (void)placementsCopy;
             }
 
             _consumed = true;
             return copy;
         }
 
-        ConfigureTileFluent &screen(uint8_t screenId)
+        UpdateTileFluent &grid(uint8_t cols, uint8_t rows)
         {
             if (!canMutate())
                 return *this;
-            _screenId = screenId;
-            return *this;
-        }
-
-        ConfigureTileFluent &items(std::initializer_list<TileItemDef> items)
-        {
-            if (!canMutate())
-                return *this;
-            _items = nullptr;
             _itemCount = 0;
+            _lastTileIndex = 0xFF;
+            _gridCols = cols;
+            _gridRows = rows;
+            _customLayout = true;
+            return *this;
+        }
 
-            if (items.size() == 0)
+        template <typename... Rest>
+        UpdateTileFluent &items(TileItemDef first, Rest... rest)
+        {
+            if (!canMutate())
                 return *this;
-
-            TileItemDef *copy = _ownedItems.copyFrom(items);
+            const TileItemDef packed[] = {first, static_cast<TileItemDef>(rest)...};
+            const uint8_t count = static_cast<uint8_t>(1 + sizeof...(rest));
+            TileItemDef *copy = _ownedItems.copyFromPtr(packed, count);
             if (!copy)
                 return *this;
-
-            _items = copy;
-            _itemCount = static_cast<uint8_t>(items.size());
+            _itemCapacity = count;
+            _itemCount = count;
+            _lastTileIndex = 0xFF;
+            _customLayout = false;
+            (void)copy;
             return *this;
         }
 
-        ConfigureTileFluent &items(const TileItemDef *items, uint8_t itemCount)
+        UpdateTileFluent &tile(const char *title, const char *subtitle, uint8_t target)
         {
             if (!canMutate())
                 return *this;
-            _ownedItems.reset();
-            _items = items;
-            _itemCount = itemCount;
+            if (!_customLayout)
+            {
+                _itemCount = 0;
+                _gridCols = 0;
+                _gridRows = 0;
+                _customLayout = true;
+            }
+            if (!detail::ensureCapacity(_ownedItems.plat, _ownedItems.data, _itemCapacity, static_cast<uint8_t>(_itemCount + 1)))
+                return *this;
+            if (!detail::ensureCapacity(_ownedPlacements.plat, _ownedPlacements.data, _placementCapacity, static_cast<uint8_t>(_itemCount + 1)))
+                return *this;
+            _ownedItems.data[_itemCount] = TileItemDef(title, subtitle, target);
+            _ownedPlacements.data[_itemCount] = TilePlacementDef();
+            _lastTileIndex = _itemCount;
+            ++_itemCount;
             return *this;
         }
 
-        ConfigureTileFluent &layout(std::initializer_list<const char *> rows)
+        UpdateTileFluent &tile(uint16_t icon, const char *title, const char *subtitle, uint8_t target)
         {
             if (!canMutate())
                 return *this;
-            _layoutRowsSpec = nullptr;
-            _layoutRowCount = 0;
-            _layoutConfigured = false;
-
-            if (rows.size() == 0)
+            if (!_customLayout)
+            {
+                _itemCount = 0;
+                _gridCols = 0;
+                _gridRows = 0;
+                _customLayout = true;
+            }
+            if (!detail::ensureCapacity(_ownedItems.plat, _ownedItems.data, _itemCapacity, static_cast<uint8_t>(_itemCount + 1)))
                 return *this;
-
-            const char **copy = _ownedLayoutRowsSpec.copyFrom(rows);
-            if (!copy)
+            if (!detail::ensureCapacity(_ownedPlacements.plat, _ownedPlacements.data, _placementCapacity, static_cast<uint8_t>(_itemCount + 1)))
                 return *this;
-
-            _layoutRowsSpec = copy;
-            _layoutRowCount = static_cast<uint8_t>(rows.size());
-            _layoutConfigured = true;
+            _ownedItems.data[_itemCount] = TileItemDef(icon, title, subtitle, target);
+            _ownedPlacements.data[_itemCount] = TilePlacementDef();
+            _lastTileIndex = _itemCount;
+            ++_itemCount;
             return *this;
         }
 
-        ConfigureTileFluent &layout(const char *const *rows, uint8_t rowCount)
+        UpdateTileFluent &at(uint8_t col, uint8_t row)
         {
-            if (!canMutate())
+            if (!canMutate() || _lastTileIndex == 0xFF || !_ownedPlacements.data)
                 return *this;
-            _ownedLayoutRowsSpec.reset();
-            _layoutRowsSpec = rows;
-            _layoutRowCount = rowCount;
-            _layoutConfigured = rows && rowCount > 0;
+            _ownedPlacements.data[_lastTileIndex].col = col;
+            _ownedPlacements.data[_lastTileIndex].row = row;
             return *this;
         }
 
-        ConfigureTileFluent &inactive(uint32_t color888)
+        UpdateTileFluent &span(uint8_t cols = 1, uint8_t rows = 1)
+        {
+            if (!canMutate() || _lastTileIndex == 0xFF || !_ownedPlacements.data)
+                return *this;
+            _ownedPlacements.data[_lastTileIndex].colSpan = cols;
+            _ownedPlacements.data[_lastTileIndex].rowSpan = rows;
+            return *this;
+        }
+
+        UpdateTileFluent &inactive(uint32_t color888)
         {
             if (!canMutate())
                 return *this;
@@ -905,7 +834,7 @@ namespace pipgui
             return *this;
         }
 
-        ConfigureTileFluent &active(uint32_t color888)
+        UpdateTileFluent &active(uint32_t color888)
         {
             if (!canMutate())
                 return *this;
@@ -913,7 +842,7 @@ namespace pipgui
             return *this;
         }
 
-        ConfigureTileFluent &radius(uint8_t px)
+        UpdateTileFluent &radius(uint8_t px)
         {
             if (!canMutate())
                 return *this;
@@ -921,7 +850,7 @@ namespace pipgui
             return *this;
         }
 
-        ConfigureTileFluent &spacing(uint8_t px)
+        UpdateTileFluent &spacing(uint8_t px)
         {
             if (!canMutate())
                 return *this;
@@ -929,7 +858,7 @@ namespace pipgui
             return *this;
         }
 
-        ConfigureTileFluent &columns(uint8_t value)
+        UpdateTileFluent &columns(uint8_t value)
         {
             if (!canMutate())
                 return *this;
@@ -937,7 +866,7 @@ namespace pipgui
             return *this;
         }
 
-        ConfigureTileFluent &tileSize(int16_t width, int16_t height)
+        UpdateTileFluent &tileSize(int16_t width, int16_t height)
         {
             if (!canMutate())
                 return *this;
@@ -946,15 +875,7 @@ namespace pipgui
             return *this;
         }
 
-        ConfigureTileFluent &lineGap(uint16_t px)
-        {
-            if (!canMutate())
-                return *this;
-            _lineGapPx = px;
-            return *this;
-        }
-
-        ConfigureTileFluent &mode(TileMode value)
+        UpdateTileFluent &mode(TileMode value)
         {
             if (!canMutate())
                 return *this;
@@ -962,8 +883,9 @@ namespace pipgui
             return *this;
         }
 
-        ~ConfigureTileFluent() { apply(); }
+        ~UpdateTileFluent() { apply(); }
 
+    private:
         void apply();
     };
 }

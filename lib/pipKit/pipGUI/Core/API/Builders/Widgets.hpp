@@ -245,14 +245,7 @@ namespace pipgui
         PIPGUI_DEFAULT_FLUENT_MOVE(SliderFluentT);
         int16_t _x, _y, _w, _h;
         int16_t *_value;
-        bool *_changed;
-        int16_t _minValue;
-        int16_t _maxValue;
-        int16_t _step;
-        bool _nextDown;
-        bool _prevDown;
         bool _enabled;
-        bool _inputSet;
         bool _enabledSet;
         uint16_t _activeColor;
         std::optional<uint16_t> _inactiveColor;
@@ -262,14 +255,7 @@ namespace pipgui
             : detail::FluentLifetime(g),
               _x(0), _y(0), _w(0), _h(0),
               _value(nullptr),
-              _changed(nullptr),
-              _minValue(0),
-              _maxValue(100),
-              _step(1),
-              _nextDown(false),
-              _prevDown(false),
               _enabled(true),
-              _inputSet(false),
               _enabledSet(false),
               _activeColor(0xFFFF),
               _inactiveColor(std::nullopt),
@@ -297,46 +283,11 @@ namespace pipgui
             return *this;
         }
 
-        SliderFluentT &value(int16_t &v)
+        SliderFluentT &bind(int16_t &v)
         {
             if (!canMutate())
                 return *this;
             _value = &v;
-            return *this;
-        }
-
-        SliderFluentT &range(int16_t minValue, int16_t maxValue)
-        {
-            if (!canMutate())
-                return *this;
-            _minValue = minValue;
-            _maxValue = maxValue;
-            return *this;
-        }
-
-        SliderFluentT &step(int16_t v)
-        {
-            if (!canMutate())
-                return *this;
-            _step = v;
-            return *this;
-        }
-
-        SliderFluentT &nextDown(bool v)
-        {
-            if (!canMutate())
-                return *this;
-            _nextDown = v;
-            _inputSet = true;
-            return *this;
-        }
-
-        SliderFluentT &prevDown(bool v)
-        {
-            if (!canMutate())
-                return *this;
-            _prevDown = v;
-            _inputSet = true;
             return *this;
         }
 
@@ -346,14 +297,6 @@ namespace pipgui
                 return *this;
             _enabled = v;
             _enabledSet = true;
-            return *this;
-        }
-
-        SliderFluentT &changed(bool &v)
-        {
-            if (!canMutate())
-                return *this;
-            _changed = &v;
             return *this;
         }
 
@@ -484,11 +427,12 @@ namespace pipgui
             return *this;
         }
 
-        ProgressFluentT &label(const String &text)
+        ProgressFluentT &label(const String &text, TextAlign align = Left)
         {
             if (!canMutate())
                 return *this;
             _label = text;
+            _labelAlign = align;
             _showLabel = text.length() > 0;
             return *this;
         }
@@ -501,14 +445,6 @@ namespace pipgui
             return *this;
         }
 
-        ProgressFluentT &labelAlign(TextAlign a)
-        {
-            if (!canMutate())
-                return *this;
-            _labelAlign = a;
-            return *this;
-        }
-
         ProgressFluentT &labelFont(uint16_t px)
         {
             if (!canMutate())
@@ -517,11 +453,12 @@ namespace pipgui
             return *this;
         }
 
-        ProgressFluentT &percent(bool enabled = true)
+        ProgressFluentT &percent(TextAlign align = Right)
         {
             if (!canMutate())
                 return *this;
-            _showPercent = enabled;
+            _showPercent = true;
+            _percentAlign = align;
             return *this;
         }
 
@@ -530,14 +467,6 @@ namespace pipgui
             if (!canMutate())
                 return *this;
             _percentColor = c;
-            return *this;
-        }
-
-        ProgressFluentT &percentAlign(TextAlign a)
-        {
-            if (!canMutate())
-                return *this;
-            _percentAlign = a;
             return *this;
         }
 
@@ -638,6 +567,145 @@ namespace pipgui
         void draw();
     };
 
+    struct DrawDrumRollFluent : detail::FluentLifetime
+    {
+        PIPGUI_DEFAULT_FLUENT_MOVE(DrawDrumRollFluent);
+        static constexpr uint8_t INLINE_OPTIONS_MAX = 8;
+        int16_t _x, _y, _w, _h;
+        const String *_options;
+        String _inlineOptions[INLINE_OPTIONS_MAX];
+        uint8_t _count;
+        uint8_t _selectedIndex;
+        uint32_t _fgColor;
+        uint32_t _bgColor;
+        uint16_t _fontPx;
+        bool _vertical;
+
+        DrawDrumRollFluent(GUI *g)
+            : detail::FluentLifetime(g),
+              _x(0), _y(0), _w(0), _h(0),
+              _options(nullptr),
+              _inlineOptions(),
+              _count(0),
+              _selectedIndex(0),
+              _fgColor(0xFFFFFF),
+              _bgColor(0),
+              _fontPx(0),
+              _vertical(false)
+        {
+        }
+
+        ~DrawDrumRollFluent() { draw(); }
+
+        DrawDrumRollFluent &pos(int16_t x, int16_t y)
+        {
+            if (!canMutate())
+                return *this;
+            _x = x;
+            _y = y;
+            return *this;
+        }
+
+        DrawDrumRollFluent &size(int16_t w, int16_t h)
+        {
+            if (!canMutate())
+                return *this;
+            _w = w;
+            _h = h;
+            return *this;
+        }
+
+        template <size_t N>
+        DrawDrumRollFluent &options(uint16_t fontPx, const String (&items)[N])
+        {
+            if (!canMutate())
+                return *this;
+            _fontPx = fontPx;
+            _options = items;
+            _count = static_cast<uint8_t>(N);
+            return *this;
+        }
+
+        template <size_t N>
+        DrawDrumRollFluent &options(uint16_t fontPx, const char *const (&items)[N])
+        {
+            if (!canMutate())
+                return *this;
+            static_assert(N <= INLINE_OPTIONS_MAX, "Too many drum roll options");
+            _fontPx = fontPx;
+            for (size_t i = 0; i < N; ++i)
+                _inlineOptions[i] = String(items[i]);
+            _options = _inlineOptions;
+            _count = static_cast<uint8_t>(N);
+            return *this;
+        }
+
+        template <typename... Args>
+        DrawDrumRollFluent &options(uint16_t fontPx, Args &&...items)
+        {
+            if (!canMutate())
+                return *this;
+            static_assert(sizeof...(Args) > 0, "DrumRoll options require at least one item");
+            static_assert(sizeof...(Args) <= INLINE_OPTIONS_MAX, "Too many drum roll options");
+            _fontPx = fontPx;
+            size_t index = 0;
+            ((void)(_inlineOptions[index++] = String(items)), ...);
+            _options = _inlineOptions;
+            _count = static_cast<uint8_t>(sizeof...(Args));
+            return *this;
+        }
+
+        DrawDrumRollFluent &selected(uint8_t index)
+        {
+            if (!canMutate())
+                return *this;
+            _selectedIndex = index;
+            return *this;
+        }
+
+        DrawDrumRollFluent &fgColor(uint32_t color)
+        {
+            if (!canMutate())
+                return *this;
+            _fgColor = color;
+            return *this;
+        }
+
+        DrawDrumRollFluent &fgColor(uint16_t color565)
+        {
+            if (!canMutate())
+                return *this;
+            _fgColor = detail::color565To888(color565);
+            return *this;
+        }
+
+        DrawDrumRollFluent &bgColor(uint32_t color)
+        {
+            if (!canMutate())
+                return *this;
+            _bgColor = color;
+            return *this;
+        }
+
+        DrawDrumRollFluent &bgColor(uint16_t color565)
+        {
+            if (!canMutate())
+                return *this;
+            _bgColor = detail::color565To888(color565);
+            return *this;
+        }
+
+        DrawDrumRollFluent &vertical(bool enabled = true)
+        {
+            if (!canMutate())
+                return *this;
+            _vertical = enabled;
+            return *this;
+        }
+
+        void draw();
+    };
+
     template <bool IsUpdate>
     struct ScrollDotsFluentT : detail::FluentLifetime
     {
@@ -713,6 +781,10 @@ namespace pipgui
         GraphDirection _dir;
         uint32_t _bgColor;
         float _speed;
+        bool _autoScale;
+        uint16_t _scopeRateHz;
+        uint16_t _scopeTimebaseMs;
+        uint16_t _scopeVisibleSamples;
 
         GraphGridFluentT(GUI *g)
             : detail::FluentLifetime(g),
@@ -720,7 +792,11 @@ namespace pipgui
               _radius(0),
               _dir(LeftToRight),
               _bgColor(0),
-              _speed(1.0f)
+              _speed(1.0f),
+              _autoScale(false),
+              _scopeRateHz(0),
+              _scopeTimebaseMs(0),
+              _scopeVisibleSamples(0)
         {
         }
 
@@ -789,6 +865,31 @@ namespace pipgui
             if (!canMutate())
                 return *this;
             _speed = v;
+            return *this;
+        }
+
+        GraphGridFluentT &scale(bool enabled = true)
+        {
+            if (!canMutate())
+                return *this;
+            _autoScale = enabled;
+            return *this;
+        }
+
+        GraphGridFluentT &scope(uint16_t rateHz, uint16_t timebaseMs)
+        {
+            if (!canMutate())
+                return *this;
+            _scopeRateHz = rateHz;
+            _scopeTimebaseMs = timebaseMs;
+            return *this;
+        }
+
+        GraphGridFluentT &visible(uint16_t samples)
+        {
+            if (!canMutate())
+                return *this;
+            _scopeVisibleSamples = samples;
             return *this;
         }
 
@@ -1030,19 +1131,12 @@ namespace pipgui
 
         ~NotificationFluent() { show(); }
 
-        NotificationFluent &title(const String &t)
+        NotificationFluent &text(const String &title, const String &message = "")
         {
             if (!canMutate())
                 return *this;
-            _title = t;
-            return *this;
-        }
-
-        NotificationFluent &message(const String &m)
-        {
-            if (!canMutate())
-                return *this;
-            _message = m;
+            _title = title;
+            _message = message;
             return *this;
         }
 
@@ -1136,11 +1230,9 @@ namespace pipgui
     struct PopupMenuFluent : detail::FluentLifetime
     {
         PIPGUI_DEFAULT_FLUENT_MOVE(PopupMenuFluent);
-        PopupMenuItemFn _itemFn;
-        void *_itemUser;
+        const char *const *_items;
         uint8_t _count;
         uint8_t _selectedIndex;
-        uint8_t _maxVisible;
         int16_t _w;
         int16_t _anchorX;
         int16_t _anchorY;
@@ -1149,11 +1241,9 @@ namespace pipgui
 
         PopupMenuFluent(GUI *g)
             : detail::FluentLifetime(g),
-              _itemFn(nullptr),
-              _itemUser(nullptr),
+              _items(nullptr),
               _count(0),
               _selectedIndex(0xFF),
-              _maxVisible(4),
               _w(0),
               _anchorX(0),
               _anchorY(0),
@@ -1164,43 +1254,22 @@ namespace pipgui
 
         ~PopupMenuFluent() { show(); }
 
-        static const char *arrayItem(void *user, uint8_t idx)
+        template <size_t N>
+        PopupMenuFluent &items(const char *const (&items)[N])
         {
-            const char *const *items = static_cast<const char *const *>(user);
-            if (!items)
-                return "";
-            const char *s = items[idx];
-            return s ? s : "";
+            if (!canMutate())
+                return *this;
+            _items = items;
+            _count = static_cast<uint8_t>(N);
+            return *this;
         }
 
         PopupMenuFluent &items(const char *const *items, uint8_t count)
         {
             if (!canMutate())
                 return *this;
-            _itemFn = &arrayItem;
-            _itemUser = const_cast<void *>(reinterpret_cast<const void *>(items));
+            _items = items;
             _count = count;
-            return *this;
-        }
-
-        PopupMenuFluent &items(PopupMenuItemFn fn, void *user, uint8_t count)
-        {
-            if (!canMutate())
-                return *this;
-            _itemFn = fn;
-            _itemUser = user;
-            _count = count;
-            return *this;
-        }
-
-        PopupMenuFluent &anchor(int16_t x, int16_t y, int16_t w, int16_t h)
-        {
-            if (!canMutate())
-                return *this;
-            _anchorX = x;
-            _anchorY = y;
-            _anchorW = w;
-            _anchorH = h;
             return *this;
         }
 
@@ -1209,7 +1278,11 @@ namespace pipgui
         {
             if (!canMutate())
                 return *this;
-            return anchor(component._x, component._y, component._w, component._h);
+            _anchorX = component._x;
+            _anchorY = component._y;
+            _anchorW = component._w;
+            _anchorH = component._h;
+            return *this;
         }
 
         PopupMenuFluent &width(int16_t w)
@@ -1225,14 +1298,6 @@ namespace pipgui
             if (!canMutate())
                 return *this;
             _selectedIndex = idx;
-            return *this;
-        }
-
-        PopupMenuFluent &maxVisible(uint8_t v)
-        {
-            if (!canMutate())
-                return *this;
-            _maxVisible = v;
             return *this;
         }
 

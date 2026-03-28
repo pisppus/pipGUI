@@ -933,15 +933,6 @@ namespace pipgui
         }
     }
 
-    void ConfigGraphScopeFluent::apply()
-    {
-        if (_consumed || !_gui || !_touched || _screenId == INVALID_SCREEN_ID)
-            return;
-
-        _consumed = true;
-        detail::GuiAccess::configGraphScope(*_gui, _screenId, _sampleRateHz, _timebaseMs, _visibleSamples);
-    }
-
     void GUI::beginGraphFrame(uint8_t screenId) noexcept
     {
         if (screenId >= _screen.capacity || !_screen.graphAreas)
@@ -1005,14 +996,19 @@ namespace pipgui
                             uint8_t radius,
                             GraphDirection dir,
                             uint32_t bgColor,
-                            float speed)
+                            float speed,
+                            bool autoScale,
+                            uint16_t scopeRateHz,
+                            uint16_t scopeTimebaseMs,
+                            uint16_t scopeVisibleSamples)
     {
         if (w <= 0 || h <= 0)
             return;
 
         if (_flags.spriteEnabled && _disp.display && !_flags.inSpritePass)
         {
-            updateGraphGrid(x, y, w, h, radius, dir, bgColor, speed);
+            updateGraphGrid(x, y, w, h, radius, dir, bgColor, speed, autoScale,
+                            scopeRateHz, scopeTimebaseMs, scopeVisibleSamples);
             return;
         }
 
@@ -1074,14 +1070,10 @@ namespace pipgui
         if (graphChanged)
         {
             const bool keepAutoScale = area->autoScaleEnabled;
-            const uint16_t sampleRate = area->oscSampleRateHz;
-            const uint16_t timebase = area->oscTimebaseMs;
-            const uint16_t visibleSamples = area->oscVisibleSamples;
             freeGraphBuffers(*area);
-            area->autoScaleEnabled = keepAutoScale;
-            area->oscSampleRateHz = sampleRate;
-            area->oscTimebaseMs = timebase;
-            area->oscVisibleSamples = visibleSamples;
+            area->autoScaleEnabled = autoScale;
+            if (keepAutoScale != autoScale)
+                area->autoScaleInitialized = false;
         }
 
         area->x = x;
@@ -1095,6 +1087,10 @@ namespace pipgui
         area->radius = resolvedRadius;
         area->direction = dir;
         area->speed = speed;
+        area->autoScaleEnabled = autoScale;
+        area->oscSampleRateHz = scopeRateHz;
+        area->oscTimebaseMs = scopeTimebaseMs;
+        area->oscVisibleSamples = scopeVisibleSamples;
         area->bgColor = bgColor;
         area->bgColor565 = bg565;
         area->drawEpoch = (area->drawEpoch == 0xFFFFFFFFU) ? 1U : (area->drawEpoch + 1U);
@@ -1122,11 +1118,16 @@ namespace pipgui
                               uint8_t radius,
                               GraphDirection dir,
                               uint32_t bgColor,
-                              float speed)
+                              float speed,
+                              bool autoScale,
+                              uint16_t scopeRateHz,
+                              uint16_t scopeTimebaseMs,
+                              uint16_t scopeVisibleSamples)
     {
         if (!_flags.spriteEnabled || !_disp.display)
         {
-            drawGraphGrid(x, y, w, h, radius, dir, bgColor, speed);
+            drawGraphGrid(x, y, w, h, radius, dir, bgColor, speed, autoScale,
+                          scopeRateHz, scopeTimebaseMs, scopeVisibleSamples);
             return;
         }
 
@@ -1135,7 +1136,8 @@ namespace pipgui
 
         _flags.inSpritePass = 1;
         _render.activeSprite = &_render.sprite;
-        drawGraphGrid(x, y, w, h, radius, dir, bgColor, speed);
+        drawGraphGrid(x, y, w, h, radius, dir, bgColor, speed, autoScale,
+                      scopeRateHz, scopeTimebaseMs, scopeVisibleSamples);
         _flags.inSpritePass = prevRender;
         _render.activeSprite = prevActive;
 
@@ -1147,57 +1149,6 @@ namespace pipgui
             return;
 
         invalidateRect((int16_t)(area->x - 2), (int16_t)(area->y - 2), (int16_t)(area->w + 4), (int16_t)(area->h + 4));
-    }
-
-    void GUI::setGraphScale(bool enabled)
-    {
-        if (_screen.current >= _screen.capacity)
-            return;
-
-        GraphArea *area = ensureGraphArea(_screen.current);
-        if (!area)
-            return;
-
-        area->autoScaleEnabled = enabled;
-        if (!enabled)
-            area->autoScaleInitialized = false;
-    }
-
-    void GUI::configGraphScope(uint8_t screenId,
-                               uint16_t sampleRateHz,
-                               uint16_t timebaseMs,
-                               uint16_t visibleSamples)
-    {
-        GraphArea *area = ensureGraphArea(screenId);
-        if (!area)
-            return;
-
-        area->oscSampleRateHz = sampleRateHz;
-        area->oscTimebaseMs = timebaseMs;
-        area->oscVisibleSamples = visibleSamples;
-    }
-
-    uint16_t GUI::graphRate(uint8_t screenId) const noexcept
-    {
-        if (screenId >= _screen.capacity || !_screen.graphAreas || !_screen.graphAreas[screenId])
-            return 0;
-        return _screen.graphAreas[screenId]->oscSampleRateHz;
-    }
-
-    uint16_t GUI::graphTimebase(uint8_t screenId) const noexcept
-    {
-        if (screenId >= _screen.capacity || !_screen.graphAreas || !_screen.graphAreas[screenId])
-            return 0;
-        return _screen.graphAreas[screenId]->oscTimebaseMs;
-    }
-
-    uint16_t GUI::graphSamplesVisible(uint8_t screenId) const noexcept
-    {
-        if (screenId >= _screen.capacity || !_screen.graphAreas || !_screen.graphAreas[screenId])
-            return 0;
-
-        const GraphArea &area = *_screen.graphAreas[screenId];
-        return resolveOscilloscopeVisibleSamples(area, (uint16_t)((area.innerW > 2) ? area.innerW : 2));
     }
 
     void GUI::drawGraphLine(uint8_t lineIndex,

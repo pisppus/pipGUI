@@ -23,11 +23,9 @@ namespace pipgui
             return v == center ? static_cast<int16_t>((total - extent) / 2) : v;
         }
 
-        uint8_t resolvePopupVisibleCount(uint8_t count, uint8_t maxVisible, uint16_t screenH, uint8_t itemHeight)
+        uint8_t resolvePopupVisibleCount(uint8_t count, uint16_t screenH, uint8_t itemHeight)
         {
-            uint8_t resolved = maxVisible ? maxVisible : 4;
-            if (resolved > 4)
-                resolved = 4;
+            uint8_t resolved = 4;
 
             const int16_t pad = 8;
             const int16_t usable = static_cast<int16_t>(screenH) - 16 - pad * 2;
@@ -101,7 +99,7 @@ namespace pipgui
         bool computePopupOverlayFrame(const detail::PopupMenuState &popup, bool popupActive, bool popupClosing, uint32_t now, PopupOverlayFrame &out)
         {
             out = {};
-            if (!popupActive || popup.list.itemCount == 0 || !popup.itemFn)
+            if (!popupActive || popup.list.itemCount == 0 || !popup.items)
                 return false;
 
             const uint32_t dur = popup.animDurationMs ? popup.animDurationMs : 1;
@@ -197,18 +195,16 @@ namespace pipgui
         _popup = {};
     }
 
-    void GUI::showPopupMenuInternal(PopupMenuItemFn itemFn,
-                                   void *itemUser,
+    void GUI::showPopupMenuInternal(const char *const *items,
                                    uint8_t count,
                                    uint8_t selectedIndex,
                                    int16_t w,
-                                   uint8_t maxVisible,
                                    int16_t anchorX,
                                    int16_t anchorY,
                                    int16_t anchorW,
                                    int16_t anchorH)
     {
-        if (!itemFn || count == 0)
+        if (!items || count == 0)
             return;
 
         const uint16_t screenW = _render.screenWidth;
@@ -222,7 +218,7 @@ namespace pipgui
         _popup.border565 = (uint16_t)detail::blend565(_popup.bg565, (uint16_t)0xFFFF, 18);
         _popup.selBg565 = rgb(40, 150, 255);
         _popup.fg565 = 0xFFFF;
-        const uint8_t resolvedMaxVisible = resolvePopupVisibleCount(count, maxVisible, screenH, _popup.itemHeight);
+        const uint8_t resolvedMaxVisible = resolvePopupVisibleCount(count, screenH, _popup.itemHeight);
         _popup.maxVisible = resolvedMaxVisible;
 
         const int16_t pad = 8;
@@ -234,8 +230,7 @@ namespace pipgui
 
         const bool sameMenu = _flags.popupActive &&
                               !_flags.popupClosing &&
-                              _popup.itemFn == itemFn &&
-                              _popup.itemUser == itemUser &&
+                              _popup.items == items &&
                               _popup.list.itemCount == count;
 
         ListState &list = _popup.list;
@@ -243,12 +238,11 @@ namespace pipgui
             return;
         for (uint8_t i = 0; i < count; ++i)
         {
-            if (!assignPopupItem(list.items[i], itemFn(itemUser, i)))
+            if (!assignPopupItem(list.items[i], items[i]))
                 return;
         }
 
-        _popup.itemFn = itemFn;
-        _popup.itemUser = itemUser;
+        _popup.items = items;
         list.itemCount = count;
         list.style = {_popup.bg565, _popup.selBg565, 14, 0, 0, _popup.itemHeight, 14, 0, 0, Plain};
 
@@ -269,7 +263,7 @@ namespace pipgui
         list.checkedIndex = 0xFF;
         list.checkedIconId = IconCheckmark;
 
-        if (_popup.rememberedItemFn == itemFn && _popup.rememberedItemUser == itemUser && _popup.rememberedCount == count && _popup.rememberedIndex < count)
+        if (_popup.rememberedItems == items && _popup.rememberedCount == count && _popup.rememberedIndex < count)
             list.checkedIndex = _popup.rememberedIndex;
 
         if (selectedIndex == 0xFF)
@@ -326,8 +320,7 @@ namespace pipgui
             }
             else if (!list.nextLongFired && list.nextHoldStartMs && (now - list.nextHoldStartMs) >= holdMs)
             {
-                _popup.rememberedItemFn = _popup.itemFn;
-                _popup.rememberedItemUser = _popup.itemUser;
+                _popup.rememberedItems = _popup.items;
                 _popup.rememberedCount = list.itemCount;
                 _popup.rememberedIndex = list.selectedIndex;
                 list.checkedIndex = list.selectedIndex;
@@ -398,7 +391,7 @@ namespace pipgui
 
     void GUI::renderPopupMenuOverlay(uint32_t now)
     {
-        if (!_flags.popupActive || _popup.list.itemCount == 0 || !_popup.itemFn)
+        if (!_flags.popupActive || _popup.list.itemCount == 0 || !_popup.items)
             return;
 
         const uint32_t dur = _popup.animDurationMs ? _popup.animDurationMs : 1;

@@ -128,6 +128,7 @@ namespace pipgui
         Item *items = nullptr;
 
         uint32_t lastUpdateMs = 0;
+        uint32_t configHash = 0;
     };
 
     struct TileState
@@ -173,5 +174,6 @@ namespace pipgui
 
         Item *items = nullptr;
         uint8_t itemCapacity = 0;
+        uint32_t configHash = 0;
     };
 }

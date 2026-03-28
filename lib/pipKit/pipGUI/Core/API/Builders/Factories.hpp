@@ -47,13 +47,13 @@ namespace pipgui
 
     inline DrawCircleProgressFluent GUI::drawCircleProgress() { return DrawCircleProgressFluent(this); }
     inline UpdateCircleProgressFluent GUI::updateCircleProgress() { return UpdateCircleProgressFluent(this); }
+    inline DrawDrumRollFluent GUI::drawDrumRoll() { return DrawDrumRollFluent(this); }
 
     inline ToastFluent GUI::showToast() { return ToastFluent(this); }
     inline NotificationFluent GUI::showNotification() { return NotificationFluent(this); }
     inline ShowErrorFluent GUI::showError() { return ShowErrorFluent(this); }
     inline PopupMenuFluent GUI::showPopupMenu() { return PopupMenuFluent(this); }
     inline PopupMenuInputFluent GUI::popupMenuInput() { return PopupMenuInputFluent(this); }
-    inline ConfigGraphScopeFluent GUI::configGraphScope() { return ConfigGraphScopeFluent(this); }
 
     inline DrawIconFluent GUI::drawIcon() { return DrawIconFluent(this); }
     inline DrawAnimIconFluent GUI::drawAnimIcon() { return DrawAnimIconFluent(this); }
@@ -64,15 +64,15 @@ namespace pipgui
     inline DrawTextMarqueeFluent GUI::drawTextMarquee() { return DrawTextMarqueeFluent(this); }
     inline DrawTextEllipsizedFluent GUI::drawTextEllipsized() { return DrawTextEllipsizedFluent(this); }
 
-    inline ConfigureStatusBarFluent GUI::configureStatusBar() { return ConfigureStatusBarFluent(this); }
+    inline ConfigStatusBarFluent GUI::configStatusBar() { return ConfigStatusBarFluent(this); }
     inline SetStatusBarTextFluent GUI::setStatusBarText() { return SetStatusBarTextFluent(this); }
     inline SetStatusBarIconFluent GUI::setStatusBarIcon() { return SetStatusBarIconFluent(this); }
 
-    inline ConfigureListFluent GUI::configureList() { return ConfigureListFluent(this); }
-    inline ListInputFluent GUI::listInput(uint8_t screenId) { return ListInputFluent(this, screenId); }
+    inline UpdateListFluent GUI::updateList() { return UpdateListFluent(this); }
+    inline ListInputFluent GUI::listInput() { return ListInputFluent(this); }
 
-    inline ConfigureTileFluent GUI::configureTile() { return ConfigureTileFluent(this); }
-    inline TileInputFluent GUI::tileInput(uint8_t screenId) { return TileInputFluent(this, screenId); }
+    inline UpdateTileFluent GUI::updateTile() { return UpdateTileFluent(this); }
+    inline TileInputFluent GUI::tileInput() { return TileInputFluent(this); }
     inline ConfigureBacklightFluent GUI::setBacklight() { return ConfigureBacklightFluent(this); }
     inline SetClipFluent GUI::setClip() { return SetClipFluent(this); }
     inline ShowLogoFluent GUI::showLogo() { return ShowLogoFluent(this); }

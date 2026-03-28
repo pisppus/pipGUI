@@ -224,10 +224,8 @@ namespace pipgui::detail
 
     struct PopupMenuState
     {
-        PopupMenuItemFn itemFn = nullptr;
-        void *itemUser = nullptr;
-        PopupMenuItemFn rememberedItemFn = nullptr;
-        void *rememberedItemUser = nullptr;
+        const char *const *items = nullptr;
+        const char *const *rememberedItems = nullptr;
         uint8_t rememberedCount = 0;
         uint8_t rememberedIndex = 0xFF;
         ListState list;
@@ -274,7 +272,7 @@ namespace pipgui::detail
     struct StatusBarState
     {
         StatusBarPosition pos = Top;
-        StatusBarStyle style = StatusBarStyleSolid;
+        StatusBarStyle style = Solid;
         uint8_t height = 0;
         uint32_t bg = 0x000000;
         uint32_t fg = 0xFFFFFF;

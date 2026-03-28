@@ -8,6 +8,57 @@ namespace pipgui
     namespace
     {
         constexpr uint8_t kDefaultListRadius = 17;
+
+        static uint32_t hashStr(uint32_t h, const char *s)
+        {
+            if (!s)
+                return (h ^ 0xFFu) * 16777619u;
+            while (*s)
+            {
+                h ^= static_cast<uint8_t>(*s++);
+                h *= 16777619u;
+            }
+            return (h ^ 0u) * 16777619u;
+        }
+
+        static uint32_t hashU32(uint32_t h, uint32_t v)
+        {
+            for (uint8_t i = 0; i < 4; ++i)
+            {
+                h ^= static_cast<uint8_t>((v >> (i * 8)) & 0xFFu);
+                h *= 16777619u;
+            }
+            return h;
+        }
+
+        static uint32_t makeListConfigHash(const ListItemDef *items,
+                                           uint8_t itemCount,
+                                           const ListStyle &style,
+                                           uint8_t checkedIndex)
+        {
+            uint32_t h = 2166136261u;
+            h = hashU32(h, itemCount);
+            h = hashU32(h, style.cardColor);
+            h = hashU32(h, style.cardActiveColor);
+            h = hashU32(h, style.radius);
+            h = hashU32(h, style.spacing);
+            h = hashU32(h, static_cast<uint16_t>(style.cardWidth));
+            h = hashU32(h, static_cast<uint16_t>(style.cardHeight));
+            h = hashU32(h, style.titleFontPx);
+            h = hashU32(h, style.subtitleFontPx);
+            h = hashU32(h, style.lineGapPx);
+            h = hashU32(h, style.mode);
+            h = hashU32(h, checkedIndex);
+
+            for (uint8_t i = 0; i < itemCount; ++i)
+            {
+                h = hashStr(h, items[i].title);
+                h = hashStr(h, items[i].subtitle);
+                h = hashU32(h, items[i].targetScreen);
+                h = hashU32(h, items[i].iconId);
+            }
+            return h;
+        }
     }
 
     static void resetListItemCache(ListState::Item &item)
@@ -62,46 +113,61 @@ namespace pipgui
         return detail::ensureCapacity(plat, menu.items, menu.capacity, newCapacity);
     }
 
-    void ConfigureListFluent::apply()
+    void UpdateListFluent::apply()
     {
-        if (_consumed || !_gui || !_items || _itemCount == 0)
+        if (_consumed || !_gui)
             return;
         _consumed = true;
 
-        if (_screenId == INVALID_SCREEN_ID)
+        const uint8_t screenId = _gui->currentScreen();
+        if (screenId == INVALID_SCREEN_ID)
             return;
-        ListState *menu = detail::GuiAccess::ensureList(*_gui, _screenId);
-        if (!menu)
-            return;
-        if (!ensureListCapacity(*menu, _itemCount, detail::GuiAccess::platform(*_gui)))
-        {
-            menu->configured = false;
-            return;
-        }
 
-        menu->configured = true;
-        menu->itemCount = _itemCount;
-        resetListRuntime(*menu);
-
-        for (uint8_t i = 0; i < _itemCount; ++i)
+        if (_items && _itemCount > 0)
         {
-            if (!initListItem(menu->items[i], _items[i]))
-            {
-                menu->configured = false;
+            ListState *menu = detail::GuiAccess::ensureList(*_gui, screenId);
+            if (!menu)
                 return;
+            const ListStyle style = {_cardColor, _cardActiveColor, _radius, 6,
+                                     _cardWidth, _cardHeight, 0, 0, 0, _mode};
+            const uint32_t configHash = makeListConfigHash(_items, _itemCount, style, _checkedIndex);
+            if (!menu->configured || menu->configHash != configHash)
+            {
+                if (!ensureListCapacity(*menu, _itemCount, detail::GuiAccess::platform(*_gui)))
+                {
+                    menu->configured = false;
+                    return;
+                }
+
+                menu->configured = true;
+                menu->itemCount = _itemCount;
+                resetListRuntime(*menu);
+
+                for (uint8_t i = 0; i < _itemCount; ++i)
+                {
+                    if (!initListItem(menu->items[i], _items[i]))
+                    {
+                        menu->configured = false;
+                        return;
+                    }
+                }
+
+                menu->style = style;
+                menu->checkedIndex = _checkedIndex;
+                menu->checkedIconId = (_checkedIndex == 0xFF) ? static_cast<uint16_t>(0xFFFF) : static_cast<uint16_t>(IconCheckmark);
+
+                if (menu->style.cardColor == 0 || menu->style.cardActiveColor == 0)
+                {
+                    menu->style.cardColor = (uint16_t)detail::blend565(0x0000, 0xFFFF, 18);
+                    menu->style.cardActiveColor = (uint16_t)(((130 >> 2) << 5) | (220 >> 3));
+                }
+
+                menu->configHash = configHash;
             }
         }
 
-        menu->style = {_cardColor, _cardActiveColor, _radius, 6,
-                       _cardWidth, _cardHeight, 0, 0, 0, _mode};
-        menu->checkedIndex = _checkedIndex;
-        menu->checkedIconId = (_checkedIndex == 0xFF) ? static_cast<uint16_t>(0xFFFF) : static_cast<uint16_t>(IconCheckmark);
-
-        if (menu->style.cardColor == 0 || menu->style.cardActiveColor == 0)
-        {
-            menu->style.cardColor = (uint16_t)detail::blend565(0x0000, 0xFFFF, 18);
-            menu->style.cardActiveColor = (uint16_t)(((130 >> 2) << 5) | (220 >> 3));
-        }
+        if (screenId == _gui->currentScreen())
+            detail::GuiAccess::updateListScreen(*_gui, screenId);
     }
 
     void GUI::handleListInput(uint8_t screenId, bool nextDown, bool prevDown)
@@ -200,13 +266,13 @@ namespace pipgui
             menu.lastScrollActivityMs = now;
             menu.marqueeStartMs = now;
             if (_flags.spriteEnabled && _disp.display && !_flags.inSpritePass && _screen.current == screenId)
-                updateList(screenId);
+                updateListScreen(screenId);
             else
                 requestRedraw();
         }
     }
 
-    bool GUI::updateList(uint8_t screenId)
+    bool GUI::updateListScreen(uint8_t screenId)
     {
         if (screenId == INVALID_SCREEN_ID)
             return false;
@@ -226,10 +292,10 @@ namespace pipgui
         if (_render.screenWidth <= 0 || contentHeight <= 0)
             return false;
 
-        return updateList(screenId, 0, top, (int16_t)_render.screenWidth, contentHeight, _render.bgColor565);
+        return updateListScreen(screenId, 0, top, (int16_t)_render.screenWidth, contentHeight, _render.bgColor565);
     }
 
-    bool GUI::updateList(uint8_t screenId, int16_t x, int16_t y, int16_t w, int16_t h, uint16_t bgColor565)
+    bool GUI::updateListScreen(uint8_t screenId, int16_t x, int16_t y, int16_t w, int16_t h, uint16_t bgColor565)
     {
         ListState *menuPtr = getList(screenId);
         if (!menuPtr || !menuPtr->configured || menuPtr->itemCount == 0 || w <= 0 || h <= 0)

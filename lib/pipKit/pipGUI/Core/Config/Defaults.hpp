@@ -36,7 +36,7 @@
 #define PIPGUI_OTA 0
 #endif
 #ifndef PIPGUI_OTA_PROJECT_URL
-#define PIPGUI_OTA_PROJECT_URL "https://pisppus.vercel.app/fw/pipboy"
+#define PIPGUI_OTA_PROJECT_URL "https://pisppus.is-a.dev/fw/pipboy"
 #endif
 
 #ifndef PIPGUI_FIRMWARE_TITLE

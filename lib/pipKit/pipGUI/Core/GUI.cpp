@@ -299,6 +299,7 @@ namespace pipgui
         out.nextPressed = next.wasPressed();
         out.prevPressed = prev.wasPressed();
         out.comboDown = combo;
+        _input = out;
         return out;
     }
 
@@ -613,7 +614,10 @@ namespace pipgui
         _consumed = true;
         if (!_gui)
             return;
-        detail::GuiAccess::handleListInput(*_gui, _screenId, _nextDown, _prevDown);
+        const uint8_t screenId = _gui->currentScreen();
+        if (screenId == INVALID_SCREEN_ID)
+            return;
+        detail::GuiAccess::handleListInput(*_gui, screenId, _nextDown, _prevDown);
     }
 
     void PopupMenuInputFluent::apply()
@@ -626,11 +630,11 @@ namespace pipgui
         detail::GuiAccess::handlePopupMenuInput(*_gui, _nextDown, _prevDown);
     }
 
-    void ConfigureStatusBarFluent::apply()
+    void ConfigStatusBarFluent::apply()
     {
         if (!beginCommit())
             return;
-        detail::GuiAccess::configureStatusBar(*_gui, _enabled, _bgColor, _height, _pos);
+        detail::GuiAccess::configStatusBar(*_gui, _height, _pos, _style);
     }
 
     void SetStatusBarTextFluent::apply()
