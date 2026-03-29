@@ -11,6 +11,7 @@ namespace pipcore
         virtual ~Display() = default;
 
         [[nodiscard]] virtual bool begin(uint8_t rotation) = 0;
+        [[nodiscard]] virtual bool setRotation(uint8_t rotation) = 0;
         [[nodiscard]] virtual uint16_t width() const noexcept = 0;
         [[nodiscard]] virtual uint16_t height() const noexcept = 0;
 

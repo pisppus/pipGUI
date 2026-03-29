@@ -10,6 +10,22 @@ namespace pipgui
     {
         constexpr uint8_t kDefaultTileRadius = 17;
 
+        static float adaptivePreviewScaleY(uint16_t physicalH, uint16_t logicalH) noexcept
+        {
+            if (physicalH == 0 || logicalH == 0 || logicalH >= physicalH)
+                return 1.0f;
+            const float scale = static_cast<float>(logicalH) / static_cast<float>(physicalH);
+            return (scale < 0.45f) ? 0.45f : scale;
+        }
+
+        static uint16_t scaleU16(uint16_t value, float scale, uint16_t minValue) noexcept
+        {
+            if (scale >= 0.999f)
+                return value;
+            const uint16_t scaled = static_cast<uint16_t>(lroundf(static_cast<float>(value) * scale));
+            return (scaled < minValue) ? minValue : scaled;
+        }
+
         static uint32_t hashStr(uint32_t h, const char *s)
         {
             if (!s)
@@ -780,13 +796,15 @@ namespace pipgui
             if (contentClipW <= 0 || contentClipH <= 0)
                 continue;
 
-            const uint16_t titlePx = hasSub ? 18 : 20;
-            uint16_t subPx = hasSub ? static_cast<uint16_t>((titlePx * 7U) / 10U) : 0;
+            const float previewScaleY = adaptivePreviewScaleY(_render.physicalHeight, _render.screenHeight);
+            const uint16_t baseTitlePx = hasSub ? 18 : 20;
+            uint16_t titlePx = scaleU16(baseTitlePx, previewScaleY, 10);
+            uint16_t subPx = hasSub ? static_cast<uint16_t>((baseTitlePx * 7U) / 10U) : 0;
             uint16_t gapPx = m.style.lineGapPx;
             if (hasSub)
             {
                 if (gapPx == 0)
-                    gapPx = (uint16_t)(titlePx / 5U);
+                    gapPx = (uint16_t)(baseTitlePx / 5U);
             }
             else
             {
@@ -794,11 +812,17 @@ namespace pipgui
                 gapPx = 0;
             }
 
+            if (subPx > 0)
+                subPx = scaleU16(subPx, previewScaleY, 8);
+            if (gapPx > 0)
+                gapPx = scaleU16(gapPx, previewScaleY, 1);
+
             ensureTextMetrics(it, titlePx, 600, hasSub, subPx, 500);
 
             bool showSub = hasSub && subPx > 0 && it.subH > 0;
             int16_t iconSize = hasIcon ? (int16_t)std::min<int16_t>((int16_t)(tileH / (hasSub ? 3 : 2)), (int16_t)(tileW / 3)) : 0;
             int16_t iconGap = hasIcon ? (int16_t)((tileH >= 84) ? 8 : 6) : 0;
+            iconGap = (int16_t)scaleU16((uint16_t)iconGap, previewScaleY, 2);
             int16_t textBlockH = it.titleH;
             if (showSub)
                 textBlockH += gapPx + it.subH;

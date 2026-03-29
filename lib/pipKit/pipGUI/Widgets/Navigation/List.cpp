@@ -9,6 +9,30 @@ namespace pipgui
     {
         constexpr uint8_t kDefaultListRadius = 17;
 
+        static float adaptivePreviewScaleY(uint16_t physicalH, uint16_t logicalH) noexcept
+        {
+            if (physicalH == 0 || logicalH == 0 || logicalH >= physicalH)
+                return 1.0f;
+            const float scale = static_cast<float>(logicalH) / static_cast<float>(physicalH);
+            return (scale < 0.45f) ? 0.45f : scale;
+        }
+
+        static int16_t scaleI16(int16_t value, float scale, int16_t minValue) noexcept
+        {
+            if (scale >= 0.999f)
+                return value;
+            const int16_t scaled = static_cast<int16_t>(lroundf(static_cast<float>(value) * scale));
+            return (scaled < minValue) ? minValue : scaled;
+        }
+
+        static uint16_t scaleU16(uint16_t value, float scale, uint16_t minValue) noexcept
+        {
+            if (scale >= 0.999f)
+                return value;
+            const uint16_t scaled = static_cast<uint16_t>(lroundf(static_cast<float>(value) * scale));
+            return (scaled < minValue) ? minValue : scaled;
+        }
+
         static uint32_t hashStr(uint32_t h, const char *s)
         {
             if (!s)
@@ -327,7 +351,9 @@ namespace pipgui
             const int16_t top = y;
             const int16_t right = left + w;
             const int16_t bottom = top + h;
-            const int16_t padY = (int16_t)menu.style.spacing;
+            const float previewScaleY = adaptivePreviewScaleY(_render.physicalHeight, _render.screenHeight);
+            const int16_t spacingY = scaleI16((int16_t)menu.style.spacing, previewScaleY, 2);
+            const int16_t padY = spacingY;
             const int16_t contentTop = top + padY;
             const int16_t contentBottom = bottom - padY;
             if (contentBottom <= contentTop)
@@ -342,8 +368,9 @@ namespace pipgui
             if (cardW < 20)
                 cardW = 20;
 
-            int16_t cardH = (menu.style.cardHeight > 0) ? menu.style.cardHeight : (cardMode ? 50 : 34);
-            if (menu.style.cardHeight <= 0 && cardH * 2 + menu.style.spacing > h)
+            int16_t cardH = (menu.style.cardHeight > 0) ? scaleI16(menu.style.cardHeight, previewScaleY, cardMode ? 24 : 18)
+                                                        : scaleI16((int16_t)(cardMode ? 50 : 34), previewScaleY, cardMode ? 24 : 18);
+            if (menu.style.cardHeight <= 0 && cardH * 2 + spacingY > h)
                 cardH = h / 3;
             int16_t cardX = left + (w - cardW) / 2;
 
@@ -385,7 +412,7 @@ namespace pipgui
             if (visibleHeight < cardH)
                 visibleHeight = cardH;
 
-            const float itemSpan = (float)(cardH + menu.style.spacing);
+            const float itemSpan = (float)(cardH + spacingY);
             uint8_t visibleCount = 1;
             if (itemSpan > 1.0f)
             {
@@ -401,7 +428,7 @@ namespace pipgui
             float maxScroll = 0.0f;
             if (itemSpan > 0.5f)
             {
-                const float contentHeightPx = (float)menu.itemCount * itemSpan - (float)menu.style.spacing;
+                const float contentHeightPx = (float)menu.itemCount * itemSpan - (float)spacingY;
                 const float maxScrollPx = contentHeightPx - (float)visibleHeight;
                 if (maxScrollPx > 0.0f)
                     maxScroll = maxScrollPx / itemSpan;
@@ -519,6 +546,7 @@ namespace pipgui
                 radius = kDefaultListRadius;
             else if (radius < 2)
                 radius = 2;
+            radius = (uint8_t)scaleU16(radius, previewScaleY, 2);
 
             const int16_t lastIdx = (int16_t)menu.itemCount - 1;
             int16_t startIndex = (int16_t)floorf(renderScrollPos) - 3;
@@ -653,6 +681,7 @@ namespace pipgui
                     uint16_t titlePx = menu.style.titleFontPx;
                     if (titlePx == 0)
                         titlePx = 18;
+                    titlePx = scaleU16(titlePx, previewScaleY, 10);
 
                     ensureTextMetrics(item, titlePx, TITLE_WEIGHT, false, 0, 0);
 
@@ -743,6 +772,12 @@ namespace pipgui
                     if (autoGapPx)
                         gapPx = 2;
                 }
+
+                titlePx = scaleU16(titlePx, previewScaleY, 10);
+                if (subPx > 0)
+                    subPx = scaleU16(subPx, previewScaleY, 8);
+                if (gapPx > 0)
+                    gapPx = scaleU16(gapPx, previewScaleY, 1);
 
                 ensureTextMetrics(item, titlePx, TITLE_WEIGHT, hasSub, subPx, SUBTITLE_WEIGHT);
 

@@ -260,6 +260,16 @@ namespace pipcore::st7789
         return true;
     }
 
+    bool Driver::setRotation(uint8_t rotation)
+    {
+        if (!_transport || !_initialized)
+        {
+            _lastError = IoError::NotReady;
+            return false;
+        }
+        return setRotationInternal(rotation);
+    }
+
     void Driver::setInversion(bool enabled)
     {
         _invert = enabled;

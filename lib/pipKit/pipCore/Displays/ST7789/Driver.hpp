@@ -57,6 +57,7 @@ namespace pipcore::st7789
                                      int16_t yOffset = 0);
 
         [[nodiscard]] bool begin(uint8_t rotation);
+        [[nodiscard]] bool setRotation(uint8_t rotation);
         void reset();
         [[nodiscard]] IoError lastError() const noexcept { return _lastError; }
         [[nodiscard]] const char *lastErrorText() const noexcept { return ioErrorText(_lastError); }

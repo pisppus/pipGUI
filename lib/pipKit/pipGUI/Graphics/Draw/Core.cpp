@@ -173,7 +173,25 @@ namespace pipgui
         pipcore::Sprite *spr = (_flags.inSpritePass && _flags.spriteEnabled)
                                    ? (_render.activeSprite ? _render.activeSprite : &_render.sprite)
                                    : &_render.sprite;
-        applyClipState(spr, _clip.enabled, _clip.x, _clip.y, _clip.w, _clip.h);
+        if (!spr)
+            return nullptr;
+
+        const int16_t baseW = (int16_t)std::min<int32_t>(_render.screenWidth, spr->width());
+        const int16_t baseH = (int16_t)std::min<int32_t>(_render.screenHeight, spr->height());
+
+        if (!_clip.enabled)
+        {
+            applyClipState(spr, true, 0, 0, baseW, baseH);
+            return spr;
+        }
+
+        const int32_t clipX1 = std::max<int32_t>(0, _clip.x);
+        const int32_t clipY1 = std::max<int32_t>(0, _clip.y);
+        const int32_t clipX2 = std::min<int32_t>(baseW, static_cast<int32_t>(_clip.x) + _clip.w);
+        const int32_t clipY2 = std::min<int32_t>(baseH, static_cast<int32_t>(_clip.y) + _clip.h);
+        const int16_t clipW = (int16_t)std::max<int32_t>(0, clipX2 - clipX1);
+        const int16_t clipH = (int16_t)std::max<int32_t>(0, clipY2 - clipY1);
+        applyClipState(spr, true, (int16_t)clipX1, (int16_t)clipY1, clipW, clipH);
         return spr;
     }
 
@@ -289,6 +307,12 @@ namespace pipgui
         if (w <= 0 || h <= 0)
             return;
 
+        if (logicalRotationActive() && !_flags.inSpritePass)
+        {
+            _flags.needRedraw = 1;
+            return;
+        }
+
         const detail::DirtyRect rect = {x, y, w, h};
 
         for (uint8_t i = 0; i < _dirty.count; ++i)
@@ -313,7 +337,7 @@ namespace pipgui
     {
         if (_dirty.count == 0)
             return;
-        if (_flags.screenTransition || _flags.errorActive || _flags.notifActive || _flags.toastActive)
+        if (_flags.screenTransition || _rotationAnim.active || _flags.errorActive || _flags.notifActive || _flags.toastActive)
         {
             _flags.needRedraw = 1;
             _dirty.count = 0;
@@ -331,6 +355,15 @@ namespace pipgui
         uint16_t *buf = (uint16_t *)_render.sprite.getBuffer();
         const int32_t stride = sw;
         const bool debugDirty = Debug::dirtyRectEnabled();
+
+        if (logicalRotationActive())
+        {
+            if (debugDirty)
+                Debug::clearRects();
+            presentSprite(0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight, "present");
+            _dirty.count = 0;
+            return;
+        }
 
         const auto clipRect = [&](const detail::DirtyRect &r, int16_t &x0, int16_t &y0, int16_t &w, int16_t &h) -> bool
         {

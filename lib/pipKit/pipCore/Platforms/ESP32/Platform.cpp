@@ -104,6 +104,24 @@ namespace pipcore::esp32
         return true;
     }
 
+    bool Platform::setDisplayRotation(uint8_t rotation) noexcept
+    {
+        if (!_displayConfigured || !_displayReady)
+        {
+            _lastError = PlatformError::InvalidDisplayConfig;
+            return false;
+        }
+
+        if (!_display.setRotation(rotation))
+        {
+            _lastError = PlatformError::DisplayIoFailed;
+            return false;
+        }
+
+        _lastError = PlatformError::None;
+        return true;
+    }
+
     pipcore::Display *Platform::display() noexcept
     {
         if (!_displayConfigured || !_displayReady)

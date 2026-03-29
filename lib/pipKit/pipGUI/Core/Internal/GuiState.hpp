@@ -89,16 +89,49 @@ namespace pipgui::detail
         BacklightHandler backlightHandler = nullptr;
         uint8_t brightness = 100;
         uint8_t brightnessMax = 100;
+        uint8_t physicalRotation = 0;
+        uint8_t rotation = 0;
     };
 
     struct RenderState
     {
         pipcore::Sprite sprite;
         pipcore::Sprite *activeSprite = nullptr;
+        uint16_t physicalWidth = 0;
+        uint16_t physicalHeight = 0;
         uint16_t screenWidth = 0;
         uint16_t screenHeight = 0;
         uint32_t bgColor = 0;
         uint16_t bgColor565 = 0;
+    };
+
+    struct AdaptivePreviewState
+    {
+        bool enabled = false;
+        uint16_t minWidth = 0;
+        uint16_t minHeight = 0;
+        uint32_t cycleMs = 3600;
+        uint32_t startMs = 0;
+        uint16_t lastPresentedW = 0;
+        uint16_t lastPresentedH = 0;
+        uint16_t *lineBuf = nullptr;
+        uint16_t lineBufCap = 0;
+    };
+
+    struct RotationState
+    {
+        bool active = false;
+        bool switched = false;
+        uint8_t from = 0;
+        uint8_t to = 0;
+        uint32_t startMs = 0;
+        uint32_t durationMs = 420;
+        uint16_t *snapshot = nullptr;
+        uint16_t snapshotW = 0;
+        uint16_t snapshotH = 0;
+        uint16_t snapshotStride = 0;
+        uint16_t *lineBuf = nullptr;
+        uint16_t lineBufCap = 0;
     };
 
     struct ClipState

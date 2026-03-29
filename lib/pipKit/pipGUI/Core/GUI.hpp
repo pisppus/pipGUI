@@ -169,6 +169,11 @@ namespace pipgui
         [[nodiscard]] uint8_t screenshotCount() const noexcept { return _shots.count; }
         [[nodiscard]] DrawScreenshotFluent drawScreenshot();
         InputState pollInput(Button &next, Button &prev);
+        void setAdaptivePreview(uint16_t minWidth, uint16_t minHeight, uint32_t cycleMs = 3600);
+        void clearAdaptivePreview() noexcept;
+        void setRotation(uint8_t rotation, uint32_t durationMs = 520);
+        [[nodiscard]] uint8_t screenRotation() const noexcept { return _disp.rotation; }
+        [[nodiscard]] bool rotationTransitionActive() const noexcept;
 
         // WiFi
         void requestWiFi(bool enabled) noexcept;
@@ -356,8 +361,24 @@ namespace pipgui
         detail::DrumRollCacheState _drumRollCache;
         detail::ScreenshotGalleryState _shots;
         detail::ScreenshotStreamState _shotStream;
+        detail::AdaptivePreviewState _adaptivePreview;
+        detail::RotationState _rotationAnim;
 
         uint32_t nowMs() const;
+        [[nodiscard]] bool adaptivePreviewActive() const noexcept;
+        [[nodiscard]] bool logicalRotationActive() const noexcept;
+        [[nodiscard]] uint8_t logicalRotationDelta() const noexcept;
+        [[nodiscard]] float presentationAngleRad(uint8_t rotation) const noexcept;
+        [[nodiscard]] bool presentOrthogonalRotatedSprite(const uint16_t *src, int16_t srcStride, int16_t srcW, int16_t srcH,
+                                                          uint8_t rotationDelta, const char *stage);
+        void serviceAdaptivePreview(uint32_t now) noexcept;
+        [[nodiscard]] bool presentAdaptivePreview(const char *stage);
+        void freeAdaptivePreviewBuffer(pipcore::Platform *plat) noexcept;
+        void freeRotationBuffer(pipcore::Platform *plat) noexcept;
+        [[nodiscard]] bool presentTransformedSprite(const uint16_t *src, int16_t srcStride, int16_t srcW, int16_t srcH,
+                                                    float angleRad, float scale, const char *stage);
+        void renderRotationTransition(uint32_t now);
+        [[nodiscard]] bool applyLogicalRotation(uint8_t rotation);
 
         void initFonts();
         void applyClip(int16_t x, int16_t y, int16_t w, int16_t h);

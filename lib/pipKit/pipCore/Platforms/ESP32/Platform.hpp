@@ -40,6 +40,7 @@ namespace pipcore::esp32
 
         [[nodiscard]] bool configDisplay(const DisplayConfig &cfg) noexcept override;
         [[nodiscard]] bool beginDisplay(uint8_t rotation) noexcept override;
+        [[nodiscard]] bool setDisplayRotation(uint8_t rotation) noexcept override;
         [[nodiscard]] pipcore::Display *display() noexcept override;
 
         [[nodiscard]] uint32_t freeHeapTotal() noexcept override;

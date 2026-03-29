@@ -13,6 +13,13 @@ namespace pipgui
     void GUI::loop()
     {
         uint32_t now = nowMs();
+        serviceAdaptivePreview(now);
+
+        if (rotationTransitionActive())
+        {
+            renderRotationTransition(now);
+            return;
+        }
 
         Debug::update();
 
@@ -265,6 +272,13 @@ namespace pipgui
                         updateListScreen(_screen.current);
                         renderStatusBar();
                         _flags.dirtyRedrawPending = 0;
+                        if (logicalRotationActive())
+                        {
+                            presentSprite(0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight, "present");
+                            _dirty.count = 0;
+                            Debug::clearRects();
+                            return;
+                        }
                         if (_dirty.count > 0)
                             flushDirty();
                         return;
@@ -275,6 +289,13 @@ namespace pipgui
                         updateTile(_screen.current, tile->selectedIndex);
                         renderStatusBar();
                         _flags.dirtyRedrawPending = 0;
+                        if (logicalRotationActive())
+                        {
+                            presentSprite(0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight, "present");
+                            _dirty.count = 0;
+                            Debug::clearRects();
+                            return;
+                        }
                         if (_dirty.count > 0)
                             flushDirty();
                         return;
@@ -285,6 +306,13 @@ namespace pipgui
                         renderCurrentScreenDirty(currentCb, _screen.current);
                         renderStatusBar();
                         _flags.dirtyRedrawPending = 0;
+                        if (logicalRotationActive())
+                        {
+                            presentSprite(0, 0, (int16_t)_render.screenWidth, (int16_t)_render.screenHeight, "present");
+                            _dirty.count = 0;
+                            Debug::clearRects();
+                            return;
+                        }
                         if (_dirty.count > 0)
                             flushDirty();
                         return;

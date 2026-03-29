@@ -6,6 +6,8 @@
 #include <pipGUI/Graphics/Utils/Colors.hpp>
 #include <pipGUI/Graphics/Utils/Easing.hpp>
 #include <pipCore/Platforms/Select.hpp>
+#include <cstring>
+#include <math.h>
 
 namespace pipgui
 {
@@ -102,6 +104,7 @@ namespace pipgui
         {
         public:
             bool begin(uint8_t) override { return false; }
+            bool setRotation(uint8_t) override { return false; }
             uint16_t width() const noexcept override { return 0; }
             uint16_t height() const noexcept override { return 0; }
             void fillScreen565(uint16_t) override {}
@@ -139,6 +142,20 @@ namespace pipgui
     {
         if (!_disp.display || !_flags.spriteEnabled || w <= 0 || h <= 0)
             return false;
+
+        if (adaptivePreviewActive())
+            return presentAdaptivePreview(stage);
+
+        if (logicalRotationActive())
+        {
+            const auto *src = static_cast<const uint16_t *>(_render.sprite.getBuffer());
+            return presentOrthogonalRotatedSprite(src,
+                                                  _render.sprite.width(),
+                                                  (int16_t)_render.screenWidth,
+                                                  (int16_t)_render.screenHeight,
+                                                  logicalRotationDelta(),
+                                                  stage);
+        }
 
         _render.sprite.writeToDisplay(*_disp.display, x, y, w, h);
         reportPlatformErrorOnce(stage);
@@ -332,7 +349,8 @@ namespace pipgui
         freeScreenshotGallery(plat);
         freeScreenshotStream(plat);
 #endif
-
+        freeAdaptivePreviewBuffer(plat);
+        freeRotationBuffer(plat);
         _render.sprite.deleteSprite();
         _flags.spriteEnabled = 0;
     }
@@ -508,7 +526,11 @@ namespace pipgui
 
     void GUI::resetDisplayRuntime() noexcept
     {
+        freeAdaptivePreviewBuffer(platform());
+        freeRotationBuffer(platform());
         _disp.display = nullptr;
+        _render.physicalWidth = 0;
+        _render.physicalHeight = 0;
         _render.screenWidth = 0;
         _render.screenHeight = 0;
         _render.bgColor = 0;
@@ -688,6 +710,8 @@ namespace pipgui
             return;
         }
         clearReportedPlatformError();
+        _disp.physicalRotation = rotation & 3U;
+        _disp.rotation = _disp.physicalRotation;
 
         _disp.display = plat->display();
         if (!_disp.display)
@@ -695,8 +719,10 @@ namespace pipgui
             return;
         }
 
-        _render.screenWidth = _disp.display->width();
-        _render.screenHeight = _disp.display->height();
+        _render.physicalWidth = _disp.display->width();
+        _render.physicalHeight = _disp.display->height();
+        _render.screenWidth = _render.physicalWidth;
+        _render.screenHeight = _render.physicalHeight;
         _render.bgColor = bgColor;
         _render.bgColor565 = bgColor;
 
@@ -722,6 +748,546 @@ namespace pipgui
 
         initFonts();
 
+    }
+
+    void GUI::setAdaptivePreview(uint16_t minWidth, uint16_t minHeight, uint32_t cycleMs)
+    {
+        _adaptivePreview.enabled = true;
+        _adaptivePreview.minWidth = minWidth;
+        _adaptivePreview.minHeight = minHeight;
+        _adaptivePreview.cycleMs = cycleMs ? cycleMs : 3600;
+        _adaptivePreview.startMs = 0;
+        requestRedraw();
+    }
+
+    void GUI::clearAdaptivePreview() noexcept
+    {
+        _adaptivePreview.enabled = false;
+        _adaptivePreview.startMs = 0;
+        _adaptivePreview.lastPresentedW = 0;
+        _adaptivePreview.lastPresentedH = 0;
+        if (_render.physicalWidth > 0 && _render.physicalHeight > 0)
+        {
+            _render.screenWidth = _render.physicalWidth;
+            _render.screenHeight = _render.physicalHeight;
+        }
+        _dirty.count = 0;
+        _flags.dirtyRedrawPending = 0;
+        _flags.needRedraw = 1;
+    }
+
+    bool GUI::adaptivePreviewActive() const noexcept
+    {
+        return _adaptivePreview.enabled &&
+               _render.physicalWidth > 0 &&
+               _render.physicalHeight > 0;
+    }
+
+    bool GUI::logicalRotationActive() const noexcept
+    {
+        return ((_disp.rotation - _disp.physicalRotation) & 3U) != 0U;
+    }
+
+    uint8_t GUI::logicalRotationDelta() const noexcept
+    {
+        return static_cast<uint8_t>((_disp.rotation - _disp.physicalRotation) & 3U);
+    }
+
+    float GUI::presentationAngleRad(uint8_t rotation) const noexcept
+    {
+        const uint8_t delta = (rotation - _disp.physicalRotation) & 3U;
+        float angleDeg = 0.0f;
+        if (delta == 1U)
+            angleDeg = 90.0f;
+        else if (delta == 2U)
+            angleDeg = 180.0f;
+        else if (delta == 3U)
+            angleDeg = -90.0f;
+        return angleDeg * (3.1415926535f / 180.0f);
+    }
+
+    bool GUI::presentOrthogonalRotatedSprite(const uint16_t *src, int16_t srcStride, int16_t srcW, int16_t srcH,
+                                             uint8_t rotationDelta, const char *stage)
+    {
+        if (!_disp.display || !src || srcStride <= 0 || srcW <= 0 || srcH <= 0)
+            return false;
+
+        const uint16_t physW = _disp.display->width();
+        const uint16_t physH = _disp.display->height();
+        if (physW == 0 || physH == 0)
+            return false;
+
+        if (rotationDelta == 0)
+        {
+            _disp.display->writeRect565(0, 0, srcW, srcH, src, srcStride);
+            reportPlatformErrorOnce(stage);
+            pipcore::Platform *plat = pipcore::GetPlatform();
+            return !plat || plat->lastError() == pipcore::PlatformError::None;
+        }
+
+        if (_rotationAnim.lineBufCap < physW)
+        {
+            pipcore::Platform *plat = platform();
+            uint16_t *newBuf = plat ? static_cast<uint16_t *>(plat->alloc(static_cast<size_t>(physW) * sizeof(uint16_t), pipcore::AllocCaps::PreferInternal)) : nullptr;
+            if (!newBuf)
+                newBuf = plat ? static_cast<uint16_t *>(plat->alloc(static_cast<size_t>(physW) * sizeof(uint16_t), pipcore::AllocCaps::Default)) : nullptr;
+            if (newBuf)
+            {
+                freeRotationBuffer(plat);
+                _rotationAnim.lineBuf = newBuf;
+                _rotationAnim.lineBufCap = physW;
+            }
+        }
+
+        if (!_rotationAnim.lineBuf || _rotationAnim.lineBufCap < physW)
+            return false;
+
+        for (int16_t y = 0; y < physH; ++y)
+        {
+            switch (rotationDelta & 3U)
+            {
+            case 1:
+            {
+                const int16_t srcX = y;
+                for (int16_t x = 0; x < physW; ++x)
+                    _rotationAnim.lineBuf[x] = src[(size_t)(srcH - 1 - x) * (size_t)srcStride + (size_t)srcX];
+                break;
+            }
+            case 2:
+            {
+                const int16_t srcY = srcH - 1 - y;
+                const uint16_t *srcRow = src + (size_t)srcY * (size_t)srcStride;
+                for (int16_t x = 0; x < physW; ++x)
+                    _rotationAnim.lineBuf[x] = srcRow[srcW - 1 - x];
+                break;
+            }
+            case 3:
+            {
+                const int16_t srcX = srcW - 1 - y;
+                for (int16_t x = 0; x < physW; ++x)
+                    _rotationAnim.lineBuf[x] = src[(size_t)x * (size_t)srcStride + (size_t)srcX];
+                break;
+            }
+            }
+
+            _disp.display->writeRect565(0, y, physW, 1, _rotationAnim.lineBuf, physW);
+        }
+
+        reportPlatformErrorOnce(stage);
+        pipcore::Platform *plat = pipcore::GetPlatform();
+        return !plat || plat->lastError() == pipcore::PlatformError::None;
+    }
+
+    void GUI::freeAdaptivePreviewBuffer(pipcore::Platform *plat) noexcept
+    {
+        if (_adaptivePreview.lineBuf && plat)
+            plat->free(_adaptivePreview.lineBuf);
+        _adaptivePreview.lineBuf = nullptr;
+        _adaptivePreview.lineBufCap = 0;
+        _adaptivePreview.lastPresentedW = 0;
+        _adaptivePreview.lastPresentedH = 0;
+    }
+
+    void GUI::freeRotationBuffer(pipcore::Platform *plat) noexcept
+    {
+        if (_rotationAnim.snapshot && plat)
+            plat->free(_rotationAnim.snapshot);
+        _rotationAnim.snapshot = nullptr;
+        _rotationAnim.snapshotW = 0;
+        _rotationAnim.snapshotH = 0;
+        _rotationAnim.snapshotStride = 0;
+        if (_rotationAnim.lineBuf && plat)
+            plat->free(_rotationAnim.lineBuf);
+        _rotationAnim.lineBuf = nullptr;
+        _rotationAnim.lineBufCap = 0;
+    }
+
+    void GUI::serviceAdaptivePreview(uint32_t now) noexcept
+    {
+        if (!adaptivePreviewActive())
+            return;
+
+        if (_adaptivePreview.startMs == 0)
+            _adaptivePreview.startMs = now;
+
+        const uint16_t maxW = _render.physicalWidth;
+        const uint16_t maxH = _render.physicalHeight;
+        uint16_t minW = _adaptivePreview.minWidth;
+        uint16_t minH = _adaptivePreview.minHeight;
+
+        if (minW == 0 || minW > maxW)
+            minW = maxW;
+        if (minH == 0 || minH > maxH)
+            minH = maxH;
+
+        const uint32_t cycleMs = _adaptivePreview.cycleMs ? _adaptivePreview.cycleMs : 3600;
+        const uint32_t elapsedMs = now - _adaptivePreview.startMs;
+        const float phase = static_cast<float>(elapsedMs % cycleMs) / static_cast<float>(cycleMs);
+        const float pingPong = 0.5f + 0.5f * cosf(phase * 6.28318530718f);
+
+        const uint16_t targetW = static_cast<uint16_t>(lroundf(static_cast<float>(minW) + (static_cast<float>(maxW - minW) * pingPong)));
+        const uint16_t targetH = static_cast<uint16_t>(lroundf(static_cast<float>(minH) + (static_cast<float>(maxH - minH) * pingPong)));
+
+        if (_render.screenWidth == targetW && _render.screenHeight == targetH)
+            return;
+
+        _render.screenWidth = targetW;
+        _render.screenHeight = targetH;
+        _dirty.count = 0;
+        _flags.dirtyRedrawPending = 0;
+        _flags.needRedraw = 1;
+        Debug::clearRects();
+    }
+
+    bool GUI::presentAdaptivePreview(const char *stage)
+    {
+        if (!_disp.display || !_flags.spriteEnabled)
+            return false;
+
+        const auto *src = static_cast<const uint16_t *>(_render.sprite.getBuffer());
+        const uint16_t virtW = _render.screenWidth;
+        const uint16_t virtH = _render.screenHeight;
+        const uint16_t physW = _render.physicalWidth;
+        const uint16_t physH = _render.physicalHeight;
+        const int16_t stride = _render.sprite.width();
+        if (!src || virtW == 0 || virtH == 0 || physW == 0 || physH == 0 || stride <= 0)
+            return false;
+
+        if (virtW == physW && virtH == physH)
+        {
+            _render.sprite.writeToDisplay(*_disp.display, 0, 0, (int16_t)physW, (int16_t)physH);
+            _adaptivePreview.lastPresentedW = virtW;
+            _adaptivePreview.lastPresentedH = virtH;
+            reportPlatformErrorOnce(stage);
+            pipcore::Platform *plat = pipcore::GetPlatform();
+            return !plat || plat->lastError() == pipcore::PlatformError::None;
+        }
+
+        if (_adaptivePreview.lineBufCap < physW)
+        {
+            pipcore::Platform *plat = platform();
+            uint16_t *newBuf = plat ? static_cast<uint16_t *>(plat->alloc(static_cast<size_t>(physW) * sizeof(uint16_t), pipcore::AllocCaps::PreferInternal)) : nullptr;
+            if (!newBuf)
+                newBuf = plat ? static_cast<uint16_t *>(plat->alloc(static_cast<size_t>(physW) * sizeof(uint16_t), pipcore::AllocCaps::Default)) : nullptr;
+            if (newBuf)
+            {
+                freeAdaptivePreviewBuffer(plat);
+                _adaptivePreview.lineBuf = newBuf;
+                _adaptivePreview.lineBufCap = physW;
+            }
+        }
+
+        const bool canClearStrips = (_adaptivePreview.lineBuf && _adaptivePreview.lineBufCap >= physW);
+        if (canClearStrips)
+        {
+            const uint16_t bg = __builtin_bswap16(_render.bgColor565);
+            for (uint16_t x = 0; x < physW; ++x)
+                _adaptivePreview.lineBuf[x] = bg;
+
+            if (_adaptivePreview.lastPresentedW == 0 || _adaptivePreview.lastPresentedH == 0)
+            {
+                for (uint16_t y = 0; y < physH; ++y)
+                {
+                    _disp.display->writeRect565(0, static_cast<int16_t>(y), static_cast<int16_t>(physW), 1,
+                                                _adaptivePreview.lineBuf, static_cast<int32_t>(physW));
+                }
+            }
+            else
+            {
+                if (virtW < _adaptivePreview.lastPresentedW)
+                {
+                    const int16_t clearW = static_cast<int16_t>(_adaptivePreview.lastPresentedW - virtW);
+                    const int16_t clearH = static_cast<int16_t>(std::max<uint16_t>(_adaptivePreview.lastPresentedH, virtH));
+                    for (int16_t y = 0; y < clearH; ++y)
+                    {
+                        _disp.display->writeRect565((int16_t)virtW, y, clearW, 1,
+                                                    _adaptivePreview.lineBuf, clearW);
+                    }
+                }
+
+                if (virtH < _adaptivePreview.lastPresentedH)
+                {
+                    const int16_t clearW = static_cast<int16_t>(std::max<uint16_t>(_adaptivePreview.lastPresentedW, virtW));
+                    const int16_t clearH = static_cast<int16_t>(_adaptivePreview.lastPresentedH - virtH);
+                    for (int16_t y = 0; y < clearH; ++y)
+                    {
+                        _disp.display->writeRect565(0, (int16_t)(virtH + y), clearW, 1,
+                                                    _adaptivePreview.lineBuf, clearW);
+                    }
+                }
+            }
+        }
+        else
+        {
+            _disp.display->fillScreen565(_render.bgColor565);
+        }
+
+        _disp.display->writeRect565(0, 0, (int16_t)virtW, (int16_t)virtH, src, stride);
+        _adaptivePreview.lastPresentedW = virtW;
+        _adaptivePreview.lastPresentedH = virtH;
+
+        reportPlatformErrorOnce(stage);
+        pipcore::Platform *plat = pipcore::GetPlatform();
+        return !plat || plat->lastError() == pipcore::PlatformError::None;
+    }
+
+    bool GUI::presentTransformedSprite(const uint16_t *src, int16_t srcStride, int16_t srcW, int16_t srcH,
+                                       float angleRad, float scale, const char *stage)
+    {
+        if (!_disp.display || !src || srcStride <= 0 || srcW <= 0 || srcH <= 0)
+            return false;
+
+        const uint16_t physW = _disp.display->width();
+        const uint16_t physH = _disp.display->height();
+        if (physW == 0 || physH == 0)
+            return false;
+
+        if (_rotationAnim.lineBufCap < physW)
+        {
+            pipcore::Platform *plat = platform();
+            uint16_t *newBuf = plat ? static_cast<uint16_t *>(plat->alloc(static_cast<size_t>(physW) * sizeof(uint16_t), pipcore::AllocCaps::PreferInternal)) : nullptr;
+            if (!newBuf)
+                newBuf = plat ? static_cast<uint16_t *>(plat->alloc(static_cast<size_t>(physW) * sizeof(uint16_t), pipcore::AllocCaps::Default)) : nullptr;
+            if (newBuf)
+            {
+                freeRotationBuffer(plat);
+                _rotationAnim.lineBuf = newBuf;
+                _rotationAnim.lineBufCap = physW;
+            }
+        }
+
+        if (!_rotationAnim.lineBuf || _rotationAnim.lineBufCap < physW)
+            return false;
+
+        const float safeScale = (scale < 0.08f) ? 0.08f : ((scale > 1.15f) ? 1.15f : scale);
+        const float invScale = 1.0f / safeScale;
+        const float cosA = cosf(angleRad);
+        const float sinA = sinf(angleRad);
+        const float srcCx = ((float)srcW - 1.0f) * 0.5f;
+        const float srcCy = ((float)srcH - 1.0f) * 0.5f;
+        const float dstCx = ((float)physW - 1.0f) * 0.5f;
+        const float dstCy = ((float)physH - 1.0f) * 0.5f;
+        const uint16_t bg = __builtin_bswap16(_render.bgColor565);
+
+        for (uint16_t x = 0; x < physW; ++x)
+            _rotationAnim.lineBuf[x] = bg;
+
+        for (uint16_t y = 0; y < physH; ++y)
+        {
+            const float dy = ((float)y - dstCy) * invScale;
+            float srcXf = (((0.0f - dstCx) * invScale) * cosA + dy * sinA) + srcCx;
+            float srcYf = (-((0.0f - dstCx) * invScale) * sinA + dy * cosA) + srcCy;
+            const float stepX = invScale * cosA;
+            const float stepY = -invScale * sinA;
+            for (uint16_t x = 0; x < physW; ++x)
+            {
+                const int16_t srcXi = (int16_t)lroundf(srcXf);
+                const int16_t srcYi = (int16_t)lroundf(srcYf);
+                if (srcXi < 0 || srcYi < 0 || srcXi >= srcW || srcYi >= srcH)
+                    _rotationAnim.lineBuf[x] = bg;
+                else
+                    _rotationAnim.lineBuf[x] = src[(size_t)srcYi * (size_t)srcStride + (size_t)srcXi];
+                srcXf += stepX;
+                srcYf += stepY;
+            }
+
+            _disp.display->writeRect565(0, (int16_t)y, (int16_t)physW, 1, _rotationAnim.lineBuf, physW);
+        }
+
+        reportPlatformErrorOnce(stage);
+        pipcore::Platform *plat = pipcore::GetPlatform();
+        return !plat || plat->lastError() == pipcore::PlatformError::None;
+    }
+
+    bool GUI::applyLogicalRotation(uint8_t rotation)
+    {
+        _disp.rotation = rotation & 3U;
+        const bool quarterTurn = (((_disp.rotation - _disp.physicalRotation) & 1U) != 0U);
+        _render.screenWidth = quarterTurn ? _render.physicalHeight : _render.physicalWidth;
+        _render.screenHeight = quarterTurn ? _render.physicalWidth : _render.physicalHeight;
+
+        _render.sprite.deleteSprite();
+        _flags.spriteEnabled = _render.sprite.createSprite((int16_t)_render.screenWidth, (int16_t)_render.screenHeight);
+        _render.activeSprite = _flags.spriteEnabled ? &_render.sprite : nullptr;
+        _clip = {};
+        _dirty.count = 0;
+        return _flags.spriteEnabled;
+    }
+
+    void GUI::setRotation(uint8_t rotation, uint32_t durationMs)
+    {
+        rotation &= 3U;
+
+        if (_rotationAnim.active)
+        {
+            _rotationAnim.active = false;
+            _rotationAnim.switched = false;
+            freeRotationBuffer(platform());
+        }
+
+        if (!_disp.display || !_flags.spriteEnabled ||
+            _flags.bootActive || _flags.errorActive || _flags.notifActive ||
+            _flags.popupActive || _flags.toastActive || _flags.screenTransition)
+        {
+            if (_disp.rotation != rotation)
+            {
+                if (applyLogicalRotation(rotation))
+                    requestRedraw();
+            }
+            return;
+        }
+
+        if (_disp.rotation == rotation)
+            return;
+
+        const uint16_t *src = static_cast<const uint16_t *>(_render.sprite.getBuffer());
+        const int16_t stride = _render.sprite.width();
+        const int16_t height = _render.sprite.height();
+        const size_t bytes = (src && stride > 0 && height > 0)
+                                 ? (size_t)stride * (size_t)height * sizeof(uint16_t)
+                                 : 0;
+
+        pipcore::Platform *plat = platform();
+        uint16_t *snapshot = nullptr;
+        if (bytes > 0 && plat)
+        {
+            snapshot = static_cast<uint16_t *>(plat->alloc(bytes, pipcore::AllocCaps::Default));
+            if (snapshot)
+                memcpy(snapshot, src, bytes);
+        }
+
+        const ScreenCallback currentCb = (_screen.current < _screen.capacity && _screen.callbacks)
+                                             ? _screen.callbacks[_screen.current]
+                                             : nullptr;
+
+        if (_screen.current < _screen.capacity)
+        {
+            if (currentCb)
+                renderScreenToMainSprite(currentCb, _screen.current);
+            else
+                clear(_render.bgColor565 ? _render.bgColor565 : (uint16_t)_render.bgColor);
+            renderStatusBar();
+        }
+
+        _rotationAnim.active = true;
+        _rotationAnim.switched = false;
+        _rotationAnim.from = _disp.rotation;
+        _rotationAnim.to = rotation;
+        _rotationAnim.startMs = nowMs();
+        _rotationAnim.durationMs = durationMs ? durationMs : 520;
+        _rotationAnim.snapshot = snapshot;
+        _rotationAnim.snapshotW = (uint16_t)_render.screenWidth;
+        _rotationAnim.snapshotH = (uint16_t)_render.screenHeight;
+        _rotationAnim.snapshotStride = (uint16_t)stride;
+        _dirty.count = 0;
+        _flags.dirtyRedrawPending = 0;
+        _flags.needRedraw = 0;
+        Debug::clearRects();
+    }
+
+    bool GUI::rotationTransitionActive() const noexcept
+    {
+        return _rotationAnim.active;
+    }
+
+    void GUI::renderRotationTransition(uint32_t now)
+    {
+        if (!_rotationAnim.active || !_disp.display || !_flags.spriteEnabled)
+            return;
+
+        const uint32_t duration = _rotationAnim.durationMs ? _rotationAnim.durationMs : 1;
+        uint32_t elapsed = now - _rotationAnim.startMs;
+        if (elapsed > duration)
+            elapsed = duration;
+
+        const float t = static_cast<float>(elapsed) / static_cast<float>(duration);
+        const bool switchedThisFrame = (!_rotationAnim.switched && t >= 0.5f);
+        if (!_rotationAnim.switched && t >= 0.5f)
+        {
+            if (!applyLogicalRotation(_rotationAnim.to))
+            {
+                _rotationAnim.active = false;
+                _rotationAnim.switched = false;
+                freeRotationBuffer(platform());
+                requestRedraw();
+                return;
+            }
+
+            _rotationAnim.switched = true;
+
+            const ScreenCallback currentCb = (_screen.current < _screen.capacity && _screen.callbacks)
+                                                 ? _screen.callbacks[_screen.current]
+                                                 : nullptr;
+
+            if (_screen.current < _screen.capacity)
+            {
+                if (currentCb)
+                    renderScreenToMainSprite(currentCb, _screen.current);
+                else
+                    clear(_render.bgColor565 ? _render.bgColor565 : (uint16_t)_render.bgColor);
+                renderStatusBar();
+            }
+            else
+            {
+                clear(_render.bgColor565 ? _render.bgColor565 : (uint16_t)_render.bgColor);
+            }
+        }
+
+        const bool shouldRenderLiveFrame = (_rotationAnim.switched && !switchedThisFrame);
+        const ScreenCallback currentCb = (_screen.current < _screen.capacity && _screen.callbacks)
+                                             ? _screen.callbacks[_screen.current]
+                                             : nullptr;
+
+        if (shouldRenderLiveFrame && _screen.current < _screen.capacity)
+        {
+            if (currentCb)
+                renderScreenToMainSprite(currentCb, _screen.current);
+            else
+                clear(_render.bgColor565 ? _render.bgColor565 : (uint16_t)_render.bgColor);
+            renderStatusBar();
+        }
+
+        const float startAngle = presentationAngleRad(_rotationAnim.from);
+        const float endAngle = presentationAngleRad(_rotationAnim.to);
+        float deltaAngle = endAngle - startAngle;
+        if (deltaAngle > 3.1415926535f)
+            deltaAngle -= 6.28318530718f;
+        else if (deltaAngle < -3.1415926535f)
+            deltaAngle += 6.28318530718f;
+        const float eased = detail::motion::easeInOutCubic(t);
+        const float angle = startAngle + (deltaAngle * eased);
+        const float scale = 1.0f - (0.10f * sinf(t * 3.1415926535f));
+        
+        const uint16_t *src = (!_rotationAnim.switched || switchedThisFrame) && _rotationAnim.snapshot
+                                  ? _rotationAnim.snapshot
+                                  : static_cast<const uint16_t *>(_render.sprite.getBuffer());
+        const int16_t srcStride = ((!_rotationAnim.switched || switchedThisFrame) && _rotationAnim.snapshot)
+                                      ? (int16_t)_rotationAnim.snapshotStride
+                                      : _render.sprite.width();
+        const int16_t srcW = ((!_rotationAnim.switched || switchedThisFrame) && _rotationAnim.snapshot)
+                                 ? (int16_t)_rotationAnim.snapshotW
+                                 : (int16_t)_render.screenWidth;
+        const int16_t srcH = ((!_rotationAnim.switched || switchedThisFrame) && _rotationAnim.snapshot)
+                                 ? (int16_t)_rotationAnim.snapshotH
+                                 : (int16_t)_render.screenHeight;
+        (void)presentTransformedSprite(src,
+                                       srcStride,
+                                       srcW,
+                                       srcH,
+                                       angle,
+                                       scale,
+                                       "present");
+
+        if (elapsed >= duration)
+        {
+            _rotationAnim.active = false;
+            _rotationAnim.switched = false;
+            freeRotationBuffer(platform());
+            _dirty.count = 0;
+            _flags.dirtyRedrawPending = 0;
+            _flags.needRedraw = 1;
+            Debug::clearRects();
+        }
     }
 
     void GUI::initFonts()

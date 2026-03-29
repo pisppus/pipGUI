@@ -199,6 +199,20 @@ namespace pipgui
         if (!_disp.display || !_flags.spriteEnabled || w <= 0 || h <= 0)
             return false;
 
+        if (adaptivePreviewActive())
+            return presentAdaptivePreview(stage);
+
+        if (logicalRotationActive())
+        {
+            const auto *buf = static_cast<const uint16_t *>(_render.sprite.getBuffer());
+            return presentOrthogonalRotatedSprite(buf,
+                                                  _render.sprite.width(),
+                                                  (int16_t)_render.screenWidth,
+                                                  (int16_t)_render.screenHeight,
+                                                  logicalRotationDelta(),
+                                                  stage);
+        }
+
         const auto *buf = static_cast<const uint16_t *>(_render.sprite.getBuffer());
         const int16_t srcW = _render.sprite.width();
         const int16_t srcH = _render.sprite.height();

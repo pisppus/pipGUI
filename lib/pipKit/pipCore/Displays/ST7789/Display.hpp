@@ -37,6 +37,7 @@ namespace pipcore::st7789
         }
 
         [[nodiscard]] bool begin(uint8_t rotation) override { return _drv.begin(rotation); }
+        [[nodiscard]] bool setRotation(uint8_t rotation) override { return _drv.setRotation(rotation); }
         [[nodiscard]] uint16_t width() const noexcept override { return _drv.width(); }
         [[nodiscard]] uint16_t height() const noexcept override { return _drv.height(); }
         void reset() noexcept { _drv.reset(); }

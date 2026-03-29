@@ -29,9 +29,16 @@ namespace
 #define PIPGUI_DEMO_BACKLIGHT_PIN 255
 #endif
 
+#ifndef PIPGUI_DEMO_ADAPTIVE_PREVIEW
+#define PIPGUI_DEMO_ADAPTIVE_PREVIEW 0
+#endif
+
   constexpr uint8_t kBtnNextPin = (uint8_t)PIPGUI_DEMO_BTN_NEXT_PIN;
   constexpr uint8_t kBtnPrevPin = (uint8_t)PIPGUI_DEMO_BTN_PREV_PIN;
   constexpr uint8_t kBacklightPin = (uint8_t)PIPGUI_DEMO_BACKLIGHT_PIN;
+  constexpr uint16_t kAdaptivePreviewMinW = 240;
+  constexpr uint16_t kAdaptivePreviewMinH = 135;
+  constexpr uint32_t kAdaptivePreviewCycleMs = 7200;
 
   static_assert(kBtnNextPin != kBtnPrevPin, "Buttons must be on different pins");
   static_assert(kBacklightPin == 255 || (kBacklightPin != kBtnNextPin && kBacklightPin != kBtnPrevPin),
@@ -371,6 +378,30 @@ bool isTileMenuScreen(uint8_t screenId)
   return screenId == tileMenu || screenId == tileMenuLayout || screenId == tileMenu4Cols;
 }
 
+void serviceSerialRotation()
+{
+  while (Serial.available() > 0)
+  {
+    const int ch = Serial.read();
+    if (ch < 0)
+      return;
+
+    if (ch >= '0' && ch <= '3')
+    {
+      const uint8_t rotation = (uint8_t)(ch - '0');
+      ui.setRotation(rotation);
+      Serial.print("rotation -> ");
+      Serial.println((unsigned)rotation);
+      continue;
+    }
+
+    if (ch == '\r' || ch == '\n' || ch == ' ' || ch == '\t')
+      continue;
+
+    Serial.println("rotation: use 0..3");
+  }
+}
+
 
 #include "screens/demo_updates.hpp"
 
@@ -387,6 +418,9 @@ void setup()
       .size(240, 320);
 
   ui.begin(3);
+#if (PIPGUI_DEMO_ADAPTIVE_PREVIEW != 0)
+  ui.setAdaptivePreview(kAdaptivePreviewMinW, kAdaptivePreviewMinH, kAdaptivePreviewCycleMs);
+#endif
   ui.setScreenAnim(SlideY, 320);
   #if (PIPGUI_STATUS_BAR != 0)
   ui.configStatusBar()
@@ -411,6 +445,8 @@ void setup()
 
 void loop()
 {
+  serviceSerialRotation();
+
   const auto input = ui.pollInput(btnNext, btnPrev);
   const uint32_t nowMs = millis();
   const bool nextPressed = input.nextPressed;

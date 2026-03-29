@@ -110,6 +110,11 @@ namespace pipcore
             return false;
         }
 
+        [[nodiscard]] virtual bool setDisplayRotation(uint8_t) noexcept
+        {
+            return false;
+        }
+
         [[nodiscard]] virtual Display *display() noexcept { return nullptr; }
 
         [[nodiscard]] virtual uint32_t freeHeapTotal() noexcept { return 0; }
